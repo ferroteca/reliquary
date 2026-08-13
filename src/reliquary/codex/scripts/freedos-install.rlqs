@@ -53,6 +53,14 @@ phase formatting timeout=5m deadline=20m {
     wait   "We are now ready to install FreeDOS 1.4."
     select "Yes"
     wait   "Installation of FreeDOS 1.4 is now complete."
+    eject  cdrom0                       # before the reboot, not after:
+                                        # the machine boots cdrom0
+                                        # first, so the disk is only
+                                        # reached once the drive is
+                                        # empty. Ejecting here rather
+                                        # than after "Yes" keeps it
+                                        # off the reboot's critical
+                                        # path.
     select "Yes"
     goto hd-boot
 }
@@ -69,6 +77,7 @@ phase shutdown {
     enter "fdapm poweroff"
     wait  machine=stopped timeout=2m    # non-default channel, named;
                                         # a bare string is the screen
-    eject cdrom0                        # leave the machine as found
-    finish
+    finish                              # cdrom0 was ejected in
+                                        # formatting, so the machine
+                                        # is already as found
 }

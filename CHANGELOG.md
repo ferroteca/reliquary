@@ -323,6 +323,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The FreeDOS codex blueprint boots the installer medium first.**
+  `boot` becomes `["cdrom0", "hdd0"]`, and the install script ejects
+  the CD at the completion dialog rather than at shutdown. The old
+  `["hdd0", "cdrom0"]` relied on firmware falling through a disk it
+  cannot boot, which is not portable: both backends skip a blank
+  disk and an empty optical slot, but only SeaBIOS moves past a disk
+  partitioned without an active partition. VirtualBox stops there —
+  the state every installer leaves before its reboot — so the
+  install appeared to work and hung on its second boot. Now no boot
+  depends on falling past a disk. **A blueprint already seeded into
+  a home keeps the old order**, since `seed-blueprint` never
+  overwrites: delete `blueprints/freedos.rlqb` and re-seed to pick
+  this up. [The blueprint reference](docs/blueprint-reference.md)
+  carries the measured behaviour under `boot`.
+
 - **The quiescence guard sizes itself to the cadence it measures.**
   Decoration is recognized by recurrence — three changes to a cell
   inside a one-second window — which was a sample count wearing a

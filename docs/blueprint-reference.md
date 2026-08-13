@@ -643,21 +643,53 @@ order.
 
 Every entry must reference a declared, enabled drive, and entries
 are unique by slot: naming the same slot twice — in either
-spelling — fails validation. An empty
-or non-bootable drive is a valid entry: firmware falls through it
-to the next entry. This is the standard install pattern —
-`["hdd0", "cdrom0"]` with a blank `hdd0` and an empty `cdrom0`
-falls through to the installer CD while a script has one attached,
-and boots the installed hard disk afterward, with no boot-order
-change needed. Scripts may still reorder boot devices with the
+spelling — fails validation. An empty or non-bootable drive is a
+valid entry, and firmware is *expected* to fall through it to the
+next entry. Scripts may still reorder boot devices with the
 [`boot`](spec/script-spec.md#boot) verb while the machine is stopped.
 When omitted, the default order is: the slot-0 floppy image if
 declared, else the slot-0 hard disk, else the first CD-ROM; the
 resolved order appears in the state.
 
+### Fallthrough is the firmware's, and it is not uniform
+
+**Do not rely on a hard disk falling through to a later entry.**
+Whether firmware moves on from an unbootable device is the
+firmware's own behaviour, not something Reliquary implements or can
+enforce, and the backends measured so far disagree about it:
+
+| the entry tried | QEMU (SeaBIOS) | VirtualBox |
+|---|---|---|
+| blank hard disk, no partition table | falls through | falls through |
+| partitioned disk with no *active* partition | falls through | **stops** |
+| empty optical drive | falls through | falls through |
+
+VirtualBox prints `No active partition. Trying next boot device...`
+and then goes no further, so a machine reaches that state once an
+installer has partitioned the disk but not yet made it bootable.
+
+**This makes `["hdd0", "cdrom0"]` the wrong order for an install
+that reboots.** It appears to work — a blank disk falls through and
+the installer CD boots — and then fails on the reboot *after*
+partitioning, on some backends only. Prefer the CD first for the
+whole install and eject it when the disk is ready:
+
+```json
+{"boot": ["cdrom0", "hdd0"]}
+```
+
+Every boot then takes the CD while one is attached, and once a
+script ejects it the empty optical slot is skipped and the
+installed disk boots — neither step depending on falling past a
+disk. This is the portable shape; `["hdd0", "cdrom0"]` is fine for
+a machine that never needs to boot an installer twice.
+
 Backends differ in how faithfully they honor multi-entry boot
-orders; a backend that cannot honor the declared order reports a
-capability error rather than silently booting from something else.
+orders more generally; a backend that cannot honor the declared
+order reports a capability error rather than silently booting from
+something else. That check covers what a backend can *express*, not
+what its firmware does when a device turns out to be unbootable —
+which is why the table above is a caution rather than a refusal.
 
 ---
 
