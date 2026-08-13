@@ -32,17 +32,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recognizer — then `agentless-display` claimed. Opt-in FreeDOS
   integration: `RELIQUARY_INTEGRATION=1` with
   `tests.test_freedos_virtualbox_integration` (pins
-  `backend: virtualbox` on the seeded blueprint). The VGA 8×16
-  glyph bank is curated from the host QEMU vgabios by
-  `tools/extract_vga_font.py`.
+  `backend: virtualbox` on the seeded blueprint). Screens are read
+  through the fonts the host's own VirtualBox paints with, extracted
+  on demand and cached rather than vendored.
 
   **Demonstrated against a live VirtualBox on 2026-08-13**: the
   unmodified codex script installs FreeDOS 1.4 from the LiveCD,
   partitions, reboots, formats, installs, boots the installed
   system to `C:\>`, and powers the guest off — then the verify and
-  ready scripts reboot it and hand it over. Six defects were found
-  and fixed in the sitting that got there, each listed in this
-  release's Fixed section.
+  ready scripts reboot it and hand it over. The defects that first
+  live run turned up are in this release's Fixed section.
 
 - **Fixed-font text-screen recognition** (F51, cut from F3 with
   F50/F52). `text_recognize` turns a PNG framebuffer into the
@@ -316,131 +315,115 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- **The shipped glyph bank is the project's own font again.**
-  `fonts/cp437_8x16.bin` had become 4096 bytes carved out of a host's
-  **QEMU** vgabios, while `REUSE.toml` recorded it as Paul
-  Galbraith's, `GPL-3.0-only` — a claim of ownership over bytes the
-  project did not author, and material that fails D82's incoming test
-  (*could this ship inside a proprietary product?*). It is once more
-  produced by `tools/gen_cp437_font.py`, which draws its shapes; the
-  extractor that overwrote it with an emulator's is deleted.
-
-  The authored font had a real defect, which is presumably why it was
-  overwritten: 62 codes were never drawn and came out **blank**, so
-  they collided with the space and could never be recognized — 194
-  distinct glyphs where a bank needs 256. Codes nobody drew now get a
-  computed first-order Reed–Muller codeword, any two differing in 64
-  of 128 pixels. The bank is **256 of 256 distinct**, better than the
-  254 of the dump it replaces, with only the space blank.
-
-  Nothing about this reaches a live guest — those are read through
-  fonts extracted from the host, and have been since the fix above.
-  The shipped bank is `recognize`'s default and what `render` draws
-  fixtures with, so the suite still needs no hypervisor. It is not a
-  VGA face and no longer pretends to be: `CLASSIC_A`, the anchor
-  `bank_from_binary` locates a *real* bank by, is deliberately absent
-  from it, and a test wanting a findable bank now says so
-  (`tests/vga_bank.py`). The three golden fixtures are regenerated —
-  their `.txt` rows, which are the real FreeDOS screens worth
-  pinning, are unchanged.
-
 - **A screen is read through every font it could have been drawn
-  with, not one chosen in advance.** More than one font is painted
-  during a single run and nothing in a framebuffer says which was in
-  the VGA: a VGA BIOS installs its bank with an override table
-  applied and draws its own messages that way, while a DOS guest
-  loads its own font and draws with that. The two a stock VirtualBox
-  offers differ in 19 glyphs — `W`, `m` and `T` among them — so
-  whichever bank was picked, half the run was misread. Reading a
-  guest-drawn screen through the installed font turned `Welcome` into
-  `Uelcooe`; reading a BIOS-drawn one through the stored font turned
-  `Trying next boot device` into `Irying`.
+  with.** The recognizer read through one bank chosen in advance,
+  and there is no right choice: more than one font is painted during
+  a run, and a framebuffer does not say which was in the VGA. A VGA
+  BIOS installs its bank with an override table applied and draws
+  its own messages that way; a DOS guest loads its own font and
+  draws with that. The two a stock VirtualBox offers differ in 19
+  glyphs — `W`, `m` and `T` among them — so whichever was picked,
+  half of every run was misread: `Welcome` as `Uelcooe` through one,
+  `Trying next boot device` as `Irying` through the other. Not an
+  emulator difference, as it first appeared — both install the same
+  font, VirtualBox's stored bank plus its own patch equalling
+  QEMU's byte for byte.
 
-  `bank=` now accepts one font or many (`as_banks`), and a cell is
-  scored against all of them. An override table changes a glyph's
-  *shape*, never its meaning, so the nearest match yields the same
-  character whichever font drew it — no state, and no guessing which
-  is loaded. The glyphs the fonts agree on are unioned rather than
-  concatenated, so the cost is proportional to how much they actually
-  differ: 275 candidate shapes against 256 for a stock VirtualBox,
-  about 5% on a read. Ties go to the first font, which keeps two runs
-  on one host agreeing.
-
-  Extraction is structural rather than a table known by name.
+  `bank=` now takes one font or many (`as_banks`) and scores a cell
+  against all of them. An override table changes a glyph's shape,
+  never its meaning, so the nearest match yields the same character
+  whichever font drew it — no state, and no guess about what is
+  loaded. Shapes the fonts share are unioned rather than
+  concatenated, so the cost tracks how much they actually differ:
+  275 candidates against 256, about 5% on a read.
   `banks_from_binary` collects every bank a backend's binaries hold
-  **plus every variant an override table behind one would install**,
-  recognizing a table by shape alone — a run of `(code, rows...)`
-  entries whose codes ascend, closed by a zero code byte, with tables
-  for other glyph heights stepped over — so a build carrying a
-  different set is read on its own terms. Identical banks collapse;
-  arbitrary bytes are refused rather than admitted as glyphs.
-  `guest_glyph_bank` becomes `guest_glyph_banks` on both adapters,
-  and the cache file becomes
-  `cache/support/<backend>/cp437-8x16-banks.bin`, holding however
-  many fonts that installation offers. A stock QEMU yields one, since
-  its bank ships with the overrides already merged — its guest-drawn
-  font is not recoverable from those binaries, which its docstring
-  now says rather than implying parity it does not have.
+  **plus every variant an override table would install**,
+  recognizing a table by shape alone — ascending codes, no blank
+  glyph, closed by a zero code byte, with tables for other glyph
+  heights stepped over — so a build carrying a different set is read
+  on its own terms.
 
-- **VirtualBox is asked whether a VM is running, not told by a
-  failure.** `showvminfo --machinereadable` reports `VMState`, and
-  the session fetched that map for its identity check and discarded
-  the state — so a powered-off VM, which stays registered and answers
-  as readily as a live one, opened a session whose every carrier then
-  failed as `machine.backend-failed`. `wait machine=stopped` could
-  therefore never be satisfied on VirtualBox: the runner reads
+  **Extracted on demand and cached, never vendored**, as
+  `cache/support/<backend>/cp437-8x16-banks.bin` holding however many
+  fonts an installation offers. It is regenerable like everything
+  under that root, so a truncated file is re-extracted rather than
+  raised on, and a cache hit never goes near the installation. The
+  cache root reaches the adapter as `Machine(cache=)` →
+  `adapter.session(vm, cache=)`, which is new on the adapter seam
+  and optional: `None` re-extracts, a speed cost and never a
+  correctness one. Not vendoring is the licensing policy as much as
+  the engineering — the glyphs belong to whatever emulator the host
+  installed. A stock QEMU yields one font, its bank shipping with
+  the overrides already merged.
+
+- **The shipped glyph bank is the project's own font again.**
+  `fonts/cp437_8x16.bin` had become bytes carved out of a host's
+  QEMU vgabios while `REUSE.toml` recorded it as Paul Galbraith's,
+  `GPL-3.0-only` — ownership claimed over bytes nobody here wrote,
+  and material that fails D82's incoming test (*could this ship
+  inside a proprietary product?*). It is produced by
+  `tools/gen_cp437_font.py` again, which draws its own shapes; the
+  extractor that overwrote it is deleted. The authored font had the
+  defect that presumably invited the overwrite — 62 codes were never
+  drawn, came out blank, collided with the space and could never be
+  recognized — so codes nobody drew now get a computed Reed–Muller
+  codeword, 64 of 128 pixels from any other: **256 of 256 distinct**,
+  against 254 for the dump it replaces. It is `recognize`'s default
+  and what `render` draws fixtures with, never what reads a guest,
+  and no longer pretends to be a VGA face — `CLASSIC_A` is
+  deliberately absent, and a test wanting a findable bank says so
+  (`tests/vga_bank.py`).
+
+- **The hypervisor is asked whether a VM is running, not told by a
+  failure.** `showvminfo --machinereadable` reports `VMState`, which
+  the session fetched for its identity check and discarded — so a
+  powered-off VM, still registered and answering as readily as a live
+  one, opened a session whose every carrier then failed as
+  `machine.backend-failed`. `wait machine=stopped` could therefore
+  never be satisfied on VirtualBox: the runner reads
   `machine.vm-unreachable` as the stopped observation and nothing
-  ever raised it. A script's ordinary ending — power the guest off,
-  wait for the machine — aborted the run instead of completing it.
+  raised it, so a script's ordinary ending — power the guest off,
+  wait for the machine — aborted the run instead of completing it. A
+  session now refuses to open for a VM reported as no longer
+  executing, and each carrier re-asks the state when it fails, which
+  closes the window where a guest powers off mid-session. The test
+  names the **stopped** states (`poweroff`, `aborted`,
+  `aborted-saved`, `saved`, `teleported`) rather than the running
+  one, so a transitional `starting` is never mistaken for a
+  power-off and a booting machine never marked stopped.
 
-  A session now refuses to open for a VM VirtualBox reports as no
-  longer executing, and each carrier re-asks the state when it fails,
-  which closes the window where a guest powers off between the
-  identity check and the command. The test is which states mean
-  *stopped* (`poweroff`, `aborted`, `aborted-saved`, `saved`,
-  `teleported`) rather than which mean running: a transitional state
-  like `starting` must never be mistaken for a power-off, since that
-  would mark a booting machine stopped mid-run.
-
-- **A machine whose VM died out of band can be stopped, and so
-  destroyed.** `stop-machine` failed on a guest that had halted
-  itself, `destroy-machine` then refused because the phase still said
-  `running`, and with no `--force` the only way out was deleting the
-  machine directory by hand. An unreachable VM is now an accomplished
-  stop rather than a failed one — the adapter went looking for the
-  VM and there is none, which is the state stop was asked to
-  produce — reconciled once at the seam so it holds for every
-  backend, QEMU's dead QMP port included. The rule id is the whole
-  test: an identity mismatch or a port answering wrongly is a
-  different condition and still fails closed.
+  The same question stranded machines outside a run: `stop-machine`
+  failed on a guest that had halted itself, `destroy-machine` then
+  refused because the phase still said `running`, and with no
+  `--force` the only way out was deleting the machine directory by
+  hand. An unreachable VM is now an accomplished stop — the adapter
+  went looking and there is none, which is the state stop was asked
+  to produce — reconciled at the seam so it holds for every backend,
+  QEMU's dead QMP port included. An identity mismatch or a port
+  answering wrongly is a different condition and still fails closed.
 
 - **A menu with a countdown is pressed before it is studied.**
-  `cursor_menu_select` opened by spending `_BASELINE_READS` learning
-  which cells repaint on their own and only then sent its first key.
-  On a screenshot backend at ~2s a read, that is longer than a boot
-  menu's timer, so the machinery timed out the very menu it was
-  preparing to steer — the installed FreeDOS menu booted its default
-  while `select` was still looking, surfacing as "menu item is not on
-  screen" with a fully booted system in the failure screenshot. The
-  edge is sharper than slowness: `_BASELINE_READS` is
-  `DEFAULT_ANIMATION_REPEATS + 1` precisely because a ticking cell
-  cannot be recognized as furniture in fewer reads, so those reads
-  are spent learning the countdown that is running out. When the
-  wanted item is already on the first screen, `select` now presses
-  immediately and classifies afterwards; it falls back to the full
-  baseline only when the item is not yet there.
+  `cursor_menu_select` spent `_BASELINE_READS` learning which cells
+  repaint on their own before sending its first key — at ~2s a read
+  on a screenshot backend, longer than a boot menu's timer, so it
+  timed out the very menu it was preparing to steer and surfaced as
+  "menu item is not on screen" with a fully booted system in the
+  failure screenshot. The edge is sharper than slowness: those reads
+  exist because a ticking cell cannot be recognized as furniture in
+  fewer, so they are spent learning the countdown that is running
+  out. `select` now presses immediately when the wanted item is
+  already on screen, taking the full baseline only when it is not.
 
 - **The FreeDOS codex blueprint boots the installer medium first.**
   `boot` becomes `["cdrom0", "hdd0"]`, and the install script ejects
   the CD at the completion dialog rather than at shutdown. The old
-  `["hdd0", "cdrom0"]` relied on firmware falling through a disk it
-  cannot boot, which is not portable: both backends skip a blank
-  disk and an empty optical slot, but only SeaBIOS moves past a disk
-  partitioned without an active partition. VirtualBox stops there —
-  the state every installer leaves before its reboot — so the
-  install appeared to work and hung on its second boot. Now no boot
-  depends on falling past a disk. **A blueprint already seeded into
-  a home keeps the old order**, since `seed-blueprint` never
+  order relied on firmware falling through a disk it cannot boot,
+  which is not portable: both backends skip a blank disk and an
+  empty optical slot, but only SeaBIOS moves past a disk partitioned
+  without an active partition — the state every installer leaves
+  before its reboot. VirtualBox stops there, so the install appeared
+  to work and hung on its second boot. **A blueprint already seeded
+  into a home keeps the old order**, since `seed-blueprint` never
   overwrites: delete `blueprints/freedos.rlqb` and re-seed to pick
   this up. [The blueprint reference](docs/blueprint-reference.md)
   carries the measured behaviour under `boot`.
@@ -451,111 +434,57 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   clock's clothes: a caller reading once per 0.83s fits two samples
   in that window and can never reach three, so the mask stayed
   empty, a blinking bar scored as content, and the screen never read
-  settled however long anyone waited. Measured at 0.98 on a
-  synthetic blink against a 0.99 gate, and 0.944 / 0.917 on a live
-  guest.
+  settled however long anyone waited (0.98 on a synthetic blink
+  against a 0.99 gate, 0.944 on a live guest).
 
   The **minimum viable cadence** is now stated rather than assumed
-  (`viable_cadence`, `viable_window`): with the built-in window and
-  a 100% safety margin, one read every ~0.17s. Measured against it,
-  a VGA text scrape costs 16ms or less and a screenshot interpreted
-  through a glyph bank ~0.83s — an order of magnitude apart, and
-  five times the requirement. So the window **widens** to what the
-  observed cadence can see, after rounding that cadence *up* to the
-  grid its noise justifies (1s where screens are interpreted, 0.1s
-  where they are scraped, since a window resized on jitter would
-  judge two identical runs differently). Cadence is the *fastest*
-  gap seen, not the average: the runtime backs off to a 2s idle poll
-  once a screen settles, and averaging that in would widen the
-  window and mask the very redraw the next dense pass exists to
-  catch.
-
-  Past `MAX_ANIMATION_WINDOW` the widening stops, because "changed
-  three times recently" would stop describing decoration and start
-  describing a screen painted in stages. A cadence that cannot be
-  accommodated there reports `Reading.blind` and the gate **stands
-  down** — every sample is judged, as before the gate existed —
-  because a guard with no verdict must not refuse, and blocking
-  would be a deadlock rather than caution. "The gate never causes a
-  failure on its own" now holds at every cadence.
-
-  Reported once per run on the stream (`guard.cadence`): the cadence
-  measured, the window it earned, and whether the gate stood down. A
-  guard that quietly went inactive would otherwise be
-  indistinguishable from one that passed. Normative in
+  (`viable_cadence`, `viable_window`): one read every ~0.17s, with a
+  100% safety margin. A VGA text scrape costs 16ms or less and a
+  screenshot interpreted through a glyph bank ~0.83s, so the window
+  **widens** to what the observed cadence can see — that cadence
+  being the *fastest* gap seen rather than the average, since the
+  runtime's 2s idle backoff would otherwise widen the window and
+  mask the very redraw the next dense pass exists to catch — after
+  rounding up to the grid its noise justifies (1s where screens are
+  interpreted, 0.1s where they are scraped). Past
+  `MAX_ANIMATION_WINDOW` the widening stops, and a cadence that
+  cannot be accommodated reports `Reading.blind` and the gate
+  **stands down**: a guard with no verdict must not refuse, and
+  blocking would be deadlock rather than caution. Reported once per
+  run as `guard.cadence` — a guard that quietly went inactive would
+  otherwise be indistinguishable from one that passed. Normative in
   [the script spec](docs/spec/script-spec.md) under `stability`.
-
-- **A guest screen is read through the guest's own font.** The
-  recognizer's only production consumer is VirtualBox, and the bank it
-  read through is curated from the host *QEMU* vgabios. Nineteen of
-  256 glyphs read wrong, `W` and `m` among them: `Welcome to the
-  FreeDOS 1.4 installation program.` recognized as `Uelcooe ...
-  prograo.`, and every `wait` on installer text missed. Those 19 are
-  **not** an emulator difference: they are `vgafont16alt`, which
-  QEMU's vgabios merges into the bank it ships and VirtualBox applies
-  at runtime on every text mode set, the merged VirtualBox bank
-  equalling QEMU's byte for byte. Both emulators install the same
-  font. What differs is who painted the screen — the BIOS uses that
-  merged set, a DOS guest loading its own CP437 font paints the
-  unpatched one — so the fix is really "read a guest-drawn screen
-  with the guest's font", and it would bite QEMU identically if
-  anything recognized a QEMU screenshot. T20 carries the rest. `recognize(bank=)` now takes
-  the bank to read through, and each backend answers for its own —
-  `guest_glyph_bank(cache)` on `backend_virtualbox` and `backend_qemu`
-  alike — carving it out of the installation, anchored on the classic
-  `A` every CP437 bank shares and failing closed by name where the
-  install holds none.
-
-  **Extracted on demand and cached, never vendored.** The bank lands
-  in `cache/support/<backend>/cp437-8x16.bin`, regenerable like
-  everything under that root: delete it and the next read extracts it
-  again, and a truncated file is re-extracted rather than raised on. A
-  cache hit never goes near the installation. The cache root reaches
-  the adapter as `Machine(cache=)` → `adapter.session(vm, cache=)`,
-  which is new on the adapter seam and optional — `None` re-extracts,
-  a speed cost and never a correctness one. Not vendoring is the
-  licensing policy as much as the engineering: the glyphs belong to
-  whatever emulator the host installed, and copying another project's
-  font into this tree is third-party material the policy does not
-  admit, whatever its licence. Reliquary's own
-  `fonts/cp437_8x16.bin` stays as `recognize`'s default and as what
-  `render` draws fixtures with, so the suite still needs no
-  hypervisor.
 
 - **The menu highlight is followed on a recognized framebuffer.**
   `select` located the selection bar as the rarest attribute on
-  screen, which assumes a row wears one attribute — true of VGA bytes
-  scraped from text memory, false of tokens recovered from pixels. A
-  blank cell shows one colour, so nothing can tell its foreground from
-  its background and it cannot carry a lettered cell's token; a bar
-  painted across a dialog therefore reads as two tokens whose blank
-  half *is* the backdrop's, the most common on screen. Rarity picked
-  the wrong row and its own guard then rejected the answer, so every
+  screen, which assumes a row wears one attribute — true of VGA
+  bytes scraped from text memory, false of tokens recovered from
+  pixels, where a blank cell shows one colour and so cannot carry a
+  lettered cell's token, and a bar across a dialog reads as two
+  tokens whose blank half *is* the backdrop's. Rarity picked the
+  wrong row and its own guard then rejected the answer, so every
   `select` on VirtualBox failed with "no menu highlight responded to
-  cursor keys". The bar is now found as what a bar is — the attribute
-  confined to one row that moved to another — which is also immune to
-  the FreeDOS language chooser rewriting every row per keypress. Where
-  a menu has exactly two items both candidates are confined and the
-  cursor key's direction settles it; anything still ambiguous falls
-  back to the frequency reading, which continues to serve text-memory
-  screens. Confirmed against a live VirtualBox guest.
+  cursor keys". The bar is now found as what a bar is: the attribute
+  confined to one row that moved to another — also immune to the
+  FreeDOS language chooser rewriting every row per keypress. A
+  two-item menu is settled by the cursor key's direction, and
+  anything still ambiguous falls back to the frequency reading,
+  which continues to serve text-memory screens.
 
 - **A guest's video mode no longer ends the run.** The fixed-font
   recognizer refused any framebuffer that was not an even 80×25 grid
   by raising a `StaticError` — exit `2`, the class reserved for input
   illegal on its face — so on a screenshot-based backend the first
-  sample of the first `wait` aborted the whole script. Every
-  VirtualBox boot passes through a 640×480 graphics-mode BIOS splash,
-  which made the agentless-display plane unusable there from the
-  first statement. The refusal is now `UnreadableScreen` (a
-  `RunFailure`, exported), and a script run does not let it escape:
-  the sample is recorded as unreadable and the wait keeps polling
-  until the guest reaches a text mode, expiring on its own clock if
-  it never does. A failure report names the shape that was captured,
-  which is the case the nearest-miss row cannot answer — with no rows
-  at any sample, nothing was ever near the target. QEMU never met
-  this: its `text_screen` scrapes VGA text memory, which is 80×25
-  whatever mode the guest is in.
+  sample of the first `wait` aborted the whole script, and every
+  VirtualBox boot passes through a 640×480 graphics-mode BIOS splash.
+  The refusal is now `UnreadableScreen` (a `RunFailure`, exported),
+  and a run does not let it escape: the sample is recorded as
+  unreadable and the wait keeps polling until the guest reaches a
+  text mode, expiring on its own clock if it never does. A failure
+  report names the shape that was captured, which the nearest-miss
+  row cannot — with no rows at any sample, nothing was ever near the
+  target. QEMU never met this, scraping VGA text memory that is
+  80×25 whatever mode the guest is in.
 
 - **`--record` and `run_script(record=)` are specified.** D98 ruled
   the `.rlqt` transcript format deliberately outside the application
