@@ -116,6 +116,30 @@ class WaitExpired(RunFailure, TimeoutError):
     """
 
 
+class UnreadableScreen(RunFailure):
+    """A captured framebuffer is not a text screen this build can read.
+
+    Raised by the fixed-font recognizer where a backend has no native
+    VGA text scrape and the guest is painting something the 80×25
+    contract cannot describe — a BIOS splash in a graphics mode, a
+    resolution whose cells the glyph bank cannot cover.
+
+    **It is a :class:`RunFailure` because none of the other three fit.**
+    Nothing about the authored blueprint or script is illegal, so exit
+    ``2`` would blame the wrong party; nothing about the host fails to
+    satisfy the input either, so it is not a preflight condition. What
+    happened is that a read was attempted and did not produce a screen,
+    which is the operation failing.
+
+    A script run does **not** let it escape: `script_runner` catches it
+    and records the sample as unreadable, so a wait keeps polling until
+    the guest reaches a text mode and expires on its own clock if it
+    never does. Escaping uncaught is for the callers that ask for one
+    screen and have no clock of their own — `rlq screen` and the
+    console verbs — where exit ``4`` and the reason are the answer.
+    """
+
+
 class InternalError(ReliquaryError):
     """An invariant reliquary detected in its own state.
 

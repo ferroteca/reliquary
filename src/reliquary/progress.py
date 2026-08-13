@@ -177,6 +177,7 @@ def _failure_report(fields):
                        ("clock", "clock"),
                        ("scope", "scope"),
                        ("nearest miss", "nearest-miss"),
+                       ("unreadable screen", "unreadable-screen"),
                        ("screenshot", "screenshot")):
         value = fields.get(key)
         if value:

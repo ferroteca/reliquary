@@ -13,7 +13,7 @@ import unittest
 from PIL import Image
 
 from reliquary import text_recognize as recognize
-from reliquary.errors import StaticError
+from reliquary.errors import StaticError, UnreadableScreen, exit_code
 
 
 _FIX = os.path.join(os.path.dirname(__file__), "fixtures", "text_recognize")
@@ -114,11 +114,21 @@ class FixtureTests(unittest.TestCase):
 
 
 class GeometryTests(unittest.TestCase):
-    def test_bad_geometry_is_static(self):
+    def test_bad_geometry_is_an_unreadable_screen(self):
+        """A guest's video mode is never the author's mistake."""
         image = Image.new("RGB", (100, 100), (0, 0, 0))
-        with self.assertRaises(StaticError) as caught:
+        with self.assertRaises(UnreadableScreen) as caught:
             recognize.recognize(image)
         self.assertEqual(caught.exception.rule_id, "recognize.geometry")
+        self.assertNotIsInstance(caught.exception, StaticError)
+        self.assertEqual(exit_code(caught.exception), 4)
+
+    def test_a_bios_splash_resolution_is_refused_by_name(self):
+        """The 640x480 mode every VirtualBox boot passes through."""
+        image = Image.new("RGB", (640, 480), (0, 0, 0))
+        with self.assertRaises(UnreadableScreen) as caught:
+            recognize.recognize(image)
+        self.assertIn("640x480", str(caught.exception))
 
 
 class RenderSaveTests(unittest.TestCase):

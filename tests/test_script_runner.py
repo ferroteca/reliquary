@@ -16,7 +16,8 @@ from unittest import mock
 
 from reliquary import events as _events
 from reliquary.binding import BoundProperties
-from reliquary.errors import PreflightError, RunCancelled, StaticError
+from reliquary.errors import (PreflightError, RunCancelled, StaticError,
+                              UnreadableScreen)
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (_preflight_machine_rules,
                                      ScriptPreflightError,
@@ -336,6 +337,50 @@ class ObservationTests(_RuntimeCase):
         engine = self.engine("wait machine=stopped\n", running=False)
         self.run_linear(engine)
         self.assertEqual(self.console.reads, 0)
+
+    def test_an_unreadable_screen_is_a_sample_the_wait_looks_past(self):
+        # Every VirtualBox boot paints a graphics-mode BIOS splash
+        # before the guest reaches text, and the recognizer can say
+        # nothing about it. That is not the end of the run: the wait
+        # keeps polling and matches once a text screen arrives.
+        engine = self.engine('wait "ready"\n', screens=[["ready"]])
+        splashes = [2]
+        inner = self.console.screen
+
+        def screen():
+            if splashes[0]:
+                splashes[0] -= 1
+                self.console.reads += 1
+                raise UnreadableScreen(
+                    "framebuffer 640x480 is not an even 80x25 text grid",
+                    rule_id="recognize.geometry")
+            return inner()
+
+        self.console.screen = screen
+        self.run_linear(engine)
+        self.assertEqual(splashes[0], 0)
+
+    def test_an_unreadable_screen_is_not_a_stopped_machine(self):
+        # It is not a blank screen and it is not an absent one: a guest
+        # painting in a mode we cannot read is running perfectly well,
+        # so `machine=stopped` must not be satisfied by it and the
+        # machine must not be marked down.
+        engine = self.engine('timeout 10s\nwait machine=stopped\n')
+
+        @contextlib.contextmanager
+        def unreadable():
+            raise UnreadableScreen(
+                "framebuffer 640x480 is not an even 80x25 text grid",
+                rule_id="recognize.geometry")
+            yield  # pragma: no cover
+
+        engine._console = unreadable
+        with mock.patch(
+                "reliquary.script_runner._machines") as machines:
+            with self.assertRaises(ScriptRuntimeError):
+                self.run_linear(engine)
+            machines.mark_stopped.assert_not_called()
+        self.assertTrue(engine._running)
 
     def test_a_screen_observation_needs_a_running_machine(self):
         engine = self.engine('machine stopped\nwait "x"\n', running=False)
@@ -923,6 +968,29 @@ class FailureReportTests(_RuntimeCase):
             [["Welcome to FreeDO"]])
         self.assertEqual(by_kind["failure"]["nearest-miss"],
                          "Welcome to FreeDO")
+
+    def test_the_report_names_a_screen_that_could_never_be_read(self):
+        # The case the nearest miss cannot answer: with no rows at any
+        # sample, nothing was ever near the target, and a silent report
+        # would look like a condition that merely never matched.
+        engine = self.engine('timeout 10s\nwait "ready"\n')
+
+        @contextlib.contextmanager
+        def unreadable():
+            raise UnreadableScreen(
+                "framebuffer 640x480 is not an even 80x25 text grid",
+                rule_id="recognize.geometry")
+            yield  # pragma: no cover
+
+        engine._console = unreadable
+        with self.whole_run(), \
+                mock.patch("reliquary.script_runner.screenshot"):
+            with self.assertRaises(ScriptRuntimeError):
+                engine.run()
+        failure = [event for event in engine.events.events
+                   if event["kind"] == "failure"][0]
+        self.assertIn("640x480", failure["unreadable-screen"])
+        self.assertNotIn("nearest-miss", failure)
 
     def test_the_report_suggests_a_next_command(self):
         _engine, by_kind = self._failed_run(

@@ -1297,8 +1297,14 @@ activation (the phase deadline's scope), a span per observation
   observations as "elapsed / limit" pairs, not progress bars;
 - on failure: the pending condition or action, the expired clock
   and its source scope, the route taken with phase revisit
-  counts, the nearest-miss screen row, the automatic screenshot
-  reference, and the suggested next command;
+  counts, the nearest-miss screen row, the reason the last screen
+  could not be read where it could not be, the automatic
+  screenshot reference, and the suggested next command. The last
+  two answer disjoint cases: a screen with rows has a nearest
+  miss, and a screen with none — a guest painting in a video mode
+  the display plane cannot describe — has the captured shape
+  instead, so an expiry never reports silence where it had a
+  reason;
 - reserved, designed but not emitted: `screen`'s CLI-only read
   kind, which waits on the guest-console commands carrying a
   stream at all (only `run-script` and `fetch-media` do today);

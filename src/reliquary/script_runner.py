@@ -31,7 +31,8 @@ from urllib.parse import urlsplit
 from .binding import bind_properties, console_asker, describe_sources
 from .document import load_document
 from .errors import (PreflightError, ReliquaryError, RunCancelled,
-                     RunFailure, StaticError, exit_code, outcome)
+                     RunFailure, StaticError, UnreadableScreen,
+                     exit_code, outcome)
 from .library import locate_blueprint, locate_script
 from .control_display import char_keys
 from .machine_handle import (Machine, screenshot,
@@ -348,11 +349,21 @@ class _Sample:
     the seam handed it over — character rows and their attribute
     tokens — which is what the quiescence gate compares, identity
     being the whole pair.
+
+    ``unreadable`` is the third kind of sample, beside a screen and a
+    stopped machine: the carrier answered, and what it handed over was
+    not a text screen. It holds the *reason* rather than a flag, so a
+    failure report can say which shape was captured — a screen nobody
+    could read is not a blank one, and reporting it as blank would
+    make a graphics-mode guest indistinguishable from a cleared one.
+    No condition holds on such a sample, so a wait simply keeps
+    looking and expires on its own clock.
     """
 
     rows: tuple = ()
     stopped: bool = False
     frame: tuple = ()
+    unreadable: str = None
 
 
 class _Observation:
@@ -607,6 +618,7 @@ class _ScriptEngine:
             revisits={name: count for name, count
                       in self._revisits.items() if count > 1} or None,
             **{"nearest-miss": self._nearest_miss(),
+               "unreadable-screen": self._unreadable_screen(),
                "screenshot": self._failure_screenshot(),
                "next-command": self._next_command()})
         self._terminal(error)
@@ -627,6 +639,20 @@ class _ScriptEngine:
         best = max(rows, key=lambda row: difflib.SequenceMatcher(
             None, target, row).ratio())
         return self._redact(best)
+
+    def _unreadable_screen(self):
+        """Why the last read produced no screen, where it produced none.
+
+        This is the other half of the nearest miss, and it answers the
+        case that one cannot: where every sample was unreadable there
+        are no rows to be near the target, so a silent report would
+        leave an expiry looking like a condition that merely never
+        matched. Naming the captured shape is what turns it into the
+        answer — the guest never reached a text mode.
+        """
+        if not self._last_sample:
+            return None
+        return self._last_sample.unreadable
 
     def _failure_screenshot(self):
         """Capture the failing screen, unless a secret has been typed.
@@ -1127,6 +1153,14 @@ class _ScriptEngine:
                 raise
             self._mark_stopped()
             return self._sampled(_Sample((), True))
+        except UnreadableScreen as error:
+            # The guest is painting something the 80x25 contract cannot
+            # describe — a graphics-mode BIOS splash on every VirtualBox
+            # boot, before the guest reaches text. That is a sample the
+            # wait looks past, never the end of the run: the machine is
+            # healthy and the screen the script waits for has simply not
+            # been drawn yet.
+            return self._sampled(_Sample((), False, (), str(error)))
         return self._sampled(
             _Sample(tuple(_normalize_row(row) for row in rows), False,
                     frame))

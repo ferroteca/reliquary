@@ -36,6 +36,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   glyph bank is curated from the host QEMU vgabios by
   `tools/extract_vga_font.py`.
 
+  **The FreeDOS parity half of this entry is not yet demonstrated.**
+  On its first run against a live VirtualBox (2026-08-13) the
+  integration reached the installer's second menu and stopped:
+  `select` cannot follow a highlight on a menu that repaints every
+  cell per keypress when a sample costs ~0.83s, where QEMU's
+  text-memory scrape costs a fraction of that. Lifecycle, VDI, input,
+  capture, recognition and the first `select` are confirmed working
+  on real hardware. Resolve before release.
+
 - **Fixed-font text-screen recognition** (F51, cut from F3 with
   F50/F52). `text_recognize` turns a PNG framebuffer into the
   seam's `(rows, attribute tokens)` contract using Reliquary's
@@ -307,6 +316,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   no public surface writes a machine variable.
 
 ### Fixed
+
+- **A guest's video mode no longer ends the run.** The fixed-font
+  recognizer refused any framebuffer that was not an even 80×25 grid
+  by raising a `StaticError` — exit `2`, the class reserved for input
+  illegal on its face — so on a screenshot-based backend the first
+  sample of the first `wait` aborted the whole script. Every
+  VirtualBox boot passes through a 640×480 graphics-mode BIOS splash,
+  which made the agentless-display plane unusable there from the
+  first statement. The refusal is now `UnreadableScreen` (a
+  `RunFailure`, exported), and a script run does not let it escape:
+  the sample is recorded as unreadable and the wait keeps polling
+  until the guest reaches a text mode, expiring on its own clock if
+  it never does. A failure report names the shape that was captured,
+  which is the case the nearest-miss row cannot answer — with no rows
+  at any sample, nothing was ever near the target. QEMU never met
+  this: its `text_screen` scrapes VGA text memory, which is 80×25
+  whatever mode the guest is in.
 
 - **`--record` and `run_script(record=)` are specified.** D98 ruled
   the `.rlqt` transcript format deliberately outside the application

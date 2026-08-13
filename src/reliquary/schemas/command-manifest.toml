@@ -176,6 +176,7 @@ errors = [
     "ScriptParseError",
     "ScriptRuntimeError",
     "StaticError",
+    "UnreadableScreen",
     "WaitExpired",
 ]
 

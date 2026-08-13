@@ -31,7 +31,8 @@ from .backends import (Availability, BackendAdapter, Capabilities,
 from .machine_handle import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .errors import (InternalError, PreflightError, ReliquaryError,
-                     RunCancelled, RunFailure, StaticError, WaitExpired)
+                     RunCancelled, RunFailure, StaticError,
+                     UnreadableScreen, WaitExpired)
 from .events import Event, EventStream
 from .machines import DryRun
 from .binding import BoundProperties, PropertyBindingError
@@ -76,6 +77,7 @@ __all__ = [
     "ScriptRuntimeError",
     "StaticError",
     "Statement",
+    "UnreadableScreen",
     "WaitExpired",
     "adapter",
     "cursor_menu_select",

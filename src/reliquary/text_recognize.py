@@ -22,7 +22,7 @@ from functools import lru_cache
 
 from PIL import Image
 
-from .errors import StaticError
+from .errors import StaticError, UnreadableScreen
 
 _COLS = 80
 _ROWS = 25
@@ -170,15 +170,24 @@ def _cp437_char(code):
 
 
 def _geometry(width, height, cols, rows):
+    """The cell size for this framebuffer, or say it is not a screen.
+
+    Both refusals are :class:`UnreadableScreen` rather than the
+    author's fault: a guest chooses its own video mode, and every
+    VirtualBox boot passes through a graphics-mode BIOS splash before
+    reaching text. What reaches a caller is the *reason* the read
+    produced nothing — the shape that was captured — never a bare
+    absence (P10).
+    """
     if width % cols != 0 or height % rows != 0:
-        raise StaticError(
+        raise UnreadableScreen(
             f"framebuffer {width}x{height} is not an even {cols}x{rows} "
             f"text grid",
             rule_id="recognize.geometry")
     cell_w = width // cols
     cell_h = height // rows
     if cell_w < _CELL_W or cell_h < _CELL_H:
-        raise StaticError(
+        raise UnreadableScreen(
             f"cell size {cell_w}x{cell_h} is smaller than the "
             f"{_CELL_W}x{_CELL_H} glyph bank",
             rule_id="recognize.geometry")
