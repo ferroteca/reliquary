@@ -37,7 +37,7 @@ from .machines import read_vm_state
 from .credentials import CredentialError
 from .progress import MODES as _PROGRESS_MODES
 from .properties import is_secret
-from .script_runner import _resolve_key
+from .script_runner import resolve_key
 from .script_nodes import ScriptParseError
 from .script_parser import load_script
 from .session import Session
@@ -1669,7 +1669,7 @@ def _dispatch(arguments, session, context):
         send_text(arguments.line, enter=True, home=machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "press":
-        combos = [_resolve_key(name) for name in arguments.names]
+        combos = [resolve_key(name) for name in arguments.names]
         send_keys(combos, home=machine_home)
         return _emit(arguments, {}, lambda: None)
     if arguments.command == "exec":

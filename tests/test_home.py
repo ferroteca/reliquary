@@ -139,7 +139,7 @@ class PinnedTests(unittest.TestCase):
     """The record-only resolution the session pins at its door."""
 
     def test_a_home_alone_fills_all_six(self):
-        pinned = home._pinned(os.path.join("some", "home"))
+        pinned = home.pinned(os.path.join("some", "home"))
         root = os.path.abspath(os.path.join("some", "home"))
         self.assertEqual(pinned.home_dir, root)
         self.assertEqual(pinned.blueprints_dir,
@@ -153,7 +153,7 @@ class PinnedTests(unittest.TestCase):
                          os.path.join(root, "cache", "machines"))
 
     def test_an_explicit_slot_wins_over_derivation(self):
-        pinned = home._pinned(home.Context(
+        pinned = home.pinned(home.Context(
             home_dir=os.path.join("some", "home"),
             cache_dir=os.path.join("fast", "disk")))
         fast = os.path.abspath(os.path.join("fast", "disk"))
@@ -161,7 +161,7 @@ class PinnedTests(unittest.TestCase):
         self.assertEqual(pinned.media_dir, os.path.join(fast, "media"))
 
     def test_what_the_record_cannot_derive_stays_none(self):
-        pinned = home._pinned(home.Context(
+        pinned = home.pinned(home.Context(
             cache_dir=os.path.join("only", "cache")))
         self.assertIsNone(pinned.home_dir)
         self.assertIsNone(pinned.blueprints_dir)
@@ -171,7 +171,7 @@ class PinnedTests(unittest.TestCase):
                          "media"))
 
     def test_the_properties_file_rides_along(self):
-        pinned = home._pinned(home.Context(
+        pinned = home.pinned(home.Context(
             home_dir=os.path.join("some", "home"),
             properties_file=os.path.join("some", "project.properties")))
         self.assertEqual(

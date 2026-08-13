@@ -180,7 +180,7 @@ class Context:
 _EMPTY = Context()
 
 
-def _ctx(context):
+def as_context(context):
     """Coerce ``None`` / a bare home string / a ``Context`` into one.
 
     A bare string assigns the home and nothing else, so the other
@@ -212,7 +212,7 @@ def _unassigned(name):
 
 def _resolve(name, context):
     """Resolve one directory: the record's slot, then derivation."""
-    context = _ctx(context)
+    context = as_context(context)
     assigned = getattr(context, "%s_dir" % name)
     if assigned:
         return assigned
@@ -246,7 +246,7 @@ def _derive_from(name, context):
     return os.path.join(parent_path, leaf)
 
 
-def _pinned(context=None):
+def pinned(context=None):
     """Return ``context`` with every derivable slot filled, from it
     alone.
 
@@ -258,7 +258,7 @@ def _pinned(context=None):
     than raising, because whether an unfilled slot is an error is the
     caller's rule, not this record's.
     """
-    context = _ctx(context)
+    context = as_context(context)
     slots = {"%s_dir" % name: _derive_from(name, context)
              for name in DIRECTORIES}
     return Context(properties_file=context.properties_file, **slots)

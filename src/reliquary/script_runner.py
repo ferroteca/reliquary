@@ -99,7 +99,7 @@ def _normalize_row(text):
     return " ".join(text.split())
 
 
-def _resolve_key(spelling):
+def resolve_key(spelling):
     """Resolve one `press` key or chord to QEMU key names.
 
     A chord's non-modifier member may be a single printable
@@ -1226,7 +1226,7 @@ class _ScriptEngine:
         combos = []
         for spelling in keys:
             try:
-                combos.append(_resolve_key(spelling))
+                combos.append(resolve_key(spelling))
             except StaticError as unknown:
                 raise self._error(str(unknown), statement,
                                   rule_id=unknown.rule_id) from None

@@ -21,7 +21,7 @@ from reliquary.script_parser import parse_script
 from reliquary.script_runner import (_preflight_machine_rules,
                                      ScriptPreflightError,
                                      ScriptRuntimeError, _normalize_row,
-                                     _resolve_key, _cancel_on_interrupt,
+                                     resolve_key, _cancel_on_interrupt,
                                      _HttpResponse,
                                      _HttpService, _ScriptEngine,
                                      execute_script)
@@ -191,22 +191,22 @@ class HelperTests(unittest.TestCase):
     def test_the_portable_key_names_resolve(self):
         for name in PORTABLE_KEY_NAMES:
             with self.subTest(name=name):
-                self.assertTrue(_resolve_key(name))
-        self.assertEqual(_resolve_key("enter"), ["ret"])
-        self.assertEqual(_resolve_key("pagedown"), ["pgdn"])
-        self.assertEqual(_resolve_key("ctrl+alt+delete"),
+                self.assertTrue(resolve_key(name))
+        self.assertEqual(resolve_key("enter"), ["ret"])
+        self.assertEqual(resolve_key("pagedown"), ["pgdn"])
+        self.assertEqual(resolve_key("ctrl+alt+delete"),
                          ["ctrl", "alt", "delete"])
 
     def test_a_chord_admits_a_printable_member(self):
-        self.assertEqual(_resolve_key("ctrl+c"), ["ctrl", "c"])
+        self.assertEqual(resolve_key("ctrl+c"), ["ctrl", "c"])
 
     def test_a_bare_character_is_not_a_key_name(self):
         with self.assertRaises(StaticError):
-            _resolve_key("c")
+            resolve_key("c")
 
     def test_an_unknown_name_is_not_passed_through(self):
         with self.assertRaises(StaticError):
-            _resolve_key("oem_3")
+            resolve_key("oem_3")
 
 
 class ObservationTests(_RuntimeCase):

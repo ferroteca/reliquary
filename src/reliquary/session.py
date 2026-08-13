@@ -34,7 +34,7 @@ pinned record means no later call reads any either.
 from . import (authoring, binding, library, machines, media,
                properties, resolve, script_runner)
 from .errors import StaticError
-from .home import _ctx, _pinned
+from .home import as_context, pinned
 
 
 class Session:
@@ -54,7 +54,7 @@ class Session:
     __slots__ = ("_context",)
 
     def __init__(self, context):
-        record = _ctx(context)
+        record = as_context(context)
         if record.home_dir is None:
             # The same condition first-use ``dir.unassigned`` names,
             # noticed at the door: one rule, one id (the tier is
@@ -65,7 +65,7 @@ class Session:
                 "assigning home_dir=<path>; every other slot can "
                 "derive from it",
                 rule_id="dir.unassigned")
-        self._context = _pinned(record)
+        self._context = pinned(record)
 
     def __repr__(self):
         return "Session(%r)" % (self._context,)
