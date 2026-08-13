@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 
 from . import acquire
 from . import backends
+from . import binding
 from . import events as _events
 from .acquire import fetch_media as _acquire_fetch
 from .errors import (InternalError, PreflightError, ReliquaryError,
@@ -387,14 +388,13 @@ def _bind_location_properties(machine, namespace, *, parameters=None,
     environment, the file, or an interactive ask supplies. Returns
     ``{key: value}`` (empty when no location references any property).
     """
-    from . import binding, resolve
     keys = set()
     for drive in machine.drives.values():
         if not drive.enabled or drive.media is None:
             continue
         media = namespace.media.get(drive.media)
         if media is not None:
-            keys.update(resolve.location_property_keys(media, namespace))
+            keys.update(location_property_keys(media, namespace))
     if not keys:
         return {}
     return binding.bind_keys(
@@ -476,7 +476,6 @@ def _describe_location_properties(machine, namespace, *, explicit=None,
     and a dry run must not — so it takes what the concrete sources
     give and reports the rest as the ask a real create would make.
     """
-    from . import binding
     keys = set()
     for drive in machine.drives.values():
         if not drive.enabled or drive.media is None:
