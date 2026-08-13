@@ -127,51 +127,6 @@ not keep.
 
 ### Restructures
 
-#### T14 — Extract the drive layer from `machines.py`
-
-`machines.py` carries two modules: the machine lifecycle, and the
-drive layer that reads a stopped machine's disks and serves files
-addressed in the guest's terms. Split it three ways, **in this
-order** — the second step is what the first exists for:
-
-1. **`machine_state.py`** — ids and machine-directory paths, the
-   lock family, the state file's read and write, and machine
-   selection (`resolve_machine`, `list_machines`,
-   `machines_for_blueprint`). `_write_state` and `_machine_lock`
-   lose their underscores; nothing else changes. Only what both
-   siblings need moves: phase transitions have one consumer and
-   stay with the lifecycle.
-2. **`drives.py`** — `describe_drives` / `refresh_drives`, the
-   at-rest record read and its volume counting, address
-   resolution, the two drive sources, and the five in-band file
-   verbs.
-
-Two findings make it worth doing rather than tidy. **One rule is
-written twice**: the first unreadable disk answering for every
-letter behind it (P11, P17) lives in `_compose_drive_report` and
-again in `_resolve_address`, the first carrying a comment
-admitting it is the file verbs' rule copied. **The drive sources
-are a seam with two adapters already at it**: `_HostDirectory`
-and `_ImageVolume` satisfy an interface written down nowhere. One
-home for the rule, a name for the seam. `at_rest` (P27) is used
-at six sites, every one of them inside the moved region, so the
-lifecycle module stops importing the disk layer entirely.
-
-The step order is not preference. Every `drives.py` verb opens on
-`resolve_machine` and takes the operation lock, while
-`start_machine` reads a drive record at its first step — so
-extracting `drives.py` first leaves the two modules importing
-each other, which is the coupling the split exists to remove.
-
-**No application surface moves**: no CLI flag, no `Session`
-method, no exported name, no rule id, no state-file field, so
-[SURFACES.md](SURFACES.md) does not trigger. `test_machines.py`
-splits along the same seam in the same change, and the oracle is
-D65's — the whole suite plus the opt-in FreeDOS install run
-passing, with no test rewritten except for its imports.
-AGENTS.md's layout paragraph folds with the code, not ahead of
-it.
-
 #### T15 — Merge `blueprint.py` and `script.py` into `authoring.py`
 
 `blueprint.py` authors and removes `.rlqb` files; `script.py` holds
@@ -201,26 +156,26 @@ made.
 
 No application surface moves: no CLI command, no `Session` method,
 no exported name, no rule id, so [SURFACES.md](SURFACES.md) does
-not trigger. Independent of T14.
+not trigger.
 
 #### T16 — Rename `machine.py` to `machine_handle.py`
 
-**After T14.** The package spells its collective engine modules in
-the plural — `media.py`, `properties.py`, `backends.py`,
-`machines.py` — and `machine.py` is the sole singular, holding the
-`Machine` handle and its console verbs rather than a family
-engine. T14 adds `machine_state.py`, which both sharpens the
-problem (three `machine*` modules to read past) and supplies the
-pairing: where a machine lives at rest, and how one is spoken to
-while it runs.
+The package spells its collective engine modules in the plural —
+`media.py`, `properties.py`, `backends.py`, `machines.py` — and
+`machine.py` is the sole singular, holding the `Machine` handle
+and its console verbs rather than a family engine. With
+`machine_state.py` and `drives.py` beside them there are now four
+modules in that neighbourhood to read past, and `machine_handle.py`
+supplies the pairing the substrate wants: where a machine lives at
+rest, and how one is spoken to while it runs.
 
-T14 also removes the other reason, which is why this waits rather
-than landing twice. `machine.py` needs exactly one name from
-`machines.py` — `read_vm_state` — and T14 moves it down, so the
-two stop importing each other. Turn the deferred `from .machine
-import Machine` imports in `machines.py` into ordinary ones in
-this change; what remains afterwards is readability, and the
-rename stands on that alone.
+The rename stands on readability alone, which is the whole of what
+is left. `machine.py` no longer imports `machines` — it takes
+`read_vm_state` from the substrate — so the cycle is already gone
+and nothing structural waits on this. Turn the deferred
+`from .machine import Machine` imports in `machines.py` into
+ordinary ones in the same change, now that nothing requires them
+to be deferred.
 
 Five import sites, one test line (`tests/test_core.py`), and
 AGENTS.md. The six module-level free functions are exported at the
@@ -285,5 +240,4 @@ exit code, so [SURFACES.md](SURFACES.md) does not trigger. The
 oracle is byte-identical output from `rlq --help` and all 48
 `rlq <command> --help`, captured before and diffed after —
 stronger than the suite here, since AGENTS.md already validates
-documented syntax against `--help`. Independent of T14, T15 and
-T16.
+documented syntax against `--help`. Independent of T15 and T16.

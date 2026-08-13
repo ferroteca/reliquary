@@ -2364,7 +2364,7 @@ class DosAddressingTests(unittest.TestCase):
                          ("A", ["OUT", "RESULT.TXT"]))
 
     def test_a_non_dos_platform_fails_closed(self):
-        from reliquary.machines import _addressing
+        from reliquary.drives import _addressing
         with self.assertRaises(PreflightError) as caught:
             _addressing("openbsd")
         self.assertIn("openbsd", str(caught.exception))

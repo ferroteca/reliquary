@@ -137,37 +137,9 @@ workflow:
   map under the op lock, cleared at `start` so a variable always
   reports the current boot, the `rlq`/`reliquary` key namespaces
   reserved; the script `set` verb is the channel's only writer —
-  the host side only reads, per the CLI spec) and the in-band file family —
-  `put_file` / `get_file`, `put_files` / `get_files` (a tree's
-  contents, recursive, a copy and never a mirror) and `list_files`
-  (one level or `recursive=`, returning a flat array of
-  `{address, name, kind, size}` sorted by address, whose addresses
-  the other four accept). All five address in guest terms — P17 —
-  over a directory-source drive, stopped-only, with a non-vvfat
-  target and an unmapped letter failing closed naming the gap
-  (P11); one address form serves all of them, a directory spelled
-  as a file is and the drive root sayable as `A:\`
-  (`platform_dos.split_address` / `split_directory_address` /
-  `join_address`), and the letter
-  map itself is `platform_dos.drive_letters`, built from declared
-  facts *and the volumes each disk actually holds* — read on the
-  host, one letter per volume, a disk holding none taking none,
-  cached per-drive in `machine.json` and cleared at every start
-  (a guest repartitions only while running). A disk whose volumes
-  cannot be read leaves every letter behind it unplaced and
-  answers with the reason it could not be read, never the
-  symptom — P10, D71 closed. `describe_drives` is the window onto
-  all of it (D83): one machine-level report — declared and chosen
-  facts per drive, the at-rest read per disk (backing, partitions,
-  per-volume filesystem/label/BPB geometry), and the letter map
-  with its undetermined drives — never phase-refused, because it
-  answers from the record in `machine.json`: **read at every
-  start's first step**, before the backend is engaged, so a running
-  machine answers with this boot's starting state
-  (`recorded: true`); the call reads a disk only when the machine
-  is down and no record exists yet, and `refresh_drives` is the
-  explicit stopped-only re-read for a layout changed behind the
-  record;
+  the host side only reads, per the CLI spec); the drive layer —
+  the report and the in-band file family alike — is `drives.py`'s
+  (below);
   where a machine lives, what serializes it and how one is named is
   `machine_state.py`'s (below); each mutating op carries an
   operation generation and writes the transitional phases
@@ -185,6 +157,51 @@ workflow:
   or stopped (persisted for the next start); `set_boot_order` is
   stopped-only (a launch-time firmware order); boot-order keys may name
   any declared drive; all three persist and survive stop/start),
+  `drives.py` is **what a stopped machine's disks hold, and how the
+  guest names them** — one module for one question asked two ways.
+  `describe_drives` is the window onto all of it (D83): one
+  machine-level report — declared and chosen facts per drive, the
+  at-rest read per disk (backing, partitions, per-volume
+  filesystem/label/BPB geometry), and the letter map with its
+  undetermined drives — never phase-refused, because it answers from
+  the record in `machine.json`: **read at every start's first step**
+  (`read_drive_record`, the one edge `machines.py` has into this
+  module), before the backend is engaged, so a running machine
+  answers with this boot's starting state (`recorded: true`); the
+  call reads a disk only when the machine is down and no record
+  exists yet, and `refresh_drives` is the explicit stopped-only
+  re-read for a layout changed behind the record. The in-band file
+  family is the other half — `put_file` / `get_file`,
+  `put_files` / `get_files` (a tree's contents, recursive, a copy and
+  never a mirror) and `list_files` (one level or `recursive=`,
+  returning a flat array of `{address, name, kind, size}` sorted by
+  address, whose addresses the other four accept). All five address
+  in guest terms — P17 — over a directory-source drive, stopped-only,
+  with a non-vvfat target and an unmapped letter failing closed
+  naming the gap (P11); one address form serves all of them, a
+  directory spelled as a file is and the drive root sayable as `A:\`
+  (`platform_dos.split_address` / `split_directory_address` /
+  `join_address`), and the letter map itself is
+  `platform_dos.drive_letters`, built from declared facts *and the
+  volumes each disk actually holds* — read on the host, one letter
+  per volume, a disk holding none taking none, cached per-drive in
+  `machine.json` and cleared at every start (a guest repartitions
+  only while running). A disk whose volumes cannot be read leaves
+  every letter behind it unplaced and answers with the reason it
+  could not be read, never the symptom — P10, D71 closed. **The two
+  halves are one module because they answer from the same three
+  facts**, and `_blocking_disk` is where that shows: which unread
+  disk accounts for the unplaceable letters is chosen once, and only
+  the wording — a list of unplaced drives, or one refused address —
+  belongs to each caller. The drive seam is `_HostDirectory` and
+  `_ImageVolume`, two adapters behind one interface (`writable`,
+  `path`, `kind`, `entries`, `copy_out`, `write_file`,
+  `make_directory`, `commit`, `close`) that `_resolve_address`
+  chooses between; a directory-source drive *is* its host directory,
+  and an image is opened where it lies through `at_rest` (P27) and
+  never copied to be read. It stands on `machine_state` alone, never
+  on the lifecycle, and `machines.py` re-exports its verbs as the
+  layer's front door,
   `machine_state.py` is **the substrate the machine layer stands on** —
   where a machine lives (`machine_dir_path`, `machine_disks_dir`,
   `backend_dir`), how one is named (`machine_id_for` /
