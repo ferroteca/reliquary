@@ -8,7 +8,7 @@ import time
 
 from . import screen_stability
 from .errors import RunFailure
-from .machine import Machine
+from .machine_handle import Machine
 
 
 _PROMPT_RE = re.compile(r"^[A-Z]:(\\[^>]*)?>$")

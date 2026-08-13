@@ -224,7 +224,7 @@ workflow:
   transitions have one consumer and stay with the lifecycle above —
   and `machines.py` remains the layer's **front door**, re-exporting
   these names so a consumer above it reaches them in one place. The
-  one module taking them from the substrate directly is `machine.py`,
+  one module taking them from the substrate directly is `machine_handle.py`,
   which needs `read_vm_state` alone and would otherwise be back in a
   cycle with the lifecycle,
   `backends.py` is **the backend adapter seam** — the provider contract behind the semantic surface
@@ -308,7 +308,9 @@ workflow:
   slice the output at a boundary that never existed, F45; the poll ramp gains a third rung for that rather
   than losing its second — `_ECHO_POLL` catches the echo, `_PROMPT_POLL` waits a prompt out cheaply, and
   `_SETTLE_POLL` confirms one, dense reads being spent only where the question has become "is this screen
-  finished?"), `machine.py` is the backend-neutral machine handle:
+  finished?"), `machine_handle.py` is the backend-neutral machine handle — **singular, and named for what it
+  holds**: the package spells its collective engine modules in the plural (`media.py`, `properties.py`,
+  `backends.py`, `machines.py`), and this one is a handle type rather than a family engine:
   a machine is addressed by its materialization directory, the adapter named in the recorded identity supplies
   the session (`Machine.session()` / `console()`), and `Machine.qmp()` is the QEMU-scoped escape hatch that
   refuses any other backend,
@@ -627,7 +629,7 @@ alone, so two sessions in one process are unremarkable; the engine functions und
 `context=` (a bare string is shorthand for `Context(home_dir=...)`), which is the seam the veneer forwards over. The
 CLI builds **one `Context` per invocation** — flags, then the environment, then the default home — and opens one
 `Session` on it, driving only session methods (the codex family and the locate seam, veneerless by D87, take the same
-record directly). `machine.py`'s and the adapters' own `home=` parameters are a different,
+record directly). `machine_handle.py`'s and the adapters' own `home=` parameters are a different,
 narrower concept — an already-resolved plain directory (sometimes a machine's own materialization directory standing
 in for one), not a `Context`; they were deliberately left alone.
 

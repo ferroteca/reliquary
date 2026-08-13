@@ -32,6 +32,8 @@ from .library import codex_blueprint_available
 # exception is `machine.py`, which takes `read_vm_state` from the
 # substrate directly because importing this module would put the two
 # back in a cycle.
+from .interaction_agentless import AgentlessGuestExec
+from .machine_handle import Machine
 from .machine_state import (allocate_machine_id, backend_dir,
                             blueprint_alloc_lock, list_machines,
                             load_machine_state, machine_dir_path,
@@ -1213,7 +1215,6 @@ def _change_media_live(machine_id, slot, path, context):
     the change the guest sees and the change persisted to the state
     stay one operation.
     """
-    from .machine import Machine
     machine_home = machine_dir_path(machine_id, context)
     if read_vm_state(machine_home) is None:
         raise PreflightError(
@@ -1563,9 +1564,6 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
     the price of the twin-name identity rule: the CLI command *is*
     ``exec``. Nothing here calls the builtin.)
     """
-    from .interaction_agentless import AgentlessGuestExec
-    from .machine import Machine
-
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
     state = load_machine_state(machine_id, context)

@@ -28,7 +28,7 @@ from .interaction_agentless import AgentlessGuestExec
 from .backends import PRIORITY as BACKEND_PRIORITY
 from .backends import (Availability, BackendAdapter, Capabilities,
                        adapter, discover)
-from .machine import (Machine, cursor_menu_select, screen_text,
+from .machine_handle import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .errors import (InternalError, PreflightError, ReliquaryError,
                      RunCancelled, RunFailure, StaticError, WaitExpired)

@@ -30,7 +30,7 @@ from reliquary import backend_qemu as qemu_module
 from reliquary import control_display as display_module
 from reliquary import interaction as interaction_module
 from reliquary import interaction_agentless as agentless_module
-from reliquary import machine as machine_module
+from reliquary import machine_handle as machine_module
 from reliquary import machines as machines_module
 from reliquary.errors import InternalError, PreflightError, RunFailure, StaticError
 from reliquary import platform_dos as platform_dos_module

@@ -21,7 +21,7 @@ try:
 except importlib.metadata.PackageNotFoundError:
     _version = "unknown"
 
-from .machine import (Machine, cursor_menu_select, screen_text,
+from .machine_handle import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .home import (Context, DIRECTORIES, default_home_dir,
                    environment_variable)

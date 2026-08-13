@@ -33,7 +33,8 @@ from .errors import (PreflightError, ReliquaryError, RunCancelled,
                      RunFailure, StaticError)
 from .library import locate_script
 from .control_display import char_keys
-from .machine import Machine, screenshot, validate_screenshot_name
+from .machine_handle import (Machine, screenshot,
+                            validate_screenshot_name)
 from .progress import interactive as _interactive, stream_for
 from .resolve import load_namespace
 from .script_parser import load_script

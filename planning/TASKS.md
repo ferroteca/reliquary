@@ -127,31 +127,6 @@ not keep.
 
 ### Restructures
 
-#### T16 — Rename `machine.py` to `machine_handle.py`
-
-The package spells its collective engine modules in the plural —
-`media.py`, `properties.py`, `backends.py`, `machines.py` — and
-`machine.py` is the sole singular, holding the `Machine` handle
-and its console verbs rather than a family engine. With
-`machine_state.py` and `drives.py` beside them there are now four
-modules in that neighbourhood to read past, and `machine_handle.py`
-supplies the pairing the substrate wants: where a machine lives at
-rest, and how one is spoken to while it runs.
-
-The rename stands on readability alone, which is the whole of what
-is left. `machine.py` no longer imports `machines` — it takes
-`read_vm_state` from the substrate — so the cycle is already gone
-and nothing structural waits on this. Turn the deferred
-`from .machine import Machine` imports in `machines.py` into
-ordinary ones in the same change, now that nothing requires them
-to be deferred.
-
-Five import sites, one test line (`tests/test_core.py`), and
-AGENTS.md. The six module-level free functions are exported at the
-root and are **not** touched — respelling those would be a surface
-change and is a separate question. Nothing else moves: no CLI
-command, no `Session` method, no rule id.
-
 #### T17 — Split `cli.py`'s `main()` and derive the command list
 
 `main()` is 466 lines that build 48 subparsers before doing
@@ -209,4 +184,4 @@ exit code, so [SURFACES.md](SURFACES.md) does not trigger. The
 oracle is byte-identical output from `rlq --help` and all 48
 `rlq <command> --help`, captured before and diffed after —
 stronger than the suite here, since AGENTS.md already validates
-documented syntax against `--help`. Independent of T16.
+documented syntax against `--help`.
