@@ -63,6 +63,7 @@ SDIST_REQUIRED_TREES = (
     "tests/fixtures/conformance/script/valid/",
     "tests/fixtures/conformance/script/invalid/",
     "tests/fixtures/conformance/script/invalid-at-preflight/",
+    "tests/fixtures/conformance/transcript/",
     "tests/fixtures/text_recognize/",
 )
 

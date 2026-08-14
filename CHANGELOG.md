@@ -566,6 +566,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`--record` now captures what it promised to.** Six defects, all
+  in the recorder and all found the only way they could be — by
+  taking a real capture of a real FreeDOS install (F43). The
+  **`screenshot` verb bypassed the recorder**, building its own
+  machine handle, so the one carrier call both codex scripts make was
+  missing from every capture. **The machine going away was never
+  recorded**: identity is verified while a session is being opened, so
+  a guest that powered itself off refuses the session before the
+  recording wrapper exists, and a capture therefore ended at the
+  shutdown every DOS install finishes with. And **the record pace did
+  nothing at all** — the poll intervals took the larger of the pace
+  and the production interval, leaving the two-second idle poll the
+  pace exists to close, so a five-and-a-half-minute install captured
+  536 screens where it now captures 2847. (The other three — the
+  wrapper installed on a frozen dataclass, an inverted keyframe test,
+  and a collapsed frame counting one sample — were fixed as they were
+  found.)
+
+  A recorded run is a **different** run and always was: each QEMU
+  sample is a 4000-byte memory dump, and one now taken ten times a
+  second makes an install run two to three times longer. Denser
+  polling is strictly more information, which is the trade the design
+  named; the transcript states the pace it was taken at.
+
 - **A cell that matched nothing no longer passes for one that was
   read.** The recognizer takes the nearest glyph only when it is
   near enough to believe and substitutes a space otherwise, since a

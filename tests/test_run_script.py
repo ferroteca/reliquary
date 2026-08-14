@@ -3,6 +3,7 @@
 """Tests for labeled script wiring: the returned output and the CLI."""
 
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -18,7 +19,7 @@ from reliquary.script_parser import parse_script
 from reliquary.transcript import _TranscriptWriter
 from reliquary.script_runner import (
     ScriptRun, _ScriptEngine,
-    _existing_machine, _resolve_script_stem, run_script,
+    _existing_machine, _resolve_script_stem, execute_script, run_script,
 )
 from tests import fake_backend
 
@@ -539,3 +540,185 @@ def test_the_runner_installs_the_recorder_through_construction(tmp_path):
     assert "frame" in kinds, (
         "the console read a screen and the transcript holds no frame, "
         "so the recorder was never installed on the session.")
+
+
+def _poll_gaps(tmp_path, **recording):
+    """Every interval a run waiting on a screen that never arrives slept."""
+    home = str(tmp_path)
+    machine_home = os.path.join(home, "machine")
+    os.makedirs(machine_home)
+    # A clock of its own rather than the replay harness's: there, time
+    # is the transcript's and a sleep costs nothing, while what is
+    # measured here is a *live* run's cadence, where it is the whole
+    # of what passes between two samples.
+    now = [0.0]
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        now[0] += seconds
+
+    engine = _ScriptEngine(
+        parse_script('platform dos\nentry only\nphase only {\n'
+                     '    wait "never drawn" timeout=10s\n'
+                     '    finish\n}\n'),
+        "freedos-0", home, machine_home, script_path="/tmp/demo.rlqs",
+        clock=lambda: now[0], sleep=sleep, **recording)
+
+    @contextlib.contextmanager
+    def blank():
+        class _Console:
+            def screen(self):
+                return [""] * 25, [[0x07] * 80 for _ in range(25)]
+
+            def screen_text(self):
+                return [""] * 25
+        yield _Console()
+
+    engine._console = blank
+    with mock.patch("reliquary.script_runner._machines") as machines:
+        machines.load_machine_state.return_value = {"phase": "running"}
+        machines.machine_dir_path.return_value = machine_home
+        machines.read_vm_state.return_value = {
+            "backend": "qemu", "backend-id": "reliquary-freedos-0",
+            "token": "0" * 32, "endpoint": {"port": 5555}}
+        with pytest.raises(RunFailure):
+            engine.run()
+    return slept
+
+
+def test_a_recorded_run_polls_at_the_pace_it_records(tmp_path):
+    """The pace has to make the run sample harder, or it does nothing.
+
+    `--record` drives the interpretation layer's own poll clocks
+    because QEMU admits one QMP client and an independent sampler
+    cannot exist — so the pace is a *ceiling* on the interval, not a
+    floor. Taking the larger of the two left the idle poll at its
+    production 2.0s, which is the two-second hole through most of an
+    install that the whole mechanism exists to close: the first real
+    capture held 536 samples across five and a half minutes.
+    """
+    recorded = _poll_gaps(tmp_path, record_pace=0.25)
+    assert max(recorded) <= 0.25, (
+        f"a run recording at 0.25s slept {max(recorded)}s between "
+        "samples, so the transcript has holes the pace promised to fill")
+    assert max(_poll_gaps(tmp_path / "plain")) > 0.25, (
+        "and an unrecorded run keeps its cheap production cadence")
+
+
+def test_a_recorded_run_names_the_script_in_its_header(tmp_path):
+    """A capture says what it is a capture of, and against which text.
+
+    The corpus replays a fixture by standing the same script back up
+    over it, so the file has to carry which script that was — nothing
+    else in the directory knows. The digest is the other half: a
+    script edited since the capture was taken diverges partway
+    through, and naming the staleness beats a keystroke mismatch
+    reported from the middle of a run.
+    """
+    home = str(tmp_path)
+    machine_home = os.path.join(home, "machine")
+    os.makedirs(machine_home)
+    text = 'platform dos\nentry only\nphase only {\n    finish\n}\n'
+    script_path = os.path.join(home, "demo.rlqs")
+    # Written as bytes, because the digest is over the file's bytes
+    # and a text-mode write on Windows would not be the same ones.
+    with open(script_path, "wb") as handle:
+        handle.write(text.encode())
+    target = os.path.join(home, "run.rlqt")
+    with mock.patch("reliquary.script_runner._machines") as machines:
+        machines.load_machine_state.return_value = {"phase": "running"}
+        machines.machine_dir_path.return_value = machine_home
+        machines.read_vm_state.return_value = {
+            "backend": "qemu", "backend-id": "reliquary-freedos-0",
+            "token": "0" * 32, "endpoint": {"port": 5555}}
+        execute_script(parse_script(text), machine_id="freedos-0",
+                       context=home, script_path=script_path,
+                       record=target)
+    header = _entries(target)[0]
+    assert header["script"] == "demo"
+    assert header["script-sha256"] == hashlib.sha256(
+        text.encode()).hexdigest()
+
+
+def _recording_engine(tmp_path, script_text):
+    """An engine over a running machine, recording to its own file.
+
+    Driven a verb at a time rather than through `run()`, following the
+    sibling test above: what is under test is which handle a carrier
+    call goes through, and the lifecycle around it says nothing about
+    that.
+    """
+    home = str(tmp_path)
+    machine_home = os.path.join(home, "machine")
+    os.makedirs(machine_home)
+    with open(os.path.join(machine_home, "machine.json"), "w",
+              encoding="utf-8") as handle:
+        json.dump({"id": "freedos-0", "phase": "running",
+                   "vm": {"backend": "qemu",
+                          "backend-id": "reliquary-freedos-0",
+                          "token": "0" * 32,
+                          "endpoint": {"port": 5555}}}, handle)
+    target = os.path.join(home, "run.rlqt")
+    writer = _TranscriptWriter(target, pace=0.05)
+    writer.open()
+    script = parse_script(script_text)
+    engine = _ScriptEngine(script, "freedos-0", home, machine_home,
+                           script_path="/tmp/demo.rlqs", record_pace=0.05,
+                           recording_writer=writer)
+    engine._running = True
+    return engine, script, writer, target
+
+
+def _entries(path):
+    with open(path, encoding="utf-8") as handle:
+        return [json.loads(line) for line in handle if line.strip()]
+
+
+def test_the_screenshot_verb_records_its_carrier_call(tmp_path):
+    """A screenshot is a carrier call, so the transcript carries it.
+
+    `screenshot` built its own `Machine` and so never got the
+    recording wrapper the console is given, which made it the one
+    carrier call a capture silently dropped — and both codex scripts
+    take one, so it was every capture. A replay then meets a call the
+    transcript cannot answer.
+    """
+    engine, script, writer, target = _recording_engine(
+        tmp_path,
+        'platform dos\nentry only\nphase only {\n'
+        '    screenshot installed\n'
+        '    finish\n}\n')
+    with fake_backend.installed():
+        engine._screenshot(script.phases[0].statements[0])
+    writer.close()
+    carriers = [entry.get("carrier") for entry in _entries(target)]
+    assert "screenshot" in carriers, (
+        "the guest framebuffer was captured and the transcript holds "
+        "no screenshot call, so the verb bypassed the recorder.")
+
+
+def test_a_vanished_vm_is_recorded_as_the_carrier_going_away(tmp_path):
+    """The moment the machine stops is the seam's, and it is recorded.
+
+    Identity is verified while the session is being opened, so an
+    unreachable VM raises *before* the recording wrapper exists and
+    the seam cannot record its own disappearance. Both codex scripts
+    end on `wait machine=stopped`, which is answered by exactly this
+    failure — a capture that loses it is one no replay can finish.
+    """
+    engine, _script, writer, target = _recording_engine(
+        tmp_path, 'platform dos\nentry only\nphase only {\n'
+                  '    finish\n}\n')
+    gone = PreflightError("the recorded VM is not reachable",
+                          rule_id="machine.vm-unreachable")
+    with fake_backend.installed() as adapter:
+        adapter.session_error = gone
+        with pytest.raises(PreflightError):
+            with engine._console():
+                pass
+    writer.close()
+    kinds = [entry.get("type") for entry in _entries(target)]
+    assert "vm-gone" in kinds, (
+        "the console could not be opened because the machine had "
+        "powered itself off, and the transcript says nothing about it.")

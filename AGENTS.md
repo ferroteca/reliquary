@@ -481,7 +481,40 @@ workflow:
   above run unmodified over a recording. Every frame carries a
   sha256 of its canonical `(rows, attributes)` pair, checked at
   reconstruction, so a bug or a hand-edited fixture fails loudly
-  rather than yielding a screen that never existed. **A bound
+  rather than yielding a screen that never existed — and it covers
+  the screen **expanded**, while the file writes each attribute row
+  as runs (`pack_attributes`), so how the file spells a screen is
+  never what a fixture asserts. The header states the capture's
+  pace and **what it is a capture of** — the script's stem and the
+  sha256 of its text — because a replay stands that same script
+  back up, and a script edited since is named as stale rather than
+  reported as a divergence partway through. **A frame carries the
+  moments its absorbed reads were taken at, not only how many there
+  were**: reconstruction runs on the capture's own timeline, every
+  measure in the layer above is a window over wall-clock, and
+  spreading a held frame's reads evenly — the obvious guess — moved
+  the menu machinery by one read and changed which key it pressed. For
+  the same reason a read arriving where the capture's next entry is a
+  **call** is an error (`transcript.read-before-call`) rather than a
+  step over it: a swallowed keypress surfaces as a mismatch much
+  later, against a screen neither run was looking at. **The pace is a ceiling
+  on the poll interval and never a floor**: no independent sampler
+  can exist (QEMU admits one QMP client), so the run's own polls
+  *are* the capture, and taking the larger of the two — which is
+  what it did — left the two-second idle hole the mechanism exists
+  to close. It is not free: a QEMU sample is a 4000-byte HMP dump,
+  and a recorded install runs two to three times longer than an
+  unrecorded one. Two things reach the transcript from **above** the
+  seam, both because the seam cannot say them. Every carrier call
+  goes through the engine's one `_machine()` handle — a caller that
+  builds its own is a call the transcript never sees, which is
+  exactly what the `screenshot` verb did — and a **`vm-gone`** entry
+  records the machine going away, since identity is verified while
+  a session is being opened and a guest that powered itself off
+  refuses the session before the wrapper exists; reconstruction
+  raises the adapter's own `machine.vm-unreachable` for it, which is
+  what answers the `wait machine=stopped` both codex scripts end on.
+  **A bound
   secret reaching the guest stops the recording** for the rest of
   the run — the same rule that suppresses the automatic failure
   screenshot above, applied to the other artifact a run can leave
@@ -622,8 +655,8 @@ workflow:
   live with the documents they govern: `planning/README.md` for the
   planning machinery, `docs/spec/README.md` for spec, reference,
   and guide.
-- **Two conformance corpora, and the second is the stronger
-  pattern.** `fixtures/conformance/script/` (`test_script_corpus.py`)
+- **Three conformance corpora, and each answers something the last
+  one could not.** `fixtures/conformance/script/` (`test_script_corpus.py`)
   does for `.rlqs` what the blueprint corpus does for `.rlqb`, and
   adds the assertion the first cannot make: an invalid fixture
   declares the V-id that must reject it, and the harness checks the
@@ -631,8 +664,21 @@ workflow:
   is caught by the suite rather than by a reviewer. Where an id does
   not exist yet the fixture carries `# cites: no`, asserted in both
   directions so it retires itself when the id lands; that count is
-  the live measurement behind D55. Each corpus has its own README,
-  which is where its findings live.
+  the live measurement behind D55. **The third is captured rather
+  than written** (F43): `fixtures/conformance/transcript/`
+  (`test_transcript_corpus.py`, over `tests/replay.py`) holds `.rlqt`
+  captures of real FreeDOS runs, taken by the integration tier
+  against QEMU and promoted by hand, and a fixture **asserts by being
+  replayable** — the shipped interpretation layer runs over
+  `ReplaySession` at the carrier seam, and a call the capture never
+  covered is an error naming it. Two claims sit beside that, because
+  a run that ends early replays without complaint: every recorded
+  carrier call must be made (`remaining_calls()`), and the header's
+  script digest must still match the script in the tree, so a stale
+  capture is named rather than reported as a divergence. Each corpus
+  has its own README, which is where its findings live — that one's
+  records the six defects the first real captures found, every one of
+  them in the recorder rather than in the layer under test.
 - **A corpus is worth what its harness can prove ran**, which is why
   both read through one helper — `tests/corpus.py` (F56). Every
   fixture is a **collected node named for its file**, in every check
@@ -646,8 +692,9 @@ workflow:
   that partitions a bucket by a marker is the same failure in
   miniature, so `// warns:` and `// schema: rejects` are each asserted
   in both directions by **one** check over the whole bucket rather
-  than by two over its halves. A third corpus inherits all of it by
-  calling the same two functions.
+  than by two over its halves. The transcript corpus inherited all of
+  it by calling the same two functions, which is what that helper was
+  written for.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
 real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no

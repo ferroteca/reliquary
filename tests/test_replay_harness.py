@@ -11,12 +11,14 @@ interpretation layer to the same carrier calls in the same order.
 """
 
 import contextlib
+import json
 import os
 from unittest import mock
 
 import pytest
 
 from reliquary.control_display import DisplayConsole
+from reliquary.errors import PreflightError
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import _ScriptEngine
 from reliquary.transcript import (RecordingSession, TranscriptError,
@@ -111,3 +113,83 @@ def test_a_transcript_refuses_a_call_it_never_captured(tmp_path):
         with pytest.raises(TranscriptError) as caught:
             engine.run()
     assert caught.value.rule_id == "transcript.send-keys-mismatch"
+
+
+_LIFECYCLE = ('platform dos\n'
+              'machine stopped\n'
+              'entry only\n'
+              'phase only {\n'
+              '    start\n'
+              '    wait "C:\\>"\n'
+              '    screenshot installed\n'
+              '    enter "fdapm poweroff"\n'
+              '    wait machine=stopped\n'
+              '    finish\n'
+              '}\n')
+
+
+def test_a_whole_lifecycle_replays_off_a_capture(tmp_path):
+    """The shape every codex script has, with no hypervisor in it.
+
+    A capture holds the carrier and nothing above it, so the two
+    halves the harness supplies are exercised here rather than only by
+    the corpus: `MachineLayer` answers the phase a script starts in and
+    the `start` it makes, and the machine going away — recorded by the
+    run, because the seam refuses the session before the wrapper
+    exists — is what answers the closing `wait machine=stopped`. The
+    `screenshot` goes through the same handle as every other carrier
+    call, which is how it reaches the transcript at all.
+    """
+    home = str(tmp_path)
+    machine_home = os.path.join(home, "machine")
+    os.makedirs(machine_home, exist_ok=True)
+    path = os.path.join(home, "run.rlqt")
+    script = parse_script(_LIFECYCLE)
+    # The recording side reaches the carrier through the real handle,
+    # which resolves the adapter from the recorded VM identity; only
+    # the replay stands a machine up from nothing.
+    with open(os.path.join(machine_home, "machine.json"), "w",
+              encoding="utf-8") as handle:
+        json.dump({"id": "plain-0", "phase": "running",
+                   "vm": {"backend": "qemu",
+                          "backend-id": "reliquary-plain-0",
+                          "token": "0" * 32,
+                          "endpoint": {"port": 5555}}}, handle)
+    writer = _TranscriptWriter(path, pace=0.05)
+    writer.open()
+    recording = replay.MachineLayer(machine_id="plain-0",
+                                    machine_home=machine_home)
+    with fake_backend.installed() as adapter:
+        adapter.session_rows = _ROWS
+
+        def takes_it_and_stops_answering(self, combos, delay=0.06):
+            """The `enter` is `fdapm poweroff`: the guest goes down.
+
+            At the seam that has exactly one form — the next session
+            refuses to open, because identity cannot be verified
+            against a machine that is gone.
+            """
+            adapter.session_error = PreflightError(
+                "the recorded VM is not reachable",
+                rule_id="machine.vm-unreachable")
+
+        engine = _ScriptEngine(script, "plain-0", home, machine_home,
+                               script_path="/tmp/demo.rlqs",
+                               record_pace=0.05, recording_writer=writer)
+        with mock.patch("reliquary.script_runner._machines", recording), \
+                mock.patch.object(fake_backend.FakeSession, "send_keys",
+                                  takes_it_and_stops_answering):
+            engine.run()
+    writer.close()
+
+    replayed = replay.MachineLayer(machine_id="plain-0",
+                                   machine_home=machine_home)
+    with replay.replaying(path, machines=replayed) as (
+            session, layer, clock, header):
+        engine = replay.engine_for(script, home, machine_home, clock,
+                                   header)
+        engine._machine_id = "plain-0"
+        engine.run()
+    assert engine.events.events[-1]["outcome"] == "ok"
+    assert session.remaining_calls() == 0
+    assert [call[0] for call in layer.calls] == ["start", "mark-stopped"]

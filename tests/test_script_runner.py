@@ -926,7 +926,7 @@ def test_a_screenshot_rests_with_its_machine(runtime):
     engine = runtime.engine("screenshot installed\n")
     with mock.patch("reliquary.script_runner.Machine") as machine:
         runtime.run_linear(engine)
-    machine.assert_called_once_with("/tmp/home/cache/machines/plain-0")
+    assert machine.call_args.args[0] == "/tmp/home/cache/machines/plain-0"
     machine.return_value.screenshot.assert_called_once_with("installed")
 
 
@@ -982,7 +982,7 @@ def test_the_terminal_event_reports_the_cancellation(runtime):
 def _failed_run(runtime, source, screens):
     engine = runtime.engine(source, screens=screens)
     with runtime.whole_run(), \
-            mock.patch("reliquary.script_runner.screenshot"):
+            mock.patch("reliquary.script_runner.Machine"):
         with pytest.raises(ScriptRuntimeError):
             engine.run()
     by_kind = {event["kind"]: event for event in engine.events.events}
@@ -1025,7 +1025,7 @@ def test_the_report_says_how_much_of_the_screen_was_a_guess(runtime):
 
     with mock.patch.object(runtime.console, "screen", screen), \
             runtime.whole_run(), \
-            mock.patch("reliquary.script_runner.screenshot"):
+            mock.patch("reliquary.script_runner.Machine"):
         with pytest.raises(ScriptRuntimeError):
             engine.run()
     failure = {event["kind"]: event
@@ -1055,7 +1055,7 @@ def test_the_report_names_a_screen_that_could_never_be_read(runtime):
 
     engine._console = unreadable
     with runtime.whole_run(), \
-            mock.patch("reliquary.script_runner.screenshot"):
+            mock.patch("reliquary.script_runner.Machine"):
         with pytest.raises(ScriptRuntimeError):
             engine.run()
     failure = [event for event in engine.events.events
@@ -1069,7 +1069,7 @@ def test_the_guard_reports_its_cadence_once(runtime):
     engine = runtime.engine('timeout 10s\nwait "never"\n',
                             screens=[["nothing"]])
     with runtime.whole_run(), \
-            mock.patch("reliquary.script_runner.screenshot"):
+            mock.patch("reliquary.script_runner.Machine"):
         with pytest.raises(ScriptRuntimeError):
             engine.run()
     guards = [event for event in engine.events.events
@@ -1098,7 +1098,7 @@ def test_the_route_and_its_revisits_are_reported(runtime):
         'phase second {\n    wait "a" stable=1s\n    goto first\n}\n',
         screens=[["a"]])
     with runtime.whole_run(), \
-            mock.patch("reliquary.script_runner.screenshot"):
+            mock.patch("reliquary.script_runner.Machine"):
         with pytest.raises(ScriptRuntimeError):
             engine.run()
     failure = [event for event in engine.events.events
@@ -1115,10 +1115,12 @@ def test_a_screenshot_is_suppressed_after_a_secret_is_typed(runtime):
         'timeout 10s\nproperty secret pw\ntype "${pw}"\n'
         'wait "never"\n', screens=[["nothing"]], bindings=bound)
     with runtime.whole_run(), \
-            mock.patch("reliquary.script_runner.screenshot") as capture:
+            mock.patch("reliquary.script_runner.Machine") as capture:
         with pytest.raises(ScriptRuntimeError):
             engine.run()
-    capture.assert_not_called()
+    # The handle itself is built for every read; what must not happen
+    # is the capture.
+    capture.return_value.screenshot.assert_not_called()
     failure = [event for event in engine.events.events
                if event["kind"] == "failure"][0]
     assert "screenshot" not in failure

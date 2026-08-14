@@ -16,6 +16,7 @@ import pytest
 
 from reliquary import transcript
 from reliquary.control_display import DisplayConsole
+from reliquary.errors import PreflightError
 from reliquary.transcript import (RecordingSession, ReplaySession,
                                   _TranscriptWriter, TranscriptError,
                                   compute_deltas, compute_digest)
@@ -115,6 +116,44 @@ def test_deltas():
 
 def test_deltas_empty():
     assert compute_deltas(["a", "b"], ["a", "b"]) == {}
+
+
+# Attributes are written as runs, and the digest never sees them that way.
+
+def test_attribute_rows_pack_into_runs():
+    assert transcript.pack_attributes(
+        [[7] * 4 + [112] * 2, [7] * 6]) == [[[4, 7], [2, 112]], [[6, 7]]]
+
+
+def test_packed_attributes_come_back_whole():
+    rows = [[7] * 80, [7] * 10 + [112] * 15 + [7] * 55]
+    assert transcript.unpack_attributes(
+        transcript.pack_attributes(rows)) == rows
+
+
+def test_a_keyframe_writes_runs_and_reconstructs_the_screen(target):
+    """The encoding is the file's; the screen the digest covers is not.
+
+    Seventy per cent of the first real capture was per-cell attribute
+    arrays — eighty tokens a row, twenty-five rows a keyframe, where a
+    DOS row is one to four runs. The digest still covers the screen
+    expanded, so what a fixture asserts cannot depend on how the file
+    spells it.
+    """
+    attributes = [[0x07] * 80 for _ in range(3)]
+    attributes[1] = [0x07] * 10 + [0x70] * 15 + [0x07] * 55
+    inner = _FakeInnerSession(rows=["", "  English", ""],
+                              attributes=attributes)
+    writer = _TranscriptWriter(target, pace=0.05)
+    writer.open()
+    RecordingSession(inner, writer).text_screen()
+    writer.close()
+    written = [json.loads(line) for line in open(target, encoding="utf-8")
+               if line.strip()]
+    assert written[1]["attributes"][1] == [[10, 7], [15, 112], [55, 7]]
+    replayed = ReplaySession(
+        transcript._TranscriptReader(target).read()).text_screen()
+    assert replayed == (["", "  English", ""], attributes)
 
 
 # Recording through the carrier seam, and reading it back.
@@ -363,8 +402,77 @@ def test_a_frame_changing_only_its_attributes_reconstructs(target):
     assert len(entries) == 2, "two distinct screens, two frames"
 
 
+def test_a_read_where_the_capture_sent_keys_is_named_there(target):
+    """A desync is reported where it happens, not where it surfaces.
+
+    Reading past a recorded call used to be silent, so the replay
+    quietly took the *next* call as its answer and every keystroke
+    after it was compared against the wrong one — the mismatch then
+    landed minutes later, against a screen neither run was looking at.
+    """
+    writer = _TranscriptWriter(target, pace=0.05)
+    writer.open()
+    inner = _FakeInnerSession(rows=["MENU"])
+    session = RecordingSession(inner, writer)
+    session.text_screen()
+    session.send_keys([["down"]])
+    inner.rows = ["MENU MOVED"]
+    session.text_screen()
+    writer.close()
+    replay = ReplaySession(transcript._TranscriptReader(target).read())
+    replay.text_screen()
+    with pytest.raises(TranscriptError) as caught:
+        replay.text_screen()
+    assert caught.value.rule_id == "transcript.read-before-call"
+
+
+def test_a_screenshot_replays_by_name_and_not_by_directory(target):
+    """Where an image lands is the machine's; what it is called is the run's.
+
+    A capture records the absolute path it wrote, and a replay runs
+    against a different machine directory every time — comparing the
+    whole path would refuse every fixture. The name is the part the
+    script chose (`screenshot installed`), and a changed one is a real
+    divergence.
+    """
+    writer = _TranscriptWriter(target, pace=0.05)
+    writer.open()
+    session = RecordingSession(_FakeInnerSession(), writer)
+    session.screenshot(os.path.join("C:", "capture", "machine",
+                                    "screenshots", "installed.png"))
+    writer.close()
+    replay = ReplaySession(transcript._TranscriptReader(target).read())
+    replay.screenshot(os.path.join("/tmp", "replay", "installed.png"))
+    replay2 = ReplaySession(transcript._TranscriptReader(target).read())
+    with pytest.raises(TranscriptError) as caught:
+        replay2.screenshot(os.path.join("/tmp", "replay", "verified.png"))
+    assert caught.value.rule_id == "transcript.screenshot-mismatch"
+
+
+def test_a_vanished_vm_replays_as_the_refusal_it_was(target):
+    """The shutdown a DOS install ends on, put back where it happened.
+
+    The entry is written by the run rather than by the seam — the
+    session refuses to open, so no wrapper exists to record it — and
+    reconstruction answers it as the adapter's own refusal, which is
+    what a `wait machine=stopped` reads as the machine having stopped.
+    """
+    writer = _TranscriptWriter(target, pace=0.05)
+    writer.open()
+    session = RecordingSession(_FakeInnerSession(rows=["C:\\>"]), writer)
+    session.text_screen()
+    writer.write_gone("the recorded VM is not reachable")
+    writer.close()
+    entries = transcript._TranscriptReader(target).read()
+    replay = ReplaySession(entries)
+    replay.text_screen()
+    with pytest.raises(PreflightError) as caught:
+        replay.text_screen()
+    assert caught.value.rule_id == "machine.vm-unreachable"
+
+
 def test_a_changed_row_is_carried_as_a_delta(target):
-    """The delta encoding, which the format never actually used.
+    r"""The delta encoding, which the format never actually used.
 
     The keyframe test read `prev != rows` and took the keyframe
     branch, so deltas were emitted only when the rows were

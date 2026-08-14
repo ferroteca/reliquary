@@ -1400,6 +1400,17 @@ and the two land together (S1, S2). A reader who finds `.rlqt`
 files and goes looking for their norm should learn here that none
 was written.
 
+**A recorded run is a different run, and slower.** No independent
+sampler can exist — a backend admits one control session at a time
+— so the run's own polls *are* the capture, and recording makes it
+poll at the transcript's stated pace rather than at the cheap
+production cadence. Denser sampling is strictly more information,
+never less, but it is not free: a QEMU sample reads the text
+memory, and one taken ten times a second makes a FreeDOS install
+run two to three times longer than it does unrecorded. The pace
+the capture was taken at is stated in the file, so a transcript is
+never mistaken for production timing.
+
 **A bound secret stops the recording.** The moment a secret
 property's value reaches the guest, capture stops for the rest of
 the run and the transcript records why; the frames already written

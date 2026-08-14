@@ -38,29 +38,20 @@ to this file on pledge.
 > number retiring with the split (D42). Demanded by **P22** and
 > **P24** — a surface that genuinely cannot be tested names the gap
 > rather than being quietly exempted, and this closes the largest
-> one. Needs **F42** delivered first. Design:
+> one. Design:
 > [design/screen-transcripts.md](design/screen-transcripts.md).
 
 The third conformance corpus, and the one whose fixtures nobody can
 author: the blueprint and script corpora are written, and this one
-is only ever captured.
+is only ever captured. The corpus stands on two captures of the
+working paths — a FreeDOS install and its verify — and what remains
+is the half a working path cannot supply.
 
-Work items:
+Work item:
 
-1. The harness: run the interpretation layer against a `.rlqt`
-   fixture — the fixture directory, the loader, and the assertion
-   vocabulary.
-2. The first captures, taken under the opt-in integration run
-   against real QEMU: the FreeDOS install path and the verify
-   script.
-3. The pathological captures — the boots where prompt detection or
+1. The pathological captures — the boots where prompt detection or
    command-echo scanning misbehaves, each becoming a regression
    fixture.
-4. The corpus README, as the blueprint and script corpora each
-   carry: where its findings live.
-5. The suite discipline: fixtures reconstruct with no QEMU present,
-   so they run in the **default** suite, and a failing capture is a
-   defect to fix rather than a skip to tolerate.
 
 ## F41 — The drive-determination handover
 

@@ -37,8 +37,7 @@ from .errors import (PreflightError, ReliquaryError, RunCancelled,
 from .home import cache_dir as _resolve_cache_dir
 from .library import locate_blueprint, locate_script
 from .control_display import char_keys
-from .machine_handle import (Machine, screenshot,
-                            validate_screenshot_name)
+from .machine_handle import Machine, validate_screenshot_name
 from .progress import interactive as _interactive, stream_for
 from .resolve import load_namespace
 from .script_parser import load_script
@@ -471,8 +470,11 @@ class _ScriptEngine:
         self._secret_recorded = False
         self._record_pace = record_pace
         self._recording_writer = recording_writer
-        self._pace_settle = max(_SETTLE_POLL, record_pace or 0)
-        self._pace_idle = max(_POLL_INTERVAL, record_pace or 0)
+        # A pace is a ceiling on the interval, never a floor: recording
+        # exists to close the two-second holes, so it can only make the
+        # run sample harder than it otherwise would.
+        self._pace_settle = min(_SETTLE_POLL, record_pace or _SETTLE_POLL)
+        self._pace_idle = min(_POLL_INTERVAL, record_pace or _POLL_INTERVAL)
         self._phase = None
         self._run_started = None
         self._phase_started = None
@@ -540,10 +542,13 @@ class _ScriptEngine:
     def _poll_interval(self, settled):
         """Return the sleep interval between samples.
 
-        When recording, both intervals are floored against the record
-        pace so a captured run polls at least as hard as the recording
-        cadence — a steady interval is simpler to replay and an
-        undersampled transcript misses frames.
+        When recording, neither interval may exceed the record pace:
+        the recorder cannot have a sampler of its own (QEMU admits one
+        QMP client), so the run's own polls *are* the capture, and a
+        two-second idle poll would leave a two-second hole through
+        most of a boot. Taking the pace as a floor instead left the
+        production cadence exactly as it was, which is the same as
+        having no pace at all.
         """
         return self._pace_idle if settled else self._pace_settle
 
@@ -736,7 +741,7 @@ class _ScriptEngine:
             return None
         name = f"failure-step-{self._step}"
         try:
-            screenshot(name, self._machine_home)
+            self._machine().screenshot(name)
         except Exception:
             # A failure report must never fail; the machine may
             # already be gone.
@@ -1511,6 +1516,26 @@ class _ScriptEngine:
         except ReliquaryError:
             return None
 
+    def _machine(self):
+        """The handle **every** carrier call goes through.
+
+        One constructor rather than three, because the recorder is
+        installed here: a caller that builds its own handle makes a
+        carrier call the transcript never sees, which is what the
+        `screenshot` verb did — and both codex scripts take one.
+
+        Passed at construction rather than assigned after: `Machine`
+        is frozen, so the assignment this replaced raised on every
+        recorded run at its first screen read.
+        """
+        wrapper = None
+        if self._recording_writer is not None:
+            wrapper = (lambda session: _transcript.RecordingSession(
+                session, self._recording_writer))
+        return Machine(self._machine_home,
+                       cache=self._cache_root_or_none(self._context),
+                       _session_wrapper=wrapper)
+
     @contextlib.contextmanager
     def _console(self):
         """Yield a console over an identity-verified session.
@@ -1519,19 +1544,29 @@ class _ScriptEngine:
         none is ever held while a statement list runs — QEMU's QMP
         server admits one client at a time.
         """
-        wrapper = None
-        if self._recording_writer is not None:
-            wrapper = (lambda session: _transcript.RecordingSession(
-                session, self._recording_writer))
-        # Passed at construction rather than assigned after: `Machine`
-        # is frozen, so the assignment this replaced raised on every
-        # recorded run at its first screen read.
-        machine = Machine(
-            self._machine_home,
-            cache=self._cache_root_or_none(self._context),
-            _session_wrapper=wrapper)
-        with machine.console() as console:
-            yield console
+        try:
+            with self._machine().console() as console:
+                yield console
+        except (OSError, ConnectionError) as gone:
+            self._note_vm_gone(gone)
+            raise
+        except PreflightError as gone:
+            if gone.rule_id == "machine.vm-unreachable":
+                self._note_vm_gone(gone)
+            raise
+
+    def _note_vm_gone(self, error):
+        """Record the moment the carrier went away, where recording.
+
+        The seam cannot record this one: the session refuses to open,
+        so the wrapper that would have written it never exists. It is
+        the guest powering itself off — the answer a `wait
+        machine=stopped` is waiting for — so a capture without it
+        replays up to the shutdown and no further.
+        """
+        writer = self._recording_writer
+        if writer is not None:
+            writer.write_gone(str(error))
 
     def _mark_stopped(self):
         self._running = False
@@ -1648,8 +1683,10 @@ class _ScriptEngine:
         self._action(statement, "screenshot", name)
         self._requires_running(statement)
         # No run directory exists any more (D36), so an author's
-        # screenshot rests with the machine it was taken from.
-        Machine(self._machine_home).screenshot(name)
+        # screenshot rests with the machine it was taken from. Through
+        # `_machine()` like every other carrier call, so a recorded
+        # run's transcript carries it.
+        self._machine().screenshot(name)
         self._completed(statement, "screenshot")
 
     def _insert(self, statement):
@@ -1919,7 +1956,8 @@ def execute_script(script, *, machine_id, context=None, display=False,
     if record is not None:
         record_pace = _RECORD_PACE
         recording_writer = _transcript._TranscriptWriter(
-            record, pace=record_pace)
+            record, pace=record_pace,
+            **_transcript.script_identity(script_path))
         recording_writer.open()
     engine = _ScriptEngine(
         script, machine_id, context,

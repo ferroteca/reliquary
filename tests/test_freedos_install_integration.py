@@ -11,7 +11,17 @@ only for the duration of the run.
 The home comes from the `integration_home` fixture, so
 `RELIQUARY_INTEGRATION_HOME` reuses an absolute home and keeps the
 LiveCD media cache across reruns.
+
+**Every run here records a screen transcript**, into `captures/` under
+that home. It is where F43's corpus fixtures come from — this tier is
+the only place a real guest draws a real screen — and it is evidence
+on the runs that fail, which are the ones worth a frame-by-frame read.
+Promotion to a fixture stays a deliberate copy: no test writes into
+the source tree, and a capture is looked at before it becomes an
+assertion (`tests/fixtures/conformance/transcript/README.md`).
 """
+
+import os
 
 import pytest
 
@@ -24,6 +34,13 @@ from tests import live_external_effects
 
 
 pytestmark = pytest.mark.integration
+
+
+def _capture(home, label):
+    """Where this run's transcript is written — the home, never the tree."""
+    captures = os.path.join(home, "captures")
+    os.makedirs(captures, exist_ok=True)
+    return os.path.join(captures, f"freedos-{label}.rlqt")
 
 
 def test_freedos_plain_install_and_verify(integration_home):
@@ -48,11 +65,13 @@ def test_freedos_plain_install_and_verify(integration_home):
         # them (U1, D88).
         seed_blueprint("freedos", context=home)
         installed = run_script("install", blueprint="freedos",
-                               context=home)
+                               context=home,
+                               record=_capture(home, "install"))
         assert installed.machine_phase == "ready"
 
         verified = run_script("verify", blueprint="freedos",
-                              context=home)
+                              context=home,
+                              record=_capture(home, "verify"))
         assert verified.machine_phase == "ready"
         assert verified.machine_id == installed.machine_id
 
@@ -62,7 +81,8 @@ def test_freedos_plain_install_and_verify(integration_home):
         # back in a second.
         handed_off = run_script("ready", blueprint="freedos",
                                 context=home,
-                                expect={"ready": "yes"})
+                                expect={"ready": "yes"},
+                                record=_capture(home, "ready"))
         assert handed_off.machine_id == installed.machine_id
         assert load_machine_state(
             handed_off.machine_id, home)["phase"] == "running", (
