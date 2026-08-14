@@ -130,8 +130,10 @@ upstream delivery omits.
 
 The pin moved to **`0.0.1a3`** on 2026-08-12, and each of the eight
 was exercised against that release on the delivered Windows host
-while the at-rest layer was rewritten onto it. Every one answers —
-the notes under each say what was observed. **That is an API
+while the at-rest layer was rewritten onto it. Seven answer — the
+notes under each say what was observed; ask 8's answer did not
+survive review, and the note under it records the restatement of
+2026-08-13. **That is an API
 observation and not this feature's gate**: the gate asks for a
 release verified against P27's guarantees, and delivery is a
 surface change (S1, S7 — the drive record and the letter map) that
