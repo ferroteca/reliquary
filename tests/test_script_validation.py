@@ -300,6 +300,44 @@ CASES = (
          _HEAD + 'wait {\n    on "a" {\n        set rlq.x "1"\n'
          "        finish\n    }\n"
          '    on "b" {\n        finish\n    }\n}\n'),
+
+    # The scoped machine-state change (F54). Each rule it carries is
+    # an existing rule stretched, which is what the pledge weighed:
+    # the head vocabulary is V14's closed-vocabulary rule, what a
+    # block may hold is V2's signatures, one-scope-per-target is V9's
+    # placement, distinct boot keys are V5's uniqueness, and the two
+    # shapes never mixing is V10 — now decided here rather than by the
+    # grammar, which can no longer see which shape a `with` opens.
+    Case("scope-unknown-head", "V14", "with does not scope 'medium'",
+         _HEAD + "with medium cdrom0 {\n    start\n}\n"),
+    Case("scope-set-boot-as-a-head", "V14", "with does not scope 'set-boot'",
+         _HEAD + "with set-boot cdrom0 {\n    start\n}\n"),
+    Case("scope-insert-without-a-medium", "V2",
+         "with insert takes a slot and a @media or $property reference",
+         _HEAD + "with insert cdrom0 {\n    start\n}\n"),
+    Case("scope-eject-takes-one-slot", "V2", "with eject takes one slot",
+         _HEAD + "with eject cdrom0 cdrom1 {\n    start\n}\n"),
+    Case("scope-wraps-a-statement-in-a-phased-script", "V2",
+         "wraps phases, and this one holds the statement start",
+         _HEAD + "entry a\nwith boot cdrom0 {\n    start\n}\n"
+         "phase a {\n    finish\n}\n"),
+    Case("scope-doubled-on-the-boot-order", "V9",
+         "the boot order is already scoped by an enclosing with",
+         _HEAD + "with boot cdrom0 {\n    with boot hdd0 {\n"
+         "        start\n    }\n}\n"),
+    Case("scope-doubled-on-one-slot", "V9",
+         "cdrom0 is already scoped by an enclosing with",
+         _HEAD + "with insert cdrom0 @disk {\n"
+         "    with eject cdrom0 {\n        start\n    }\n}\n"),
+    Case("scope-boot-names-one-drive-twice", "V5",
+         "boot names one drive twice: cdrom0 and cdrom0",
+         _HEAD + "with boot cdrom0 cdrom0 {\n    start\n}\n"),
+    Case("scope-boot-names-one-drive-by-two-spellings", "V5",
+         "boot names one drive twice: cdrom and cdrom0",
+         _HEAD + "with boot cdrom cdrom0 {\n    start\n}\n"),
+    Case("statement-outside-every-phase", "V10",
+         "start is outside every phase",
+         _HEAD + "entry a\nstart\nphase a {\n    finish\n}\n"),
 )
 
 #: Scripts the rules must let through, asserted by parsing alone.
@@ -316,6 +354,22 @@ ACCEPTS = (
     ("press-takes-a-key-name", _HEAD + "press enter\n"),
     ("screenshot-takes-a-name", _HEAD + "screenshot end\n"),
     ("an-ordinary-variable-key", _HEAD + 'set suite.result "PASS"\n'),
+    # Scopes on different targets nest freely, and each shape wraps
+    # its own units.
+    ("a-scope-over-phases",
+     _HEAD + "entry a\nwith boot cdrom0 {\n    phase a {\n"
+     "        finish\n    }\n}\n"),
+    ("a-scope-over-statements",
+     _HEAD + "with insert cdrom0 @disk {\n    start\n}\n"),
+    ("scopes-on-different-targets-nest",
+     _HEAD + "with boot cdrom0 {\n    with insert cdrom0 @disk {\n"
+     "        with eject floppy0 {\n            start\n        }\n"
+     "    }\n}\n"),
+    ("a-scope-beside-a-phase",
+     _HEAD + "entry a\nwith boot cdrom0 {\n    phase a {\n"
+     "        goto b\n    }\n}\nphase b {\n    finish\n}\n"),
+    ("a-phase-named-with-is-still-refused-elsewhere",
+     _HEAD + "entry withdraw\nphase withdraw {\n    finish\n}\n"),
 )
 
 

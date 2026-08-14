@@ -1,0 +1,15 @@
+# invalid: a with block in a phased script wraps phases
+# rule: V2
+# id: scope.wraps-the-wrong-unit
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+with boot cdrom0 {
+    start
+}
+
+phase a {
+    finish
+}

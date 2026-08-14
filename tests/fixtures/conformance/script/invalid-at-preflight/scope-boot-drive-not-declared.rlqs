@@ -1,0 +1,10 @@
+# invalid at preflight: a scoped boot prefix names a drive the machine
+# invalid at preflight: does not declare -- the same rule set-boot's
+# invalid at preflight: keys answer to, and the same diagnostic
+# spec: Validation and preflight
+# id: machine.slot-not-declared
+
+platform dos
+with boot cdrom7 {
+    wait "C:\>"
+}

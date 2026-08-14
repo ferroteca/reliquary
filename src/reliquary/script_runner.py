@@ -426,6 +426,21 @@ class _Observation:
         return self.stable is None or now - self._episode >= self.stable
 
 
+@dataclasses.dataclass
+class _ActiveScope:
+    """One entered ``with`` scope, and the value it will put back.
+
+    ``captured`` is read at entry, before the change is applied: a
+    tuple of drive keys for the machine's boot order, or a slot's
+    medium as the ``(media, path)`` pair that reinstates it — a
+    declared media by name, an anonymous image by the path it was
+    mounted from, and ``(None, None)`` for a slot that was empty.
+    """
+
+    scope: object
+    captured: object
+
+
 class _ScriptEngine:
     """One run of one script against one cached machine."""
 
@@ -476,6 +491,13 @@ class _ScriptEngine:
         #: nothing: a cadence needs two samples before it exists.
         self._recognized_screens = False
         self._guard_reported = False
+        #: The scopes control is currently inside, outermost first,
+        #: and what each of them will put back.
+        self._scopes = []
+        #: What the run has already put back, for the failure report:
+        #: a scope took state a diagnostician would otherwise have
+        #: found, so the run has to say what it took.
+        self._restored = []
         self._cancelled = threading.Event()
         self.events = (events if events is not None
                        else _events.EventStream(redact=self._redact))
@@ -584,19 +606,28 @@ class _ScriptEngine:
                 # A linear script's one ending: reaching end of file
                 # completes the run.
                 self._execute(self._script.statements)
+            # The run reached its end inside whatever scopes were
+            # still open, and the last thing it does is close them. A
+            # restore that cannot be made fails the run here — the
+            # cost D104 named and accepted, arriving through the arm
+            # below like any other failure.
+            self._unwind(None)
             self._report_final()
             self._terminal(None)
         except RunCancelled as exc:
+            self._unwind(exc)
             self._report_final()
             self._terminal(exc)
             raise
         except ReliquaryError as exc:
+            self._unwind(exc)
             self._report_final()
             if isinstance(exc, ScriptRuntimeError) and exc.path is None:
                 exc.path = self._script_path
             self._fail(exc)
             raise
         except Exception as exc:
+            self._unwind(exc)
             self._report_final()
             wrapped = self._error(f"unexpected error: {exc}")
             self._fail(wrapped)
@@ -621,13 +652,17 @@ class _ScriptEngine:
         pending condition or action, the clock that expired and the
         scope that supplied it, the route with its revisit counts, the
         nearest miss on the last screen read, an automatic screenshot,
-        and the command to try next.
+        the command to try next — and **what a scope put back**. That
+        last is not decoration: a scoped change is state a
+        diagnostician would otherwise have found on the machine, so a
+        run that took it back has to say so.
         """
         self.events.clear()
         self._emit(
             _events.FAILURE, error=str(error), pending=self._pending,
             clock=getattr(error, "clock", None),
             scope=getattr(error, "scope", None),
+            restored=tuple(self._restored) or None,
             route=tuple(self._route) or None,
             revisits={name: count for name, count
                       in self._revisits.items() if count > 1} or None,
@@ -766,9 +801,194 @@ class _ScriptEngine:
                 f"(phase: {phase})",
                 rule_id="machine.phase-cannot-run")
 
+    # -- scoped machine-state changes ----------------------------
+
+    def _enter_scope(self, scope):
+        """Capture what a scope owns, then make its change.
+
+        Entry is a boundary like a statement start, so a cancellation
+        lands here rather than between the capture and the change — a
+        scope that never applied owns nothing and is never pushed.
+        """
+        self._check_clocks(scope.action)
+        captured = self._capture(scope)
+        self._emit(_events.SCOPE_ENTER, head=scope.head,
+                   target=scope.target, detail=self._detail(scope.action),
+                   line=scope.line)
+        self._apply(scope)
+        # Pushed only once the change is made: a scope whose entry
+        # failed owns nothing and must not be unwound.
+        self._scopes.append(_ActiveScope(scope, captured))
+
+    def _capture(self, scope):
+        """Read the value this scope's exit will put back."""
+        state = _machines.load_machine_state(self._machine_id,
+                                             self._context)
+        if scope.head == "boot":
+            return tuple(state.get("boot") or ())
+        drive = (state.get("drives") or {}).get(
+            scope.action.arguments[0]) or {}
+        return (drive.get("media"), drive.get("path"))
+
+    def _apply(self, scope):
+        """Make the change a scope's head names."""
+        if scope.head == "insert":
+            self._insert(scope.action)
+        elif scope.head == "eject":
+            self._eject(scope.action)
+        else:
+            self._set_boot_prefix(scope.action)
+
+    def _set_boot_prefix(self, action):
+        """Put the named drives first, keeping the rest of the order.
+
+        The difference from `set-boot`, and the whole reason the head
+        is spelled `boot` (D104): a stage says "boot the CD first",
+        and an author should not have to restate an order they are not
+        changing.
+        """
+        keys = list(action.arguments)
+        state = _machines.load_machine_state(self._machine_id,
+                                             self._context)
+        order = keys + [key for key in (state.get("boot") or ())
+                        if key not in keys]
+        self._action(action, "boot", " ".join(order))
+        self._machine_change(action, _machines.set_boot_order, order)
+        self._completed(action, "boot")
+
+    def _leave_scopes(self, depth):
+        """Restore every scope deeper than ``depth``, innermost first.
+
+        Raises where a restore cannot be made, which is a run failure
+        like any other: the run is still going, so there is no earlier
+        error for this one to displace.
+        """
+        while len(self._scopes) > depth:
+            self._restore(self._scopes.pop())
+
+    def _unwind(self, failing):
+        """Close every open scope as the run ends.
+
+        ``failing`` is the error the run is already ending with, or
+        ``None`` on a run that otherwise succeeded. It decides what a
+        restore that cannot be made does: on a clean run it becomes
+        the run's failure, and on a failing one it is reported and the
+        original error stands — a restore that could not be made is
+        never the more useful of two diagnostics.
+        """
+        problem = None
+        while self._scopes:
+            try:
+                self._restore(self._scopes.pop())
+            except ReliquaryError as exc:
+                problem = problem or exc
+        if problem is not None and failing is None:
+            raise problem
+
+    def _restore(self, active):
+        """Put back what one scope captured, reporting either way.
+
+        A restore that cannot be made says **what it could not undo**
+        rather than only why: the machine layer's refusal names the
+        rule (a boot order is stopped-only), and only the run knows
+        which scope was open and what it was holding.
+        """
+        scope = active.scope
+        wanted = self._wanted(scope, active.captured)
+        try:
+            self._put_back(scope, active.captured)
+        except ReliquaryError as exc:
+            self._emit(_events.SCOPE_RESTORE, head=scope.head,
+                       target=scope.target, detail=wanted,
+                       error=str(exc), line=scope.line)
+            raise self._error(
+                f"{scope.target} could not be restored to {wanted}: {exc}",
+                scope.action, rule_id=exc.rule_id) from exc
+        self._restored.append(f"{scope.target}: {wanted}")
+        self._emit(_events.SCOPE_RESTORE, head=scope.head,
+                   target=scope.target, detail=wanted, line=scope.line)
+
+    @staticmethod
+    def _wanted(scope, captured):
+        """What a restore will put back, as a phrase, before it runs."""
+        if scope.head == "boot":
+            # A machine always has an order, so the empty case is
+            # unreachable rather than a policy: there is simply
+            # nothing to put back, and `set_boot_order` refuses an
+            # empty order in any case.
+            return " ".join(captured) if captured else "no recorded order"
+        media, path = captured
+        if media is not None:
+            return f"@{media}"
+        # An anonymous image the slot held when the run arrived is
+        # mounted in place, so putting it back names the path again
+        # rather than resolving anything.
+        return path if path is not None else "empty"
+
+    def _put_back(self, scope, captured):
+        """Reinstate one captured value, or raise saying it could not.
+
+        The machine calls are made directly rather than through
+        :meth:`_machine_change`: the caller states the change that
+        failed, and a diagnostic located twice reads worse than one
+        located once.
+        """
+        if scope.head == "boot":
+            if captured:
+                _machines.set_boot_order(self._machine_id, list(captured),
+                                         context=self._context)
+            return
+        slot = scope.action.arguments[0]
+        media, path = captured
+        state = _machines.load_machine_state(self._machine_id,
+                                             self._context)
+        drive = (state.get("drives") or {}).get(slot) or {}
+        if drive.get("path") is not None:
+            _machines.eject_media(self._machine_id, slot,
+                                  context=self._context)
+        if media is None and path is None:
+            return
+        # No cancel event: a run ending on a Ctrl-C still owes the
+        # machine what it took, and a fetch that aborts on arrival
+        # would leave the slot empty rather than as it was found.
+        _machines.insert_media(
+            self._machine_id, slot, media, file=None if media else path,
+            context=self._context, events=self.events)
+
+    @staticmethod
+    def _detail(action):
+        """How a head's change reads on the stream, as authored."""
+        if action.verb != "insert":
+            return " ".join(action.arguments if action.verb == "boot"
+                            else (action.arguments[0],))
+        kind, name = action.arguments[1]
+        sigil = "@" if kind == "media" else "$"
+        return f"{action.arguments[0]} {sigil}{name}"
+
+    def _cross_into(self, name):
+        """Leave the scopes a phase sits outside; enter the ones it is in.
+
+        **The scope is where control is, not where the text is**
+        (D104): a phase is inside a group whichever way control
+        reached it, so the two chains are compared rather than the two
+        positions. Their common prefix stays untouched, what the old
+        phase had beyond it is restored innermost first, and what the
+        new one has beyond it is applied outermost first — which makes
+        re-entry re-apply, with no case of its own.
+        """
+        chain = self._script.phase_scopes.get(name, ())
+        depth = 0
+        while (depth < len(chain) and depth < len(self._scopes)
+               and self._scopes[depth].scope is chain[depth]):
+            depth += 1
+        self._leave_scopes(depth)
+        for scope in chain[depth:]:
+            self._enter_scope(scope)
+
     def _run_phases(self):
         """Walk the phase graph from `entry` until a `finish`."""
         name = self._script.entry
+        self._cross_into(name)
         while True:
             phase = self._phases[name]
             self._phase = phase
@@ -788,13 +1008,30 @@ class _ScriptEngine:
                        elapsed=round(self._now() - self._phase_started, 3))
             if result is _FINISH or result is None:
                 return
+            self._cross_into(result)
             name = result
 
     # -- statements ----------------------------------------------
 
     def _execute(self, statements):
-        """Run a statement list; report how control left it."""
+        """Run a statement list; report how control left it.
+
+        A ``with`` scope in a linear script brackets a run of the list:
+        control is inside it for exactly the statements it wraps, so
+        entering and leaving are where the text says. A failure inside
+        leaves the scope on the stack, where the run's unwind restores
+        it — the same path every other outcome takes.
+        """
         for statement in statements:
+            units = getattr(statement, "units", None)
+            if units is not None:
+                depth = len(self._scopes)
+                self._enter_scope(statement)
+                result = self._execute(units)
+                self._leave_scopes(depth)
+                if result is not None:
+                    return result
+                continue
             self._step += 1
             self._check_clocks(statement)
             result = self._statement(statement)
@@ -1185,9 +1422,19 @@ class _ScriptEngine:
     def _check_clocks(self, statement=None):
         """Check the budgets — and a cancellation — at a boundary."""
         if self._cancelled.is_set():
+            # "As it stands" is the whole promise of a cancellation, so
+            # an open scope is the one thing that has to be said out
+            # loud: its restore is about to run, and a machine that
+            # comes back different from the one the interrupt left is
+            # only honest if the message named it first.
+            left = "is left as it stands"
+            if self._scopes:
+                left += (", apart from the scoped changes being put "
+                         "back: " + ", ".join(active.scope.target
+                                              for active in self._scopes))
             raise RunCancelled(
                 f"the run was cancelled at step {self._step}; machine "
-                f"{self._machine_id} is left as it stands")
+                f"{self._machine_id} {left}")
         now = self._now()
         run = self._plan.run_deadline
         if (run is not None and self._run_started is not None
@@ -1537,12 +1784,23 @@ def _walk(script):
     The validation and timing layers walk the tree too, but each
     threads its own scope context and neither may import this
     module's; this is the plain traversal.
+
+    A ``with`` head is yielded as the action it is written as, so a
+    scoped `insert` answers to the same preflight rules as a written
+    one; the pseudo-verb ``boot`` is the head-only third.
     """
 
     def statements(items, handlers=()):
         for handler in handlers:
             yield from statements(handler.statements)
         for item in items:
+            units = getattr(item, "units", None)
+            if units is not None:
+                yield item.action
+                yield from statements(units)
+                continue
+            if not hasattr(item, "verb"):
+                continue              # a phase, reached below
             yield item
             yield from statements((), item.handlers)
 
@@ -1575,7 +1833,9 @@ def _preflight_machine_rules(script, machine_state, script_path,
     ``insert``/``eject``/``set-boot`` never create or remove a drive
     — the blueprint alone defines machine topology — so every named
     slot must exist in the machine's state.  ``insert``/``eject``
-    further require a floppy or cdrom slot.
+    further require a floppy or cdrom slot. A ``with`` head is checked
+    as the action it spells, the scoped ``boot`` prefix answering to
+    ``set-boot``'s rule: every key names a declared drive.
 
     A ``$property`` media argument resolves at binding, not here, so
     only a literal ``@name`` is checked. The namespace is loaded
@@ -1589,7 +1849,7 @@ def _preflight_machine_rules(script, machine_state, script_path,
         if statement.verb in ("insert", "eject"):
             slots = (statement.arguments[0],)
             removable_only = True
-        elif statement.verb == "set-boot":
+        elif statement.verb in ("set-boot", "boot"):
             slots = statement.arguments
             removable_only = False
         else:

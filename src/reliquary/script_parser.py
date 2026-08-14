@@ -259,6 +259,41 @@ class Phase:
 
 
 @dataclass(frozen=True)
+class Scope:
+    """A ``with`` block: one machine-state change and what it holds.
+
+    ``action`` is the head, typed as the statement it is written as —
+    an ``insert`` or ``eject`` node with those verbs' own arguments, or
+    a ``boot`` node whose arguments are the slot keys it puts first.
+    Reusing the statement type is what keeps preflight's slot rules one
+    piece of code rather than two.
+
+    ``units`` are the wrapped units in source order: phases in a
+    phased script, statements in a linear one, and nested scopes in
+    either. Which of those a block may legally hold is V2's, decided
+    once the script's shape is known.
+    """
+
+    head: str                     # "boot", "insert", or "eject"
+    action: "Statement"
+    units: Tuple[object, ...] = ()
+    line: int = 0
+    column: int = 1
+
+    @property
+    def target(self):
+        """What this scope owns, for the one-scope-per-target rule.
+
+        The boot order is one target however many drives a head names;
+        a medium's target is its slot, so an ``insert`` and an
+        ``eject`` on one slot collide as they should.
+        """
+        if self.head == "boot":
+            return "the boot order"
+        return self.action.arguments[0]
+
+
+@dataclass(frozen=True)
 class HttpContent:
     """One run-served HTTP response body declared by a script."""
 
@@ -296,9 +331,24 @@ class Script:
     stability: Optional[str] = None
     properties: Tuple[Property, ...] = ()
     http: Optional[Http] = None
-    statements: Tuple[Statement, ...] = ()
+    #: The linear body: every top-level unit that is not a phase,
+    #: nesting preserved, so a ``Scope`` still holds what it wraps. In
+    #: a *phased* script this is the top-level scopes and nothing
+    #: else — a statement landing here is a script mixing the two
+    #: shapes, which V10 rejects.
+    statements: Tuple[object, ...] = ()
+    #: Every phase, **flattened** out of whatever scopes wrap it, in
+    #: source order. The phase graph is the flat namespace `goto` and
+    #: `entry` address, and a scope changes where control *is*, never
+    #: which phases exist.
     phases: Tuple[Phase, ...] = ()
     headers: Mapping[str, int] = field(default_factory=dict)
+    #: Every scope, flattened, in source order.
+    scopes: Tuple[Scope, ...] = ()
+    #: Per phase name, the scopes enclosing it, outermost first. The
+    #: runner reads this to know what a transition enters and leaves.
+    phase_scopes: Mapping[str, Tuple[Scope, ...]] = field(
+        default_factory=dict)
 
 
 class _Token(LarkToken):
@@ -451,6 +501,46 @@ def _channel(item):
     return Condition(name, kind,
                      decoded.value if decoded is not None else str(value),
                      line, column, named=True)
+
+
+#: The heads a ``with`` block may carry, each with the argument
+#: shape it is written in. ``insert`` and ``eject`` are the verbs
+#: exactly as they appear as statements; ``boot`` is the head-only
+#: one, and states a prefix of the order rather than replacing it —
+#: which is why it is not spelled ``set-boot`` (D104).
+_SCOPE_HEADS = ("boot", "insert", "eject")
+
+
+def _insert_arguments(slot, reference):
+    """The ``insert`` argument tuple: a slot and a typed reference."""
+    return (str(slot),
+            ("media" if reference.type == "MEDIA_REF" else "property",
+             str(reference)))
+
+
+def _scope_action(head, arguments, line, column):
+    """Type a ``with`` head's arguments as the action it spells."""
+    def refuse(expected):
+        raise ScriptParseError(
+            line, f"with {head} takes {expected}", column,
+            rule_id="scope.head-arguments")
+
+    if head == "boot":
+        if any(token.type != "NAME" for token in arguments):
+            refuse("drive keys, and nothing else")
+        return Statement("boot", tuple(str(token) for token in arguments),
+                         line=line, column=column)
+    if head == "insert":
+        if len(arguments) != 2 or arguments[0].type != "NAME" \
+                or arguments[1].type not in ("MEDIA_REF", "PROP_REF"):
+            refuse("a slot and a @media or $property reference")
+        return Statement("insert",
+                         _insert_arguments(arguments[0], arguments[1]),
+                         line=line, column=column)
+    if len(arguments) != 1 or arguments[0].type != "NAME":
+        refuse("one slot")
+    return Statement("eject", (str(arguments[0]),), line=line,
+                     column=column)
 
 
 def _opens_content_body(tokens):
@@ -828,12 +918,9 @@ class _Builder(Transformer):
         return self._simple("screenshot", "screenshot", children, names)
 
     def insert(self, children):
-        reference = children[2]
         return self._simple(
             "insert", "insert", children,
-            (str(children[1]),
-             (reference.type == "MEDIA_REF" and "media" or "property",
-              str(reference))))
+            _insert_arguments(children[1], children[2]))
 
     def eject(self, children):
         return self._simple("eject", "eject", children,
@@ -858,6 +945,31 @@ class _Builder(Transformer):
     def stop(self, children):
         return self._simple("stop", "stop", children, ())
 
+    # -- scopes --------------------------------------------------
+    def scope_block(self, children):
+        """Type one ``with`` head and collect what it wraps.
+
+        The head vocabulary is closed at three names (V14's kind) and
+        each name's arity is its own (V2's kind); both are decided
+        here, where the diagnostic can name the head the author wrote.
+        The two media heads take the `insert`/`eject` signatures
+        rather than restating them, so a scope and a statement can
+        never drift apart.
+        """
+        keyword, head = children[0], str(children[1])
+        line, column = _line(keyword), _column(keyword)
+        arguments = [child for child in children[2:]
+                     if isinstance(child, LarkToken)]
+        units = tuple(child for child in children[2:]
+                      if not isinstance(child, LarkToken))
+        if head not in _SCOPE_HEADS:
+            raise ScriptParseError(
+                line, f"with does not scope {head!r} (scopes: "
+                f"{', '.join(_SCOPE_HEADS)})", column,
+                rule_id="scope.unknown-head")
+        action = _scope_action(head, arguments, line, column)
+        return Scope(head, action, units, line, column)
+
     # -- phases and the document ---------------------------------
     def phase(self, children):
         modifiers = _modifiers(
@@ -872,15 +984,12 @@ class _Builder(Transformer):
             _spelling(modifiers.get("stability")), _line(children[0]),
             _column(children[0]))
 
-    def phased_body(self, children):
-        return ("phased", tuple(children))
-
-    def linear_body(self, children):
-        return ("linear", tuple(children))
+    def body(self, children):
+        return ("body", tuple(children))
 
     def script(self, children):
         headers, lines = {}, {}
-        properties, statements, phases, http = [], [], [], None
+        properties, units, http = [], (), None
         for child in children:
             if isinstance(child, Property):
                 properties.append(child)
@@ -890,12 +999,8 @@ class _Builder(Transformer):
                         child.line, "http may appear only once",
                         rule_id="http.duplicate-declaration")
                 http = child
-            elif isinstance(child, tuple) and child[0] in ("linear",
-                                                           "phased"):
-                if child[0] == "linear":
-                    statements.extend(child[1])
-                else:
-                    phases.extend(child[1])
+            elif isinstance(child, tuple) and child[0] == "body":
+                units = child[1]
             elif isinstance(child, tuple):
                 name, value, line = child
                 if name in headers:
@@ -904,12 +1009,35 @@ class _Builder(Transformer):
                         rule_id="syn.duplicate-header")
                 headers[name] = value
                 lines[name] = line
+        phases, scopes, enclosing = [], [], {}
+        _flatten(units, (), phases, scopes, enclosing)
         return Script(
             headers.get("platform"), headers.get("description"),
             headers.get("machine"), headers.get("entry"),
             headers.get("timeout"), headers.get("deadline"),
             headers.get("pacing"), headers.get("stability"),
-            tuple(properties), http, tuple(statements), tuple(phases), lines)
+            tuple(properties), http,
+            tuple(unit for unit in units if not isinstance(unit, Phase)),
+            tuple(phases), lines, tuple(scopes), enclosing)
+
+
+def _flatten(units, chain, phases, scopes, enclosing):
+    """Collect the phases and scopes a unit list holds, at any depth.
+
+    A scope wraps where control *is*, never which phases exist, so the
+    phase namespace stays flat and every layer above this one — the
+    graph rules, the timing plan, the runner's phase map — is unchanged
+    by the construct. What a scope adds is ``enclosing``: the chain of
+    scopes around each phase, outermost first, which is the whole of
+    what a transition needs to know.
+    """
+    for unit in units:
+        if isinstance(unit, Phase):
+            phases.append(unit)
+            enclosing[unit.name] = chain
+        elif isinstance(unit, Scope):
+            scopes.append(unit)
+            _flatten(unit.units, chain + (unit,), phases, scopes, enclosing)
 
 
 def _duration(token):

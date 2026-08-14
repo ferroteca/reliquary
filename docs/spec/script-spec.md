@@ -161,6 +161,12 @@ residual problems in [`script-examples/`](../../planning/design/script-examples/
   machine state that outlives the run, deliberately diverging a
   machine from its blueprint until restored — the `set-` prefix
   naming the persistence is what settled the spelling.
+- The [`with` block](#scoped-machine-state-changes) gives one such
+  mutation a declarative extent and undoes it at the edge, which
+  is the seam's own shape applied to the divergence above; it is
+  also the language's only construct whose scope is **dynamic**,
+  since every phase body ends in a transition and a lexical one
+  would revert at the first `goto`.
 
 **The prohibitions that keep the seam clean.** Each exists to stop
 the procedural half from eroding the declarative half:
@@ -175,7 +181,9 @@ the procedural half from eroding the declarative half:
 - no `sleep` or `delay`, so every pause is justified by an
   observation rather than a guess about guest speed (G1, G5);
 - no implicit machine teardown, so a failed run leaves state to
-  diagnose rather than a tidied crime scene.
+  diagnose rather than a tidied crime scene. A `with` scope is not
+  an exception to this: it tidies exactly what the author wrote a
+  scope around, and the run says what it took.
 
 OS installation automation is expressed as install and verify scripts
 attached to machine blueprints. Media acquisition (download, hash-verify,
@@ -187,7 +195,8 @@ the script.
 
 The language is a deliberately constrained, domain-specific
 programming language. It has sequencing, branching, named phases,
-and explicit phase transitions, but no expressions, mutable
+explicit phase transitions, and scoped machine-state changes, but
+no expressions, mutable
 variables, arithmetic, user-defined functions, or general-purpose
 loops. Its job is guest automation, not computation (G2).
 
@@ -483,11 +492,12 @@ Statements:
 | `start` | — | — | — |
 | `stop` | — | — | — |
 
-And the phase declaration:
+And the two block declarations, the phase and the scope:
 
 | node | arguments | modifiers | block |
 |---|---|---|---|
 | `phase` | name | `timeout`, `deadline`, `pacing`, `stability` | statements, or `always` handlers |
+| `with` | a head — `boot` plus drive keys, `insert` plus a slot and a `@media`/`$property`, or `eject` plus a slot | — | phases in a phased script, statements in a linear one |
 
 ### Grammar (normative)
 
@@ -525,8 +535,21 @@ inline-content-mod
 from-mod        = "from" , "=" , string ;
 port            = digit , { digit } ;
 
-linear-body     = statement-list ;
-phased-body     = phase , { phase } ;
+linear-body     = linear-unit , { linear-unit } ;
+linear-unit     = statement | linear-scope ;
+phased-body     = phased-unit , { phased-unit } ;
+phased-unit     = phase | phased-scope ;
+(* A scope wraps the enclosing shape's own units. Which shape a
+   `with` opens is not decidable at its head, so an implementation
+   may parse one permissive unit list and decide it with V2 and
+   V10; this grammar states the legal shapes. *)
+linear-scope    = "with" , scope-head , block-open ,
+                  linear-unit , { linear-unit } , block-close ;
+phased-scope    = "with" , scope-head , block-open ,
+                  phased-unit , { phased-unit } , block-close ;
+scope-head      = "boot" , slot , { slot }
+                | "insert" , slot , ( media-ref | property-ref )
+                | "eject" , slot ;
 phase           = "phase" , name , { timing-mod } , block-open ,
                   ( sequential-body | reactive-body ) ,
                   block-close ;
@@ -619,7 +642,11 @@ and `machine-state` values are `name` tokens whose closed
 vocabularies (drive slots, the portable key set, machine states)
 are checked by validation, not the grammar; `property-key` values
 are `name` tokens whose dot-separated segment structure (each
-segment starting with a letter) is likewise validation's rule.
+segment starting with a letter) is likewise validation's rule. The
+three words of `scope-head` are `name` tokens too — a word is a
+keyword only where a node name may start, so `insert` after `with`
+is an ordinary word and the head vocabulary is V14's closed set
+rather than the grammar's.
 
 ### Terminating statements
 
@@ -667,9 +694,11 @@ the CFG. Each has a stable id; diagnostics cite them:
 
 - **V2** — every argument, modifier, and block fits its node's
   signature, including each timing modifier's placement per the
-  [placement matrix](#timing).
+  [placement matrix](#timing) and the units a `with` block may
+  wrap in each script shape.
   Ids: `node.modifier-not-allowed`, `node.timing-placement`,
-  `node.modifier-not-a-duration`, `node.modifier-not-a-string`.
+  `node.modifier-not-a-duration`, `node.modifier-not-a-string`,
+  `scope.head-arguments`, `scope.wraps-the-wrong-unit`.
 
 - **V3** — each header appears at most once; `entry` appears
   exactly in phased scripts.
@@ -685,12 +714,14 @@ the CFG. Each has a stable id; diagnostics cite them:
   declared once per script and are not spelled `text`, `media`,
   or `secret`, user-declared property keys do not use the
   reserved `rlq` or `reliquary` namespaces, durations are
-  positive.
+  positive, and a scoped `boot` prefix names each drive once —
+  by slot, so an alias and its indexed form are one drive.
   Ids: `name.reserved-node`, `name.duplicate-phase`,
   `name.duplicate-property`, `name.property-is-a-kind`,
   `name.property-reserved-namespace`,
   `name.variable-reserved-namespace`, `time.non-positive`,
-  `prop.secret-default`, `prop.dead-default`, `prop.unknown-kind`.
+  `prop.secret-default`, `prop.dead-default`, `prop.unknown-kind`,
+  `drive.boot-duplicate`.
 
 - **V6** — every `$` reference names a declared property or a
   Reliquary-owned run property in a reserved namespace made
@@ -717,17 +748,20 @@ the CFG. Each has a stable id; diagnostics cite them:
   `wait.branching-condition` — the last unreachable today, the
   grammar rejecting that shape first.
 
-- **V9** — `on` appears only inside a branching `wait`, `always`
-  only directly inside a reactive phase, and a phase is
-  sequential or reactive, never mixed.
+- **V9** — a construct appears only where it is legal: `on` only
+  inside a branching `wait`, `always` only directly inside a
+  reactive phase, a phase is sequential or reactive and never
+  mixed, and no `with` scope stands inside another on the same
+  target.
   Ids: `handler.mixed-phase`, `handler.on-outside-branching-wait`,
-  `handler.always-outside-reactive-phase`.
+  `handler.always-outside-reactive-phase`,
+  `scope.doubled-target`.
 
 - **V10** — the two script shapes never mix; `goto` and `finish`
   are invalid in a linear script; every `goto` names a declared
   phase; `entry` names exactly one.
   Ids: `flow.transfer-in-linear`, `flow.goto-undeclared`,
-  `flow.entry-undeclared`.
+  `flow.entry-undeclared`, `flow.mixed-shapes`.
 
 - **V11** — the [terminating-statements rules](#terminating-statements):
   nothing follows a terminating statement, and a sequential
@@ -742,11 +776,13 @@ the CFG. Each has a stable id; diagnostics cite them:
   Ids: `obs.empty-pattern`, `obs.uncompilable-regex`.
 
 - **V14** — closed vocabularies hold by name: key names are from
-  the portable set, `insert`/`eject` name removable
+  the portable set, a `with` head is one of `boot`, `insert` and
+  `eject`, `insert`/`eject` name removable
   (floppy/cdrom) slots, `set-boot` names drive slots, and
   interpolation appears only where the argument accepts it.
-  Id: `key.not-portable` (the `press` vocabulary; the
-  insert/eject and set-boot vocabularies are preflight's).
+  Ids: `key.not-portable` (the `press` vocabulary) and
+  `scope.unknown-head` (the scope heads); the insert/eject and
+  boot slot vocabularies are preflight's.
 
 - **V16** — the `http` declaration and its `content` entries are
   well formed: the port range is sane, content names are unique
@@ -857,12 +893,16 @@ the planned format carries no compatibility promise yet.
 
 ## Script shapes
 
-A script uses one of two shapes. Mixing them is a parse error.
+A script uses one of two shapes, and mixing them is an error
+(V10). Which shape a script is, is decided by whether it declares
+any phase; a `with` block wraps the units of whichever shape it
+is in and never changes it.
 
 ### Linear script
 
-A linear script has top-level statements, executed in order. It is
-the normal form for a known sequence:
+A linear script has top-level statements, executed in order — and
+whatever [scopes](#scoped-machine-state-changes) wrap runs of
+them. It is the normal form for a known sequence:
 
 ```rlqs
 description "Confirm that the installed DOS system boots"
@@ -884,7 +924,10 @@ refuses a second spelling for it.
 ### Phased script
 
 A phased script declares named phases and an explicit `entry`
-phase. Top-level executable statements are not allowed:
+phase. Top-level executable statements are not allowed; the only
+other thing that may stand beside a phase is a
+[`with` block](#scoped-machine-state-changes), which holds
+phases:
 
 ```rlqs
 description "An installer with a reboot loop"
@@ -1284,6 +1327,10 @@ activation (the phase deadline's scope), a span per observation
   `finish` transitions;
 - observation arm, match (with the matched row and elapsed
   time), and timeout;
+- a scope's entry and its restore (`scope.enter`,
+  `scope.restore`), naming the target and what the exit put the
+  machine back to — the change itself is an ordinary action and
+  reports as one, so *that it was scoped* is carried only here;
 - handler fires, and each action's start and completion — input
   deliveries, `insert` / `eject` / `set-boot`, `start` / `stop`,
   `screenshot`. An `insert` names the media it actually mounted,
@@ -1301,7 +1348,8 @@ activation (the phase deadline's scope), a span per observation
   (`guard.cadence`, above under `stability`) — measured rather than
   configured, so it cannot be reported before a screen is read;
 - on failure: the pending condition or action, the expired clock
-  and its source scope, the route taken with phase revisit
+  and its source scope, **every scoped change the run put back**,
+  the route taken with phase revisit
   counts, the nearest-miss screen row, the reason the last screen
   could not be read where it could not be, **how many of its cells
   matched no glyph** where any did not, the automatic
@@ -1948,11 +1996,21 @@ diverged until a later `insert`/`eject` changes the slot again or
 [`apply`](../blueprint-guide.md#applying-blueprint-edits) returns
 the machine to its blueprint. A script that changes machine state
 it should not leave behind — an install script's installer CD —
-ends by explicitly restoring it, conventionally with `eject` as
-its final step. A script that fails or is interrupted leaves its
-media changes in place for diagnosis and resumption; `apply` is the
-one-command recovery when a diverged machine should return to its
-blueprint shape.
+either restores it explicitly, conventionally with `eject` as its
+final step, or gives the change a
+[scope](#scoped-machine-state-changes), which restores it on every
+outcome including the ones no final step reaches.
+
+**What a failure leaves behind is therefore the author's choice,
+and it is a real trade.** An *unscoped* change is left in place for
+diagnosis and resumption; `apply` is the one-command recovery when
+a diverged machine should return to its blueprint shape. A *scoped*
+change is put back before the run ends, so the machine is found as
+it was and the state a diagnostician might have wanted is gone —
+which is why the failure report names every restore the run
+performed. Neither is the safe default: leaving an installer CD
+attached is how the next boot runs the installer again, and taking
+it back is how the screen that failed stops being reproducible.
 
 ### `set-boot`
 
@@ -1983,6 +2041,83 @@ disk partitioned without an active partition, which is the state an
 installer leaves behind before its reboot, is where the two
 reference backends part company. The verb exists for scripts that
 genuinely need a different order than the blueprint's default.
+
+### Scoped machine-state changes
+
+```rlqs
+with boot cdrom0 {
+    phase startup { … }
+    phase cd-boot { … }
+}
+```
+
+`insert`, `eject` and `set-boot` change the machine durably and
+leave it changed. A `with` block gives one such change a **scope**,
+and the scope undoes it: the head names the change, the block names
+what it holds for, and leaving the block puts the target back to the
+value it held on entry.
+
+**The head vocabulary is closed at three names**: `boot`, `insert`
+and `eject`. The last two are the verbs above, written exactly as
+they are written as statements and carrying exactly their
+signatures, so a scoped `insert` answers to the same slot rules, the
+same media resolution, and the same preflight.
+
+**`boot` states a prefix, and is deliberately not `set-boot`.** The
+drives it names come first, in the order given, and the machine's
+own order follows for everything else — so `with boot cdrom0` over a
+machine ordered `["hdd0", "cdrom0"]` boots `["cdrom0", "hdd0"]`, and
+an author never restates an order they are not changing. Naming more
+than one drive pins a longer prefix. Every key must name a declared
+drive, as `set-boot`'s must, and each key names a drive once — by
+slot, so an alias and its indexed form are the same drive.
+`set-boot` is untouched and still *replaces* the order: two
+spellings, two meanings, which is the one thing a closed grammar
+cannot afford to blur.
+
+**A block wraps the enclosing shape's own units** — phases in a
+phased script, statements in a linear one, and nested `with` blocks
+in either. That is what gives the language a word for a **stage**: a
+group of phases. It is also the only form in which an install is
+expressible, since an install's stage spans phases and every phase
+body ends in a transition.
+
+**The scope is where control is, not where the text is.** It holds
+while control is inside the group; it is entered by reaching any
+phase in it, including by `goto` from outside, and left by reaching
+a phase outside it or by the run ending. Re-entry re-applies. In a
+linear script, where there is no `goto`, this reduces to the text.
+
+**On exit the target returns to the value it held on entry**, on
+every outcome the runtime reaches: `finish`, a failure, and a
+cancellation at a boundary. A host crash restores nothing, and
+[`apply`](../blueprint-guide.md#applying-blueprint-edits) remains
+its recovery — exactly as for an unscoped change.
+
+**A boot restore requires a stopped machine.** The boot order is
+launch-time firmware configuration and stopped-only as a property of
+the machine, not as a courtesy to the author, so a restore is not
+exempted from the rule a second writer would erode. An exit reached
+with the machine running **fails the run**, naming the change it
+could not undo. The cost is real and accepted: a run that otherwise
+succeeded can fail at its last act, and the remedy is to say in the
+script's own shape that the stage ends with the machine down.
+Media restores carry no such rule — `insert` and `eject` are
+running-or-stopped, so a media restore is live where the machine is
+up.
+
+**One scope per target.** The boot order is one target however many
+drives a head names; a medium's target is its slot, so an `insert`
+and an `eject` on one slot collide. Two scopes on the same target,
+nested or overlapping, are refused; scopes on different targets nest
+freely.
+
+Entry and the restore are reported on the [run event
+stream](#the-run-event-stream) (`scope.enter`, `scope.restore`), and
+a failure report names every restore the run performed. That is not
+decoration: what a scope takes back is state a diagnostician would
+otherwise have found on the machine, so a run that took it back has
+to say so.
 
 ### `set`
 
@@ -2096,7 +2231,9 @@ scope, preflight further rejects, naming what it needed:
 - media references (`@name`) naming no media the namespace
   defines (the media namespace);
 - `insert`/`eject` slots and `set-boot` drives the target
-  machine does not declare (a machine);
+  machine does not declare — a `with` head answering to the rule
+  of the action it spells, and a scoped `boot` prefix to
+  `set-boot`'s (a machine);
 - explicit `--property` keys the running script does not declare,
   keys given twice, and still-unbound noninteractive properties
   (the explicit values);
@@ -2328,7 +2465,9 @@ keeps the multithreaded case free of a shared store.
 The stream ends with a **terminal event** stating the outcome:
 success, a failure class, or cancelled — Ctrl-C on a foreground
 run emits a `cancelled` terminal event, exits `5`, and leaves
-the machine as-is. Under `jsonl` the last line is the
+the machine as-is but for the
+[scoped changes](#scoped-machine-state-changes) it puts back,
+which the cancellation names. Under `jsonl` the last line is the
 machine-readable result; there is no separate result mode. On
 the API, `run_script` / `exec` return a typed result and raise
 by error class ([error classes and exit
@@ -2402,6 +2541,13 @@ The intended post-beta growth discipline is (G7):
   keyword;
 - new action kinds use explicit sibling forms following the same
   node shape, as future pointer verbs will;
+- **a new construct is argued as one.** `with` is the only block
+  form added since the vocabulary was set, and it earned that
+  standing by expressing a unit — a *stage*, a group of phases —
+  that no modifier on an existing verb could name (D104). The
+  cheaper spellings were weighed and declined for saying something
+  narrower than the demand, which is the bar a second construct
+  meets or does not;
 - new behavior never appears merely because a script omitted a new
   modifier; and
 - capability requirements remain explicit and preflightable —
@@ -2431,99 +2577,116 @@ entry       startup
 timeout     30s
 deadline    45m
 
-phase startup {
-    insert cdrom0 @freedos-livecd
-    start
-    goto cd-boot
-}
+with boot cdrom0 {
 
-phase cd-boot {
-    wait   "Welcome to FreeDOS 1.4 (LiveCD)"
-    select "Install to harddisk"
-    wait   "What is your preferred language"
-    select "English"
-    wait   "Welcome to the FreeDOS 1.4 installation program"
-    select "Yes"                    # feedback-driven: a bare `press
+    phase startup {
+        insert cdrom0 @freedos-livecd
+        start
+        goto cd-boot
+    }
+
+    phase cd-boot {
+        wait   "Welcome to FreeDOS 1.4 (LiveCD)"
+        select "Install to harddisk"
+        wait   "What is your preferred language"
+        select "English"
+        wait   "Welcome to the FreeDOS 1.4 installation program"
+        select "Yes"                # feedback-driven: a bare `press
                                     # enter` here is drawn before the
                                     # installer reads the keyboard
 
-    wait {
-        on "Drive C: does not appear to be partitioned." {
-            select "Yes"
-            goto partitioning
-        }
-        on "Drive C: does not appear to be formatted." {
-            select "Yes"
-            goto formatting
+        wait {
+            on "Drive C: does not appear to be partitioned." {
+                select "Yes"
+                goto partitioning
+            }
+            on "Drive C: does not appear to be formatted." {
+                select "Yes"
+                goto formatting
+            }
         }
     }
-}
 
-phase partitioning {
-    wait   "You must reboot your computer"
-    select "Yes"
-    goto cd-boot
-}
+    phase partitioning {
+        wait   "You must reboot your computer"
+        select "Yes"
+        goto cd-boot
+    }
 
-phase formatting timeout=5m deadline=20m {
-    wait   "Press a key..."
-    press  enter
-    wait   "Please select your keyboard layout"
-    select "US English (Default)"
-    wait   "What FreeDOS packages do you want to install?"
-    select "Plain DOS system" exclude="with sources"
-    wait   "We are now ready to install FreeDOS 1.4."
-    select "Yes"
-    wait   "Installation of FreeDOS 1.4 is now complete."
-    eject  cdrom0                   # before the reboot, not after:
-                                    # the machine boots cdrom0 first,
-                                    # so the disk is only reached once
-                                    # the drive is empty
-    select "Yes"
-    goto hd-boot
-}
+    phase formatting timeout=5m deadline=20m {
+        wait   "Press a key..."
+        press  enter
+        wait   "Please select your keyboard layout"
+        select "US English (Default)"
+        wait   "What FreeDOS packages do you want to install?"
+        select "Plain DOS system" exclude="with sources"
+        wait   "We are now ready to install FreeDOS 1.4."
+        select "Yes"
+        wait   "Installation of FreeDOS 1.4 is now complete."
+        eject  cdrom0               # before the reboot, not after:
+                                    # the stage boots cdrom0 first, so
+                                    # the disk is only reached once the
+                                    # drive is empty
+        select "Yes"
+        goto hd-boot
+    }
 
-phase hd-boot {
-    wait   "Load FreeDOS"
-    select "Load FreeDOS with JEMM386 (Expanded Memory)"
-    wait   "C:\>"
-    screenshot installed
-    goto shutdown
-}
+    phase hd-boot {
+        wait   "Load FreeDOS"
+        select "Load FreeDOS with JEMM386 (Expanded Memory)"
+        wait   "C:\>"
+        screenshot installed
+        goto shutdown
+    }
 
-phase shutdown {
-    enter "fdapm poweroff"
-    wait  machine=stopped timeout=2m
-    finish                          # cdrom0 was ejected in
-                                    # formatting, so the machine is
-                                    # already as it was found
+    phase shutdown {
+        enter "fdapm poweroff"
+        wait  machine=stopped timeout=2m
+        finish                      # the eject already returned
+                                    # cdrom0; the scope returns the
+                                    # boot order behind this line
+    }
 }
 ```
 
 The blueprint declares `cdrom0` empty and boots
-`["cdrom0", "hdd0"]`; the script supplies the installer medium.
-**The eject is what hands the disk its turn**: the machine boots
-its optical drive first, so the disk is reached only once that
-drive is empty, and no boot in the run depends on firmware moving
-past a partitioned disk. Ejecting in `formatting` rather than after
-the reboot selection keeps it off that reboot's critical path, and
-returns the machine to its blueprint shape as a side effect. No
-`set-boot` verb is needed.
+`["hdd0", "cdrom0"]` — what the machine *is*, a system that boots
+its own disk. **Booting the installer is true of the install and
+not of the machine**, so the script says it, in the one place it
+holds: `with boot cdrom0` puts the optical drive in front of the
+blueprint's order for the whole install and puts the order back
+when the run ends. The scope wraps the phases rather than sitting
+inside one because the stage spans phases — the
+`cd-boot` ⇄ `partitioning` cycle crosses them twice — and every
+phase body ends in a transition.
+
+**The eject is what hands the disk its turn.** While the stage
+holds, every boot takes the optical drive, so the disk is reached
+only once that drive is empty, and no boot in the run depends on
+firmware moving past a partitioned disk. Ejecting in `formatting`
+rather than after the reboot selection keeps it off that reboot's
+critical path. The guest-driven reboot is expressed by the
+installer selection and the resulting screen, not by a Reliquary
+reboot command — and it is the guest's alone: the machine never
+stops, so the boot order it was launched with is the one firmware
+reads again.
+
 The second visit to `cd-boot` reaches the other branch of its
-closing `wait` because the disk has been partitioned. The
-guest-driven reboot is expressed by the installer selection and the
-resulting screen, not by a Reliquary reboot command — and it is the
-guest's alone: the machine never stops, so the boot order it was
-launched with is the one that firmware reads again.
+closing `wait` because the disk has been partitioned.
+
+The scope's exit is reached in `shutdown`, with the guest powered
+off — which is what a boot restore requires. Had the script handed
+back a running machine, the run would have failed at its last act
+naming the order it could not put back.
 
 Verification is a separate script needing no machine
-reconfiguration at all: after the install script's `eject`, the
-machine is back in its blueprint shape and boots the installed hard
-disk past an empty optical drive. The verify script declares
-`machine stopped` too and issues a plain `start`. If an
-interrupted install run left the CD attached, `apply` restores the
-blueprint shape — without it, the CD-first order boots the
-installer again rather than the installed disk.
+reconfiguration at all: the install returned both the medium and
+the order, so the machine is in its blueprint shape and a plain
+`start` boots the installed hard disk past an empty optical drive.
+The verify script declares `machine stopped` too and issues that
+`start`. If a run was interrupted before its restore — a host
+crash, which no scope survives — `apply` returns the machine to
+its blueprint shape.
 
 ## Sharing
 

@@ -8,76 +8,95 @@ entry       startup                 # entry phase
 timeout     30s
 deadline    45m                     # required: cd-boot <-> partitioning cycle
 
-phase startup {
-    insert cdrom0 @freedos-livecd
-    start                           # start the machine
-    goto cd-boot
-}
+# The install stage states what it boots, and the scope undoes it.
+#
+# The blueprint declares what this machine *is* — a system that boots
+# its installed disk — and booting the installer instead is true of
+# this script and only while it runs. `boot` states a prefix rather
+# than an order: the drive named comes first and the machine's own
+# order follows, so nothing here restates ["hdd0", "cdrom0"] in order
+# to put one drive in front of it.
+#
+# The scope holds while control is inside the group, which is why it
+# wraps the phases rather than sitting inside one: every phase body
+# ends in a transition, and the cd-boot <-> partitioning cycle crosses
+# phases twice. It is left by the run ending, and the machine is
+# stopped by then — `shutdown` waits for the guest to power itself
+# off, which is what a boot restore requires.
+with boot cdrom0 {
 
-phase cd-boot {
-    wait   "Welcome to FreeDOS 1.4 (LiveCD)"
-    select "Install to harddisk"
-    wait   "What is your preferred language"
-    select "English"
-    wait   "Welcome to the FreeDOS 1.4 installation program"
-    select "Yes"                    # feedback-driven: a bare `press
-                                    # enter` here is drawn before the
-                                    # installer reads the keyboard and
-                                    # is swallowed
+    phase startup {
+        insert cdrom0 @freedos-livecd
+        start                           # start the machine
+        goto cd-boot
+    }
 
-    wait {
-        on "Drive C: does not appear to be partitioned." {
-            select "Yes"
-            goto partitioning
-        }
-        on "Drive C: does not appear to be formatted." {
-            select "Yes"
-            goto formatting
+    phase cd-boot {
+        wait   "Welcome to FreeDOS 1.4 (LiveCD)"
+        select "Install to harddisk"
+        wait   "What is your preferred language"
+        select "English"
+        wait   "Welcome to the FreeDOS 1.4 installation program"
+        select "Yes"                    # feedback-driven: a bare `press
+                                        # enter` here is drawn before the
+                                        # installer reads the keyboard and
+                                        # is swallowed
+
+        wait {
+            on "Drive C: does not appear to be partitioned." {
+                select "Yes"
+                goto partitioning
+            }
+            on "Drive C: does not appear to be formatted." {
+                select "Yes"
+                goto formatting
+            }
         }
     }
-}
 
-phase partitioning {
-    wait   "You must reboot your computer"
-    select "Yes"
-    goto cd-boot
-}
+    phase partitioning {
+        wait   "You must reboot your computer"
+        select "Yes"
+        goto cd-boot
+    }
 
-phase formatting timeout=5m deadline=20m {
-    wait   "Press a key..."
-    press  enter
-    wait   "Please select your keyboard layout"
-    select "US English (Default)"
-    wait   "What FreeDOS packages do you want to install?"
-    select "Plain DOS system" exclude="with sources"
-    wait   "We are now ready to install FreeDOS 1.4."
-    select "Yes"
-    wait   "Installation of FreeDOS 1.4 is now complete."
-    eject  cdrom0                       # before the reboot, not after:
-                                        # the machine boots cdrom0
-                                        # first, so the disk is only
-                                        # reached once the drive is
-                                        # empty. Ejecting here rather
-                                        # than after "Yes" keeps it
-                                        # off the reboot's critical
-                                        # path.
-    select "Yes"
-    goto hd-boot
-}
+    phase formatting timeout=5m deadline=20m {
+        wait   "Press a key..."
+        press  enter
+        wait   "Please select your keyboard layout"
+        select "US English (Default)"
+        wait   "What FreeDOS packages do you want to install?"
+        select "Plain DOS system" exclude="with sources"
+        wait   "We are now ready to install FreeDOS 1.4."
+        select "Yes"
+        wait   "Installation of FreeDOS 1.4 is now complete."
+        eject  cdrom0                       # before the reboot, not after:
+                                            # the scope boots cdrom0 first
+                                            # and the machine never stops,
+                                            # so firmware reads that same
+                                            # order again — the disk is
+                                            # reached only once the drive is
+                                            # empty. Ejecting here rather
+                                            # than after "Yes" keeps it off
+                                            # the reboot's critical path.
+        select "Yes"
+        goto hd-boot
+    }
 
-phase hd-boot {
-    wait   "Load FreeDOS"
-    select "Load FreeDOS with JEMM386 (Expanded Memory)"
-    wait   "C:\>"
-    screenshot installed
-    goto shutdown
-}
+    phase hd-boot {
+        wait   "Load FreeDOS"
+        select "Load FreeDOS with JEMM386 (Expanded Memory)"
+        wait   "C:\>"
+        screenshot installed
+        goto shutdown
+    }
 
-phase shutdown {
-    enter "fdapm poweroff"
-    wait  machine=stopped timeout=2m    # non-default channel, named;
-                                        # a bare string is the screen
-    finish                              # cdrom0 was ejected in
-                                        # formatting, so the machine
-                                        # is already as found
+    phase shutdown {
+        enter "fdapm poweroff"
+        wait  machine=stopped timeout=2m    # non-default channel, named;
+                                            # a bare string is the screen
+        finish                              # the eject already returned
+                                            # cdrom0; the scope returns the
+                                            # boot order behind this line
+    }
 }

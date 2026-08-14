@@ -13,6 +13,64 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The scoped machine-state change** (F54; U24, U26, D104). A
+  script's `insert`, `eject` and `set-boot` change the machine
+  durably and leave it changed; the author writes the undo by hand,
+  in a place no failure path reaches. A `with` block gives one such
+  change a scope, and **the scope undoes it**:
+
+  ```rlqs
+  with boot cdrom0 {
+      phase startup { … }
+      phase cd-boot { … }
+  }
+  ```
+
+  The head vocabulary is closed at three names. `insert` and `eject`
+  are those verbs written exactly as they are written as statements,
+  carrying their own signatures and their own preflight. The third
+  is **`boot`, not `set-boot`, and it states a prefix**: the drives
+  named come first and the machine's own order follows, so
+  `with boot cdrom0` over a machine ordered `["hdd0", "cdrom0"]`
+  boots `["cdrom0", "hdd0"]` and an author never restates an order
+  they are not changing. `set-boot` is untouched — replacement is
+  still what that verb means.
+
+  A block **wraps the enclosing shape's own units** — phases in a
+  phased script, statements in a linear one — which is what gives
+  the language a word for a *stage*. **The scope is where control
+  is, not where the text is**: it holds while control is inside the
+  group, is entered by reaching any phase in it including by `goto`
+  from outside, and is left by reaching a phase outside it or by the
+  run ending; re-entry re-applies. A lexical reading would have
+  reverted at the first transition and expressed nothing, every
+  phase body ending in one.
+
+  **On exit the target returns to the value it held on entry**, on
+  every outcome the runtime reaches — `finish`, a failure, a
+  cancellation at a boundary. A **boot restore requires a stopped
+  machine**: the boot order is stopped-only as a property of the
+  machine, and a restore is not exempted from a rule a second writer
+  would erode, so an exit reached with the machine running fails the
+  run naming the change it could not undo. Media restores carry no
+  such rule. **One scope per target**; scopes on different targets
+  nest freely. Entry and restore are on the run event stream
+  (`scope.enter`, `scope.restore`), and a failure report names every
+  restore performed — what a scope takes back is state a
+  diagnostician would otherwise have found.
+
+  **The shipped FreeDOS pair moved with it.** `freedos.rlqb` now
+  declares `boot: ["hdd0", "cdrom0"]` — what the machine *is*, a
+  system that boots its own disk past an empty optical drive — and
+  `freedos-install.rlqs` wraps its phases in `with boot cdrom0`,
+  keeping its mid-install `eject`. An interrupted install no longer
+  leaves a machine that boots its installer forever.
+
+  Not yet static: a boot restore an exit *provably* reaches with the
+  machine running is a run failure rather than an authoring refusal.
+  Moving that verdict to parse time is T27's reachability analysis,
+  and the check reuses it when it lands.
+
 - **JSON5 blueprints** (F53; D102). `.rlqb` documents accept the
   published JSON5 grammar — comments, trailing commas, unquoted
   keys, single-quoted strings, hexadecimal and signed numbers, and

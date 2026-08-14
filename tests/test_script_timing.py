@@ -358,3 +358,36 @@ def test_a_proportion_outside_zero_to_one_is_refused():
         with pytest.raises(ScriptParseError) as caught:
             parse_script(_HEAD + f'wait "x" stability={spelling}\n')
         assert "between 0 and 1" in caught.value.message
+
+
+# A `with` scope is transparent to the timing model (F54).
+
+def test_a_scope_resolves_its_statements_as_if_it_were_not_there():
+    """The construct carries no timing modifier, so it is no scope.
+
+    Written as a test rather than trusted because the plan is
+    positional: a wrapped statement that fell out of the walk would
+    still run, and would silently take the built-in default instead
+    of the phase's.
+    """
+    scoped = _plan(
+        _HEAD + "entry p\nphase p timeout=9s {\n"
+        '    wait "x"\n    finish\n}\n')
+    plan = _plan(
+        _HEAD + "entry p\nwith boot cdrom0 {\n"
+        "    phase p timeout=9s {\n"
+        '        wait "x"\n        finish\n    }\n}\n')
+    wait = next(entry for entry in plan.observations
+                if entry.kind == "wait")
+    assert wait.timeout.spelling == "9s"
+    unscoped = scoped.observations[0].timeout
+    assert (wait.timeout.scope, wait.timeout.scope_name) == (
+        unscoped.scope, unscoped.scope_name)
+
+
+def test_a_linear_scope_contributes_its_wrapped_input_verbs():
+    plan = _plan(
+        _HEAD + "pacing 2s\nwith eject cdrom0 {\n    press enter\n}\n")
+    delivery, = plan.inputs
+    assert delivery.verb == "press"
+    assert delivery.pacing.spelling == "2s"

@@ -55,6 +55,14 @@ VERIFY_END = "verify.end"
 #: it is discovered, and a guard that quietly stood down would
 #: otherwise look identical to one that passed.
 GUARD_CADENCE = "guard.cadence"
+#: A scoped machine-state change taking hold, and being put back. The
+#: pair is the whole of what a `with` block does that a reader cannot
+#: see from the actions themselves: the change is an ordinary
+#: `insert`/`eject`/boot action and reports as one, while *that it was
+#: scoped* — and what the exit returned the machine to — lives only
+#: here (P5).
+SCOPE_ENTER = "scope.enter"
+SCOPE_RESTORE = "scope.restore"
 FAILURE = "failure"
 
 #: Every kind above, so a test can compare what is declared with
@@ -67,7 +75,8 @@ KINDS = (
     OBSERVATION_ARM, OBSERVATION_MATCH, OBSERVATION_TIMEOUT,
     HANDLER_FIRE, ACTION_START, ACTION_END,
     TRANSFER_START, TRANSFER_PROGRESS, TRANSFER_END,
-    VERIFY_START, VERIFY_END, GUARD_CADENCE, FAILURE,
+    VERIFY_START, VERIFY_END, GUARD_CADENCE,
+    SCOPE_ENTER, SCOPE_RESTORE, FAILURE,
 )
 
 _TIMESTAMP = "%Y-%m-%dT%H:%M:%S"

@@ -1546,3 +1546,249 @@ def test_the_previous_handler_is_restored():
     with _cancel_on_interrupt(_AskableEngine()):
         pass
     assert signal.getsignal(signal.SIGINT) is before
+
+
+# Scoped machine-state changes — the `with` block (F54).
+#
+# The construct's whole claim is that the scope undoes itself on every
+# outcome, so what these drive is the *pairing*: what entry applied
+# and what exit put back, over a machine layer that records its calls.
+
+_SCOPED_MACHINE = {
+    "phase": "ready",
+    "boot": ["hdd0", "cdrom0"],
+    "drives": {"hdd0": {"medium": "hdd"},
+               "cdrom0": {"medium": "cdrom", "media": None, "path": None}},
+}
+
+
+class _ScopedRun:
+    """A whole run over a machine layer that answers and records.
+
+    The double **applies** what it is told, because a scope reads the
+    machine twice — once to capture and once to decide what putting a
+    slot back involves — and a state frozen between those two reads
+    would answer the second question with the first one's world.
+    """
+
+    def __init__(self, machines, state):
+        self.machines = machines
+        self.state = state
+        self.phase = state.get("phase", "ready")
+        self.engine = None
+
+    def snapshot(self, *_args, **_kwargs):
+        state = json.loads(json.dumps(self.state))
+        state["phase"] = self.phase
+        return state
+
+    def insert(self, _machine, slot, media=None, *, file=None, **_kwargs):
+        self.state["drives"][slot].update(
+            {"media": media, "path": file or f"/cache/media/{media}.iso"})
+
+    def eject(self, _machine, slot, **_kwargs):
+        self.state["drives"][slot].update({"media": None, "path": None})
+
+    @property
+    def boot_orders(self):
+        return [list(call.args[1])
+                for call in self.machines.set_boot_order.call_args_list]
+
+
+@contextlib.contextmanager
+def _scoped(source, state=None, machine="freedos-0"):
+    """Run a script whole against a recording machine layer."""
+    script = parse_script(source)
+    with mock.patch("reliquary.script_runner._machines") as machines:
+        run = _ScopedRun(machines, state or _SCOPED_MACHINE)
+        machines.load_machine_state.side_effect = run.snapshot
+        machines.insert_media.side_effect = run.insert
+        machines.eject_media.side_effect = run.eject
+        machines.start_machine.side_effect = (
+            lambda *a, **k: setattr(run, "phase", "running"))
+        machines.stop_machine.side_effect = (
+            lambda *a, **k: setattr(run, "phase", "ready"))
+        run.engine = _ScriptEngine(
+            script, machine, "/tmp/home", "/tmp/home/machines/" + machine,
+            script_path="demo.rlqs")
+        yield run
+
+
+def _kinds(engine, *kinds):
+    return [event for event in engine.events.events
+            if event["kind"] in kinds]
+
+
+def test_a_boot_scope_puts_its_drives_first_and_keeps_the_rest():
+    """The difference from `set-boot`, which is the point of `boot`.
+
+    A stage says "boot the CD first"; the order behind it is the
+    machine's own, and the author never restated it.
+    """
+    with _scoped("platform dos\nmachine stopped\nentry a\n"
+                 "with boot cdrom0 {\n    phase a {\n"
+                 "        finish\n    }\n}\n") as run:
+        run.engine.run()
+    assert run.boot_orders == [["cdrom0", "hdd0"], ["hdd0", "cdrom0"]]
+
+
+def test_the_exit_returns_the_target_to_what_it_held_on_entry():
+    with _scoped("platform dos\nmachine stopped\nentry a\n"
+                 "with boot cdrom0 {\n    phase a {\n"
+                 "        finish\n    }\n}\n") as run:
+        run.engine.run()
+    restore, = _kinds(run.engine, _events.SCOPE_RESTORE)
+    assert restore["target"] == "the boot order"
+    assert restore["detail"] == "hdd0 cdrom0"
+    assert "error" not in restore
+
+
+def test_a_goto_inside_the_group_neither_restores_nor_reapplies():
+    """The scope holds while control is inside it, and no longer.
+
+    Every phase body ends in a transition, so a scope that closed at
+    each one would express nothing — which is why the reading is
+    dynamic rather than lexical (D104).
+    """
+    with _scoped("platform dos\nmachine stopped\nentry a\n"
+                 "with boot cdrom0 {\n"
+                 "    phase a {\n        goto b\n    }\n"
+                 "    phase b {\n        finish\n    }\n}\n") as run:
+        run.engine.run()
+    assert run.boot_orders == [["cdrom0", "hdd0"], ["hdd0", "cdrom0"]]
+
+
+def test_leaving_the_group_restores_and_returning_reapplies():
+    """A scope is entered by reaching any phase in it, `goto` from
+    outside included."""
+    with _scoped("platform dos\nmachine stopped\nentry a\n"
+                 "with boot cdrom0 {\n"
+                 "    phase a {\n        goto outside\n    }\n}\n"
+                 "phase outside {\n    goto back\n}\n"
+                 "with boot cdrom0 {\n"
+                 "    phase back {\n        finish\n    }\n}\n") as run:
+        run.engine.run()
+    assert run.boot_orders == [["cdrom0", "hdd0"], ["hdd0", "cdrom0"],
+                               ["cdrom0", "hdd0"], ["hdd0", "cdrom0"]]
+
+
+def test_a_failure_inside_the_scope_still_restores_and_says_so():
+    """What the author gave up by scoping is the state a
+    diagnostician would have found, so the report has to name it."""
+    with _scoped("platform dos\nmachine stopped\nentry a\n"
+                 "with boot cdrom0 {\n    phase a {\n"
+                 '        wait "never" timeout=1ms\n        finish\n'
+                 "    }\n}\n") as run:
+        with pytest.raises(ScriptRuntimeError):
+            run.engine.run()
+    assert run.boot_orders[-1] == ["hdd0", "cdrom0"]
+    failure, = _kinds(run.engine, _events.FAILURE)
+    assert failure["restored"] == ("the boot order: hdd0 cdrom0",)
+
+
+def test_a_cancellation_restores_and_the_message_says_so():
+    """A cancellation leaves the machine as it stands — and a scope is
+    the one thing that does not, so the message names it."""
+    with _scoped("platform dos\nmachine stopped\nentry a\n"
+                 "with boot cdrom0 {\n    phase a {\n"
+                 "        screenshot one\n        screenshot two\n"
+                 "        finish\n    }\n}\n") as run:
+        with mock.patch.object(_ScriptEngine, "_screenshot",
+                               lambda self, statement: self.cancel()):
+            with pytest.raises(RunCancelled) as caught:
+                run.engine.run()
+    assert run.boot_orders == [["cdrom0", "hdd0"], ["hdd0", "cdrom0"]]
+    assert "apart from the scoped changes being put back: the boot " \
+           "order" in str(caught.value)
+
+
+def test_a_boot_restore_reached_running_fails_the_run_naming_it():
+    """The cost D104 weighed and accepted.
+
+    A boot order is stopped-only as a property of the machine, and a
+    restore is not exempted from it: a second writer under a different
+    rule is how such a guarantee erodes. So a run that hands back a
+    live machine fails at its last act, saying what it could not undo.
+    """
+    with _scoped("platform dos\nmachine stopped\nentry a\n"
+                 "with boot cdrom0 {\n    phase a {\n"
+                 "        start\n        finish\n    }\n}\n") as run:
+        def refuse(machine_id, keys, **_kwargs):
+            if run.phase == "running":
+                raise PreflightError(
+                    f"machine {machine_id} must be stopped to change "
+                    "boot order (phase: running)",
+                    rule_id="machine.must-be-stopped")
+
+        run.machines.set_boot_order.side_effect = refuse
+        with pytest.raises(ScriptRuntimeError) as caught:
+            run.engine.run()
+    assert "the boot order could not be restored to hdd0 cdrom0" in str(
+        caught.value)
+    assert caught.value.rule_id == "machine.must-be-stopped"
+
+
+def test_a_media_restore_needs_no_stopped_machine():
+    """`insert` and `eject` are running-or-stopped, so the restore is
+    live where the machine is up: the stopped rule the other half
+    carries is the boot order's, not the construct's."""
+    with _scoped("platform dos\nentry a\n"
+                 "with insert cdrom0 @livecd {\n    phase a {\n"
+                 "        finish\n    }\n}\n",
+                 state=dict(_SCOPED_MACHINE, phase="running")) as run:
+        run.engine.run()
+    assert run.machines.insert_media.call_args_list[0].args[1:] == (
+        "cdrom0", "livecd")
+    # The slot was empty when the run arrived, so putting it back is
+    # an eject and nothing else.
+    run.machines.eject_media.assert_called_once()
+    assert not run.machines.set_boot_order.called
+
+
+def test_a_media_restore_reinstates_the_medium_it_found():
+    occupied = json.loads(json.dumps(_SCOPED_MACHINE))
+    occupied["phase"] = "running"
+    occupied["drives"]["cdrom0"].update(
+        {"media": "tools", "path": "/cache/media/tools.iso"})
+    with _scoped("platform dos\nentry a\n"
+                 "with eject cdrom0 {\n    phase a {\n"
+                 "        finish\n    }\n}\n", state=occupied) as run:
+        run.engine.run()
+    restore, = _kinds(run.engine, _events.SCOPE_RESTORE)
+    assert restore["detail"] == "@tools"
+    assert run.machines.insert_media.call_args.args[1:] == ("cdrom0", "tools")
+
+
+def test_a_linear_scope_brackets_exactly_what_it_wraps():
+    with _scoped("platform dos\n"
+                 "with eject cdrom0 {\n    screenshot one\n}\n"
+                 "screenshot two\n",
+                 state=dict(_SCOPED_MACHINE, phase="running")) as run:
+        with mock.patch.object(_ScriptEngine, "_screenshot"):
+            run.engine.run()
+    bracket = [event["kind"] for event in run.engine.events.events
+               if event["kind"] in (_events.SCOPE_ENTER,
+                                    _events.ACTION_START,
+                                    _events.SCOPE_RESTORE)]
+    assert bracket == [_events.SCOPE_ENTER, _events.ACTION_START,
+                       _events.SCOPE_RESTORE]
+
+
+def test_a_scoped_head_answers_to_the_same_preflight_rules():
+    """A `with boot` key is checked where `set-boot`'s already is."""
+    script = parse_script(
+        "platform dos\nentry a\nwith boot cdrom7 {\n"
+        "    phase a {\n        finish\n    }\n}\n")
+    with pytest.raises(ScriptPreflightError) as caught:
+        _preflight_machine_rules(script, {"drives": {"hdd0": {}}}, "s.rlqs")
+    assert "the machine declares no drive cdrom7" in str(caught.value)
+    assert caught.value.rule_id == "machine.slot-not-declared"
+
+
+def test_a_scoped_insert_head_must_name_a_removable_slot():
+    script = parse_script(
+        "platform dos\nwith insert hdd0 @livecd {\n    start\n}\n")
+    with pytest.raises(ScriptPreflightError) as caught:
+        _preflight_machine_rules(
+            script, {"drives": {"hdd0": {"medium": "hdd"}}}, "s.rlqs")
+    assert caught.value.rule_id == "machine.slot-not-removable"

@@ -645,10 +645,13 @@ Every entry must reference a declared, enabled drive, and entries
 are unique by slot: naming the same slot twice — in either
 spelling — fails validation. An empty or non-bootable drive is a
 valid entry, though whether firmware falls through it to the next
-entry is the firmware's own behaviour — see below. Scripts may
-still reorder boot devices with the
-[`set-boot`](spec/script-spec.md#set-boot) verb while the machine is
-stopped.
+entry is the firmware's own behaviour — see below. A script may
+still reorder boot devices while the machine is stopped: the
+[`set-boot`](spec/script-spec.md#set-boot) verb *replaces* the order
+and leaves it replaced, and
+[`with boot`](spec/script-spec.md#scoped-machine-state-changes) puts
+named drives in front of it for one stage and puts the order back
+when the stage ends.
 When omitted, the default order is: the slot-0 floppy image if
 declared, else the slot-0 hard disk, else the first CD-ROM; the
 resolved order appears in the state.
@@ -670,21 +673,36 @@ VirtualBox prints `No active partition. Trying next boot device...`
 and then goes no further, so a machine reaches that state once an
 installer has partitioned the disk but not yet made it bootable.
 
-**This makes `["hdd0", "cdrom0"]` the wrong order for an install
-that reboots.** It appears to work — a blank disk falls through and
-the installer CD boots — and then fails on the reboot *after*
-partitioning, on some backends only. Prefer the CD first for the
-whole install and eject it when the disk is ready:
+**So an install that reboots must not depend on falling past its
+disk.** Ordering `["hdd0", "cdrom0"]` and trusting the blank disk
+to fall through appears to work — the installer CD boots — and then
+fails on the reboot *after* partitioning, on some backends only.
+The CD has to be genuinely first for the whole install, and the
+script ejects it once the disk is ready: every boot then takes the
+CD while one is attached, and once the slot is empty the installed
+disk boots, neither step depending on falling past a disk.
 
-```json
-{"boot": ["cdrom0", "hdd0"]}
+**Where that order is declared is the question this field
+answers.** Booting the installer is true of an *install*, not of
+the machine, so it belongs to the install script and not here:
+
+```rlqs
+with boot cdrom0 {
+    phase startup { … }
+}
 ```
 
-Every boot then takes the CD while one is attached, and once a
-script ejects it the empty optical slot is skipped and the
-installed disk boots — neither step depending on falling past a
-disk. This is the portable shape; `["hdd0", "cdrom0"]` is fine for
-a machine that never needs to boot an installer twice.
+`boot` states a prefix — the named drive comes first and this
+field's order follows — so the blueprint declares what the machine
+is (`["hdd0", "cdrom0"]`, a system that boots its own disk past an
+empty optical drive) and the stage declares what it boots. The
+scoped change is undone when the stage ends, on every outcome
+including a failure, which is what keeps a half-finished install
+from leaving a machine that boots its installer forever. The
+shipped `freedos` blueprint and its install script are that
+pairing. Declaring `["cdrom0", "hdd0"]` in the blueprint is still
+correct for a machine whose *job* is to boot an optical drive
+first.
 
 Backends differ in how faithfully they honor multi-entry boot
 orders more generally; a backend that cannot honor the declared

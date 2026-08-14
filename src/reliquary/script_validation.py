@@ -15,7 +15,8 @@ name the offending construct and cite its rule:
   has at least two handlers, and never appears inside a handler
   body;
 - **V9** — ``on`` only inside a branching ``wait``, ``always``
-  only directly inside a reactive phase, and no hybrid phase;
+  only directly inside a reactive phase, no hybrid phase, and no
+  ``with`` scope inside another on the same target;
 - **V10** — the two script shapes never mix, and every phase name
   a script transfers to is declared;
 - **V11** — nothing follows a terminating statement, and a
@@ -69,6 +70,11 @@ def _not_reserved(name, what, line, column):
 # is deliberately absent: it has no named spelling.
 _CHANNELS = {"machine": ("state", ("stopped",))}
 _TRANSFERS = ("goto", "finish")
+# A drive key as the blueprint field reference spells it: a medium
+# name and an optional slot index, the bare name being slot 0. Only
+# the shape is known here — which slots a machine actually declares is
+# preflight's question, and needs a machine to answer.
+_SLOT_KEY = re.compile(r"([A-Za-z]+)([0-9]*)")
 PORTABLE_KEY_NAMES = frozenset({
     "enter", "esc", "tab", "space", "backspace",
     "up", "down", "left", "right",
@@ -91,6 +97,7 @@ def validate(script):
     _durations(script)
     _keys(script)
     _variables(script)
+    _scoping(script)
     if script.phases:
         _phased(script)
     else:
@@ -427,6 +434,11 @@ def _timed(statements, handlers=()):
         yield handler
         yield from _timed(handler.statements)
     for statement in statements:
+        if _scoped(statement) is not None:
+            yield from _timed(_scoped(statement))
+            continue
+        if not _is_statement(statement):
+            continue
         yield statement
         yield from _timed((), statement.handlers)
 
@@ -461,7 +473,7 @@ def reach(script):
     """
     total = len(_all_statements(script))
     if not script.phases:
-        return len(script.statements), total
+        return len(list(_sequence(script.statements))), total
     reachable = 0
     seen = set()
     pending = [script.entry]
@@ -521,6 +533,93 @@ def _keys(script):
                     f"{unknown!r} is not a portable key name",
                     statement.column,
                     rule_id="key.not-portable")
+
+
+# -- scoped machine-state changes (V2, V5, V9, V10) --------------
+
+def _scoping(script):
+    """The rules a ``with`` block answers to.
+
+    Four, and not one of them is new in kind. What a block may hold is
+    a signature rule (V2). That no two scopes own one target is a
+    placement rule (V9): nested scopes on one target would leave the
+    value a restore returns depending on which order they unwound in,
+    which is not a question a reader should have to ask. That `boot`
+    names distinct drives is uniqueness (V5), and it canonicalizes
+    first, an alias and its indexed form being one slot. And that the
+    two script shapes never mix is V10 — a rule the grammar used to
+    decide and no longer can, because a `with` head says nothing about
+    which shape follows it.
+    """
+    phased = bool(script.phases)
+    _units(script.statements, phased, top=True)
+    _targets(script.statements, ())
+    for scope in script.scopes:
+        if scope.head == "boot":
+            _boot_keys(scope)
+
+
+def _units(units, phased, top):
+    """A block wraps the enclosing shape's own units, and only those."""
+    for unit in units:
+        inner = _scoped(unit)
+        if inner is not None:
+            _units(inner, phased, top=False)
+            continue
+        if not (phased and _is_statement(unit)):
+            continue
+        if top:
+            raise ScriptParseError(
+                unit.line,
+                f"{unit.verb} is outside every phase: a script is phased "
+                "or linear, and a phased one holds its statements in "
+                "phases", unit.column, rule_id="flow.mixed-shapes")
+        raise ScriptParseError(
+            unit.line,
+            f"a with block in a phased script wraps phases, and this one "
+            f"holds the statement {unit.verb}", unit.column,
+            rule_id="scope.wraps-the-wrong-unit")
+
+
+def _targets(units, chain):
+    """One scope per target; scopes on different targets nest freely."""
+    for unit in units:
+        inner = _scoped(unit)
+        if inner is None:
+            continue
+        if unit.target in chain:
+            raise ScriptParseError(
+                unit.line,
+                f"{unit.target} is already scoped by an enclosing with: "
+                "one scope per target, so what a restore puts back is "
+                "never in question", unit.column,
+                rule_id="scope.doubled-target")
+        _targets(inner, chain + (unit.target,))
+
+
+def _boot_keys(scope):
+    """A scoped boot prefix names each drive once (V5).
+
+    By slot rather than by spelling: `cdrom` is the blueprint's alias
+    for `cdrom0`, so the two name one drive and a prefix cannot put it
+    in two places. Whether the drive exists at all is preflight's,
+    where `set-boot`'s keys are checked and a machine is in scope.
+    """
+    seen = {}
+    for key in scope.action.arguments:
+        slot = _canonical_slot(key)
+        if slot in seen:
+            raise ScriptParseError(
+                scope.line,
+                f"boot names one drive twice: {seen[slot]} and {key}",
+                scope.column, rule_id="drive.boot-duplicate")
+        seen[slot] = key
+
+
+def _canonical_slot(key):
+    """A drive key's canonical spelling, or the key where it is not one."""
+    match = _SLOT_KEY.fullmatch(key)
+    return f"{match.group(1)}{match.group(2) or '0'}" if match else key
 
 
 # -- the two shapes (V3, V10) ------------------------------------
@@ -652,7 +751,10 @@ def _phase(phase):
 def _body(statements, in_handler=False):
     """Validate one statement list and everything nested in it."""
     for index, statement in enumerate(statements):
-        _statement(statement, in_handler)
+        if _scoped(statement) is not None:
+            _body(_scoped(statement), in_handler)
+        else:
+            _statement(statement, in_handler)
         if _terminating(statement) and index + 1 < len(statements):
             following = statements[index + 1]
             raise ScriptParseError(
@@ -808,6 +910,11 @@ def _pattern(condition):
 
 def _terminating(statement):
     """Whether a statement ends the flow through its list."""
+    if _scoped(statement) is not None:
+        # A scope ends the flow through its list exactly when what it
+        # wraps does: control leaves the block through the same
+        # transfer it would have left the list through.
+        return _terminates(_scoped(statement))
     if statement.verb in _TRANSFERS:
         return True
     if statement.verb == "wait" and statement.handlers:
@@ -822,9 +929,50 @@ def _terminates(statements):
 
 
 def _walk(statements, handlers=()):
-    """Yield every statement in a body, handler bodies included."""
+    """Yield every statement in a body, handler bodies included.
+
+    A ``with`` scope is transparent here: what it wraps is walked and
+    the scope itself is not a statement. Phases inside one are skipped
+    rather than descended into, because every phase is reached through
+    the flat ``script.phases`` and walking it twice would double every
+    rule that counts.
+    """
     for handler in handlers:
         yield from _walk(handler.statements)
     for statement in statements:
+        if _scoped(statement) is not None:
+            yield from _walk(_scoped(statement))
+            continue
+        if not _is_statement(statement):
+            continue
         yield statement
         yield from _walk((), statement.handlers)
+
+
+def _sequence(statements):
+    """Yield a statement list's own statements, scopes flattened.
+
+    :func:`_walk` without the handler bodies — the statements control
+    reaches by falling through the list rather than by the guest
+    satisfying a condition, which is the distinction :func:`reach`
+    measures.
+    """
+    for statement in statements:
+        if _scoped(statement) is not None:
+            yield from _sequence(_scoped(statement))
+        elif _is_statement(statement):
+            yield statement
+
+
+def _scoped(node):
+    """The units a ``with`` scope wraps, or ``None`` for anything else.
+
+    Structural, like the rest of this module: a scope is the node that
+    holds units.
+    """
+    return getattr(node, "units", None)
+
+
+def _is_statement(node):
+    """Whether a body item is a statement rather than a phase."""
+    return hasattr(node, "verb")

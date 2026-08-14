@@ -44,10 +44,17 @@ def test_headers_carry_their_values(reference):
 
 
 def test_the_phases_are_named_in_order(reference):
+    """Flat, though the reference wraps every one of them in a scope.
+
+    The phase namespace is what `entry` and `goto` address, and a
+    `with` block changes where control *is*, never which phases exist.
+    """
     assert [phase.name for phase in reference.phases] == [
         "startup", "cd-boot", "partitioning", "formatting", "hd-boot",
         "shutdown"]
-    assert reference.statements == ()
+    scope, = reference.statements
+    assert (scope.head, scope.action.arguments) == ("boot", ("cdrom0",))
+    assert reference.phase_scopes["formatting"] == (scope,)
 
 
 def test_a_branching_wait_carries_its_on_handlers(reference):
@@ -462,3 +469,70 @@ def test_the_old_surface_no_longer_parses():
         except ScriptParseError:
             continue
         raise AssertionError(f"the {label} spelling still parses")
+
+
+# The scoped machine-state change — the `with` block (F54).
+
+def test_a_boot_scope_carries_its_keys_and_wraps_its_phases():
+    script = parse_script(
+        _HEAD + "entry startup\n"
+        "with boot cdrom0 {\n"
+        "    phase startup {\n        goto done\n    }\n"
+        "    phase done {\n        finish\n    }\n}\n")
+    scope, = script.scopes
+    assert scope.head == "boot"
+    assert scope.action.verb == "boot"
+    assert scope.action.arguments == ("cdrom0",)
+    assert scope.target == "the boot order"
+    assert [unit.name for unit in scope.units] == ["startup", "done"]
+
+
+def test_a_wrapped_phase_is_still_in_the_flat_phase_namespace():
+    """A scope changes where control *is*, never which phases exist.
+
+    That is what keeps `goto`, `entry` and the timing plan unaware of
+    the construct: the graph they address is the same flat namespace
+    whether a `with` wraps it or not.
+    """
+    script = parse_script(
+        _HEAD + "entry startup\n"
+        "with boot cdrom0 {\n"
+        "    phase startup {\n        goto done\n    }\n}\n"
+        "phase done {\n    finish\n}\n")
+    assert [phase.name for phase in script.phases] == ["startup", "done"]
+    assert script.phase_scopes["startup"] == script.scopes
+    assert script.phase_scopes["done"] == ()
+
+
+def test_the_media_heads_take_the_verbs_own_signatures():
+    script = parse_script(
+        _HEAD + "with insert cdrom0 @livecd {\n"
+        "    with eject floppy0 {\n        start\n    }\n}\n")
+    outer, inner = script.scopes
+    assert outer.action.verb == "insert"
+    assert outer.action.arguments == ("cdrom0", ("media", "livecd"))
+    assert outer.target == "cdrom0"
+    assert inner.action.verb == "eject"
+    assert inner.action.arguments == ("floppy0",)
+    assert inner.target == "floppy0"
+
+
+def test_an_insert_head_takes_a_property_reference():
+    script = parse_script(
+        _HEAD + "property media disk\n"
+        "with insert cdrom0 $disk {\n    start\n}\n")
+    assert script.scopes[0].action.arguments == (
+        "cdrom0", ("property", "disk"))
+
+
+def test_a_linear_scope_keeps_its_statements_nested():
+    script = parse_script(
+        _HEAD + "with eject cdrom0 {\n    start\n    stop\n}\n")
+    scope, = script.statements
+    assert [statement.verb for statement in scope.units] == ["start", "stop"]
+
+
+def test_with_is_a_reserved_node_name():
+    with pytest.raises(ScriptParseError) as caught:
+        parse_script(_HEAD + "entry with\nphase with {\n    finish\n}\n")
+    assert "reserved node name" in str(caught.value)

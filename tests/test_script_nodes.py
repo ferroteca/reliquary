@@ -250,15 +250,38 @@ def reference_nodes():
         return parse_nodes(handle.read(), path=_REFERENCE)
 
 
-def test_the_headers_and_phases_are_the_top_level_nodes(reference_nodes):
+def _phases(nodes):
+    """Every phase node, at whatever depth a scope puts it.
+
+    The node layer knows nothing of `with` beyond its shape — a name,
+    arguments and a block, like every other node — so the reference
+    script's phases are one block deeper than they used to be and
+    otherwise unchanged. That is the claim these tests make.
+    """
+    found = []
+    for node in nodes:
+        if node.name == "phase":
+            found.append(node)
+        elif node.block is not None:
+            found.extend(_phases(node.block))
+    return found
+
+
+def test_the_headers_and_the_scope_are_the_top_level_nodes(reference_nodes):
     assert [node.name for node in reference_nodes] == [
         "description", "platform", "machine", "entry", "timeout",
-        "deadline", "phase", "phase", "phase", "phase", "phase",
-        "phase"]
+        "deadline", "with"]
+
+
+def test_the_scope_names_its_head_and_holds_the_phases(reference_nodes):
+    scope = reference_nodes[-1]
+    assert [argument.value for argument in scope.arguments] == [
+        "boot", "cdrom0"]
+    assert [node.name for node in scope.block] == ["phase"] * 6
 
 
 def test_every_phase_opens_a_block_of_statements(reference_nodes):
-    phases = [node for node in reference_nodes if node.name == "phase"]
+    phases = _phases(reference_nodes)
     assert [phase.arguments[0].value for phase in phases] == [
         "startup", "cd-boot", "partitioning", "formatting", "hd-boot",
         "shutdown"]
@@ -267,9 +290,8 @@ def test_every_phase_opens_a_block_of_statements(reference_nodes):
 
 
 def test_the_branching_wait_holds_two_handlers(reference_nodes):
-    cd_boot = next(node for node in reference_nodes
-                   if node.name == "phase"
-                   and node.arguments[0].value == "cd-boot")
+    cd_boot = next(node for node in _phases(reference_nodes)
+                   if node.arguments[0].value == "cd-boot")
     wait = cd_boot.block[-1]
     assert wait.name == "wait"
     assert wait.arguments == ()
@@ -279,17 +301,15 @@ def test_the_branching_wait_holds_two_handlers(reference_nodes):
 
 
 def test_phase_timing_modifiers_are_read(reference_nodes):
-    formatting = next(node for node in reference_nodes
-                      if node.name == "phase"
-                      and node.arguments[0].value == "formatting")
+    formatting = next(node for node in _phases(reference_nodes)
+                      if node.arguments[0].value == "formatting")
     assert formatting.modifiers["timeout"].value.value == "5m"
     assert formatting.modifiers["deadline"].value.value == "20m"
 
 
 def test_the_machine_channel_reads_as_a_modifier(reference_nodes):
-    shutdown = next(node for node in reference_nodes
-                    if node.name == "phase"
-                    and node.arguments[0].value == "shutdown")
+    shutdown = next(node for node in _phases(reference_nodes)
+                    if node.arguments[0].value == "shutdown")
     wait = shutdown.block[1]
     assert wait.name == "wait"
     assert wait.arguments == ()

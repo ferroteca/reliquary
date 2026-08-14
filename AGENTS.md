@@ -162,7 +162,13 @@ workflow:
   copied: U20's live-iteration transport)
   or stopped (persisted for the next start); `set_boot_order` is
   stopped-only (a launch-time firmware order); boot-order keys may name
-  any declared drive; all three persist and survive stop/start),
+  any declared drive; all three persist and survive stop/start — and **a
+  script's `with` scope is a second caller of exactly these three**,
+  capturing before it changes and calling them again to put the value
+  back, under the same rules: a boot restore is refused on a running
+  machine like any other write of that order, and the run fails naming
+  what it could not undo rather than the state document gaining a
+  writer under a different rule, D104),
   `drives.py` is **what a stopped machine's disks hold, and how the
   guest names them** — one module for one question asked two ways.
   `describe_drives` is the window onto all of it (D83): one
@@ -422,7 +428,19 @@ workflow:
   and `machines.create` / `apply_blueprint` bind at materialization
   so the state records the resolved location, never a `${key}` — a
   bound value that is itself a reference is refused (no chaining).
-  `script_runner.py` executes that tree against
+  **The one construct added since the vocabulary was set is `with`** (F54, D104), the scoped
+  machine-state change: a block whose head is `boot`, `insert` or `eject` and whose exit puts
+  the target back to what it held on entry, on every outcome the runner reaches. Three things
+  about it are load-bearing across the layers. **`boot` states a prefix and is deliberately not
+  `set-boot`** — the drives named come first and the machine's own order follows, so a stage says
+  what it boots without restating an order it is not changing, and the two spellings keep two
+  meanings. **The scope is dynamic**: it holds while control is *inside* the group, so the
+  parser flattens the phases out (`Script.phases` stays the one flat namespace `goto` and `entry`
+  address) and records only `phase_scopes`, the chain around each phase — which is the whole of
+  what a transition needs, and is why every layer above the parser is unchanged by the construct.
+  **The grammar can no longer split the two script shapes**, a `with` head saying nothing about
+  which shape follows it, so the body is one permissive unit list and V10 and V2 decide it where a
+  diagnostic can name the shape. `script_runner.py` executes that tree against
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
   create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys

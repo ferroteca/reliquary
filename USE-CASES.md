@@ -232,3 +232,62 @@ number they superseded.
   beats a user's standing defaults; an explicit per-run value
   beats the design; and nothing reaches a script that did not
   declare the key.
+
+- **U24 — Install from a medium, and keep a blueprint that
+  describes the machine.** An install takes two boots — the
+  medium first, the disk once it is bootable — and the author
+  automating it has to say which is which. Written into the
+  blueprint, that arrangement outlives the install it was for: the
+  definition says the machine boots its CD-ROM first, forever, and
+  says it to everyone the definition is shared with (U4). Written
+  into the script instead, the blueprint goes on stating what the
+  machine *is* while the install states what the install *does*,
+  and the machine that comes out boots its disk under the
+  blueprint's own order — on whatever backend the host provides
+  (U7), without the author knowing which firmware will skip a
+  device it cannot boot.
+
+  Precondition: the blueprint copied out of the library —
+  `rlq seed-blueprint <name>` (U11).
+
+  1. **Declare the machine.** In the blueprint, the drives it has
+     and the order it boots in ordinary use — the disk ahead of an
+     empty optical slot: `"boot": ["hdd0", "cdrom0"]` with
+     `"cdrom0": null`.
+  2. **Put the install's boot arrangement in the install.** In the
+     script, enclose the phases that drive the installer and name
+     what they boot — `with boot cdrom0 { … }` — inserting the
+     medium as those phases begin.
+  3. **Run it.** `rlq run-script install --blueprint <name>`.
+
+- **U26 — Iterate on an install script without repairing the
+  machine between attempts.** Writing an install script is a loop
+  of failed runs: a wait whose screen never arrives, a menu that
+  moved, a timeout a slower host blows through. Each failure
+  leaves the machine part-installed, which is what the author
+  wants to look at — but if it also leaves behind the arrangements
+  the *script* made to get there, the medium it inserted and the
+  device it told the machine to boot, then the next attempt starts
+  from a machine that is no longer the one the blueprint
+  describes, and every retry is preceded by a repair. This case
+  makes the retry the next thing the author does: what the script
+  arranged is put back when its run ends, whether it ended by
+  finishing or by failing, so a change to the script is the only
+  thing that differs between two attempts. What the *guest* did is
+  not an arrangement and stays — the installer's writes to the
+  disk are the run's own product, and how far it got is the
+  evidence.
+
+  Precondition: the blueprint copied out of the library —
+  `rlq seed-blueprint <name>` (U11).
+
+  1. **Run the script.** `rlq run-script install --blueprint
+     <name>`. It fails partway, returning the failure report and
+     screenshot that say what it was waiting for.
+  2. **Power the machine off.** `rlq stop-machine --blueprint
+     <name>` — the script declares `machine stopped`, and a guest
+     left mid-install is still running.
+  3. **Change the script and run it again.** The same
+     `rlq run-script` command: the medium the failed attempt
+     inserted is out of the drive, and the boot arrangement it made
+     is off the machine.

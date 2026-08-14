@@ -163,6 +163,15 @@ def describe(event):
             return (f"{fields.get('name')}: {_bytes(moved)} / "
                     f"{_bytes(total)}")
         return f"{fields.get('name')}: {_bytes(moved)}"
+    if kind == _events.SCOPE_ENTER:
+        return prefix + (f"with {fields.get('head')} "
+                         f"{fields.get('detail')}")
+    if kind == _events.SCOPE_RESTORE:
+        error = fields.get("error")
+        target = fields.get("target")
+        if error:
+            return f"could not restore {target}: {error}"
+        return f"restored {target} to {fields.get('detail')}"
     if kind == _events.GUARD_CADENCE:
         return _guard_report(fields)
     if kind == _events.FAILURE:
@@ -213,6 +222,11 @@ def _failure_report(fields):
             f"  unreadable: {unclear} cells matched no glyph and were "
             "read as spaces; the screen may use a font this host "
             "does not have")
+    restored = fields.get("restored")
+    if restored:
+        # What a scope took back before this report was written. The
+        # machine no longer shows it, so the report has to.
+        lines.append("  restored: " + "; ".join(restored))
     route = fields.get("route")
     if route:
         lines.append("  route: " + " -> ".join(route))

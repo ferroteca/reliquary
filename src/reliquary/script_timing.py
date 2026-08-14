@@ -315,8 +315,21 @@ def _bound(spelling, scope, scope_name, line):
 
 def _statements(statements, default, pacing, stability, phase,
                 observations, inputs):
-    """Resolve a statement list under its innermost defaults."""
+    """Resolve a statement list under its innermost defaults.
+
+    A ``with`` scope is transparent to the timing model: it carries no
+    timing modifier and so introduces no scope, and what it wraps
+    resolves against exactly the defaults it would have had without
+    the block. Nothing here changes when one is written.
+    """
     for statement in statements:
+        units = getattr(statement, "units", None)
+        if units is not None:
+            _statements(units, default, pacing, stability, phase,
+                        observations, inputs)
+            continue
+        if not hasattr(statement, "verb"):
+            continue                  # a phase, resolved by `resolve`
         if statement.verb in INPUT_VERBS:
             inputs.append(Input(
                 statement.verb, statement.line, statement.column, phase,

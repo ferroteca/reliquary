@@ -1,0 +1,13 @@
+# invalid: the two script shapes never mix
+# rule: V10
+# id: flow.mixed-shapes
+# spec: Syntactic restrictions
+
+platform dos
+entry a
+
+start
+
+phase a {
+    finish
+}

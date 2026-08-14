@@ -1,0 +1,13 @@
+# valid: a with block wraps a linear script's statements
+# spec: Core grammar / Scoped machine-state changes
+
+platform dos
+machine stopped
+
+with insert cdrom0 @install-cd {
+    with boot cdrom0 {
+        start
+        wait "C:\>"
+        stop
+    }
+}

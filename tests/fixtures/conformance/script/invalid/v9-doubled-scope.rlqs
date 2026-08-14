@@ -1,0 +1,12 @@
+# invalid: one scope per target, so what a restore puts back is never
+# invalid: in question
+# rule: V9
+# id: scope.doubled-target
+# spec: Syntactic restrictions
+
+platform dos
+with boot cdrom0 {
+    with boot hdd0 {
+        start
+    }
+}

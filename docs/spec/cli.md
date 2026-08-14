@@ -1368,7 +1368,9 @@ family (that whole record model — persisted runs, `run status` /
 interaction runs — is asynchronous-runs backlog work
 (planning/proposed/FEATURES.md, D35/D36). Ctrl-C cancels the run
 at the next event boundary (a `cancelled` terminal event, exit
-`5`) and leaves the machine as-is.
+`5`) and leaves the machine as-is, apart from the
+[scoped changes](script-spec.md#scoped-machine-state-changes) the
+run puts back, which the cancellation names.
 
 The run's product is the caller's — the returned value, a file
 retrieved in-band, a machine variable read with `get-machine-var`,

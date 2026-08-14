@@ -1,0 +1,9 @@
+# invalid: the with head vocabulary is closed at boot, insert, eject
+# rule: V14
+# id: scope.unknown-head
+# spec: Syntactic restrictions
+
+platform dos
+with medium cdrom0 {
+    start
+}

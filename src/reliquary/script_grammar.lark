@@ -19,6 +19,15 @@
 // permissive: a phase takes statements and handlers in any mix (V9
 // splits them), a branching wait takes one or more handlers (V8
 // requires two), and a phase body need not terminate (V11).
+//
+// The body is one permissive unit list for the same reason. A `with`
+// block wraps phases in a phased script and statements in a linear
+// one, and which of those it is cannot be known at the `with` --
+// only on reaching the first unit inside it, which is unbounded
+// lookahead. So the two script shapes are no longer split here: the
+// grammar admits any mix of phases, statements and scopes, and V10
+// and V2 decide it above, where a diagnostic can say which shape the
+// script is and what the block was allowed to hold.
 
 script: header* property_def* http_def* body?
 
@@ -38,8 +47,16 @@ http_def: KW_HTTP modifier* _open content_def+ _close
 content_def: KW_CONTENT NAME STRING modifier* TRIPLE _NL CONTENT_TEXT _NL
            | KW_CONTENT NAME STRING modifier* _NL
 
-?body: phase+                           -> phased_body
-     | statement+                       -> linear_body
+body: unit+
+?unit: phase | statement | scope_block
+
+// A scoped machine-state change. The head verb is an ordinary NAME:
+// keywords are recognized only where a node may start, so `insert`
+// after `with` lexes as a word. Which three names are legal, and how
+// many arguments each takes, is the transformer's -- it can name the
+// head, where "unexpected token" could not.
+scope_block: KW_WITH NAME scope_arg+ _open unit+ _close
+?scope_arg: NAME | MEDIA_REF | PROP_REF
 
 phase: KW_PHASE NAME modifier* _open phase_item+ _close
 ?phase_item: statement | handler
@@ -93,7 +110,8 @@ _close: _BLOCK_CLOSE _NL
 
 %declare KW_DESCRIPTION KW_PLATFORM KW_MACHINE KW_ENTRY KW_TIMEOUT KW_PACING
 %declare KW_STABILITY
-%declare KW_DEADLINE KW_PROPERTY KW_HTTP KW_CONTENT KW_PHASE KW_WAIT KW_ON KW_ALWAYS
+%declare KW_DEADLINE KW_PROPERTY KW_HTTP KW_CONTENT KW_PHASE KW_WITH
+%declare KW_WAIT KW_ON KW_ALWAYS
 %declare KW_GOTO KW_FINISH KW_ENTER KW_TYPE KW_PRESS KW_SELECT
 %declare KW_SCREENSHOT KW_INSERT KW_EJECT KW_SET_BOOT KW_SET KW_START KW_STOP
 %declare NAME STRING REGEX DURATION MEDIA_REF PROP_REF MOD_NAME TRIPLE CONTENT_TEXT

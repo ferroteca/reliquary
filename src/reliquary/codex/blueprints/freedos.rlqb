@@ -18,13 +18,18 @@
       // Declared but empty — the install script inserts the LiveCD.
       "cdrom0": null
     },
-    // The installer medium first, and the disk behind it. A blueprint
-    // that carries an installer wants this order: firmware is only
-    // reliably willing to skip an *empty* drive, not a disk that has
-    // been partitioned without an active partition — VirtualBox stops
-    // there where SeaBIOS moves on. The install script ejects the CD
-    // when the disk is ready, and every later boot takes the disk.
-    "boot": ["cdrom0", "hdd0"],
+    // The installed disk first, which is what this machine *is*: a
+    // plain FreeDOS system that boots its own hard disk past an empty
+    // optical drive. Booting the installer instead is a property of
+    // one stage of one script, and `freedos-install` says so where it
+    // is true — `with boot cdrom0` around its install phases, undone
+    // when the run ends. Firmware is only reliably willing to skip an
+    // *empty* drive, not a disk partitioned without an active
+    // partition (VirtualBox stops there where SeaBIOS moves on), so
+    // nothing here depends on falling past one: the install boots the
+    // CD because the stage asked for it, and the mid-install eject is
+    // what hands the disk its turn.
+    "boot": ["hdd0", "cdrom0"],
     "scripts": {
       "install": "freedos-install",
       "verify": "freedos-verify",

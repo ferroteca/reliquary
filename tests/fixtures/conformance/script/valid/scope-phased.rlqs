@@ -1,0 +1,30 @@
+# valid: a with block wraps a phased script's phases, scopes on
+# valid: different targets nest, and control leaving the group is what
+# valid: closes it
+# spec: Core grammar / Scoped machine-state changes
+
+platform dos
+machine stopped
+entry startup
+deadline 20m
+
+with boot cdrom0 {
+    with insert cdrom0 @install-cd {
+        phase startup {
+            start
+            goto install
+        }
+
+        phase install {
+            wait "Installation is now complete."
+            goto verify
+        }
+    }
+}
+
+with eject floppy0 {
+    phase verify {
+        wait machine=stopped timeout=2m
+        finish
+    }
+}

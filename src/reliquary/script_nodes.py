@@ -58,7 +58,7 @@ _DELIMITERS = " \t{}#"
 KEYWORDS = (
     "description", "platform", "machine", "entry", "timeout", "deadline",
     "pacing", "stability",
-    "property", "http", "content", "phase", "wait", "on", "always",
+    "property", "http", "content", "phase", "with", "wait", "on", "always",
     "goto", "finish", "enter", "type", "press", "select", "screenshot",
     "insert", "eject", "set-boot", "set", "start", "stop",
 )
@@ -87,6 +87,12 @@ RULE_OF = {
     "node.duplicate-modifier": "V4",
     "node.modifier-not-allowed": "V2",
     "node.timing-placement": "V2",
+    "scope.head-arguments": "V2",
+    "scope.wraps-the-wrong-unit": "V2",
+    "scope.unknown-head": "V14",
+    "scope.doubled-target": "V9",
+    "flow.mixed-shapes": "V10",
+    "drive.boot-duplicate": "V5",
     "name.reserved-node": "V5",
     "name.duplicate-phase": "V5",
     "name.duplicate-property": "V5",
