@@ -1,6 +1,7 @@
 # valid: a with block wraps a phased script's phases, scopes on
 # valid: different targets nest, and control leaving the group is what
-# valid: closes it
+# valid: closes it -- with the machine down where the boot order is
+# valid: put back, which V17 checks
 # spec: Core grammar / Scoped machine-state changes
 
 platform dos
@@ -20,11 +21,12 @@ with boot cdrom0 {
             goto verify
         }
     }
-}
 
-with eject floppy0 {
-    phase verify {
-        wait machine=stopped timeout=2m
-        finish
+    with eject floppy0 {
+        phase verify {
+            enter "shutdown"
+            wait machine=stopped timeout=2m
+            finish
+        }
     }
 }

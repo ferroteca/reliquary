@@ -1,0 +1,20 @@
+# valid: the shape a scoped boot order asks for -- the stage hands
+# valid: back a machine that is down, so the exit can put the order
+# valid: back. This is V17's silence as much as its refusal: the run
+# valid: says how the machine came to be stopped, and the static pass
+# valid: reads it.
+# spec: Scoped machine-state changes
+
+platform dos
+machine  stopped
+entry    startup
+
+with boot cdrom0 {
+    phase startup {
+        start
+        wait "C:\>"
+        enter "fdapm poweroff"
+        wait machine=stopped timeout=2m
+        finish
+    }
+}

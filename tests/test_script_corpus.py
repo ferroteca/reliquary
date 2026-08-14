@@ -79,8 +79,8 @@ _RULE = re.compile(r"^# rule: (V\d+)", re.M)
 _ID = re.compile(r"^# id: (\S+)", re.M)
 _CAUGHT_BY = re.compile(r"^# caught-by: (V\d+)", re.M)
 
-VALID = corpus.fixtures(_CORPUS, "valid", ".rlqs", count=19)
-INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqs", count=50)
+VALID = corpus.fixtures(_CORPUS, "valid", ".rlqs", count=20)
+INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqs", count=52)
 AT_PREFLIGHT = corpus.fixtures(
     _CORPUS, "invalid-at-preflight", ".rlqs", count=5)
 
@@ -232,6 +232,11 @@ def test_every_enforced_rule_has_a_fixture_exercising_it():
 #: Each of these is one rule raised from more than one module, with
 #: the number of sites the id must still cover.
 SHARED_IDS = {
+    # V17 put a *static* site on the machine layer's own rule rather
+    # than inventing a second name for it, which is the pattern this
+    # check exists to hold: one condition, one answer, whichever
+    # layer noticed.
+    "machine.must-be-stopped": 7,
     "machine.not-running": 3,
     "machine.no-selector": 3,
     "machine.no-vm-identity": 3,

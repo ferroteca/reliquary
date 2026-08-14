@@ -440,7 +440,13 @@ workflow:
   what a transition needs, and is why every layer above the parser is unchanged by the construct.
   **The grammar can no longer split the two script shapes**, a `with` head saying nothing about
   which shape follows it, so the body is one permissive unit list and V10 and V2 decide it where a
-  diagnostic can name the shape. `script_runner.py` executes that tree against
+  diagnostic can name the shape. **V17 is the one static rule that is a *flow* analysis** (T27): where the
+  machine is — from the `machine` header, `start`, `stop`, and a completed
+  `wait machine=stopped` — carried to a fixed point over the transition graph, so a `set-boot` or a
+  boot scope's edge the plan promises is reached with the machine up is refused at parse time rather
+  than five minutes into an install. It is bounded by exactly what `reach` bounds: a handler body is
+  walked for its effect and never judged, and two paths that disagree refuse nothing — a false
+  refusal being far worse than the late failure it replaces, which is why the run-time check stays. `script_runner.py` executes that tree against
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
   create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys

@@ -61,7 +61,7 @@ nothing is ever reissued.
   resolving to exactly one thing.
 - **The next U-number to issue is U27** — use cases, one namespace
   across proposed, pledged, and the root list.
-- **The next V-number to issue is V17** — the script language's
+- **The next V-number to issue is V18** — the script language's
   static validation rules
   ([docs/spec/script-spec.md](../docs/spec/script-spec.md)). The
   sequence spent 1–15 under its old S-spelling before D84 renamed

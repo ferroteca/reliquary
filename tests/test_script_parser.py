@@ -108,7 +108,7 @@ def test_a_keyword_is_a_plain_name_outside_node_position():
     # `enter` is a verb at the start of a line and a key name
     # after `press`; `insert` and `type` likewise.
     script = parse_script(
-        _HEAD + "press enter\npress ctrl+alt+delete\n"
+        _HEAD + "machine stopped\npress enter\npress ctrl+alt+delete\n"
         "press insert\nset-boot hdd0 cdrom0\n")
     assert [s.verb for s in script.statements] == [
         "press", "press", "press", "set-boot"]
@@ -475,7 +475,7 @@ def test_the_old_surface_no_longer_parses():
 
 def test_a_boot_scope_carries_its_keys_and_wraps_its_phases():
     script = parse_script(
-        _HEAD + "entry startup\n"
+        _HEAD + "machine stopped\nentry startup\n"
         "with boot cdrom0 {\n"
         "    phase startup {\n        goto done\n    }\n"
         "    phase done {\n        finish\n    }\n}\n")
@@ -495,7 +495,7 @@ def test_a_wrapped_phase_is_still_in_the_flat_phase_namespace():
     whether a `with` wraps it or not.
     """
     script = parse_script(
-        _HEAD + "entry startup\n"
+        _HEAD + "machine stopped\nentry startup\n"
         "with boot cdrom0 {\n"
         "    phase startup {\n        goto done\n    }\n}\n"
         "phase done {\n    finish\n}\n")

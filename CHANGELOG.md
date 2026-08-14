@@ -13,6 +13,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A stopped-only verb reached running is refused before the run**
+  (T27; V17). `set-boot` and F54's scoped `boot` head write a
+  launch-time firmware order, which is stopped-only as a property of
+  the machine. Reached with the machine up they failed closed and by
+  name — at **run** time, and for the shape that provokes them (flip
+  the boot device, start, install, stop, flip back) run time means
+  after five minutes of installing.
+
+  **The script text already decided it.** The header declares the
+  starting state and the language knows exactly which verbs start and
+  stop the machine, so the verdict now lands at parse time, exit `2`,
+  before anything reaches a guest. A scope's **exit** is checked with
+  its entry — the half no author can see coming, since it is reached
+  by finishing and by every failure too — which is the check F54
+  deferred to this analysis.
+
+  **Bounded by what a static pass can promise, and silent everywhere
+  else.** Control reaching a handler body is the guest's decision, so
+  nothing inside one is judged and no phase only a handler transfers
+  to is analysed — the boundary `reach` already draws. Handler bodies
+  are still walked for their *effect* on the machine, and two paths
+  that disagree answer nothing at all. A `wait machine=stopped` that
+  completed has observed the machine down and leaves it stopped, so
+  the shape every script that powers a guest off from inside already
+  ends with keeps working. A false refusal would be far worse than
+  the late failure this replaces, and the run-time refusal remains
+  for everything the plan cannot promise.
+
+  The diagnostic is the machine layer's own id, unchanged —
+  `machine.must-be-stopped` — so a consumer switching on it never has
+  to know which layer noticed.
+
 - **The scoped machine-state change** (F54; U24, U26, D104). A
   script's `insert`, `eject` and `set-boot` change the machine
   durably and leave it changed; the author writes the undo by hand,

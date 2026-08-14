@@ -374,7 +374,7 @@ def test_a_scope_resolves_its_statements_as_if_it_were_not_there():
         _HEAD + "entry p\nphase p timeout=9s {\n"
         '    wait "x"\n    finish\n}\n')
     plan = _plan(
-        _HEAD + "entry p\nwith boot cdrom0 {\n"
+        _HEAD + "machine stopped\nentry p\nwith boot cdrom0 {\n"
         "    phase p timeout=9s {\n"
         '        wait "x"\n        finish\n    }\n}\n')
     wait = next(entry for entry in plan.observations

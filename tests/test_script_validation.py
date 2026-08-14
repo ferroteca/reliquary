@@ -338,6 +338,31 @@ CASES = (
     Case("statement-outside-every-phase", "V10",
          "start is outside every phase",
          _HEAD + "entry a\nstart\nphase a {\n    finish\n}\n"),
+
+    # V17: a stopped-only verb the plan promises runs while the
+    # machine is up. The rule is bounded by what a static pass can
+    # promise, so every case here is a path with no guest decision on
+    # it; the silences are in ACCEPTS below, where they matter more.
+    Case("set-boot-after-a-start", "V17",
+         "set-boot needs a stopped machine, and it is running here "
+         "(started at line 3)",
+         _HEAD + "machine stopped\nstart\nset-boot hdd0\n"),
+    Case("set-boot-under-a-running-header", "V17",
+         "(the machine header defaults to running)",
+         _HEAD + "set-boot hdd0\n"),
+    Case("set-boot-across-a-transition", "V17",
+         "it is running here (started at line 5)",
+         _HEAD + "machine stopped\nentry a\n"
+         "phase a {\n    start\n    goto b\n}\n"
+         "phase b {\n    set-boot hdd0\n    finish\n}\n"),
+    Case("a-boot-scope-entered-running", "V17",
+         "this scope is entered with the machine running",
+         _HEAD + "entry a\nwith boot cdrom0 {\n    phase a {\n"
+         "        finish\n    }\n}\n"),
+    Case("a-boot-scope-left-running", "V17",
+         "puts the boot order back where it is left at line 7",
+         _HEAD + "machine stopped\nentry a\nwith boot cdrom0 {\n"
+         "    phase a {\n        start\n        finish\n    }\n}\n"),
 )
 
 #: Scripts the rules must let through, asserted by parsing alone.
@@ -357,19 +382,47 @@ ACCEPTS = (
     # Scopes on different targets nest freely, and each shape wraps
     # its own units.
     ("a-scope-over-phases",
-     _HEAD + "entry a\nwith boot cdrom0 {\n    phase a {\n"
-     "        finish\n    }\n}\n"),
+     _HEAD + "machine stopped\nentry a\nwith boot cdrom0 {\n"
+     "    phase a {\n        finish\n    }\n}\n"),
     ("a-scope-over-statements",
      _HEAD + "with insert cdrom0 @disk {\n    start\n}\n"),
     ("scopes-on-different-targets-nest",
-     _HEAD + "with boot cdrom0 {\n    with insert cdrom0 @disk {\n"
-     "        with eject floppy0 {\n            start\n        }\n"
-     "    }\n}\n"),
+     _HEAD + "machine stopped\nwith insert cdrom0 @disk {\n"
+     "    with eject floppy0 {\n        with boot cdrom0 {\n"
+     "            screenshot ready\n        }\n    }\n}\n"),
     ("a-scope-beside-a-phase",
-     _HEAD + "entry a\nwith boot cdrom0 {\n    phase a {\n"
-     "        goto b\n    }\n}\nphase b {\n    finish\n}\n"),
+     _HEAD + "machine stopped\nentry a\nwith boot cdrom0 {\n"
+     "    phase a {\n        goto b\n    }\n}\n"
+     "phase b {\n    finish\n}\n"),
     ("a-phase-named-with-is-still-refused-elsewhere",
      _HEAD + "entry withdraw\nphase withdraw {\n    finish\n}\n"),
+
+    # V17's silences, which matter more than its refusals: a false
+    # refusal would be far worse than the late failure the rule
+    # replaces, so a path the guest decides, and two paths that
+    # disagree, are answered with nothing at all.
+    ("a-stop-before-the-set-boot",
+     _HEAD + "machine stopped\nstart\nstop\nset-boot hdd0\n"),
+    ("a-poweroff-the-script-observed",
+     _HEAD + "machine stopped\nstart\n"
+     'enter "fdapm poweroff"\nwait machine=stopped timeout=2m\n'
+     "set-boot hdd0\n"),
+    ("a-start-only-a-handler-reaches",
+     _HEAD + "machine stopped\n"
+     'wait {\n    on "up" {\n        start\n    }\n'
+     '    on "down" {\n        screenshot idle\n    }\n}\n'
+     "set-boot hdd0\n"),
+    ("a-set-boot-inside-a-handler",
+     _HEAD + "machine stopped\nstart\n"
+     'wait {\n    on "up" {\n        set-boot hdd0\n    }\n'
+     '    on "down" {\n        screenshot idle\n    }\n}\n'),
+    ("a-phase-only-a-handler-reaches",
+     _HEAD + "machine stopped\nentry a\n"
+     "phase a {\n    start\n"
+     '    wait {\n        on "up" {\n            goto b\n        }\n'
+     '        on "down" {\n            goto c\n        }\n    }\n}\n'
+     "phase b {\n    set-boot hdd0\n    finish\n}\n"
+     "phase c {\n    finish\n}\n"),
 )
 
 

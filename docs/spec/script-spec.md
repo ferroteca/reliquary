@@ -805,6 +805,34 @@ the CFG. Each has a stable id; diagnostics cite them:
   `http.start-without-content`, `http.stop-takes-nothing`,
   `http.undeclared-content`, `http.unknown-action`.
 
+- **V17** — a **stopped-only verb is never reached with the machine
+  running**, wherever the plan can promise it is reached at all.
+  `set-boot` and a scoped `boot` head write a launch-time firmware
+  order, which is stopped-only as a property of the machine; the
+  header declares the starting state and the language knows which
+  verbs start and stop the machine, so the answer is decidable from
+  the text. A scope's **exit** is checked with its entry, that being
+  the half no author can see coming — it is reached by finishing and
+  by every failure too.
+
+  **The rule is bounded by what a static pass can promise, and is
+  silent everywhere else.** Control reaching a handler body is the
+  guest's decision, so nothing inside one is judged and no phase
+  only a handler transfers to is reached — the same boundary the
+  reachability count is drawn on. A handler body is still walked for
+  its *effect* on the machine, and two paths that disagree answer
+  `unknown` and refuse nothing. A false refusal would be far worse
+  than the late failure this replaces: the run-time refusal remains,
+  and is what catches everything the plan could not promise.
+
+  A `wait machine=stopped` that completes has *observed* the machine
+  down, so it leaves it stopped for this analysis — a reading rather
+  than an assumption, and the shape every script that powers a guest
+  off from inside already ends with.
+  Id: `machine.must-be-stopped` — **the run-time id, unchanged**.
+  One rule, one answer for a consumer; what V17 adds is when it is
+  noticed, not what it means.
+
 The grammar is line-oriented and LL(1) over the token stream in
 [lexical rules](#lexical-rules), given one lexical rule: a bare
 word immediately followed by `=` is a modifier-name token. Without
@@ -2025,7 +2053,10 @@ document — the verb *sets configuration* rather than performing an
 immediate action, and its name says so. Every key must name a
 drive the machine already
 declares; duplicates are rejected. The machine must be stopped —
-the new order takes effect on the next `start`. Like
+the new order takes effect on the next `start`, and **a `set-boot`
+the plan promises is reached with the machine running is refused
+before the run starts** (V17) rather than five minutes into an
+install. Like
 `insert`/`eject`, the change diverges the machine from its
 blueprint until a later `set-boot`, or
 [`apply`](../blueprint-guide.md#applying-blueprint-edits), restores
@@ -2099,9 +2130,12 @@ launch-time firmware configuration and stopped-only as a property of
 the machine, not as a courtesy to the author, so a restore is not
 exempted from the rule a second writer would erode. An exit reached
 with the machine running **fails the run**, naming the change it
-could not undo. The cost is real and accepted: a run that otherwise
-succeeded can fail at its last act, and the remedy is to say in the
-script's own shape that the stage ends with the machine down.
+could not undo — and where the plan can promise that exit is reached
+running, it is an authoring refusal instead (V17), which is where
+most of the cost goes. What is left of it is real and accepted: a
+run whose route the guest chose can fail at its last act, and the
+remedy is to say in the script's own shape that the stage ends with
+the machine down.
 Media restores carry no such rule — `insert` and `eject` are
 running-or-stopped, so a media restore is live where the machine is
 up.
@@ -2244,6 +2278,12 @@ scope, preflight further rejects, naming what it needed:
   mismatches at the file source, and required secret credentials
   unavailable from a secure host
   store (the property sources).
+
+Every one of those needs more than the text. What the text alone
+decides is settled before preflight is reached, V17 included: a
+stopped-only verb the plan promises runs while the machine is up is
+a legality error, not a preflight one, and the machine it would have
+needed is never consulted.
 
 Static analysis warns about unreachable phases, reactive phases
 with no possible exit, obvious shadowed literal conditions, a

@@ -5,6 +5,7 @@
 # id: machine.slot-not-declared
 
 platform dos
+machine stopped
 with boot cdrom7 {
     wait "C:\>"
 }

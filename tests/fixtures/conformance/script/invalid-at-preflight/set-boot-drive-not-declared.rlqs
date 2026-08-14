@@ -3,5 +3,6 @@
 # id: machine.slot-not-declared
 
 platform dos
+machine stopped
 set-boot hdd6
 wait "C:\>"

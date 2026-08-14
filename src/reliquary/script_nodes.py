@@ -129,6 +129,11 @@ RULE_OF = {
     "obs.empty-pattern": "V13",
     "obs.uncompilable-regex": "V13",
     "key.not-portable": "V14",
+    # Deliberately the *runtime* id, unchanged: the static pass and
+    # the machine layer enforce one rule, so a consumer switching on
+    # it never has to know which layer noticed. What V17 adds is when
+    # it is noticed, not what it means.
+    "machine.must-be-stopped": "V17",
 }
 
 #: The lexical and structural tiers. V1 is "syntax is well formed:

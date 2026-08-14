@@ -1,0 +1,18 @@
+# invalid: a scope exit provably reached with the machine running --
+# invalid: the boot order it puts back is written only on a stopped
+# invalid: machine, so the restore could never be made
+# rule: V17
+# id: machine.must-be-stopped
+# spec: Scoped machine-state changes
+
+platform dos
+machine  stopped
+entry    startup
+
+with boot cdrom0 {
+    phase startup {
+        start
+        wait "C:\>"
+        finish
+    }
+}

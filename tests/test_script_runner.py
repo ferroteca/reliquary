@@ -893,7 +893,7 @@ def test_eject_empties_the_slot(runtime):
 
 
 def test_set_boot_replaces_the_boot_order(runtime):
-    engine = runtime.engine("set-boot hdd0 cdrom0\n")
+    engine = runtime.engine("machine stopped\nset-boot hdd0 cdrom0\n")
     with mock.patch("reliquary.script_runner._machines") as machines:
         runtime.run_linear(engine)
         machines.set_boot_order.assert_called_once_with(
@@ -1596,8 +1596,13 @@ class _ScopedRun:
 
 
 @contextlib.contextmanager
-def _scoped(source, state=None, machine="freedos-0"):
-    """Run a script whole against a recording machine layer."""
+def _scoped(source, state=None, machine="freedos-0", screens=None):
+    """Run a script whole against a recording machine layer.
+
+    ``screens`` gives the run a console, for the scripts whose route
+    is the guest's to choose — which is the only kind that can reach a
+    scope exit V17 could not rule on.
+    """
     script = parse_script(source)
     with mock.patch("reliquary.script_runner._machines") as machines:
         run = _ScopedRun(machines, state or _SCOPED_MACHINE)
@@ -1608,9 +1613,18 @@ def _scoped(source, state=None, machine="freedos-0"):
             lambda *a, **k: setattr(run, "phase", "running"))
         machines.stop_machine.side_effect = (
             lambda *a, **k: setattr(run, "phase", "ready"))
+        clock = _Clock()
         run.engine = _ScriptEngine(
             script, machine, "/tmp/home", "/tmp/home/machines/" + machine,
-            script_path="demo.rlqs")
+            script_path="demo.rlqs", clock=clock, sleep=clock.sleep)
+        if screens is not None:
+            console = _FakeConsole(screens)
+
+            @contextlib.contextmanager
+            def opened():
+                yield console
+
+            run.engine._console = opened
         yield run
 
 
@@ -1703,16 +1717,26 @@ def test_a_cancellation_restores_and_the_message_says_so():
 
 
 def test_a_boot_restore_reached_running_fails_the_run_naming_it():
-    """The cost D104 weighed and accepted.
+    """The cost D104 weighed and accepted, and what V17 cannot take.
 
     A boot order is stopped-only as a property of the machine, and a
     restore is not exempted from it: a second writer under a different
     rule is how such a guarantee erodes. So a run that hands back a
     live machine fails at its last act, saying what it could not undo.
+
+    **The route here is the guest's**, which is the whole reason this
+    check still exists at run time. V17 moves the verdict to parse
+    time wherever the plan can promise the exit is reached running;
+    here one branch stops the machine and the other does not, so the
+    static pass answers `unknown` and says nothing — deliberately,
+    a false refusal being far worse than this late failure.
     """
-    with _scoped("platform dos\nmachine stopped\nentry a\n"
-                 "with boot cdrom0 {\n    phase a {\n"
-                 "        start\n        finish\n    }\n}\n") as run:
+    with _scoped("platform dos\nmachine stopped\n"
+                 "with boot cdrom0 {\n    start\n"
+                 '    wait {\n        on "done" {\n            stop\n'
+                 '        }\n        on "failed" {\n'
+                 "            screenshot bad\n        }\n    }\n}\n",
+                 screens=[["failed"]]) as run:
         def refuse(machine_id, keys, **_kwargs):
             if run.phase == "running":
                 raise PreflightError(
@@ -1721,8 +1745,9 @@ def test_a_boot_restore_reached_running_fails_the_run_naming_it():
                     rule_id="machine.must-be-stopped")
 
         run.machines.set_boot_order.side_effect = refuse
-        with pytest.raises(ScriptRuntimeError) as caught:
-            run.engine.run()
+        with mock.patch.object(_ScriptEngine, "_screenshot"):
+            with pytest.raises(ScriptRuntimeError) as caught:
+                run.engine.run()
     assert "the boot order could not be restored to hdd0 cdrom0" in str(
         caught.value)
     assert caught.value.rule_id == "machine.must-be-stopped"
@@ -1777,7 +1802,7 @@ def test_a_linear_scope_brackets_exactly_what_it_wraps():
 def test_a_scoped_head_answers_to_the_same_preflight_rules():
     """A `with boot` key is checked where `set-boot`'s already is."""
     script = parse_script(
-        "platform dos\nentry a\nwith boot cdrom7 {\n"
+        "platform dos\nmachine stopped\nentry a\nwith boot cdrom7 {\n"
         "    phase a {\n        finish\n    }\n}\n")
     with pytest.raises(ScriptPreflightError) as caught:
         _preflight_machine_rules(script, {"drives": {"hdd0": {}}}, "s.rlqs")

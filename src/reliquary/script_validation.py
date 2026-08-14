@@ -26,7 +26,9 @@ name the offending construct and cite its rule:
   run.
 - **V13** — a watch pattern is non-empty, and a regex compiles;
 - **V14** — every ``press`` key belongs to the language's closed
-  portable vocabulary.
+  portable vocabulary;
+- **V17** — a stopped-only verb is never reached with the machine
+  running, wherever a static pass can promise it runs at all.
 
 The remaining rules belong to the layers around this one: V1, V2,
 and V4 are the lexer's and the parser's — the timing placement
@@ -41,6 +43,7 @@ This module works structurally over the tree, so it imports no
 node type; that keeps the parser free to import it.
 """
 
+import collections
 import re
 
 from . import facts
@@ -102,6 +105,9 @@ def validate(script):
         _phased(script)
     else:
         _linear(script)
+    # Last: the flow analysis reads the transition graph, so it runs
+    # once V10 has agreed every `goto` names a phase that exists.
+    _machine_flow(script)
 
 
 # -- durations (V5) ----------------------------------------------
@@ -620,6 +626,228 @@ def _canonical_slot(key):
     """A drive key's canonical spelling, or the key where it is not one."""
     match = _SLOT_KEY.fullmatch(key)
     return f"{match.group(1)}{match.group(2) or '0'}" if match else key
+
+
+# -- where the machine is (V17) ----------------------------------
+#
+# `set-boot` and a scoped `boot` head write a launch-time firmware
+# order, which is stopped-only as a property of the machine (D15's
+# Q1). Reached with the machine up they fail closed and by name — at
+# RUN time, and for the shape that provokes them (flip the boot
+# device, start, install, stop, flip back) run time means after five
+# minutes of installing.
+#
+# **The script text already decides it.** The header declares the
+# starting state, and the language knows exactly which verbs start
+# and stop the machine, so the answer is available before anything
+# reaches a guest.
+#
+# **What bounds it is the bound the rest of the static pass already
+# accepts.** A handler body is the guest's decision and not the
+# plan's — `reach` is where that line is already drawn — so this rule
+# speaks only about the statements a static pass can *promise* will
+# run, and is silent everywhere else. A handler body is walked for
+# its *effect* on the machine and never judged, because control
+# reaching it is the guest's call. And two paths that disagree answer
+# nothing at all: a false refusal would be far worse than the late
+# failure this replaces.
+
+_STOPPED, _RUNNING, _UNKNOWN = "stopped", "running", "unknown"
+
+#: One program point: where the machine is, and the clause a
+#: diagnostic uses to say how it got that way. Naming the cause is
+#: most of the value — "the machine is running here" is a verdict,
+#: "started at line 7" is a fix.
+_Where = collections.namedtuple("_Where", "state why")
+
+
+def _machine_flow(script):
+    """Refuse a stopped-only verb the plan promises runs running."""
+    if script.machine == "stopped":
+        start = _Where(_STOPPED, "the machine header says stopped")
+    else:
+        start = _Where(
+            _RUNNING,
+            "the machine header says running" if script.machine
+            else "the machine header defaults to running")
+    if script.phases:
+        _phased_flow(script, start)
+    else:
+        _flow(script.statements, start, judge=True)
+
+
+def _join(here, there):
+    """Merge two paths' answers; disagreement is no answer at all."""
+    if here is None:
+        return there
+    if here.state != there.state:
+        return _Where(_UNKNOWN, None)
+    return here if here.why == there.why else _Where(here.state, None)
+
+
+def _after(statement, where):
+    """Where the machine is once this statement has run."""
+    verb, line = statement.verb, statement.line
+    if verb == "start":
+        return _Where(_RUNNING, f"started at line {line}")
+    if verb == "stop":
+        return _Where(_STOPPED, f"stopped at line {line}")
+    if verb != "wait":
+        return where
+    if not statement.handlers:
+        condition = statement.condition
+        # A `wait machine=stopped` that completed *observed* the
+        # machine down, so this is a reading rather than an
+        # assumption — and it is how every script that powers a guest
+        # off from inside already ends.
+        if condition is not None and condition.channel == "machine" \
+                and condition.value == "stopped":
+            return _Where(_STOPPED, f"observed stopped at line {line}")
+        return where
+    # A branching wait continues through whichever handlers do not
+    # transfer, so what follows sees the join of their effects.
+    reached = [_flow(handler.statements, where, judge=False)
+               for handler in statement.handlers
+               if not _terminates(handler.statements)]
+    if not reached:
+        return where                    # terminating: nothing follows
+    merged = reached[0]
+    for other in reached[1:]:
+        merged = _join(merged, other)
+    return merged
+
+
+def _flow(units, where, judge):
+    """Walk a unit list; report where the machine is once it is done.
+
+    ``judge`` is off wherever control arriving is the guest's
+    decision: the walk still folds in what the statements *do*, and
+    refuses nothing.
+    """
+    for unit in units:
+        inner = _scoped(unit)
+        if inner is not None:
+            if judge:
+                _scope_gate(unit, where, entering=True)
+            where = _flow(inner, where, judge)
+            if judge:
+                _scope_gate(unit, where, entering=False)
+            continue
+        if not _is_statement(unit):
+            continue                    # a phase, walked in its own turn
+        if judge:
+            _statement_gate(unit, where)
+        where = _after(unit, where)
+    return where
+
+
+def _statement_gate(statement, where):
+    """Refuse a stopped-only verb the machine cannot be down for."""
+    if statement.verb != "set-boot" or where.state != _RUNNING:
+        return
+    raise ScriptParseError(
+        statement.line,
+        f"set-boot needs a stopped machine, and it is running here "
+        f"({where.why}): the order is read at the next start, so it "
+        "belongs before one or after a stop",
+        statement.column, rule_id="machine.must-be-stopped")
+
+
+def _scope_gate(scope, where, entering, leaving_at=None):
+    """Refuse a boot scope whose edge is crossed with the machine up.
+
+    Both edges write the boot order — entry applies the prefix, exit
+    puts the old order back — so both answer to the verb's own rule,
+    and the exit is the half no author can see coming: it is reached
+    by finishing, and by every failure too.
+    """
+    if scope.head != "boot" or where.state != _RUNNING:
+        return
+    at = f" at line {leaving_at}" if leaving_at else ""
+    said = (f"this scope is entered with the machine running "
+            f"({where.why})" if entering else
+            f"this scope puts the boot order back where it is left{at}, "
+            f"and the machine is running there ({where.why})")
+    raise ScriptParseError(
+        scope.line,
+        f"{said}: a boot order is written only on a stopped machine",
+        scope.column, rule_id="machine.must-be-stopped")
+
+
+def _phased_flow(script, start):
+    """Resolve where the machine is at every phase the plan reaches.
+
+    Two passes over the static transition graph. The first runs the
+    joins to a fixed point, because a phase reached two ways is judged
+    on what *both* of them promise; the second judges each phase
+    against the answer that settled, so nothing is refused on a state
+    a later edge would have widened to `unknown`.
+    """
+    by_name = {phase.name: phase for phase in script.phases}
+    entries = {script.entry: start}
+    pending = [script.entry]
+    while pending:
+        phase = by_name.get(pending.pop())
+        if phase is None:
+            continue
+        end, target = _phase_exit(phase, entries[phase.name])
+        if target is None:
+            continue
+        merged = _join(entries.get(target), end)
+        if entries.get(target) != merged:
+            entries[target] = merged
+            pending.append(target)
+    for scope in script.phase_scopes.get(script.entry, ()):
+        _scope_gate(scope, start, entering=True)
+    # Source order, so a script with two of these reports the first
+    # one an author reads rather than the first the walk settled.
+    for phase in script.phases:
+        where = entries.get(phase.name)
+        if where is None:
+            continue                    # not a phase the plan reaches
+        _flow(phase.statements, where, judge=True)
+        _crossings(script, phase, *_phase_exit(phase, where))
+
+
+def _phase_exit(phase, where):
+    """Where a phase leaves the machine, and the phase it transfers to.
+
+    Only the phase's **own** statement list: a `goto` inside a handler
+    is the guest's decision, so the phase it names is not one the plan
+    reaches and neither is anything beyond it.
+    """
+    end = _flow(phase.statements, where, judge=False)
+    last = phase.statements[-1] if phase.statements else None
+    if last is not None and last.verb == "goto":
+        return end, last.arguments[0]
+    return end, None
+
+
+def _crossings(script, phase, where, target):
+    """Judge the scope edges a phase's transfer crosses.
+
+    A scope holds while control is inside its group, so leaving one
+    and entering another happen **on the transition** — which is why
+    this is the edge's business rather than either phase's. A `finish`
+    leaves every scope its phase sits in.
+    """
+    chain = script.phase_scopes.get(phase.name, ())
+    last = phase.statements[-1] if phase.statements else None
+    line = last.line if last is not None else phase.line
+    if target is None:
+        if last is not None and last.verb == "finish":
+            for scope in reversed(chain):
+                _scope_gate(scope, where, entering=False, leaving_at=line)
+        return
+    onward = script.phase_scopes.get(target, ())
+    shared = 0
+    while (shared < len(chain) and shared < len(onward)
+           and chain[shared] is onward[shared]):
+        shared += 1
+    for scope in reversed(chain[shared:]):
+        _scope_gate(scope, where, entering=False, leaving_at=line)
+    for scope in onward[shared:]:
+        _scope_gate(scope, where, entering=True)
 
 
 # -- the two shapes (V3, V10) ------------------------------------

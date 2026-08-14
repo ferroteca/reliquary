@@ -1,0 +1,20 @@
+# invalid: a stopped-only verb the plan promises runs with the machine
+# invalid: up -- decidable from the header and the start/stop verbs,
+# invalid: rather than five minutes into an install
+# rule: V17
+# id: machine.must-be-stopped
+# spec: Syntactic restrictions
+
+platform dos
+machine  stopped
+entry    startup
+
+phase startup {
+    start
+    goto flip
+}
+
+phase flip {
+    set-boot cdrom0 hdd0
+    finish
+}
