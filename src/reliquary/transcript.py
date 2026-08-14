@@ -151,18 +151,28 @@ class _TranscriptWriter:
             "digest": compute_digest(rows, attributes),
         }
         prev = getattr(self, "_last_frame", None)
-        if prev is None or prev != rows:
-            # After a gap in sampling — a call, or the first frame —
-            # the next entry is a keyframe: a full frame rather than
-            # deltas, because continuity cannot be claimed. Both rows
-            # and attributes are stored so reconstruction can verify
-            # the digest — a cursor menu moves by attribute alone.
+        prev_attributes = getattr(self, "_last_attributes", None)
+        if prev is None or prev_attributes != attributes:
+            # Two things force a full frame, and a changed *row* is
+            # not one of them — a changed row is what a delta is for.
+            #
+            # A gap in sampling (a call, or the first frame) is the
+            # first: continuity cannot be claimed across one, so the
+            # next entry restates the screen whole.
+            #
+            # Changed attributes are the second, and they are the
+            # whole of what a delta cannot carry: deltas are rows, the
+            # digest covers rows *and* attributes, so a selection bar
+            # moving under identical text would otherwise be written
+            # as an empty row delta and rebuilt from the wrong
+            # attributes. A cursor menu moves by attribute alone.
             entry["keyframe"] = True
             entry["rows"] = rows
             entry["attributes"] = attributes
         else:
             entry["deltas"] = compute_deltas(prev, rows)
         self._last_frame = list(rows)
+        self._last_attributes = [list(row) for row in attributes]
         self._write_json(entry)
 
     def write_call(self, carrier, fields=None, clock=time.monotonic,
@@ -183,6 +193,7 @@ class _TranscriptWriter:
             entry.update(fields)
         # A call is a sampling gap: the next frame must be a keyframe.
         self._last_frame = None
+        self._last_attributes = None
         self._write_json(entry)
 
     def stop(self, reason, clock=time.monotonic, now=_utc_now):

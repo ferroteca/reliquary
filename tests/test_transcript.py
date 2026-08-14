@@ -335,3 +335,61 @@ def test_replay_returns_a_collapsed_frame_once_per_absorbed_sample():
     replay = ReplaySession(entries)
     for _ in range(3):
         assert replay.text_screen()[0] == ["idle"]
+
+
+def test_a_frame_changing_only_its_attributes_reconstructs(target):
+    """A cursor menu moves its selection by attribute alone.
+
+    The keyframe/delta decision read *rows* while the digest covers
+    rows **and** attributes, so a screen whose attributes changed
+    under identical text was written as an empty row delta and
+    rebuilt from the previous frame's attributes — a digest mismatch.
+    The first real capture hit it 29 entries in, on the install's
+    first menu.
+    """
+    rows = ["", "  Select language", "  English", "  Deutsch"]
+    plain = [[0x07] * 80 for _ in range(len(rows))]
+    highlighted = [list(row) for row in plain]
+    highlighted[2] = [0x70] * 80          # the selection bar moves
+    inner = _FakeInnerSession(rows=rows, attributes=plain)
+    writer = _TranscriptWriter(target, pace=0.05)
+    writer.open()
+    session = RecordingSession(inner, writer)
+    session.text_screen()
+    inner.attributes = highlighted
+    session.text_screen()
+    writer.close()
+    entries = transcript._TranscriptReader(target).read()
+    assert len(entries) == 2, "two distinct screens, two frames"
+
+
+def test_a_changed_row_is_carried_as_a_delta(target):
+    """The delta encoding, which the format never actually used.
+
+    The keyframe test read `prev != rows` and took the keyframe
+    branch, so deltas were emitted only when the rows were
+    *identical* — an empty delta — and every real row change was
+    written as a full frame. The format the design argues for on
+    reviewability grounds ("row 12 became `C:\>` at 4.35s") had the
+    condition backwards, so a re-recording rewrote every line and no
+    transcript ever narrated anything.
+    """
+    inner = _FakeInnerSession(rows=["one", "two"],
+                              attributes=[[0x07] * 80] * 2)
+    writer = _TranscriptWriter(target, pace=0.05)
+    writer.open()
+    session = RecordingSession(inner, writer)
+    session.text_screen()
+    inner.rows = ["one", "CHANGED"]       # attributes untouched
+    session.text_screen()
+    writer.close()
+    written = [json.loads(line) for line in open(target, encoding="utf-8")
+               if line.strip()]
+    frames = [entry for entry in written if entry.get("type") == "frame"]
+    assert len(frames) == 2
+    assert frames[0].get("keyframe"), "the first frame has no predecessor"
+    assert "deltas" in frames[1], (
+        "a row changed under unchanged attributes, which is exactly "
+        "what a delta carries; writing a keyframe here is what made "
+        "every re-recording touch every line.")
+    assert frames[1]["deltas"] == {"1": "CHANGED"}
