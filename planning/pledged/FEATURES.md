@@ -249,6 +249,26 @@ Proposed upstream when this was written (F24 / F25 / F26):
    `ms-dos-5`), and where an unstated variant leaves them
    disagreeing the letter is undetermined rather than chosen.
 
+   *Restated 2026-08-13, and not available.* The per-variant rules
+   are this capability's defect rather than its surplus. The
+   composer takes the DOS variant and every resident condition
+   (`LASTDRIVE`, `SUBST`, `JOIN`, `ASSIGN`, a block-device driver, a
+   network redirector) as caller assertions, though each is evidence
+   on a volume it already reads — the boot volume's kernel and
+   `COMMAND.COM` for the version, `CONFIG.SYS` and `AUTOEXEC.BAT`
+   for the conditions — and it derives no boot device at all. So the
+   ask is restated: reliquary states the machine it already holds —
+   devices, their slots and attachment order, and the media in them
+   — and the composer derives which device boots, the DOS booting
+   from it, the conditions that DOS declared, and the letters. It
+   takes a boot-order override only because an emulated machine's
+   order is its host's (`boot`, `set-boot-order`), and that belongs
+   on the machine model rather than on this call. Note also that no
+   claimed rule names FreeDOS, which is the DOS the shipped codex
+   runs. Raised upstream as remanence **T7**: until it lands this
+   capability is unavailable and ask 8 is unmet, so the eight stand
+   blocking exactly as written.
+
 The upstream API's spelling is Remanence's design choice. The gate
 is observable: a released API must make each answer above available
 without Reliquary reading disk structures, reproducing filesystem
