@@ -79,6 +79,11 @@ class _TranscriptWriter:
         self._started = None
         self._last_wall = None
         self._stopped = False
+        #: The frame not yet written, held open so the reads it goes
+        #: on to absorb can be counted onto it. A frame's count is not
+        #: known when the frame arrives — only when the screen next
+        #: changes — so writing eagerly is what threw the count away.
+        self._pending = None
 
     def open(self, clock=time.monotonic, now=_utc_now):
         """Begin the transcript — one header line."""
@@ -92,6 +97,7 @@ class _TranscriptWriter:
 
     def close(self):
         """Close the transcript; harmless when already closed."""
+        self._flush_frame()
         file = self._file
         self._file = None
         if file is not None:
@@ -99,14 +105,49 @@ class _TranscriptWriter:
 
     def write_frame(self, rows, attributes, samples=1,
                     clock=time.monotonic, now=_utc_now):
-        """Record one screen reading with its metadata."""
+        """Record one screen reading, collapsing it onto the last.
+
+        A read identical to the one still pending is **absorbed onto
+        it** rather than dropped: the frame's sample count is what
+        separates "this screen held two seconds across forty samples"
+        from "it held two seconds with nobody looking", and only the
+        first says the guest was quiet (P11).
+
+        The frame is therefore held until the screen changes, a call
+        interrupts, or the transcript closes — its count is not
+        knowable any earlier. Its timestamps stay those of the read it
+        first appeared on, which is when the screen actually arrived.
+        """
         if self._stopped or self._file is None:
             return
-        entry = {
-            "type": "frame",
+        rows = list(rows)
+        attributes = [list(row) for row in attributes]
+        pending = self._pending
+        if pending is not None and pending["rows"] == rows and \
+                pending["attributes"] == attributes:
+            pending["samples"] += samples
+            return
+        self._flush_frame()
+        self._pending = {
+            "rows": rows,
+            "attributes": attributes,
+            "samples": samples,
             "elapsed": round(clock() - self._started, 3),
             "wall": _stamp(now()),
-            "samples": samples,
+        }
+
+    def _flush_frame(self):
+        """Write the held frame out, with the count it absorbed."""
+        pending = self._pending
+        self._pending = None
+        if pending is None or self._stopped or self._file is None:
+            return
+        rows, attributes = pending["rows"], pending["attributes"]
+        entry = {
+            "type": "frame",
+            "elapsed": pending["elapsed"],
+            "wall": pending["wall"],
+            "samples": pending["samples"],
             "digest": compute_digest(rows, attributes),
         }
         prev = getattr(self, "_last_frame", None)
@@ -117,7 +158,7 @@ class _TranscriptWriter:
             # and attributes are stored so reconstruction can verify
             # the digest — a cursor menu moves by attribute alone.
             entry["keyframe"] = True
-            entry["rows"] = list(rows)
+            entry["rows"] = rows
             entry["attributes"] = attributes
         else:
             entry["deltas"] = compute_deltas(prev, rows)
@@ -129,6 +170,9 @@ class _TranscriptWriter:
         """Record a carrier call the run made."""
         if self._stopped or self._file is None:
             return
+        # A call ends the frame it interrupted: the count that frame
+        # absorbed is complete, and what follows is a new screen.
+        self._flush_frame()
         entry = {
             "type": "call",
             "elapsed": round(clock() - self._started, 3),
@@ -145,6 +189,9 @@ class _TranscriptWriter:
         """End recording mid-run — a bound secret reached the guest."""
         if self._stopped or self._file is None:
             return
+        # What was captured before the secret is kept whole, count
+        # and all; it is everything after that stops.
+        self._flush_frame()
         entry = {
             "type": "secret-stopped",
             "elapsed": round(clock() - self._started, 3),
@@ -203,36 +250,23 @@ class RecordingSession:
             fields={"combos": list(list(c) for c in combos)})
 
     def text_screen(self):
-        """Return the screen and record it, collapsing identical frames.
+        """Return the screen, and offer every read to the transcript.
 
-        The first read of each call records a frame — the screen
-        before the call took effect. Subsequent reads that are
-        identical to the last are counted but not written; the
-        *absorbed sample count* says "this screen held N seconds
-        across M samples", and a keyframe after every sampling gap
-        (a call) bounds the damage when a reporter is missing.
+        **Every** read is offered, including one identical to the
+        last: collapsing is the writer's, because a frame's absorbed
+        sample count is only known once the screen changes, and a read
+        dropped here would be a sample the transcript could never
+        count. A keyframe after every sampling gap (a call) bounds the
+        damage when a reporter is missing.
         """
         rows, attributes = self._inner.text_screen()
-        # Copy the mutable lists the adapter hands back, so the
-        # compare below is against what we actually wrote.
+        # Copy the mutable lists the adapter hands back, so what the
+        # transcript holds cannot be edited from underneath it.
         rows = list(rows)
         attributes = [list(row) for row in attributes]
         writer = self._writer
-        if writer is None or writer.stopped:
-            return rows, attributes
-        last = getattr(self, "_last_capture", None)
-        if last is None:
-            writer.write_frame(rows, attributes, samples=1)
-            self._last_capture = (rows, attributes)
-            self._frame_added = True
-            return rows, attributes
-        prev_rows, prev_attrs = last
-        if rows == prev_rows and attributes == prev_attrs:
-            # Identical: absorbed but not written.
-            return rows, attributes
-        writer.write_frame(rows, attributes, samples=1)
-        self._last_capture = (rows, attributes)
-        self._frame_added = True
+        if writer is not None and not writer.stopped:
+            writer.write_frame(rows, attributes)
         return rows, attributes
 
     def screenshot(self, path):
@@ -364,6 +398,12 @@ class ReplaySession:
         # The current reconstructed screen.
         self._rows = None
         self._attributes = None
+        #: Reads the current frame still answers before the replay
+        #: advances. A capture collapses a held screen into one entry
+        #: carrying the count it absorbed, so a replay that advanced
+        #: once per read would run out of transcript long before the
+        #: run ran out of statements.
+        self._remaining = 0
 
     def native(self):
         raise TranscriptError(
@@ -371,6 +411,12 @@ class ReplaySession:
             rule_id="transcript.no-native-session")
 
     def text_screen(self):
+        if self._remaining > 0:
+            # The frame is still standing: it was read this many more
+            # times when it was captured.
+            self._remaining -= 1
+            return (list(self._rows),
+                    [list(row) for row in self._attributes])
         while self._index < len(self._entries):
             entry = self._entries[self._index]
             if entry.kind != "frame":
@@ -378,6 +424,7 @@ class ReplaySession:
                 continue
             data = entry.data
             self._index += 1
+            self._remaining = max(0, int(data.get("samples", 1)) - 1)
             if data.get("keyframe"):
                 self._rows = data["rows"]
                 self._attributes = data.get("attributes")

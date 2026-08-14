@@ -8,6 +8,7 @@ session, which is what makes the fixtures worth having (F42).
 """
 
 import io
+import json
 import os
 import time
 
@@ -71,6 +72,10 @@ class _StringWriter(_TranscriptWriter):
         self._write_json(header)
 
     def close(self):
+        # The parent flushes the frame it is still holding before it
+        # lets go of the file; a double that forgot to would lose
+        # every transcript's last frame.
+        self._flush_frame()
         self._file = None
 
     def _write_json(self, document):
@@ -231,6 +236,10 @@ def test_display_console_over_recording():
 
     # The transcript recorded the frame through the recording
     # wrapper even though the console went through DisplayConsole.
+    # Closing first, because a frame is held open until the screen
+    # changes, a call interrupts, or the transcript closes — that is
+    # what lets it carry the count of reads it absorbed.
+    writer.close()
     lines = _lines(stream)
     # header + at least one frame
     assert len(lines) >= 2, (
@@ -281,3 +290,48 @@ def test_change_medium_recorded_and_replayed(target):
     replay = ReplaySession(entries)
     replay.text_screen()
     replay.change_medium("fd0", None)
+
+
+# The absorbed sample count: recorded, and honoured on replay.
+
+def test_an_absorbed_sample_is_counted_on_the_frame_it_held():
+    """A collapsed frame says how many reads it stood for.
+
+    "This screen held two seconds across forty samples" and "it held
+    two seconds with nobody looking" are different facts, and only
+    the first says the guest was quiet (P11). Absorbing a read
+    without counting it throws away the half that carries the claim.
+    """
+    out = io.StringIO()
+    writer = _StringWriter(out, pace=0.05)
+    writer.open()
+    session = RecordingSession(_FakeInnerSession(rows=["idle"]), writer)
+    for _ in range(3):
+        session.text_screen()
+    writer.close()
+    frames = [json.loads(line) for line in _lines(out)
+              if json.loads(line).get("type") == "frame"]
+    assert len(frames) == 1, "identical reads collapse to one frame"
+    assert frames[0]["samples"] == 3
+
+
+def test_replay_returns_a_collapsed_frame_once_per_absorbed_sample():
+    """Replay reads as many times as the capture was read.
+
+    The recorder collapses identical screens, so a replay that
+    advances one entry per read runs out of transcript long before
+    the run runs out of statements — which is any real capture, since
+    a DOS screen holds still for most of a boot.
+    """
+    out = io.StringIO()
+    writer = _StringWriter(out, pace=0.05)
+    writer.open()
+    session = RecordingSession(_FakeInnerSession(rows=["idle"]), writer)
+    for _ in range(3):
+        session.text_screen()
+    writer.close()
+    entries = [transcript._TranscriptEntry(json.loads(line))
+               for line in _lines(out)[1:]]
+    replay = ReplaySession(entries)
+    for _ in range(3):
+        assert replay.text_screen()[0] == ["idle"]
