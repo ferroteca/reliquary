@@ -1519,13 +1519,17 @@ class _ScriptEngine:
         none is ever held while a statement list runs — QEMU's QMP
         server admits one client at a time.
         """
+        wrapper = None
+        if self._recording_writer is not None:
+            wrapper = (lambda session: _transcript.RecordingSession(
+                session, self._recording_writer))
+        # Passed at construction rather than assigned after: `Machine`
+        # is frozen, so the assignment this replaced raised on every
+        # recorded run at its first screen read.
         machine = Machine(
             self._machine_home,
-            cache=self._cache_root_or_none(self._context))
-        if self._recording_writer is not None:
-            machine._session_wrapper = (
-                lambda session: _transcript.RecordingSession(
-                    session, self._recording_writer))
+            cache=self._cache_root_or_none(self._context),
+            _session_wrapper=wrapper)
         with machine.console() as console:
             yield console
 

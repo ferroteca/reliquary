@@ -15,6 +15,7 @@ from reliquary.errors import PreflightError, RunFailure, StaticError
 from reliquary.machines import create_machine, set_machine_var
 from reliquary.events import RUN_END, RUN_START
 from reliquary.script_parser import parse_script
+from reliquary.transcript import _TranscriptWriter
 from reliquary.script_runner import (
     ScriptRun, _ScriptEngine,
     _existing_machine, _resolve_script_stem, run_script,
@@ -495,3 +496,46 @@ def test_cli_script_forwards_display_and_progress(wiring_home):
     assert result == 0
     assert run.call_args.kwargs["display"]
     assert run.call_args.kwargs["progress"] == "jsonl"
+
+
+# --record installs the recorder on a frozen Machine.
+
+def test_the_runner_installs_the_recorder_through_construction(tmp_path):
+    """`--record` must survive `Machine` being frozen (regression).
+
+    The engine used to assign `machine._session_wrapper` after
+    construction, and `Machine` is a frozen dataclass, so **every**
+    recorded run died at its first screen read with "cannot assign to
+    field '_session_wrapper'". The flag had never worked on a real
+    run: F42's own tests build `RecordingSession` directly and the
+    replay harness replaces `_console`, so nothing drove the wiring
+    this covers.
+    """
+    home = str(tmp_path)
+    machine_home = os.path.join(home, "machine")
+    os.makedirs(machine_home)
+    with open(os.path.join(machine_home, "machine.json"), "w",
+              encoding="utf-8") as handle:
+        json.dump({"id": "freedos-0", "phase": "running",
+                   "vm": {"backend": "qemu",
+                          "backend-id": "reliquary-freedos-0",
+                          "token": "0" * 32,
+                          "endpoint": {"port": 5555}}}, handle)
+    target = os.path.join(home, "run.rlqt")
+    writer = _TranscriptWriter(target, pace=0.05)
+    writer.open()
+    engine = _ScriptEngine(
+        parse_script('platform dos\nentry only\nphase only {\n'
+                     '    finish\n}\n'),
+        "freedos-0", home, machine_home, script_path="/tmp/demo.rlqs",
+        record_pace=0.05, recording_writer=writer)
+    with fake_backend.installed():
+        with engine._console() as console:
+            console.screen_text()
+    writer.close()
+    with open(target, encoding="utf-8") as handle:
+        kinds = [json.loads(line)["type"] for line in handle
+                 if line.strip() and "type" in json.loads(line)]
+    assert "frame" in kinds, (
+        "the console read a screen and the transcript holds no frame, "
+        "so the recorder was never installed on the session.")
