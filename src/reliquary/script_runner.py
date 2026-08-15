@@ -1967,10 +1967,32 @@ def execute_script(script, *, machine_id, context=None, display=False,
     try:
         with _cancel_on_interrupt(engine):
             engine.run(display=display)
+        _record_outcome(recording_writer, None, engine)
         return engine.final_phase, engine.machine_phase
+    except ReliquaryError as failure:
+        _record_outcome(recording_writer, failure, engine)
+        raise
     finally:
         if recording_writer is not None:
             recording_writer.close()
+
+
+def _record_outcome(writer, failure, engine):
+    """Tell the transcript what the run concluded, where recording.
+
+    The seam cannot show this: a run that reached its `finish` and one
+    that expired on the same screens make the same carrier calls, and
+    which of them happened is decided above. A capture is asserted
+    against it, so a fixture of a run that *failed* is a fixture like
+    any other.
+    """
+    if writer is None:
+        return
+    if failure is None:
+        writer.write_outcome("ok", phase=engine.final_phase)
+        return
+    writer.write_outcome("failed", rule=failure.rule_id,
+                         phase=engine.final_phase)
 
 
 @contextlib.contextmanager

@@ -5,9 +5,12 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # Screen transcripts: capture and reconstruction
 
-> **Status:** design for **F43** ([../FEATURES.md](../FEATURES.md)),
-> and the delivered design of F42's capture, whose corpus F43 is.
-> Demanded by **P22** — the
+> **Status:** delivered doctrine — F42 built the capture and F43 the
+> corpus over it, and a delivered feature leaves no feature for its
+> design to sit with ([README.md](README.md)). It stays under
+> `planning/` rather than moving to `docs/spec/` because the format
+> is internal by decision (**D98**), which is the same route
+> `backend-adapter.md` took. Demanded by **P22** — the
 > suite is the gate, and the interpretation layer has no honest way
 > to be tested without captured input. Shaped by **P11** (a limit
 > names itself), **P6** (the CLI and the API land together) and
@@ -49,6 +52,13 @@ Two consequences, and both are the point:
   whole interpretation layer — `control_display`,
   `interaction_agentless`, the runner's dispatch — runs unmodified
   above it. That is what makes the fixtures worth having.
+- **Both front doors reach it.** A script run drives the phase graph,
+  the menus and the stability gates; `exec` drives prompt detection
+  and command-echo scanning, which no script run touches. The seam is
+  under both, so a capture of either is the same kind of file — and
+  the exec adapter takes the machine handle it reads through, so a
+  capture of one needs no flag on the exec surface, only a handle
+  with the recorder in it.
 - **The recorder is backend-neutral by construction.** It wraps the
   seam, not QEMU, so a capture taken against another adapter
   reconstructs through the same reader.
@@ -202,8 +212,21 @@ further.
 ## What a capture says about itself
 
 The header carries the pace (above), whether a secret stopped the
-recording, and **what the capture is a capture of**: the script's
-name and the sha256 of its text.
+recording, and **what the capture is a capture of** — a script by
+name and the sha256 of its text, or a command by its text and the
+timeout it was given, that being the whole of an `exec` run's input.
+
+**And the file ends with what the run concluded.** The seam cannot
+show it: two runs over the same screens — one that returned the right
+rows, one that returned somebody else's, one that finished and one
+that expired — make the same carrier calls, because which rows are
+"the output" is decided above the carrier. So the driver states its
+conclusion as a trailer, and a reconstruction is asserted against it.
+That is what makes a capture of a run that **failed** a fixture like
+any other, which the pathological captures are: they pin what the
+layer does with a screen it reads wrongly, so that closing the gap
+retires the fixture loudly instead of leaving a green check over
+behaviour nobody believes in any more.
 
 A transcript is replayed by standing the same script back up over it,
 and the file is the only thing that knows which script that was —
@@ -225,10 +248,14 @@ ticked by its own sleeps would therefore put frames 100ms apart that
 the guest drew a third of a second apart, and reach verdicts the
 recorded run never reached.
 
-So in reconstruction **time is what the transcript says it is**: each
-read is answered at the moment that read was taken, and the waiting
-between them costs nothing. Two consequences, and the second is why
-the frame carries its absorbed moments:
+So in reconstruction **time is what the transcript says it is**: a
+sleep passes as the layer asked, and the read that follows it lands
+on the moment that read was taken. Both halves are needed and they
+are not interchangeable — the layer samples the clock *before* it
+reads, so a reader where only reads moved time hands the caller a
+moment one read stale, and one where only sleeps did drifts away from
+the guest entirely. Two consequences, and the second is why the frame
+carries its absorbed moments:
 
 - A five-minute capture replays in about a second, which is what lets
   the fixtures live in the default suite rather than an opt-in tier.

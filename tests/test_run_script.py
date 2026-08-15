@@ -641,6 +641,39 @@ def test_a_recorded_run_names_the_script_in_its_header(tmp_path):
         text.encode()).hexdigest()
 
 
+def test_a_recorded_run_states_what_it_concluded(tmp_path):
+    """The half a capture cannot show, said once at the end.
+
+    Two runs over the same screens — one that reached its `finish`,
+    one that expired waiting — make the same carrier calls, so the
+    file is the same file and only the conclusion differs. A replay
+    is asserted against this, which is what makes a capture of a run
+    that failed a fixture like any other.
+    """
+    home = str(tmp_path)
+    machine_home = os.path.join(home, "machine")
+    os.makedirs(machine_home)
+    text = ('platform dos\nentry only\nphase only {\n'
+            '    finish\n}\n')
+    script_path = os.path.join(home, "demo.rlqs")
+    with open(script_path, "wb") as handle:
+        handle.write(text.encode())
+    target = os.path.join(home, "run.rlqt")
+    with mock.patch("reliquary.script_runner._machines") as machines:
+        machines.load_machine_state.return_value = {"phase": "running"}
+        machines.machine_dir_path.return_value = machine_home
+        machines.read_vm_state.return_value = {
+            "backend": "qemu", "backend-id": "reliquary-freedos-0",
+            "token": "0" * 32, "endpoint": {"port": 5555}}
+        execute_script(parse_script(text), machine_id="freedos-0",
+                       context=home, script_path=script_path,
+                       record=target)
+    trailer = _entries(target)[-1]
+    assert trailer["type"] == "outcome"
+    assert trailer["result"] == "ok"
+    assert trailer["phase"] == "only"
+
+
 def _recording_engine(tmp_path, script_text):
     """An engine over a running machine, recording to its own file.
 

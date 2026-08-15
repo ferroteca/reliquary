@@ -133,12 +133,22 @@ def script_identity(script_path):
 
 class _TranscriptWriter:
 
-    def __init__(self, path, pace, script=None, script_digest=None):
+    def __init__(self, path, pace, script=None, script_digest=None,
+                 command=None, timeout=None):
         self._path = os.fspath(path)
         self._file = None
         self._pace = pace
         self._script = script
         self._script_digest = script_digest
+        #: The command an `exec` capture is of. A capture states its
+        #: input whatever kind of run it was: a script by name and
+        #: digest, a command by its text — which *is* the whole input,
+        #: so there is nothing else to pin it against.
+        self._command = command
+        #: And the limit it was given, because a wait that expires is
+        #: a conclusion the timeout decided: replaying a capture under
+        #: a different one asks a different question of it.
+        self._timeout = timeout
         self._written_header = False
         self._started = None
         self._last_wall = None
@@ -160,6 +170,10 @@ class _TranscriptWriter:
             header["script"] = self._script
         if self._script_digest is not None:
             header["script-sha256"] = self._script_digest
+        if self._command is not None:
+            header["command"] = self._command
+        if self._timeout is not None:
+            header["timeout"] = self._timeout
         self._write_json(header)
         self._written_header = True
 
@@ -298,6 +312,35 @@ class _TranscriptWriter:
         self._last_attributes = None
         self._write_json(entry)
 
+    def write_outcome(self, result, clock=time.monotonic, now=_utc_now,
+                      **fields):
+        """Record what the run concluded — the half the seam cannot show.
+
+        At the carrier seam a run that returned the right answer and
+        one that returned somebody else's text are the same file: the
+        same keys go out, the same screens come back, and *which rows
+        it called the answer* is a decision taken above. A capture of
+        a run that failed is the same story — the refusal is a
+        conclusion, not a carrier call.
+
+        So the driver states its conclusion, once, as the last entry,
+        and a replay is asserted against it. ``result`` is ``ok`` or
+        ``failed``; the rest is the driver's, since what a conclusion
+        *is* differs by what was run — rows for a command, a phase for
+        a script, a rule id for either when it refused.
+        """
+        if self._stopped or self._file is None:
+            return
+        self._flush_frame()
+        entry = {
+            "type": "outcome",
+            "elapsed": round(clock() - self._started, 3),
+            "wall": _stamp(now()),
+            "result": result,
+        }
+        entry.update(fields)
+        self._write_json(entry)
+
     def stop(self, reason, clock=time.monotonic, now=_utc_now):
         """End recording mid-run — a bound secret reached the guest."""
         if self._stopped or self._file is None:
@@ -421,6 +464,13 @@ class _TranscriptReader:
         self.secret_recorded = False
         self.script = None
         self.script_digest = None
+        self.command = None
+        self.timeout = None
+        #: What the recorded run concluded, or ``None`` where the run
+        #: never reached a conclusion — a capture cut short by a
+        #: secret, or one whose driver crashed. A fixture asserting a
+        #: conclusion says so; a reader gets the absence honestly.
+        self.outcome = None
         self._entries = None
 
     def read(self):
@@ -448,6 +498,8 @@ class _TranscriptReader:
         self.secret_recorded = header.get("secret-recorded", False)
         self.script = header.get("script")
         self.script_digest = header.get("script-sha256")
+        self.command = header.get("command")
+        self.timeout = header.get("timeout")
         entries = []
         reconstructed_rows = None
         reconstructed_attrs = None
@@ -492,6 +544,8 @@ class _TranscriptReader:
                         f"expected {expected}, got {digest}",
                         rule_id="transcript.digest-mismatch")
                 reconstructed_rows = rows
+            elif kind == "outcome":
+                self.outcome = entry_data
             entries.append(_TranscriptEntry(entry_data))
         self._entries = entries
         return entries

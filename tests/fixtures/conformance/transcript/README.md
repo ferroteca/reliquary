@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-only
 
 The corpus for the **interpretation layer** — `control_display`,
 `interaction_agentless`, and the runner's dispatch and clocks. Design:
-[planning/pledged/design/screen-transcripts.md](../../../../planning/pledged/design/screen-transcripts.md).
+[planning/design/screen-transcripts.md](../../../../planning/design/screen-transcripts.md).
 Harness: [test_transcript_corpus.py](../../../test_transcript_corpus.py),
 over [tests/replay.py](../../../replay.py).
 
@@ -22,17 +22,38 @@ the stray CR, the half-drawn menu, the prompt that arrived mid-scroll.
 
 ## The fixtures
 
-| fixture | what it is a capture of | screens | reads | calls |
-|---|---|---|---|---|
-| `freedos-install.rlqt` | the codex `freedos-install.rlqs` — LiveCD boot, partitioning, format, package selection, reboot, shutdown: 292 seconds, and every cursor menu the install has | 430 | 2673 | 46 |
-| `freedos-verify.rlqt` | the codex `freedos-verify.rlqs` — boot the installed disk, read a prompt, power off | 37 | 225 | 2 |
+**Two kinds, because the layer has two front doors.** A `.rlqs` run
+drives the phase graph, the cursor menus and the stability gates; a
+`exec` command drives prompt detection and command-echo scanning,
+which a script run never touches. A fixture declares which it is by
+carrying a `script` or a `command` in its header.
 
-Both replay in about a second: the layer's waiting is real time and a
-replay has none of it (see below).
+### The working paths
 
-Both are taken against real QEMU on the opt-in integration tier and
+| fixture | what it is a capture of |
+|---|---|
+| `freedos-install.rlqt` | the codex `freedos-install.rlqs` — LiveCD boot, partitioning, format, package selection, reboot, shutdown, and every cursor menu the install has |
+| `freedos-verify.rlqt` | the codex `freedos-verify.rlqs` — boot the installed disk, read a prompt, power off |
+| `freedos-ready.rlqt` | the codex `freedos-ready.rlqs` — the handoff, and the one capture that ends with the machine still **running**: no `vm-gone`, and a `set` reaching the host |
+
+### The pathological screens
+
+Each is a screen a real FreeDOS draws for an ordinary command —
+nothing here is malformed or staged. What the layer *makes* of each
+is what the fixture pins, and three of the four are wrong today.
+
+| fixture | the screen | what the layer does |
+|---|---|---|
+| `freedos-exec-wrapped-echo.rlqt` | an 85-column command, whose echo wraps across two rows | **refuses** it — `screen.no-echo` on a command that ran fine |
+| `freedos-exec-echo-lookalike.rlqt` | a file whose last line reads `C:\>TYPE C:\ECHOLIKE.TXT`, printed by that very command | **returns nothing** — no error, three lines on screen, an empty result |
+| `freedos-exec-scrolling-output.rlqt` | `DIR /S` over a thousand files: pages of scroll, then a prompt | correct — the visible tail, which is the documented limit |
+| `freedos-exec-custom-prompt.rlqt` | a guest whose prompt is `[C:\]>` after `PROMPT [$P]$G` | **never completes** — `screen.no-match` at the timeout |
+
+All seven are taken against real QEMU on the opt-in integration tier and
 **reconstruct with no hypervisor present**, so they run in the default
-suite. A failing capture is a defect to fix, not a skip to tolerate.
+suite, in about a second between them: the layer's waiting is real
+time and a replay has none of it. A failing capture is a defect to
+fix, not a skip to tolerate.
 
 ## What a fixture asserts
 
@@ -55,6 +76,18 @@ than it looks:
   name and the sha256 of its text; a capture taken against an edited
   script is named as stale rather than reported as a divergence
   eleven minutes into a replay.
+- **The run reached the conclusion it reached.** Two runs over the
+  same screens — one returning the right rows, one returning somebody
+  else's — make the same carrier calls, so the file is the same file.
+  The capture states its conclusion as a trailer, and the replay is
+  held to it: the rows a command returned, the phase a script
+  finished in, or the rule id either refused with.
+
+**Which is what lets a capture of a failing run be a fixture.** Three
+of the four pathological captures record a refusal or a wrong answer,
+and they assert it — so the day one of those gaps closes, its fixture
+fails saying so and asks to be re-recorded. A green test over
+behaviour nobody believes in is the thing this avoids.
 
 A codex label resolves to the shipped script rather than to a copy —
 the codex is the live, tested one — and any other name resolves to a
@@ -159,6 +192,38 @@ The general form: **the transcript has to carry the moments, not
 just the screens.** A guest's screen is only half of what the layer
 above sees; the other half is when somebody looked at it.
 
+## And three the pathological captures found in the layer itself
+
+The first five findings were about capturing faithfully. These are
+what the faithful captures then showed, and they are **not** in the
+recorder — they are what `exec` does with three ordinary screens.
+
+- **A command over 80 columns cannot be run.** Its echo wraps, no row
+  *ends* with the command, and `_echo_at` finds nothing; the command
+  runs fine on the guest and `exec` refuses to tell you what it said
+  (`screen.no-echo`).
+- **A line of output that looks like the echo silently wins.** The
+  scan runs backwards from the bottom for a row ending with the
+  command and carrying a `>`, and a file whose last line is
+  `C:\>TYPE C:\ECHOLIKE.TXT` is exactly that row. Everything above it
+  — the file's real content — is discarded and `exec` returns an
+  **empty** result with no error. This one is a **spec violation**,
+  not an unstated limit: `docs/spec/cli.md` promises "the command's
+  own output or a failure — never text it cannot attribute", and an
+  empty tuple attributed to a command that printed three lines is
+  neither.
+- **A customized prompt is never recognized.** `_PROMPT_RE` is
+  `^[A-Z]:(\\[^>]*)?>$`, so a guest whose `AUTOEXEC.BAT` sets
+  `PROMPT [$P]$G` — or `$T$G`, or anything with a suffix — makes
+  every `exec` wait out its full timeout. Nothing in the spec says
+  which prompts are supported.
+
+None of the three is fixed here, and that is deliberate: a corpus
+records what the layer does, and what counts as a DOS prompt (or as
+an echo) is a design question with a decision to make, not a test
+fixture's to settle. The fixtures pin today's behaviour so that
+whoever settles it cannot do so silently.
+
 ## What this corpus deliberately does not cover
 
 - **The machine layer.** A live `insert` or `eject` changes the medium
@@ -171,6 +236,10 @@ above sees; the other half is when somebody looked at it.
   measures against is the one the recording holds, and the waiting
   between them costs nothing. A capture is minutes long because a
   guest is slow, not because the layer is.
+- **`--check`.** The ERRORLEVEL probe is a second command at the
+  prompt, read back through the same echo discipline, so a capture of
+  it would pin the probe rather than the reading. Nothing here runs
+  one.
 - **The other backend.** These are QEMU captures, which scrape text
   memory. VirtualBox reaches the same seam through the fixed-font
   recognizer, and a capture taken there would exercise that path

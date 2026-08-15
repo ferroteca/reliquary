@@ -497,7 +497,13 @@ workflow:
   the same reason a read arriving where the capture's next entry is a
   **call** is an error (`transcript.read-before-call`) rather than a
   step over it: a swallowed keypress surfaces as a mismatch much
-  later, against a screen neither run was looking at. **The pace is a ceiling
+  later, against a screen neither run was looking at. **The file ends
+  with what the run concluded** — `write_outcome`, the rows a command
+  returned or the phase a script finished in, or the rule either
+  refused with — because two runs over the same screens make the same
+  carrier calls and which rows are "the output" is decided above the
+  seam; it is what a reconstruction is asserted against, and what
+  makes a capture of a *failing* run assertable at all. **The pace is a ceiling
   on the poll interval and never a floor**: no independent sampler
   can exist (QEMU admits one QMP client), so the run's own polls
   *are* the capture, and taking the larger of the two — which is
@@ -671,11 +677,22 @@ workflow:
   against QEMU and promoted by hand, and a fixture **asserts by being
   replayable** — the shipped interpretation layer runs over
   `ReplaySession` at the carrier seam, and a call the capture never
-  covered is an error naming it. Two claims sit beside that, because
+  covered is an error naming it. Three claims sit beside that, because
   a run that ends early replays without complaint: every recorded
-  carrier call must be made (`remaining_calls()`), and the header's
+  carrier call must be made (`remaining_calls()`), the header's
   script digest must still match the script in the tree, so a stale
-  capture is named rather than reported as a divergence. Each corpus
+  capture is named rather than reported as a divergence, and **the
+  replay must reach the conclusion the capture recorded** — the rows
+  a command returned, the phase a script finished in, or the rule it
+  refused with, none of which the seam can show. **Fixtures come in
+  two kinds because the layer has two front doors**: a `script`
+  capture drives the phase graph, the cursor menus and the stability
+  gates, while a `command` capture drives the **exec** adapter's
+  prompt detection and echo scanning, which no script run touches.
+  And a capture of a run that *failed* is a fixture like any other —
+  three of the four pathological captures pin a wrong answer `exec`
+  gives an ordinary screen today, so closing one of those gaps
+  retires its fixture loudly. Each corpus
   has its own README, which is where its findings live — that one's
   records the six defects the first real captures found, every one of
   them in the recorder rather than in the layer under test.

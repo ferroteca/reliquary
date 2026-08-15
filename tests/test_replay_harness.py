@@ -19,6 +19,7 @@ import pytest
 
 from reliquary.control_display import DisplayConsole
 from reliquary.errors import PreflightError
+from reliquary.interaction_agentless import AgentlessGuestExec
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import _ScriptEngine
 from reliquary.transcript import (RecordingSession, TranscriptError,
@@ -113,6 +114,68 @@ def test_a_transcript_refuses_a_call_it_never_captured(tmp_path):
         with pytest.raises(TranscriptError) as caught:
             engine.run()
     assert caught.value.rule_id == "transcript.send-keys-mismatch"
+
+
+class _EchoingGuest:
+    """A DOS screen that echoes a command, answers it, and prompts again.
+
+    Enough of a guest for the exec adapter to have something to
+    interpret: the echo it scans back for, output between it and the
+    prompt, and the prompt itself. The real screens are the corpus's
+    job — what is under test here is that a captured command replays
+    to the same conclusion.
+    """
+
+    backend = "fake"
+
+    def __init__(self):
+        self.rows = ["C:\\>"] + [""] * 24
+        self._reads_since_command = None
+
+    def native(self):
+        raise AssertionError("no native session in a fake guest")
+
+    def text_screen(self):
+        if self._reads_since_command is not None:
+            self._reads_since_command += 1
+            if self._reads_since_command == 3:
+                self.rows = ["C:\\>VER", "FreeDOS 1.4", "C:\\>"] + [""] * 22
+        return list(self.rows), [[0x07] * 80 for _ in range(25)]
+
+    def send_keys(self, combos, delay=0.06):
+        self.rows = ["C:\\>VER"] + [""] * 24
+        self._reads_since_command = 0
+
+    def screenshot(self, path):
+        return path
+
+    def change_medium(self, drive_key, path=None):
+        pass
+
+
+def test_an_exec_run_replays_to_the_conclusion_it_reached(tmp_path):
+    """The second kind of fixture: a command rather than a script.
+
+    Prompt detection and echo scanning are the exec adapter's, so a
+    script capture never touches them — and at the seam a run that
+    returned the right rows and one that returned somebody else's are
+    the same file. The capture therefore states its conclusion, and
+    that is what the replay is held to.
+    """
+    path = os.path.join(str(tmp_path), "exec.rlqt")
+    writer = _TranscriptWriter(path, pace=0.05, command="VER", timeout=30)
+    writer.open()
+    guest = RecordingSession(_EchoingGuest(), writer)
+    recorded = AgentlessGuestExec(replay.machine_handle(guest)).execute(
+        "VER", 30)
+    writer.write_outcome("ok", rows=list(recorded))
+    writer.close()
+    assert recorded == ("FreeDOS 1.4",)
+
+    with replay.replaying_exec(path) as (guest, session, header):
+        replayed = guest.execute(header.command, header.timeout)
+    assert list(replayed) == header.outcome["rows"]
+    assert session.remaining_calls() == 0
 
 
 _LIFECYCLE = ('platform dos\n'

@@ -26,10 +26,14 @@ import os
 import pytest
 
 from reliquary.backend_qemu import find_qemu, find_qemu_img
+from reliquary.errors import RunFailure
+from reliquary.interaction_agentless import AgentlessGuestExec
 from reliquary.library import seed_blueprint
+from reliquary.machine_handle import Machine
 from reliquary.machines import (get_machine_var, load_machine_state,
-                                stop_machine)
+                                machine_dir_path, put_file, stop_machine)
 from reliquary.script_runner import run_script
+from reliquary.transcript import RecordingSession, _TranscriptWriter
 from tests import live_external_effects
 
 
@@ -41,6 +45,78 @@ def _capture(home, label):
     captures = os.path.join(home, "captures")
     os.makedirs(captures, exist_ok=True)
     return os.path.join(captures, f"freedos-{label}.rlqt")
+
+
+#: A file planted in the guest whose **last line is the echo of the
+#: command that reads it**. Nothing about it is malformed: it is a
+#: text file a user could write, and it is what a heuristic that
+#: scans backwards for "a row ending with the command, with a prompt
+#: before it" cannot tell from the real thing.
+_ECHO_LOOKALIKE = (
+    "THE FIRST LINE OF THE FILE",
+    "THE SECOND LINE OF THE FILE",
+    r"C:\>TYPE C:\ECHOLIKE.TXT",
+)
+
+#: The screens worth capturing, and every one of them is a screen a
+#: real guest draws rather than a defect staged for the camera. What
+#: the layer *does* with each is what the fixture pins — the right
+#: answer where it manages one, and the wrong answer where it does
+#: not, so that closing the gap retires the fixture loudly.
+_HAZARDS = (
+    # An 85-column command wraps its echo across two rows, so no row
+    # *ends* with it.
+    ("wrapped-echo", "ECHO " + "X" * 80, 30),
+    # Output whose own last line is indistinguishable from the echo.
+    ("echo-lookalike", r"TYPE C:\ECHOLIKE.TXT", 30),
+    # More output than a screen holds: agentless capture's documented
+    # limit, and the prompt arriving after a long scroll.
+    ("scrolling-output", r"DIR /S C:\FREEDOS", 90),
+    # A guest whose prompt is not the shape the pattern expects. Taken
+    # last, because it leaves the guest that way for the session.
+    ("custom-prompt", "PROMPT [$P]$G", 20),
+)
+
+
+def _plant_echo_lookalike(home, machine_id):
+    """Write the lookalike file into the stopped guest's own disk."""
+    source = os.path.join(home, "captures", "echolike.txt")
+    os.makedirs(os.path.dirname(source), exist_ok=True)
+    with open(source, "w", encoding="ascii", newline="\r\n") as handle:
+        handle.write("\n".join(_ECHO_LOOKALIKE) + "\n")
+    put_file(source, r"C:\ECHOLIKE.TXT", machine=machine_id, context=home)
+
+
+def _capture_exec(home, machine_id, name, command, timeout):
+    """Run one command through the exec adapter, recording the seam.
+
+    `machines.exec` builds its own machine handle, so a capture is
+    taken by standing the adapter on one that carries the recorder —
+    the same seam `--record` wraps for a script, reached without
+    putting a flag on a surface for a fixture's sake.
+
+    **The conclusion is written here** because the seam cannot show
+    it: which rows the adapter called the output, or which refusal it
+    raised, is decided above the carrier and two different answers
+    make the same file.
+    """
+    path = _capture(home, f"exec-{name}")
+    writer = _TranscriptWriter(path, pace=None, command=command,
+                               timeout=timeout)
+    writer.open()
+    guest = AgentlessGuestExec(Machine(
+        machine_dir_path(machine_id, home),
+        _session_wrapper=lambda session: RecordingSession(session, writer)))
+    try:
+        try:
+            rows = guest.execute(command, timeout)
+        except RunFailure as refused:
+            writer.write_outcome("failed", rule=refused.rule_id)
+        else:
+            writer.write_outcome("ok", rows=list(rows))
+    finally:
+        writer.close()
+    return path
 
 
 def test_freedos_plain_install_and_verify(integration_home):
@@ -75,6 +151,11 @@ def test_freedos_plain_install_and_verify(integration_home):
         assert verified.machine_phase == "ready"
         assert verified.machine_id == installed.machine_id
 
+        # Planted while the machine is down, because that is when a
+        # disk can be written to — and read by a command below, once
+        # the readiness script has the guest at a prompt.
+        _plant_echo_lookalike(home, installed.machine_id)
+
         # The handoff: the codex's readiness example leaves the
         # machine running with `ready` set, and `--expect` contracts
         # the run on it in one call rather than reading the variable
@@ -90,4 +171,15 @@ def test_freedos_plain_install_and_verify(integration_home):
             "every other codex script ends with the guest powered off")
         assert get_machine_var("ready", machine=handed_off.machine_id,
                                context=home) == "yes"
+
+        # And the machine the readiness example just handed over is
+        # what the pathological captures need: a guest at a prompt,
+        # which is expensive to reach and already standing here.
+        for name, command, timeout in _HAZARDS:
+            written = _capture_exec(home, handed_off.machine_id, name,
+                                    command, timeout)
+            assert os.path.getsize(written) > 0, (
+                f"the {name} capture is empty, so the recorder was "
+                "never installed on the exec adapter's session")
+
         stop_machine(handed_off.machine_id, context=home)

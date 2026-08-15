@@ -32,27 +32,6 @@ door the entry arrives — drafted in
 [proposed/FEATURES.md](../proposed/FEATURES.md), or cut straight
 to this file on pledge.
 
-## F43 — The interpretation-layer corpus
-
-> **Pledged 2026-08-01** (owner), cut from F13 with F42, that
-> number retiring with the split (D42). Demanded by **P22** and
-> **P24** — a surface that genuinely cannot be tested names the gap
-> rather than being quietly exempted, and this closes the largest
-> one. Design:
-> [design/screen-transcripts.md](design/screen-transcripts.md).
-
-The third conformance corpus, and the one whose fixtures nobody can
-author: the blueprint and script corpora are written, and this one
-is only ever captured. The corpus stands on two captures of the
-working paths — a FreeDOS install and its verify — and what remains
-is the half a working path cannot supply.
-
-Work item:
-
-1. The pathological captures — the boots where prompt detection or
-   command-echo scanning misbehaves, each becoming a regression
-   fixture.
-
 ## F41 — The drive-determination handover
 
 > **Pledged 2026-08-03** (owner), with the **P27** keeps-clause

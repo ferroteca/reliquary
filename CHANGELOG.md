@@ -13,6 +13,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The interpretation layer has a conformance corpus** (F43), and it
+  is the first one whose fixtures nobody wrote: seven `.rlqt`
+  captures of real FreeDOS runs against QEMU — the three codex
+  scripts and four ordinary commands — replayed in the default suite
+  through the
+  shipped `control_display`, `interaction_agentless` and script
+  dispatch, with no hypervisor. A fixture asserts by being
+  replayable: a call the capture never covered is an error, every
+  recorded call must be made, and the replay must reach the
+  conclusion the capture recorded.
+
+  **Which is how a capture of a wrong answer becomes a fixture**, and
+  three of the four command captures are exactly that. `rlq exec`
+  today: refuses a command longer than 80 columns
+  (`screen.no-echo`, because the echo wraps and no row *ends* with
+  it); returns an **empty result with no error** when the output's
+  own last line looks like the echo — a file whose last line reads
+  `C:\>TYPE C:\ECHOLIKE.TXT` is enough, and the spec's promise of
+  "the command's own output or a failure" is broken by it; and never
+  completes against a guest whose `PROMPT` has been customized, since
+  the prompt pattern admits no suffix. None is fixed here — what
+  counts as a DOS prompt, or as an echo, is a decision rather than a
+  test fixture's to settle — and each fixture retires itself loudly
+  when the gap closes.
+
 - **A stopped-only verb reached running is refused before the run**
   (T27; V17). `set-boot` and F54's scoped `boot` head write a
   launch-time firmware order, which is stopped-only as a property of

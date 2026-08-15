@@ -42,6 +42,7 @@ from reliquary import control_display, interaction_agentless, screen_stability
 from reliquary import script_runner
 from reliquary.control_display import DisplayConsole
 from reliquary.errors import PreflightError
+from reliquary.interaction_agentless import AgentlessGuestExec
 from reliquary.script_runner import _ScriptEngine
 from reliquary.transcript import ReplaySession, _TranscriptReader
 
@@ -119,16 +120,18 @@ class Clock:
         return self._now
 
     def sleep(self, seconds):
-        """Waiting costs nothing here, and it moves no clock.
+        """A sleep passes, and the reading that follows it lands.
 
-        The recorded run's sleep *and* the cost of the read that
-        followed it are already in the gap between two samples, so a
-        replay that also charged the sleep would count the wait twice
-        — and a loop that sleeps without reading (a settling gap
-        before a keypress) would move the layer's clock while the
-        guest's timeline stood still. Time here is what the transcript
-        says it is, and nothing else.
+        The recorded gap between two samples is the layer's own sleep
+        plus what the read cost, and the two are not
+        interchangeable: the layer samples the clock **before** it
+        reads, so a replay where only reads moved time would hand the
+        caller a moment one read stale. Sleeping here and jumping to
+        the recorded moment at the read reproduces both halves — and
+        the jump is monotone, so a sleep can never carry the clock
+        past the guest's own timeline.
         """
+        self._now += max(0.0, float(seconds))
 
     def advance_to(self, elapsed):
         """Move to a recorded moment, never backwards.
@@ -272,6 +275,16 @@ class _MachineHandle:
         return self._session.screenshot(path)
 
 
+def machine_handle(session):
+    """A `Machine` standing on one session — replayed or recorded.
+
+    The exec adapter takes a machine and reaches the carrier through
+    it, so this is what a capture is taken *through* as well as what a
+    replay is stood on.
+    """
+    return _MachineHandle(session)
+
+
 def machine_handles(session):
     """A `Machine` replacement bound to one replayed session."""
     def handle(home=None, deadline=None, cache=None, _session_wrapper=None):
@@ -296,6 +309,25 @@ def replaying(path, machines=None):
                               machine_handles(session)), \
             virtual_time(clock):
         yield session, layer, clock, reader
+
+
+@contextlib.contextmanager
+def replaying_exec(path):
+    """Stand the agentless exec adapter on a capture of one command.
+
+    The other kind of fixture, and a narrower stand-up than a script's:
+    the adapter reaches the carrier through a machine handle and asks
+    nothing of the lifecycle, so the seam and the clock are the whole
+    of what the harness supplies. Yields the adapter and the session
+    the capture is being read through, with the header beside them —
+    the command it was taken of and the limit it was given, both of
+    which the replay has to use unchanged.
+    """
+    entries, reader = read(path)
+    clock = Clock()
+    session = ReplaySession(entries, advance=clock.advance_to)
+    with virtual_time(clock):
+        yield AgentlessGuestExec(machine_handle(session)), session, reader
 
 
 def engine_for(script, home, machine_home, clock, reader, **rest):
