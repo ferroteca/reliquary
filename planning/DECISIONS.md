@@ -178,6 +178,39 @@ is waiting on an answer today.
 
 ## Decided
 
+- D107 — A DRIVE MAPPING IS NEVER REFUSED, AND A MACHINE WITH NO DOS
+  HAS NO LETTERS — DECIDED (owner, 2026-08-15). Refines **P11**'s
+  reading where the letter map applies, and settles the semantics
+  **F41**'s ask 8 delivers into.
+
+  A drive letter exists because an installed DOS assigned it, so a
+  machine with no DOS on it has **no letters rather than undetermined
+  ones**. The mapping is therefore always produced and always
+  honoured, and an empty or partial one is a correct answer rather
+  than a failure. An address outside the mapping is still refused —
+  by the address, not by the map: "this machine has no `C:`" states a
+  fact about the machine, where "reliquary cannot determine which
+  drive is `C:`" states reliquary's own uncertainty and reads as a
+  defect in the tool.
+
+  WEIGHED AND DECLINED: **refusing the mapping wherever it cannot be
+  established whole**, which is the behaviour this replaces — an
+  unread volume count stops the walk and every letter behind it goes
+  unplaced, and a machine mixing controller types yields no disk
+  letter at all. That was the right shape while the map was
+  *derived* from slot order and volume counts, because a derivation
+  that cannot see the whole machine is guessing, and P11 forbids
+  guessing at an address. Once the letters are read off the
+  installed system the premise is gone: what that system assigned is
+  what there is, and a map shorter than a caller expected is
+  evidence rather than a gap.
+
+  Reopens if a workflow needs a letter for a machine whose DOS is not
+  yet installed. Nothing shipped does — no codex script addresses a
+  letter, and the suite's only letter-addressed `put` runs after the
+  install — and such a workflow would be asking for a prediction,
+  which is the thing this entry declines to call a mapping.
+
 - D106 — THE SUITE IS PYTEST-NATIVE — DECIDED (owner, 2026-08-13).
   Supports **P11**'s reading, as D95 read it across: a check that
   silently does not run is a capability gap failing open. Amends

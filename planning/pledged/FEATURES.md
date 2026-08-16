@@ -103,7 +103,19 @@ was exercised against that release on the delivered Windows host
 while the at-rest layer was rewritten onto it. Seven answer — the
 notes under each say what was observed; ask 8's answer did not
 survive review, and the note under it records the restatement of
-2026-08-13. **That is an API
+2026-08-13.
+
+**The pin moved to `0.0.1a5` on 2026-08-15, and all eight were
+re-exercised against it on the delivered Windows host.** Asks 1
+through 6 were re-run over the rig disk and answer as their a3 notes
+record; ask 7 stands on reliquary's own suite, which exercises the
+8.3 rules and passes unchanged on the new pin. **Ask 8 now answers**
+— the note under it records what the restatement asked for and what
+came back, and the two residues it leaves. `0.0.1a4` is skipped
+throughout: its wheel could not be imported, so nothing was ever
+observed against it. **That is an API
+
+
 observation and not this feature's gate**: the gate asks for a
 release verified against P27's guarantees, and delivery is a
 surface change (S1, S7 — the drive record and the letter map) that
@@ -240,6 +252,37 @@ Proposed upstream when this was written (F24 / F25 / F26):
    runs. Raised upstream as remanence **T7**: until it lands this
    capability is unavailable and ask 8 is unmet, so the eight stand
    blocking exactly as written.
+
+   *Observed in `0.0.1a5`, and the restatement is met.* `Machine`
+   takes the machine reliquary already holds — devices added in
+   attachment order, media inserted — and `Machine.inspect()`
+   derives the rest. Exercised over the FreeDOS rig disk it named
+   the boot device it chose and why ("the first attached device
+   holding a recognized system"), the DOS booting from it
+   (`freedos`, version `(5, 1)`, state `settled`, from `KERNEL.SYS`
+   and the boot record's `FRDOS5.1`), the conditions that DOS
+   declared — reporting that none of `FDCONFIG.SYS`, `CONFIG.SYS`,
+   `FDAUTO.BAT`, `AUTOEXEC.BAT` was present rather than assuming
+   their absence — and the letters `C:`, `D:`, `E:`, `F:` **by
+   stable volume identity**, each with the rule that placed it. The
+   boot-order override sits on the machine model as
+   `declare_boot_device`, which is where the restatement asked for
+   it. **FreeDOS is claimed by name**, which the restatement above
+   records as absent. Provenance says of itself that it is
+   provenance and not evidence read off a disk.
+
+   **Two residues.** No optical device exists in the storage model —
+   `device_slots()` enumerates none and `formats()` reads no ISO
+   9660 — so the "then CD-ROMs" half of this ask cannot be stated at
+   all, and a letter for one is inferred from an `MSCDEX /L:` line
+   rather than placed on a drive the machine holds; raised upstream
+   as remanence **T8**, and it is what keeps this ask short of
+   complete. And FreeDOS's own letter order, patched into
+   `KERNEL.SYS` by `SYS CONFIG`, is not read: the letters follow the
+   kernel's documented MS-DOS default. That second one is
+   **declared in the provenance rather than left silent**, which is
+   what the restatement asked of a gap, so it stands as a stated
+   limit rather than an unmet ask.
 
 The upstream API's spelling is Remanence's design choice. The gate
 is observable: a released API must make each answer above available
