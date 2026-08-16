@@ -256,21 +256,16 @@ Decide first:
   stays behind that backend's pin in `backend-settings`. So this
   bullet's entries each carry two questions now: the design
   itself, and whether the capability clears the bar at all.
-  **A second controller type unfixes every disk letter**, which
-  is the one constraint this bullet carries rather than merely
-  lists. Slot order is authoritative only within a type; across
-  types the guest's firmware decides how the controllers
-  themselves enumerate, so not even the first disk is a declared
-  fact and P17 requires refusing the address instead of guessing.
-  `platform_dos.drive_letters` already refuses across types, and
-  that guard is asserted by test though no machine can reach it
-  today — so wiring a second type does not silently start
-  answering a question there is no fact for. What it *does* need
-  is the reverse: a way to say which disk is first when the facts
-  do determine it, or DOS machines lose in-band file exchange the
-  moment they gain a controller type. That is the design this
-  bullet owes, and it was left behind in the field reference as
-  prose until 2026-07-27.
+  **A second controller type leaves no declared first disk.**
+  Slot order is authoritative only within a type; across types the
+  guest's firmware decides how the controllers themselves
+  enumerate. That was a live constraint while Reliquary mapped
+  drives to guest letters, and **D108 retired the mapping**, so
+  what remains is narrower and still real: any future answer about
+  which disk a guest sees first is a fact no declaration supplies,
+  and P10 forbids guessing at one. Boot order is the exception
+  that already works, being stated to the firmware rather than
+  read back from it.
 - The Hyper-V agentless screen strategy: whether WMI
   thumbnail/keyboard automation is good enough for installer
   scripting, or Hyper-V machines require the serial/agent
@@ -623,40 +618,37 @@ answer:
 
 DECIDE FIRST: **whether (2) is Reliquary's at all.** The competing
 answer is (1) plus the value channels that already exist — a guest
-program writing its long output to a file the caller retrieves in
-band, which is `get_file` today and attaches no meaning to the
-content (P18). If that is the answer, this entry shrinks to (1) and
-stops being a feature; if it is not, the argument for why belongs
-here before any work starts.
+program writing its long output to a drive the caller reads on the
+host, which Reliquary supplies without reading a byte of it (P18,
+and P16's file-content carve-out since D108). If that is the answer,
+this entry shrinks to (1) and stops being a feature; if it is not,
+the argument for why belongs here before any work starts.
 
 ## F15 — Host-directory attachment as a first-class operation
 
 > **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). Demanded by **P17**, in force
-> since D47, and **P16**, in force since D62 — P16 because the
-> capability is reached today only by a caller reproducing
-> Reliquary's internal model outside it, and P17 because the
-> answer it owes is an address in the guest's own terms. **Neither
-> half of this citation is a hope any more**, and the second
-> hardened while this entry sat: both are standing rules now, so a
-> gap against either is a defect rather than unbuilt work. Serves
-> **U14** and **U20**. **Its address question is already
-> answered**: the in-band file family (F23, delivered 2026-07-27
-> by D62) settled one guest-terms vocabulary for all five of its
-> verbs — a directory addressed exactly as a file is, `A:\` the
-> drive root — and D5's `<drive-key>:<path>` shape died there.
-> This verb adopts that vocabulary rather than reopening it; what
-> it owes is the *answer* — attach this directory, and tell me its
-> guest address in those terms.
+> (owner: admitted as a proposal). Demanded by **P16**, in force,
+> because the capability is reached today only by a caller
+> reproducing Reliquary's internal model outside it. Serves
+> **U14** and **U20**, and **D108 raised its value rather than
+> lowering it**: with the in-band file family gone, a
+> directory-source drive is one of the two routes Reliquary
+> supplies for a file to cross at all, so the arithmetic this verb
+> hides is arithmetic every consumer now does. **What it answers
+> with changed in the same act.** The guest-terms address the
+> original entry promised no longer exists — there is no letter
+> map — so the answer is the **drive key** the attachment took,
+> which is what `insert-media`, `eject-media` and `set-boot-order`
+> already speak and what a blueprint already writes. A demand for
+> the letter back is a demand for the mapping back, and is
+> argued as that.
 
 A caller that needs a host directory visible to a guest **synthesizes
 a directory-source drive into the blueprint**, which forces it to
-know slot keys, slot limits, and the DOS drive-letter rule — three
-pieces of Reliquary's model reproduced outside Reliquary in order to
-reach a capability Reliquary supports. "Attach this host directory,
-and tell me its guest address" deletes all three: the request is what
-the caller actually means, and the answer is what P17 says an address
-looks like.
+know slot keys and slot limits — pieces of Reliquary's model
+reproduced outside Reliquary in order to reach a capability
+Reliquary supports. "Attach this host directory, and tell me the
+drive it landed on" deletes both.
 
 CONSTRAINTS ALREADY SETTLED, which shape the verb rather than block
 it. QEMU snapshots a vvfat staging directory when the drive is
@@ -664,7 +656,8 @@ attached, so a host-side change needs a stop/start cycle — this is a
 **stopped-machine** operation, and the live-iteration path stays
 U20's `insert-media` over a running machine. Slot limits and the
 directory-on-cdrom refusal stay exactly as they are: the verb hides
-the arithmetic, never the rules.
+the arithmetic, never the rules. What the guest calls the drive is
+the guest's business and Reliquary states nothing about it.
 
 DECIDE FIRST: whether the attachment is **state or request** — a
 persisted machine-state mutation in the family of `insert_media` /
@@ -677,10 +670,10 @@ and its inverse.
 ## F16 — The public surface a caller copies today
 
 > **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). Three small exposures with one
+> (owner: admitted as a proposal). Two small exposures with one
 > shared argument: each is Reliquary's own knowledge, reproduced
 > outside Reliquary because the public surface does not carry it.
-> **They are small but they are not housekeeping** — every one adds
+> **They are small but they are not housekeeping** — both add
 > to the embedding API, which the housekeeping boundary excludes
 > absolutely ([SURFACES.md](../SURFACES.md)). **That is not why
 > they sit here rather than in [TASKS.md](../TASKS.md)**, and this
@@ -688,29 +681,23 @@ and its inverse.
 > housekeeping's alone, and a small surface change may be a task
 > (D45, which the 2026-07-27 gate audit cited this very sentence as
 > precedent for before the reading was caught). What holds them
-> here is that two of the three are **unsettled below** — item 2
-> asks which artifact owns the answer, item 3 is probably F2's work
-> rather than its own. Serves **U14**;
-> item 1 cites **P10** and **P17**, item 3 belongs to **F2**.
+> here is that both are **unsettled below** — item 1
+> asks which artifact owns the answer, item 2 is probably F2's work
+> rather than its own. Serves **U14**; item 2 belongs to **F2**.
+> **A third item died with D108**: the public drive-address query,
+> which asked for `platform_dos.drive_letters` on the import
+> surface so a caller need not copy the letter rule. There is no
+> letter rule to copy any more, and nothing is owed in its place.
 
-1. **A public drive-address query.** `platform_dos.drive_letters` is
-   not on the root import surface, so a caller needing a guest
-   address copies the rule and guards the copy with a test against
-   Reliquary's own function. That is a **correctness risk, not
-   tidiness**: the mapping shifts when one disk carries several
-   volumes, which a copy cannot know. P10 is what makes the function
-   the only correct source — it is built from declared facts and
-   never from a guest — and P17 is the shape the answer takes.
-   Pairs with F15, which needs exactly this to answer with.
-2. **Public topology limits.** Slot counts per medium
+1. **Public topology limits.** Slot counts per medium
    (`_SLOT_LIMITS`), so a caller building a blueprint
    programmatically stops carrying its own copied `4`. Blueprint-model
    truth, and arguably the published schema's job rather than the
    API's — settle which before adding a function.
-3. **A backend-agnostic availability check.** `backend_available()`
+2. **A backend-agnostic availability check.** `backend_available()`
    rather than `find_qemu()`, so a caller gating integration tests
    never has to name an emulator to ask a backend-neutral question.
-   Lowest priority of the three, and **probably not its own work**:
+   Lowest priority of the two, and **probably not its own work**:
    the honest version of it is F2's autodiscovery work item, so
    this is a note against that feature as much as a request — and
    since F2 was pledged on 2026-07-28, that note now has somewhere

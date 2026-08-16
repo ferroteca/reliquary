@@ -739,8 +739,6 @@ class QemuAdapter(BackendAdapter):
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
-            at_rest=True,
-            at_rest_write=True,
         )
 
     def validate_settings(self, settings):

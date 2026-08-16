@@ -315,7 +315,6 @@ unmet(requirements)                         -> tuple[str, ...]
 
 image_path(root, stem)                      -> path
 create_image(path, *, mode, size, base)     -> path
-open_drive(path, *, writable=False)         -> at-rest access
 dispose(machine_dir)
 
 start(state, *, machine_dir, backend_dir,
@@ -329,18 +328,12 @@ adapter: a requirement is judged against a report, and what comes
 back is the text a preflight failure quotes — so a refusal always
 names *which* requirement was refused.
 
-`open_drive()` presents a stopped machine's disk as addressable
-bytes, since the native format is the adapter's choice and undoing
-it is therefore the adapter's job. What comes back answers
-`device` (the byte device `at_rest` reads through — `size`,
-`read_at`, `write_at`, `flush`, `close`), `commit()` and
-`close()`. **The commit point is the contract, not the
-mechanism**: a writable access closed without `commit()` leaves
-the image exactly as it was, and how an adapter stands that undo
-up is its own business — QEMU takes a qcow2 internal snapshot
-where the format affords one and stages a copy where it does not.
-The image is locked for the length of the access, and one another
-caller holds is refused rather than waited for (D77).
+**There is no at-rest drive access in this contract.** An
+`open_drive()` was sketched here and never landed, and D108 closed
+the question for good by putting a machine's file content outside
+Reliquary's purview (**P16**'s carve-out): an adapter creates the
+images a machine runs on and exposes nothing that reads inside
+one.
 
 **The identity record** (`backends.identity()`) is the ownership
 doctrine as data: `{backend, backend-id, token, endpoint, pid?}`.

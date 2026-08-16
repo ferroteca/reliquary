@@ -841,132 +841,6 @@ rlq set-boot-order cdrom0 hdd0 -b freedos
 rlq start-machine -b freedos
 ```
 
-### In-band file exchange
-
-```
-rlq put-file <source> <destination> (--blueprint <name> | --machine <id>)
-rlq get-file <source> <destination> (--blueprint <name> | --machine <id>)
-rlq put-files <source> <destination> (--blueprint <name> | --machine <id>)
-rlq get-files <source> <destination> (--blueprint <name> | --machine <id>)
-rlq list-files <address> [--recursive] (--blueprint <name> | --machine <id>)
-```
-
-Twins `put_file` / `get_file` / `put_files` / `get_files` /
-`list_files`. The guest-side path is written **the way the guest
-names it** — `A:\TEST.EXE` on DOS, that system's separators and
-roots, never an image file or a staging directory (**P17**). The
-drive letter resolves from the machine's declared platform and
-Reliquary's own drive assignment, never by inspecting a guest
-(**P10**).
-
-**One address vocabulary across all five**, not two spellings of
-it. A directory is addressed exactly as a file is, and only the
-drive itself is newly sayable: `A:\` (or the bare `A:`) is the
-drive root, a trailing separator is optional everywhere else, and
-`.` / `..` segments are refused. A file address needs a file — a
-plain `A:\` to `get-file` is an error, because a drive is not a
-file.
-
-All five are **stopped-only**, and the addressed drive must be a
-directory-source drive: the backend snapshots that directory when
-it attaches, so a change made while the machine runs would be
-invisible to the guest and a guest write is not flushed until it
-stops. A **drive image is read and written at rest**: with the
-machine stopped its disk is a file the host owns, so all five
-verbs reach an installed `C:` by mounting the image and working
-the FAT volume in it — no guest, no boot, and no reaching around
-Reliquary. **The image is never copied to be read**, so a listing
-costs the sectors it touches rather than the size of the disk.
-Every write stands on a commit point the backend holds open until
-the last write returns, so an interrupted, refused or crashed
-write leaves the image exactly as it was; a differencing image
-stays one, over the same base.
-
-**The image is locked for the length of the access**, and a second
-caller meeting that lock is refused (`image.locked`) rather than
-made to wait: two callers working one disk at once is the case the
-lock exists to prevent.
-
-**A partition is read for what it declares itself to be.** The
-partition table is walked in the order the guest sees — primaries,
-then the logical drives behind a DOS extended container — and a
-partition whose type this build does not read is refused by name
-rather than skipped, because skipping renumbers every volume after
-it and answers confidently for the wrong one. **The recognition
-claim is FAT12, FAT16 and FAT16B over standard MBR
-primary/extended partitioning** (D83); everything else — FAT32
-included — is `drive.image-unreadable` naming what the type was.
-
-A guest-side name must be one the guest could type: **8.3, or a
-refusal** (`drive.image-unreadable`), never a silent truncation
-that would land the file where the caller cannot find it.
-Two more refusals name themselves, each raised before anything
-is transferred (**P11**): `drive.no-at-rest-access` when the
-backend cannot open its own image format at rest, and
-`drive.no-at-rest-write` when it can read one and not write it.
-
-**The letter map is read, never assumed.** Floppies take `A:` and
-`B:` by slot, always. Hard disks follow from `C:` in slot order,
-**each taking one letter per volume it holds** — a disk
-partitioned in two takes `C:` and `D:`, and the next disk starts
-at `E:`. CD-ROMs follow the last disk volume. A disk holding no
-volumes — a blank Reliquary materialized, before a guest
-partitions it — takes **no letter at all**, which is what DOS
-itself does. The volume count is read off the image on the host,
-which is a declared-or-read fact and never an inference about a
-guest (**P10**); it is recorded in the machine's state and
-**cleared at every start**, because a guest can repartition a disk
-and can only do so while it is running.
-
-A directory-source drive is therefore addressable wherever it
-sits, including behind an installed `C:`. Two things unfix a
-letter, and both fail closed naming what could not be placed: a
-disk whose volumes Reliquary cannot read — which shifts every
-letter behind it by an unknown amount, and which answers with the
-reason it could not be read rather than with the symptom — and a
-machine mixing controller types, where slot order is
-authoritative only within a type.
-
-The plural verbs move a tree's **contents**: `put-files` places
-what is inside the host directory into the guest directory, and
-`get-files` the reverse — the only shape a drive root can take,
-having no name of its own to nest under. Both recurse, create
-directories as needed — the destination included, as `put-file`
-already creates the ones its address names — overwrite a file
-already there, and remove
-nothing: a copy, never a mirror. `get-files`' destination is
-**required** — Reliquary invents no location to write to (**P12**)
-— and is created if absent. `put-files` returns the guest
-addresses written and `get-files` the host paths, each sorted.
-
-`list-files` reports one directory level, or the whole tree under
-`--recursive`. Its return is a flat array sorted by address, one
-object per entry:
-
-```json
-[
-  {"address": "A:\\JOB.BAT", "name": "JOB.BAT", "kind": "file", "size": 42},
-  {"address": "A:\\OUT", "name": "OUT", "kind": "directory", "size": null}
-]
-```
-
-`kind` is `file` or `directory`; `size` is the file's bytes and
-`null` for a directory, which is not a size the guest would
-report. `address` is the full guest address, so a caller feeds a
-listing straight back to `get-file` without composing a path of
-its own — the same vocabulary out as in (**P17**). The array is
-flat rather than nested because a tree costs every binding a
-walker and buys nothing a full address does not already carry
-(**P7**).
-
-```powershell
-rlq put-file .\JOB.BAT "A:\JOB.BAT" --machine freedos-0
-rlq get-file "A:\RESULT.TXT" .\result.txt --machine freedos-0
-rlq put-files .\suite "A:\" --machine freedos-0
-rlq list-files "A:\" --recursive --machine freedos-0
-rlq get-files "A:\OUT" .\results --machine freedos-0
-```
-
 ### Reading and waiting on a machine variable
 
 ```
@@ -1001,147 +875,6 @@ machine went wrong and the value may still arrive, so a caller
 holding the loop catches `TimeoutError` and asks again. Exit `1` is
 reserved for Reliquary's own faults and a timeout is never one.
 
-### Describing drives
-
-```
-rlq describe-drives (--blueprint <name> | --machine <id>)
-rlq refresh-drives (--blueprint <name> | --machine <id>)
-```
-
-Twins `describe_drives` /
-`refresh_drives`. **One machine-level report of what the
-machine's drives are and what they actually hold** — the
-observation the letter map and the file verbs already run on,
-given a window (D83). Per drive it reports the declared and
-chosen facts: key, medium, slot, media, materialization. Per hard
-disk it reports what was **read at rest**: the backing standing
-behind the drive (`qcow2`, `raw`, or `directory` — a directory
-served as one FAT volume), the partition table as it declares
-itself (the type byte verbatim, and what this build reads it as),
-and per volume the filesystem it declares itself to be, its label
-where one exists, and the BPB's own geometry where it states one —
-`null` rather than guessed where it does not. The `mapping`
-section is the platform's derivation over those same facts in the
-platform's own vocabulary: for DOS, the letter map — letter to
-(drive key, volume index) — with every unplaced drive named as
-**undetermined**, carrying the blocking disk's own reason and id,
-the same words the file verbs use, because they are the same
-facts (**P11**).
-
-**The recognition claim is deliberate and narrow** (D83): DOS
-platforms; FAT12, FAT16 and FAT16B filesystems; standard MBR
-primary/extended partitioning. Everything else — FAT32 included —
-reports as a named refusal (`unread`), never as a guess. A
-non-DOS platform's `mapping` is the named gap
-(`platform.verb-not-implemented`) rather than a borrowed DOS
-answer.
-
-**The report answers from the record in the machine's state, and
-is never phase-refused.** The automatic read is **the first step
-of every `start`, before the backend is engaged**, so the record
-a running machine answers from is this boot's own starting state;
-the file verbs' stopped re-reads refresh it too — their counts
-are cleared at every start (D78), and the read that restores them
-rewrites this record with it. `describe-drives` itself reads a
-disk in exactly one case: the machine is down and the disk has no
-record yet, which is the window between create and first start.
-Everything else answers as recorded — `"recorded": true` when the
-call read nothing, each disk's own `read-at` saying when it was
-read; a running guest owns its disks, so Reliquary does not read
-them live.
-
-A layout changed *behind* the record — a guest session's
-repartitioning, an out-of-band edit through the machine directory
-— is picked up at the next start, or now by **`refresh-drives`**:
-the explicit re-read. It is stopped-only
-(`machine.must-be-stopped`), because a running guest owns its
-disks, and it returns the same report `describe-drives` gives,
-read fresh.
-
-The report is for a **created** machine — its subject is disks
-that exist. What a create *would* build is the dry-run family's
-question (`create-machine --dry-run`), and the two families stay
-distinguishable by their subjects.
-
-```powershell
-rlq describe-drives --machine freedos-0
-rlq describe-drives -b freedos --json
-```
-
-Under `--json` the document is exactly the twin's return:
-
-```json
-{
-  "machine": "freedos-0",
-  "blueprint": "freedos",
-  "platform": "dos",
-  "phase": "ready",
-  "recorded": false,
-  "drives": [
-    {
-      "key": "floppy0",
-      "medium": "floppy",
-      "slot": 0,
-      "media": "boot-floppy",
-      "materialize": "use"
-    },
-    {
-      "key": "hdd0",
-      "medium": "hdd",
-      "slot": 0,
-      "media": "freedos-disk",
-      "materialize": "copy",
-      "geometry": {
-        "read-at": "2026-07-29T18:00:00Z",
-        "backing": "qcow2",
-        "partitioned": true,
-        "partitions": [
-          {
-            "number": 1,
-            "type": 6,
-            "declares": "FAT16B",
-            "size": 66060288,
-            "logical": false
-          }
-        ],
-        "cylinders": 130,
-        "volumes": [
-          {
-            "index": 0,
-            "filesystem": "FAT16",
-            "label": "FREEDOS",
-            "size": 66060288,
-            "heads": 16,
-            "sectors-per-track": 63
-          }
-        ]
-      }
-    }
-  ],
-  "mapping": {
-    "letters": {
-      "A": {
-        "drive": "floppy0",
-        "volume": 0
-      },
-      "C": {
-        "drive": "hdd0",
-        "volume": 0
-      }
-    },
-    "undetermined": []
-  }
-}
-```
-
-An unreadable disk's `geometry` carries `unread` — `id` and
-`reason`, the refusal's own vocabulary — in place of the read
-facts, and appears under `mapping.undetermined` together with
-every drive behind it, each entry naming the blocking disk. A
-directory-source disk is one volume by construction, its
-per-volume facts `null` throughout: the backend composes them at
-attach, so they are unanswered rather than guessed.
-
 ### The machine directory
 
 ```
@@ -1154,18 +887,24 @@ Prints the machine's cache directory —
 serializes it like any other return). A query: it works in any
 machine phase and touches nothing.
 
-The path is the door to out-of-band file exchange, and it is no
-longer a door anything needs: the in-band family covers single
-files (`put-file` / `get-file`) and whole trees and listings
-(`put-files` / `get-files` / `list-files`), so reaching in is a
-convenience rather than a route (**P16**). While the machine is
-stopped on every control
-plane, its drives are plain host state — a drive whose media is a
-directory *is* that directory, and image drives are readable and
-writable with the user's own tools. Reliquary neither mediates nor records
-out-of-band access. The contract, including what stays
-untouchable (`cache/media/` payloads), lives
-in the [instance model](instance-model.md).
+**This is the door to a machine's file content, and it is the
+route rather than a convenience** (D108). Reliquary places no file
+on a machine's drives, reads none back and maps no volume to a
+guest letter — a machine's file content is out of purview by
+design (**P16**'s carve-out) — so a caller that needs a file in or
+out gets the directory here and uses its own tools. While the
+machine is stopped on every control plane its drives are plain
+host state: a drive whose media is a directory *is* that
+directory, and an image drive is a raw or qcow2 file any image
+library opens. Reliquary neither mediates nor records out-of-band
+access. The contract, including what stays untouchable
+(`cache/media/` payloads), lives in the
+[instance model](instance-model.md).
+
+Two Reliquary-supplied routes stay in-band, and neither reaches
+inside a volume: a **directory-source media** attaches a host
+directory as a drive, and **`insert-media --file`** mounts an
+image the caller built, live (U20).
 
 ```powershell
 rlq get-machine-dir -b freedos
@@ -1372,10 +1111,10 @@ at the next event boundary (a `cancelled` terminal event, exit
 [scoped changes](script-spec.md#scoped-machine-state-changes) the
 run puts back, which the cancellation names.
 
-The run's product is the caller's — the returned value, a file
-retrieved in-band, a machine variable read with `get-machine-var`,
-a disk image swapped out — kept and organized on the caller's own
-side of the seam (P4, P18). The whole `run` family and the
+The run's product is the caller's — the returned value, a machine
+variable read with `get-machine-var`, a disk image swapped out and
+opened with the caller's own tools — kept and organized on the
+caller's own side of the seam (P4, P18). The whole `run` family and the
 detach/follow surface return only if the async work schedules
 (drafted as U19).
 

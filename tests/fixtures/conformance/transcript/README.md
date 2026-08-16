@@ -112,6 +112,14 @@ FreeDOS already boots its disk rather than the LiveCD — so
 `destroy-machine --machine freedos-0` first, or the install run waits
 out its deadline on a welcome screen that never comes.
 
+**The lookalike fixture is staged by the guest itself**, with
+`COPY CON` typed at the prompt. Reliquary places no file on a
+machine's drives (D108), and DOS redirection cannot emit the `>` that
+file's third line turns on — there is no escape for it in any DOS
+shell — so the guest has to write it. That is why the plant happens
+after the readiness script hands over a running machine rather than
+while the machine is down.
+
 ## One fixture, one node
 
 Every fixture is a collected pytest node named for its file, in each

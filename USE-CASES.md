@@ -186,12 +186,18 @@ number they superseded.
   from its own code, through a native binding or the CLI: it
   places input into the guest, runs work, reads results back,
   iterates, and closes the machine down. The **result is the
-  product** — a value the run produced, and the specific file
-  the caller asked Reliquary to hand back — delivered across the
+  product** — a value the run produced — delivered across the
   seam to the caller; Reliquary's own run output is *evidence*,
-  never the product. The loop is tight: per-run selection goes
-  in as properties, granular results come out as the caller's
-  own files and values, and re-running one step or the whole
+  never the product. **A file is the caller's own to move.**
+  Reliquary carries values across the seam and supplies the
+  drives a file crosses on — a host directory declared as a
+  drive, a medium swapped live (U20), the machine directory
+  handed back — but it does not reach into a drive to read or
+  write one, and it maps no volume to a guest letter; a caller
+  wanting a file out opens the drive itself, with its own tools.
+  The loop is tight: per-run selection goes
+  in as properties, granular results come out as values and as
+  the caller's own media, and re-running one step or the whole
   task is first-class. Reliquary supplies the mechanics and
   attaches no meaning to any of it — the computation, the result
   parsing, and any reusable scripting are the caller's or

@@ -86,18 +86,6 @@ class Capabilities:
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
     vvfat: bool = False
-    #: Whether the adapter's drive images are within the at-rest
-    #: claim — raw or qcow2, the formats Remanence opens where they
-    #: lie (P27). A declaration rather than a service: opening the
-    #: image is the machine model's business, and an adapter whose
-    #: native format is beyond the claim says so here, so the file
-    #: verbs refuse by name instead of guessing at the drive's
-    #: contents (P11).
-    at_rest: bool = False
-    #: Whether those images may also be written at rest. Split from
-    #: ``at_rest`` because reading and writing a disk are different
-    #: promises.
-    at_rest_write: bool = False
 
 
 @dataclasses.dataclass(frozen=True)

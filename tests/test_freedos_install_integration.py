@@ -31,7 +31,7 @@ from reliquary.interaction_agentless import AgentlessGuestExec
 from reliquary.library import seed_blueprint
 from reliquary.machine_handle import Machine
 from reliquary.machines import (get_machine_var, load_machine_state,
-                                machine_dir_path, put_file, stop_machine)
+                                machine_dir_path, stop_machine)
 from reliquary.script_runner import run_script
 from reliquary.transcript import RecordingSession, _TranscriptWriter
 from tests import live_external_effects
@@ -79,12 +79,21 @@ _HAZARDS = (
 
 
 def _plant_echo_lookalike(home, machine_id):
-    """Write the lookalike file into the stopped guest's own disk."""
-    source = os.path.join(home, "captures", "echolike.txt")
-    os.makedirs(os.path.dirname(source), exist_ok=True)
-    with open(source, "w", encoding="ascii", newline="\r\n") as handle:
-        handle.write("\n".join(_ECHO_LOOKALIKE) + "\n")
-    put_file(source, r"C:\ECHOLIKE.TXT", machine=machine_id, context=home)
+    """Have the running guest write the lookalike file itself.
+
+    `COPY CON` and nothing else, because the guest has to be the one
+    that writes it: reliquary places no file on a machine's drives
+    (D108), and DOS redirection cannot emit the `>` the third line
+    turns on — there is no escape for it in any DOS shell. Typing it
+    at the guest costs a few keystrokes and needs no capability
+    beyond the one this whole tier is about.
+    """
+    machine = Machine(machine_dir_path(machine_id, home))
+    machine.send_text(r"COPY CON C:\ECHOLIKE.TXT")
+    for line in _ECHO_LOOKALIKE:
+        machine.send_text(line)
+    machine.send_keys(["ctrl+z"])
+    machine.send_keys(["ret"])
 
 
 def _capture_exec(home, machine_id, name, command, timeout):
@@ -151,11 +160,6 @@ def test_freedos_plain_install_and_verify(integration_home):
         assert verified.machine_phase == "ready"
         assert verified.machine_id == installed.machine_id
 
-        # Planted while the machine is down, because that is when a
-        # disk can be written to — and read by a command below, once
-        # the readiness script has the guest at a prompt.
-        _plant_echo_lookalike(home, installed.machine_id)
-
         # The handoff: the codex's readiness example leaves the
         # machine running with `ready` set, and `--expect` contracts
         # the run on it in one call rather than reading the variable
@@ -174,7 +178,11 @@ def test_freedos_plain_install_and_verify(integration_home):
 
         # And the machine the readiness example just handed over is
         # what the pathological captures need: a guest at a prompt,
-        # which is expensive to reach and already standing here.
+        # which is expensive to reach and already standing here — and
+        # is also the only thing that can plant the lookalike file,
+        # now that nothing writes a machine's drives from the host.
+        _plant_echo_lookalike(home, handed_off.machine_id)
+
         for name, command, timeout in _HAZARDS:
             written = _capture_exec(home, handed_off.machine_id, name,
                                     command, timeout)

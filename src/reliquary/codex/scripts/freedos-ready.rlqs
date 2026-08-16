@@ -12,8 +12,8 @@ timeout  2m
 # `freedos-install` and `freedos-verify` both end with the guest
 # powered off, because each has finished with it. A readiness script
 # has the opposite job — it hands a live machine to whatever comes
-# next, which is a harness driving `exec`, `put-file` and `get-file`
-# against a guest that is already at a prompt.
+# next, which is a harness driving `exec` and `insert-media` against
+# a guest that is already at a prompt.
 #
 # What "ready" means is the workflow's own business, never
 # reliquary's, and this is the whole of what it means here: the

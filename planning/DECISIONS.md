@@ -178,38 +178,39 @@ is waiting on an answer today.
 
 ## Decided
 
-- D107 — A DRIVE MAPPING IS NEVER REFUSED, AND A MACHINE WITH NO DOS
-  HAS NO LETTERS — DECIDED (owner, 2026-08-15). Refines **P11**'s
-  reading where the letter map applies, and settles the semantics
-  **F41**'s ask 8 delivers into.
+- D108 — A MACHINE'S FILE CONTENT LEAVES RELIQUARY, AND THE VOLUME
+  MAPPING GOES WITH IT — DECIDED (owner, 2026-08-16). Supports
+  U14, U20; P16, P18. Amends **U14** and **P16**, strikes **P17**
+  and **P27**, and withdraws **F41**.
 
-  A drive letter exists because an installed DOS assigned it, so a
-  machine with no DOS on it has **no letters rather than undetermined
-  ones**. The mapping is therefore always produced and always
-  honoured, and an empty or partial one is a correct answer rather
-  than a failure. An address outside the mapping is still refused —
-  by the address, not by the map: "this machine has no `C:`" states a
-  fact about the machine, where "reliquary cannot determine which
-  drive is `C:`" states reliquary's own uncertainty and reads as a
-  defect in the tool.
+  Reliquary declares a machine's drives, materializes them and
+  moves their media; it does not read or write what is inside one,
+  and it maps no volume to a guest drive letter. A consumer needing
+  a file across the boundary supplies the drive and moves the file
+  itself — a directory-source media attaching a host directory, an
+  image swapped live with `insert-media --file`, or the machine
+  directory D5's out-of-band door already hands back, opened with
+  the consumer's own tools. **Remanence is the tool named**, and it
+  leaves the runtime closure with the layer that wrapped it: a
+  consumer uses it directly rather than through Reliquary.
 
-  WEIGHED AND DECLINED: **refusing the mapping wherever it cannot be
-  established whole**, which is the behaviour this replaces — an
-  unread volume count stops the walk and every letter behind it goes
-  unplaced, and a machine mixing controller types yields no disk
-  letter at all. That was the right shape while the map was
-  *derived* from slot order and volume counts, because a derivation
-  that cannot see the whole machine is guessing, and P11 forbids
-  guessing at an address. Once the letters are read off the
-  installed system the premise is gone: what that system assigned is
-  what there is, and a map shorter than a caller expected is
-  evidence rather than a gap.
+  WEIGHED AND DECLINED: **keeping the directory-source half of the
+  file family**, which needs no at-rest access at all. It would
+  have kept the drive-letter map alive to address it — the volume
+  mapping this decision removes — so half the family costs nearly
+  the whole mechanism, and the surviving half would be QEMU-only.
+  Also declined: **a narrowed `describe-drives`** reporting the
+  declared and chosen facts alone. `list-machines --json` already
+  carries them, and a report shaped by what was deleted is a
+  remnant rather than a stated need; a per-machine inspection
+  command is argued on its own merits or not at all.
 
-  Reopens if a workflow needs a letter for a machine whose DOS is not
-  yet installed. Nothing shipped does — no codex script addresses a
-  letter, and the suite's only letter-addressed `put` runs after the
-  install — and such a workflow would be asking for a prediction,
-  which is the thing this entry declines to call a mapping.
+  WHAT WOULD REOPEN IT: a use case that cannot be completed with
+  values, declared drives and live media swap. **F15 is the
+  pressure point** — it now answers with a drive key rather than a
+  guest letter, and a demand for the letter back is a demand for
+  the mapping back.
+
 
 - D106 — THE SUITE IS PYTEST-NATIVE — DECIDED (owner, 2026-08-13).
   Supports **P11**'s reading, as D95 read it across: a check that
@@ -801,23 +802,6 @@ is waiting on an answer today.
   `test_dry_run.py`; [AGENTS.md](../AGENTS.md); and the CHANGELOG's
   unreleased section.
 
-- D83 — THE DRIVE REPORT, AND THE RECOGNITION CLAIM NARROWS TO
-  FAT12/FAT16/FAT16B — DECIDED (owner, 2026-07-29) and delivered
-  the same day. Supports U14, U20; P10, P11. Normative in
-  AGENTS.md.
-
-  - **The claim is narrow and named.** FAT12, FAT16 and FAT16B over
-    standard MBR partitioning; everything else, FAT32 included, is
-    a refusal in reliquary's own vocabulary rather than a silent
-    failure. Partition types are pinned value by value: a type byte
-    is a meaning the tool *acts* on, so guessing one is how a disk
-    gets misread with confidence.
-  - **The report answers from the record**, read at every start's
-    first step before the backend is engaged, so a running machine
-    answers with this boot's starting state rather than being
-    phase-refused. A guest repartitions only while running, which
-    is why the record is cleared at start and never mid-run.
-
 - D82 — THE PROJECT IS GPL-3.0-ONLY, RELICENSING IS RESERVED, AND
   CONTRIBUTIONS ARE ASSIGNED — DECIDED (owner, 2026-07-29).
   Supports none: no use case or principle demands a licence, and
@@ -887,102 +871,6 @@ is waiting on an answer today.
     own limit instead (`3 statements not statically reachable`),
     which is P11 at the report level.
 
-- D78 — THE LETTER MAP READS THE DISK; D71'S ASSUMPTION IS GONE —
-  DECIDED (owner, 2026-07-29) and delivered the same day. Supports
-  U14, U20; P10, P11, P16, P17. **Closes D71's residue.**
-
-  The map is built from declared facts **and the volumes each disk
-  actually holds**: one letter per volume, a disk holding none
-  taking none. Reading the disk is an *observation* rather than a
-  guess about a guest, so it stays inside P10 — what it must never
-  do is ask the guest.
-
-  The change is one-directional by construction: addresses that
-  were refused may now work, and **no address that worked
-  changes**. That is what let it land without a migration — a
-  remapping would have silently rewritten the meaning of every
-  script's file paths.
-
-- D77 — A DRIVE IMAGE IS OPENED WHERE IT LIES, NOT COPIED; THE
-  COMMIT POINT MOVES INTO THE FORMAT — DECIDED (owner, 2026-07-29)
-  and delivered the same day. Supports U14, U20; P10, P11, P12.
-  The at-rest model is normative in AGENTS.md and
-  [instance-model.md](../docs/spec/instance-model.md).
-
-  - **Open in place, never copy.** A copy-edit-swap cycle on a
-    multi-gigabyte image is a cost paid on every access to buy
-    atomicity once; a durable undo journal beneath `commit()` buys
-    the same atomicity where the write happens, and an interrupted
-    commit is reconciled at the image's next open.
-  - **A region that cannot be read is refused rather than
-    skipped.** A disk with a partition reliquary cannot account for
-    is one whose volume ordering it cannot vouch for, so the whole
-    disk is refused — silently skipping would renumber everything
-    after it.
-
-- D76 — THE BOOT SIGNATURE WAS BYTE-SWAPPED IN BOTH THE READER AND
-  ITS ORACLE — DECIDED (owner, 2026-07-29). Supports P11, P16;
-  P24. **Amends D74's independence claim.** A defect against
-  [ARCHITECTURE.md](../ARCHITECTURE.md)'s P16 entry, which asserts
-  a drive image is read and written at rest, so it needed no pledge
-  — and it arrived fixed, so it never entered
-  [TASKS.md](TASKS.md).
-
-  WHAT WAS WRONG. `at_rest` compared the boot sector's last two
-  bytes as a little-endian word against `0x55AA`. On disk those
-  bytes are `0x55` then `0xAA`, which reads back as `0xAA55`. The
-  comparison could therefore never be true, so **every real disk
-  was rejected** as "no partition table and no FAT boot sector"
-  and the whole at-rest capability was inoperative outside its own
-  tests. Found by running the D75 fix against the integration rig
-  and noticing that a machine which had just booted FreeDOS from
-  `hdd0` was a disk this reader claimed it could not identify.
-
-  WHY THE SUITE PASSED, WHICH IS THE PART WORTH KEEPING.
-  `fat_image` writes the images `at_rest` reads, and it wrote the
-  same constant the same wrong way — `struct.pack_into("<H", …,
-  0x55AA)`. The two agreed, so 27 tests passed against images no
-  formatter would produce, and the one thing neither could see was
-  the thing they shared.
-
-  **D74 CLAIMED MORE THAN IT HAD.** Its entry says the structural
-  check "reads a volume from the format's layout rather than
-  through `at_rest`", and that "a writer validated only by its own
-  reader would agree with itself about a shared mistake." Both
-  sentences are true of the *method* and were not true of the
-  *artifact*: written by one hand in one sitting, the builder
-  inherited the reader's misreading of the specification rather
-  than checking it. An oracle is independent of the code it
-  checks, not of the person who wrote both.
-
-  THE REMEDY IS LITERAL BYTES, NOT A SHARED SYMBOL. Moving the
-  constant somewhere common would have made the two agree *by
-  construction*, which is the failure with a tidier name. Instead
-  the guards state the layout as fact — the signature is asserted
-  to be `b"\x55\xaa"` at offset 510 on both a volume and a
-  partition table, and a hand-assembled MBR owing nothing to the
-  builder must be accepted. Each fails against the old code, which
-  is the test of a regression guard worth having.
-
-  WHAT THIS SAYS ABOUT ORACLES GENERALLY (P24's grain). A
-  second implementation is a real check on logic and a weak one on
-  *constants and layout*, because those are copied rather than
-  reasoned out. Where a format is the contract, at least one
-  assertion should quote the format's own bytes. That is the
-  standing lesson, and it is why this entry exists rather than the
-  fix being a commit line.
-
-  NO CHANGELOG LINE. The at-rest capability is in the unreleased
-  section and has never been in anyone's hands, so there is no
-  shipped behaviour to report fixed; the entry describing it now
-  describes something that works.
-
-  FOLDED: this entry; D74's independence paragraph (the bracketed
-  amendment); [at_rest.py](../reliquary/at_rest.py) (the signature
-  compared as the bytes it is, in all three places);
-  `fat_image.py` (the same, and the shared constant named for what
-  it is); `test_at_rest.py` (the layout guards).
-
 - D75 — A PROMPT IS NOT COMPLETION, AND UNATTRIBUTABLE OUTPUT IS A
   FAILURE — DECIDED (owner, 2026-07-28) and delivered the same day.
   Supports U12, U14, U9; P11.
@@ -999,32 +887,6 @@ is waiting on an answer today.
   somebody else's text is worse than an error, because nothing
   downstream can tell it is wrong.
 
-- D74 — A DRIVE IMAGE IS WRITTEN AT REST, STAGED AND SWAPPED —
-  DECIDED (owner, 2026-07-28) and delivered the same day. Supports
-  U14, U20; P10, P11, P12, P16, P17. **Closes P16's residue.**
-
-  Staged-and-swapped was chosen over writing in place: a refused or
-  crashed write then costs a temporary file rather than a corrupted
-  image, and the failure mode of the cheap option is unbounded
-  where the failure mode of the expensive one is a stray file.
-  **Superseded in substance by D77**, which moved the commit point
-  into the format itself — a durable undo journal beneath
-  `commit()` buys the same atomicity without the copy, so the
-  staging cost went away rather than being accepted.
-
-- D73 — A DRIVE IMAGE IS READ AT REST; THE WRITE HALF IS SPLIT OFF
-  — DECIDED (owner, 2026-07-28) and delivered the same day.
-  Supports U14, U20; P10, P11, P12, P16, P17.
-
-  Reading a stopped machine's disk is reliquary's own capability,
-  not the backend adapter's: what a disk holds is a property of the
-  image, and routing it through whichever hypervisor happens to be
-  assigned would make the answer depend on a choice that has
-  nothing to do with the question. The write half was split off
-  deliberately rather than designed alongside — writing needs a
-  commit story reading does not, and bundling them would have let
-  the harder half set the shape of the easier one (D74 took it up).
-
 - D72 — P10 SHARPENS: GUESSING IS THE VIOLATION, AND A GUEST'S
   ANSWER ABOUT ITSELF IS AN OBSERVATION — DECIDED (owner,
   2026-07-28) and armed the same day. Supports U14, U20; P11, P16.
@@ -1033,24 +895,9 @@ is waiting on an answer today.
   about itself is an observation and may be used; what is refused
   is inference from appearance — deducing a filesystem from a
   screen, a platform from a banner. The distinction matters because
-  the naive reading ("never ask the guest") would have barred the
-  at-rest disk reads, which are the most reliable facts available
-  and involve no guest at all.
-
-- D71 — ONE VOLUME PER HARD DISK, ASSUMED AND FILED; AN IMAGE
-  DRIVE ANSWERS NO CAPABILITY — DECIDED (owner, 2026-07-28) and
-  delivered the same day. Supports U14, U20; P11, P16, P17.
-  **Amends D56.**
-
-  A disk whose volumes cannot be read **refuses every letter after
-  it**, rather than skipping to the next: the letters are assigned
-  by position, so a disk the guest would have lettered makes every
-  later assignment a guess. It answers with the reason it could not
-  be read, never the symptom — P10.
-
-  [Superseded in mechanism by **D83**, which reads the volumes each
-  disk actually holds rather than assuming one; the refusal rule
-  above is what carried forward.]
+  the naive reading ("never ask the guest") would bar reading
+  anything on the host at all — an image's format, a file's size —
+  which involves no guest and is the most reliable fact available.
 
 - D70 — THE BLUEPRINT SURFACE IS LOCATED; POSITIONS RIDE ON THE
   PARSED CONTAINERS — DECIDED (owner, 2026-07-28) and delivered the
@@ -1290,18 +1137,6 @@ is waiting on an answer today.
   this file's preamble. Nothing else in the tree changes: the
   rule governs entries not yet written.
 
-- D62 — THE IN-BAND FILE FAMILY IS COMPLETE; P16 IS ARMED —
-  DECIDED (owner, 2026-07-27) and delivered the same day. Supports
-  U14, U20; P16, P17. The five verbs are normative in
-  [cli.md](../docs/spec/cli.md) and AGENTS.md.
-
-  **One address form serves all five**, and that is the ruling: a
-  directory is addressed exactly as a file is, and the drive root
-  is sayable (`A:\`). D5's `<drive-key>:<path>` shape died here —
-  an address the guest could not type is not an address the guest
-  can be asked about. An unmapped letter is refused naming the gap
-  rather than guessed at (P11).
-
 - D60 — INPUT PACING IS CONTROL-PLANE PACING, NOT A `delay` VERB —
   DECIDED (owner, 2026-07-24) and delivered 2026-07-27. Supports
   U14, U20, U12. Normative in
@@ -1387,20 +1222,10 @@ is waiting on an answer today.
   something reliquary already knows, and will get it wrong in ways
   reliquary cannot see.
 
-- D56 — RELIQUARY ADDRESSES ONLY WHAT IT CAN REASON ABOUT; P17
-  CLARIFIED — DECIDED (owner, 2026-07-27). Supports P10, P11, P17.
-
-  Where the drive-letter mapping cannot be established, the address
-  is **refused naming the gap** rather than guessed: an address is
-  a claim about what the guest will see, and a wrong one fails
-  later, elsewhere, as a missing file. Across controller types the
-  guest's firmware decides enumeration, so not even the first disk
-  is a declared fact — the refusal is permanent there, not a gap
-  waiting to be filled.
-
-  [Amended by **D71** and then **D78**, which replaced the
-  one-volume assumption with reading the volumes each disk holds;
-  the refusal rule above is what survived both.]
+  [P16 gained a carve-out in **D108**: a machine's file
+  content is out of purview by design, so the test above is
+  asked only of what a machine *is* — its lifecycle, drives,
+  media, screen, input and returned values.]
 
 - D55 — THE REASON-BLOCKQUOTE SWEEP IS DROPPED — DECIDED (owner,
   2026-07-27, closing out the Language queue). Supports P8, P23.
@@ -1868,19 +1693,20 @@ is waiting on an answer today.
 
 - D37 — MILESTONE 9 DELIVERS U14 AND U20; BOTH PROMOTE —
   DECIDED (2026-07-24, landing milestone 9). Supports P8, P11,
-  P17, P18; applies D34's promotion-on-delivery rule and D36's
+  P18; applies D34's promotion-on-delivery rule and D36's
   reframing. The milestone landed in full — the return-not-store
   run model, the error taxonomy, live `--progress` feedback, and
   the exec-run mechanics — so by D34 the two use cases it accepted
   move to their standing list as a step of that delivery.
   U14 PROMOTED. The loop it describes runs end to end against a
-  live FreeDOS machine: a file injected by its guest address
-  (`put-file "A:\JOB.BAT"`), work run from a consumer-authored
-  script, and the result read back both ways — a value through a
-  machine variable (`get-machine-var`) and the guest's own file
-  retrieved in-band (`get-file`). The `exec` twin landed with it,
+  live FreeDOS machine: work put in, run from a consumer-authored
+  script, and the result read back through a machine variable
+  (`get-machine-var`). The `exec` twin landed with it,
   returning the text its command produced, which is the run
-  family's parity D36 named.
+  family's parity D36 named. [The in-band file verbs this entry
+  also cited as evidence are gone (**D108**), and U14 no longer
+  claims a file as the product; the promotion stands on what
+  survives.]
   U20 PROMOTED, ITS TRANSPORT PROVEN. The T1 spike ran the swap
   cycle on QEMU/DOS: a live `insert-media --file` swap is *seen*
   by DOS (the directory listing after a swap is the new image's,
@@ -1898,15 +1724,13 @@ is waiting on an answer today.
   medium's size and a mismatched live insert fails closed naming
   both sizes and the fix. This is what the spike was *for* — the
   finding became a guard rather than a footnote.
-  P16/P17/P18 NOT PROMOTED. The code now honors P17's candidate
-  statement (guest-terms addressing, built from declared facts,
-  failing closed on ambiguity) and P18 (no shipped readiness
-  script, no result vocabulary), but all three principles are
-  **drafted, adjudication pending** — P17 still carries four open
-  questions. Promotion presupposes acceptance, which is the
-  owner's, so they stay in PRINCIPLE-PROPOSALS.md; the
-  implementation is evidence for that adjudication, not a
-  substitute for it.
+  P16/P17/P18 NOT PROMOTED. The code honors P18 (no shipped
+  readiness script, no result vocabulary), but the principles are
+  **drafted, adjudication pending**. Promotion presupposes
+  acceptance, which is the owner's, so they stay in
+  PRINCIPLE-PROPOSALS.md; the implementation is evidence for that
+  adjudication, not a substitute for it. [P17 was later armed and
+  is now struck outright — **D108**.]
   U3's SUPERSESSION IS DUE, NOT TAKEN. D36 settled that U14
   supersedes U3 alone, and U14 is now delivered — but retiring a
   use case is the lifecycle's Retire clause, an owner
@@ -2705,7 +2529,11 @@ is waiting on an answer today.
   to that milestone's own round; value concentrates where
   out-of-band thins (non-QEMU backends — no hostdir — and
   non-FAT filesystems), so sequence at or soon after the second
-  backend. Named cost accepted: per-iteration artifact history
+  backend. [**That deferral is closed refused, not pending**: the
+  in-band family was built (D62) and then deleted by **D108**,
+  which put a machine's file content outside Reliquary's purview.
+  The out-of-band door this entry created is now the route rather
+  than the fallback.] Named cost accepted: per-iteration artifact history
   is the caller's to keep (U3 already makes the caller the
   interpreter). Use-case triage: no amendment — strong U3
   alignment (interpretation on the agent's side; the record is
@@ -2835,6 +2663,20 @@ already carries, is struck outright rather than kept as furniture;
 a gap in the sequence is the history, and git holds the text.
 Reopening a retired decision is argued through the surface-change
 rule.
+
+- D62 — RETIRED (overruled by D108) — THE IN-BAND FILE FAMILY IS
+  COMPLETE; P16 IS ARMED. Supports U14, U20; P16.
+
+  **Kept because its position is the re-raisable one**: that P16
+  obliges Reliquary to carry a file across the host/guest boundary,
+  which is what armed the principle here and what D108 declined.
+  Under the carve-out, a machine's file content is out of purview by
+  design, so the five verbs are gone and no use case demands them
+  back. Its address ruling — one form for files and directories
+  alike, the drive root sayable — died with the letter map it was
+  written against, and D5's `<drive-key>:<path>` shape stays dead
+  too: nothing addresses inside a volume at all.
+
 
 - D91 — RETIRED (overruled by D93 the same day it was decided and
   delivered) — A DEVICE IS A DECLARED MODEL, JUDGED AT ASSIGNMENT.

@@ -35,6 +35,13 @@ _OLD_CLI_COMMANDS = frozenset({
     # (D88). `search-scripts` and `search-media` never shipped and
     # are retired unbuilt, so neither is planned under either name.
     "search-blueprints", "search-scripts", "search-media",
+    # The drive report and the in-band file family, retired when a
+    # machine's file content left reliquary's purview (D108).
+    # Reliquary declares a machine's drives and moves their media;
+    # what is inside a volume is the caller's, so there is nothing
+    # to report a letter for and nothing to address.
+    "describe-drives", "refresh-drives",
+    "put-file", "get-file", "put-files", "get-files", "list-files",
 })
 
 # Superseded public API names.

@@ -553,9 +553,10 @@ error naming both.
 One ordering caveat, for when a second controller type is wired:
 slot order is authoritative *within* a type, and across types the
 guest's firmware decides how the controllers themselves enumerate.
-On such a machine no disk letter is a declared fact, so the
-in-band file verbs refuse every disk address rather than guess one
-(floppies keep `A:` and `B:`, which nothing can shift). Prefer one
+On such a machine no disk letter is a declared fact, so you cannot
+work out from the blueprint alone which disk the guest will call
+`C:` — and Reliquary will not tell you either, since it maps no
+volume to a letter. Prefer one
 controller type per machine when drive lettering matters, as it
 does under DOS. The constraint is recorded with the work that
 would make it reachable — richer device topology, in

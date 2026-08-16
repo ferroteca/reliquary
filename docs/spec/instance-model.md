@@ -79,15 +79,14 @@ instead).
 machine's cache directory as an absolute path — a query under
 the standard selectors, valid in any phase, touching nothing.
 
-The path is the door to **out-of-band file exchange**, which is
-now a convenience rather than the way files cross the host/guest
-boundary (owner, 2026-07-22 — the run-collection model was
-dropped; the in-band verbs then closed the gap, single files at
-milestone 9 as `put-file` / `get-file` and whole trees and
-listings with D62 as `put-files` / `get-files` / `list-files`).
-Reaching in stays possible and always will — a stopped machine's
-drives are plain host state — but no supported use case requires
-it (**P16**). While the machine is stopped on every control
+The path is the door to **out-of-band file exchange**, and it is
+the way a file crosses the host/guest boundary rather than a
+convenience (D108). Reliquary places no file on a machine's
+drives, reads none back and maps no volume to a guest letter: a
+machine's **file content is out of purview by design**, which is
+**P16**'s carve-out rather than a gap in it, so no supported use
+case asks Reliquary to reach inside a volume and none is failed by
+its not doing so. While the machine is stopped on every control
 plane, the content under `disks/` is plain host state: a drive
 whose media is a directory *is* that directory, and image drives
 are readable and writable with the user's own tools. Reliquary
@@ -242,25 +241,14 @@ identifier alone cannot authorize a command, because an addressable
 endpoint outlives its owner, so the per-start token is checked
 too.
 
-Beside the resolved shape sit the **recorded observations** —
-facts read from the machine's own materialization, never part of
-the blueprint digest. Per hard disk, `volumes` (how many volumes
-the disk actually holds, read on the host — D78) and `geometry`
-(the drive record behind `describe-drives` — D83: the backing, the
-partition table as it declares itself, per-volume filesystem,
-label and BPB geometry, or the `unread` refusal, each stamped
-`read-at`). Per floppy drive, `launch-size` — the byte size of the
-medium attached at launch, which fixes the drive's geometry for
-the boot. Their lifecycles differ deliberately: `volumes` is
-cleared at every start, because a guest can repartition only while
-running and addressing must never trust a pre-boot count;
-`geometry` is **read at every start** — the first step, before the
-backend is engaged — so while the machine runs it records this
-boot's own starting state, and between boots it moves only when
-something reads a disk: the file verbs' stopped re-reads (the same
-read that restores the count, so the two cannot drift), a
-`describe-drives` meeting a disk never yet recorded, or an
-explicit `refresh-drives`.
+Beside the resolved shape sits the one **recorded observation** —
+a fact read from the machine's own materialization, never part of
+the blueprint digest. Per floppy drive, `launch-size`: the byte
+size of the medium attached at launch, which fixes the drive's
+geometry for the boot and is what refuses a live swap that
+geometry could not serve (U20). It is a file size and nothing
+more — **nothing here reads inside a disk**, so no volume count,
+partition table or filesystem fact is recorded (D108).
 
 The phase is one of `creating`, `ready`, `running`, `stopping`,
 or `destroying`. Every mutating operation takes an exclusive

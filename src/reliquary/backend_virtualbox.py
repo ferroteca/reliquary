@@ -703,8 +703,7 @@ class VirtualBoxAdapter(BackendAdapter):
     def capabilities(self):
         """What this adapter honors today — including agentless-display.
 
-        ``vvfat`` and at-rest stay false: VDI is outside Remanence's
-        claim, and directory-source drives are QEMU-only.
+        ``vvfat`` stays false: directory-source drives are QEMU-only.
         """
         return Capabilities(
             backend="virtualbox",
@@ -713,8 +712,6 @@ class VirtualBoxAdapter(BackendAdapter):
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
             vvfat=False,
-            at_rest=False,
-            at_rest_write=False,
         )
 
     def image_path(self, root, stem):

@@ -21,18 +21,16 @@ from .errors import (InternalError, PreflightError, ReliquaryError,
                      StaticError, WaitExpired)
 from .home import machines_dir
 from .library import codex_blueprint_available
-# The substrate both halves of the machine layer stand on: ids and
-# directories, the locks, machine.json, and selector resolution.
+# The substrate the machine layer stands on: ids and directories, the
+# locks, machine.json, and selector resolution.
 #
-# **This module stays the machine layer's front door.** `machine_state`
-# is the seam `machines` and `drives` share so neither has to import
-# the other; it is not a second entrance. A consumer above the layer —
-# the session veneer, the script runner, the media family — reaches
-# every one of these through `machines`, which is why the names below
-# that this module does not itself call are imported anyway. The one
-# exception is `machine.py`, which takes `read_vm_state` from the
-# substrate directly because importing this module would put the two
-# back in a cycle.
+# **This module stays the machine layer's front door.** A consumer
+# above the layer — the session veneer, the script runner, the media
+# family — reaches every one of these through `machines`, which is why
+# the names below that this module does not itself call are imported
+# anyway. The one exception is `machine.py`, which takes
+# `read_vm_state` from the substrate directly because importing this
+# module would put the two back in a cycle.
 from .interaction_agentless import AgentlessGuestExec
 from .machine_handle import Machine
 from .machine_state import (allocate_machine_id, backend_dir,
@@ -42,14 +40,6 @@ from .machine_state import (allocate_machine_id, backend_dir,
                             machine_lock, machines_for_blueprint,
                             read_vm_state, resolve_machine,
                             split_machine_id, write_state)
-# The drive layer: what a stopped machine's disks hold and how the
-# guest names them. `start_machine` reads a disk's record at its
-# first step, and that is the only edge — the drive layer stands on
-# `machine_state`, never on the lifecycle. The verbs below it are
-# re-exported for the same front-door reason as the substrate's.
-from .drives import (describe_drives, get_file, get_files,
-                     list_files, put_file, put_files,
-                     read_drive_record, refresh_drives)
 from .resolve import (load_namespace, location_property_keys,
                       resolve_media, resolve_media_plan)
 
@@ -174,13 +164,13 @@ def _blueprint_digest(resolved, drives):
     """Digest the resolved blueprint snapshot (the machine baseline).
 
     Covers the resolved logical shape only — the per-drive cache
-    ``path`` (environment-specific) and the recorded observations
-    (``volumes``, ``geometry``, ``launch-size``: what a disk was
-    *seen* to hold, not what the blueprint asked for) are excluded —
-    so the same blueprint resolves to the same digest across homes
-    and across boots, which is what ``apply`` compares against.
+    ``path`` (environment-specific) and the recorded observation
+    (``launch-size``: the size a floppy drive was *launched* with, not
+    what the blueprint asked for) are excluded — so the same blueprint
+    resolves to the same digest across homes and across boots, which
+    is what ``apply`` compares against.
     """
-    observed = {"path", "volumes", "geometry", "launch-size"}
+    observed = {"path", "launch-size"}
     snapshot = dict(resolved)
     snapshot["drives"] = {
         key: {name: value for name, value in entry.items()
@@ -1129,25 +1119,6 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
     for drive in drives.values():
         if drive.get("medium") == "floppy":
             drive["launch-size"] = _medium_size(drive.get("path"))
-    # The drive record is refreshed here, as the first step of a
-    # start and before the backend is engaged (D83): what the
-    # guest is about to boot from is read off each disk, so the
-    # record a running machine's `describe-drives` answers from
-    # is this boot's own starting state. An unreadable disk
-    # records the refusal rather than failing the start — the
-    # machine may boot it fine; only at-rest access refuses.
-    for key, drive in sorted(drives.items()):
-        if drive.get("medium") == "hdd":
-            drive["geometry"] = read_drive_record(
-                state.get("backend") or "qemu", drive, key)[0]
-    # A recorded volume count belongs to one boot, and is dropped
-    # even though the record above was just read: a guest can
-    # repartition its disk and can only do it while running, so
-    # addressing after this boot must re-read — which refreshes
-    # the record with it (D78). Dropped here rather than at stop,
-    # so an interrupted run cannot leave a stale one behind.
-    for drive in drives.values():
-        drive.pop("volumes", None)
     state["drives"] = drives
     # A machine variable belongs to one boot: a script `set` it
     # while the guest ran, so the next start starts empty.
@@ -1600,8 +1571,9 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
     the machine and **returns its output** to the caller, storing
     nothing (D36). The output is the text the command left on the
     guest's screen, as a tuple of rows — reliquary reads no meaning
-    into it (G2), and a caller wanting structure retrieves a file
-    instead (:func:`get_file`) or reads a machine variable.
+    into it (G2), and a caller wanting structure reads a machine
+    variable instead, or takes the file off a drive of its own
+    (P16's file-content carve-out).
 
     ``check=True`` adds the channel the rows cannot carry: **whether
     the command worked.** A setup command — load a driver, install a

@@ -147,18 +147,18 @@ could add those operations, but that would be a separate protocol
 carried over serial.
 
 **Fast file transport is wholly external (backlog; owner,
-2026-07-24, D36).** Agentless vvfat exchange reboots the machine
-per file swap; live media swap (`insert-media`/`eject-media`, U20)
-avoids the reboot but still pays a swap per round. A transport
+2026-07-24, D36).** A directory-source drive reboots the machine
+per host-side change; live media swap (`insert-media`/`eject-media`,
+U20) avoids the reboot but still pays a swap per round. A transport
 faster than that needs guest cooperation and is **outside
 Reliquary's scope entirely, host and guest sides alike**:
-Reliquary provides only the file-transfer control-plane seam (P17
-guest-terms addressing, P11 capability selection), and the
-transport itself is sourced externally — an existing tool
-(Kermit-style serial file transfer is the candidate) → another
-alternative → worst-case a dedicated project — never built here.
-vvfat stays the built-in agentless fallback (P2). Demand is the
-swap/reboot cost. **P3 already carries the rule**, sharpened the
+Reliquary supplies the drives a file crosses on and nothing inside
+them (**P16**'s file-content carve-out, D108), and the transport
+itself is sourced externally — an existing tool (Kermit-style
+serial file transfer is the candidate) → another alternative →
+worst-case a dedicated project — never built here. The
+directory-source drive stays the built-in agentless fallback (P2).
+Demand is the swap/reboot cost. **P3 already carries the rule**, sharpened the
 both-sides way it was tracked for (D68,
 [ARCHITECTURE.md](../../ARCHITECTURE.md)): its never-build clause
 covers a host-side agent as much as a guest one, so scheduling
@@ -264,8 +264,10 @@ execution does not affect screenshot availability, and a control plane
 does not implement or advertise screenshots. Orchestration may
 capture them internally when useful, while the existing direct-use
 screenshot surface remains independent. File exchange should not be
-bundled into a console abstraction: vvfat and QGA file operations
-have different lifecycle and consistency rules.
+bundled into a console abstraction: a directory-source drive and
+QGA file operations have different lifecycle and consistency rules
+— and today Reliquary offers only the first, since it reaches
+inside no volume (D108).
 
 The QEMU `Machine` exposes its identity-verified QMP session
 through `Machine.qmp()`. Raw QMP `cmd()` and HMP `hmp()` operations

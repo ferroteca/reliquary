@@ -2,19 +2,20 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Where a machine lives, what serializes it, and how one is named.
 
-The substrate both halves of the machine layer stand on: the ids
+The substrate the machine layer stands on: the ids
 and directories a machine is addressed by, the locks that serialize
 work against it, its ``machine.json``, and the selector resolution
 that turns ``--blueprint`` / ``--machine`` into one id.
 
-**Only what both siblings need lives here.** ``machines.py`` owns
-the lifecycle — create, the dry run, start/stop/destroy, phases and
-the persistent state mutations — and ``drives.py`` owns the drive
-layer; both address machines, take the operation lock and read and
-write the state file, and neither can import the other for it
-without the two importing each other. Phase transitions have one
-consumer and stay with the lifecycle: this module is a substrate,
-not a place for whatever is shared by nothing.
+**It stayed a separate module after its second consumer left.**
+``drives.py`` was the other half — the drive report and the in-band
+file family — and D108 deleted it, so ``machines.py`` is the only
+caller of most of what is here. What keeps the split worth having is
+``machine_handle.py``, which needs ``read_vm_state`` and would be
+back in an import cycle with the lifecycle without it. Phase
+transitions have one consumer and stay with the lifecycle: this
+module is a substrate, not a place for whatever is shared by
+nothing.
 
 Nothing here knows what a machine *is*. No backend, no adapter, no
 drive, no media — a machine id, a directory, a lock, and a JSON

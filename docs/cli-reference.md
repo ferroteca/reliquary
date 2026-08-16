@@ -260,8 +260,8 @@ directory, no saved transcript, and no run-management commands: the
 event stream is rendered as `--progress` asks and is gone when the run
 ends. Keep it by redirecting `--progress jsonl`, or take the returned
 stream from the `run_script()` twin. The run's *product* is yours —
-the file you pull back with `get-file`, the value you read with
-`get-machine-var`, the image you swapped out — and Reliquary attaches
+the value you read with `get-machine-var`, the image you swapped out,
+the results directory the guest wrote into — and Reliquary attaches
 no meaning to any of it.
 
 A script declares the properties it consumes; each is bound before
@@ -429,71 +429,33 @@ whatever you are building, not to Reliquary.
 rlq get-machine-var ready --machine rig-0
 ```
 
-### `rlq put-file <host-path> <guest-address> (--blueprint NAME | --machine ID)`
+### Moving files across the boundary
 
-### `rlq get-file <guest-address> <host-path> (--blueprint NAME | --machine ID)`
+**Reliquary does not.** It puts no file on a machine's drives, reads
+none back, and never tells you which letter the guest gave a disk —
+what is inside a volume is yours, opened with your own tools. What it
+supplies is the drives a file crosses on, and there are three ways
+over:
 
-Move one file across the guest boundary, addressed **the way the
-guest names it** — `A:\TEST.EXE`, not an image file or a staging
-directory. The drive-letter mapping comes from the machine's declared
-platform and Reliquary's own drive assignment; nothing is inferred by
-inspecting the guest. Every drive gets a letter — floppies `A:`/`B:`,
-hard disks from `C:` in slot order, CD-ROMs after them — on the stated
-assumption that each hard disk holds one volume.
-
-Both are **stopped-only**: the backend snapshots a
-directory-source drive when it is attached, so a change made while
-the machine runs would be invisible to the guest and a guest write
-is not flushed until it stops — and a drive image is only safe to
-work once nothing holds it open. Both reach either kind, mounting
-the image and working its FAT volume where there is no host
-directory, so files move into and out of an installed `C:`
-directly. A guest-side name has to be one DOS could type — 8.3, or
-a refusal rather than a silent truncation.
-
-`put-file` prints the guest address it wrote; `get-file` prints the
-host path.
+- **A directory-source drive.** A media whose `location` is a host
+  directory attaches as a drive: you write into that directory and
+  the guest reads it, the guest writes and you read it back. The
+  backend snapshots the directory when it is attached, so the machine
+  has to be stopped for a change to be visible either way.
+- **A whole image, swapped live** — `insert-media --file`, below.
+- **The machine directory** — `rlq get-machine-dir`. While the machine
+  is stopped its drives are plain files: a directory-source drive *is*
+  its directory, and an image drive is a raw or qcow2 file that any
+  image library opens.
 
 ```powershell
-rlq stop-machine --machine rig-0
-rlq put-file .\build\TEST.EXE "A:\TEST.EXE" --machine rig-0
+# the exchange directory is declared in the blueprint as a drive
+copy .uild\TEST.EXE .\exchangerlq start-machine --machine rig-0
 rlq run-script test --machine rig-0
 rlq stop-machine --machine rig-0
-rlq get-file "A:\RESULT.TXT" .\out\result.txt --machine rig-0
+type .\exchange\RESULT.TXT
 ```
 
-### `rlq put-files <host-dir> <guest-dir> (--blueprint NAME | --machine ID)`
-
-### `rlq get-files <guest-dir> <host-dir> (--blueprint NAME | --machine ID)`
-
-### `rlq list-files <guest-dir> [--recursive] (--blueprint NAME | --machine ID)`
-
-The same boundary, a whole tree at a time — and a way to ask what
-is over there. A directory is addressed exactly as a file is, with
-`A:\` (or bare `A:`) meaning the drive itself; the same
-stopped-only, directory-source-drive rules apply.
-
-The plural verbs move a tree's **contents**: `put-files .\suite "A:\"`
-puts everything inside `suite` at the drive root, and `get-files`
-does the reverse into a host directory it creates. Both recurse,
-overwrite what is in the way, and delete nothing — a copy, not a
-mirror. `put-files` prints the guest addresses written, `get-files`
-the host paths.
-
-`list-files` prints a size and an address per line, one directory
-level unless you pass `--recursive`. The addresses it prints are
-the ones `get-file` takes, so a listing feeds the next command
-directly. Under `--json` each entry is an object — `address`,
-`name`, `kind`, and `size` (`null` for a directory).
-
-```powershell
-rlq put-files .\suite "A:\" --machine rig-0
-rlq start-machine --machine rig-0
-rlq run-script test --machine rig-0
-rlq stop-machine --machine rig-0
-rlq list-files "A:\OUT" --recursive --machine rig-0
-rlq get-files "A:\OUT" .\results --machine rig-0
-```
 
 ### Iterating against a live machine
 
@@ -650,8 +612,8 @@ those rows.
 The capture is agentless, so the output is what the command left on
 the visible 80x25 screen: a command that scrolls more than a
 screenful leaves only its tail. When you need more than that, have
-the guest write a file and take it with `get-file`, or set a machine
-variable. Reliquary reads no meaning into any of it.
+the guest write a file onto a drive you can read on the host, or set
+a machine variable. Reliquary reads no meaning into any of it.
 
 `--check` answers the question the output cannot: **did it work?**
 For a setup command — loading a driver or a TSR — the output is

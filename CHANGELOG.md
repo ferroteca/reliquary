@@ -233,20 +233,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Remanence moves to `0.0.1a5`, and its exception is
-  `remanence.Error`.** The dependency renamed the class from
-  `RemanenceError` with no compatibility alias, so `at_rest.py` catches
-  the new name; its `category` attribute, which is what the refusal
-  translator reads to tell a locked image from an unreadable one, is
-  unchanged. Nothing a reliquary user meets behaves differently, and
-  the suite reports the same 2,259 tests either side of the move.
-
-  **`0.0.1a4` is skipped deliberately.** Its Windows wheel links
-  `libpython3.dll` rather than `python3.dll` and fails at `import` on
-  any stock CPython, so no reliquary could have been installed beside
-  it. `0.0.1a5` is that wheel rebuilt correctly and carries no other
-  change.
-
 - **The suite is pytest-native throughout** (F60, the last of the
   sweeps; D106). The remaining twenty modules convert — the CLI and
   document surface, the core helpers, the home and asset machinery,
@@ -257,18 +243,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   work: with nothing for it to collect it would have reported success
   over an empty run.
 
-  **No assertion changed**, and the suite reports **2,140 tests where
-  it reported 2,016**. Most of the difference is the command
-  manifest: its thirty-seven declared capabilities, six family
-  members and six exceptions each report for themselves now, where
+  **No assertion changed**, and the suite reports **2,102 tests where
+  it reported 2,016** (2,140 before the drive and file family were
+  removed, below). Most of the difference is the command
+  manifest: its declared capabilities, family
+  members and exceptions each report for themselves now, where
   one method reported for all of them — and every example the
   documents teach from is a node named for its document and
   position.
 
 - **The machine and backend suites are pytest-native** (F59, over
   F55; D106). Ten modules — machines, the session veneer, events,
-  properties, both backend adapters, the seam, at-rest, screen
-  stability, and the recognizer. The shared construction is fixtures
+  properties, both backend adapters, the seam, the drive layer,
+  screen stability, and the recognizer. The shared construction is fixtures
   now: one `rig` builds the temp home, the adapter double and the
   blueprint writers the machine layer needs, so a test says what it
   is about rather than how its home was built. **No assertion
@@ -372,7 +359,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   time — on platforms and interpreters this project never tests,
   which is the whole of what shipping it buys. Unpack
   `reliquary-<version>.tar.gz` outside the tree, put `src` on
-  `PYTHONPATH`, and `pytest` runs **2,086 tests and deselects two** —
+  `PYTHONPATH`, and `pytest` runs **2,048 tests and deselects two** —
   the opt-in FreeDOS integration runs, one per backend, exactly as in
   the repository.
 
@@ -407,20 +394,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The machine layer and the CLI entry point are restructured, and
   nothing you use moved.** `machines.py` was two modules and a
   substrate: the drive layer — the drive report and the five in-band
-  file verbs — is now `drives.py`, and the ids, directories, locks,
-  `machine.json` and selector resolution both halves stand on are
-  `machine_state.py`. `blueprint.py` and `script.py` merge into
+  file verbs, both since removed (below) — became `drives.py`, and
+  the ids, directories, locks, `machine.json` and selector
+  resolution are `machine_state.py`. `blueprint.py` and `script.py` merge into
   `authoring.py`, the counterpart of `assets.py`. `machine.py`
   becomes `machine_handle.py`, the package spelling its collective
-  engine modules in the plural. `cli.py`'s `main()` builds its 48
-  commands through ten family builders, and the command set it
+  engine modules in the plural. `cli.py`'s `main()` builds its
+  commands through family builders, and the command set it
   recognises is derived from the parser rather than restated beside
   it.
 
   **Every documented surface is untouched**, and deliberately
   checked rather than assumed: the same 50 root exports, the same
   `Session` methods, the same commands, flags and exit codes, and
-  `rlq --help` plus all 48 subcommand helps byte-identical. Machine
+  `rlq --help` plus every subcommand help byte-identical. Machine
   state, rule ids and the working-directory layout are unchanged, so
   no home, blueprint or machine needs recreating. An embedder
   reaching *past* the root — importing `reliquary.machine`,
@@ -438,50 +425,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to no effect is exactly the dishonesty P11 exists to forbid. The
   refusal lives in `run_script`, so the CLI flag and the API's
   `record=` get it from one place.
-
-- **Remanence owns at-rest disk access** (P27; D77). The `remanence`
-  dependency, pinned `==0.0.1a3`, is now the one deep module for
-  reading and writing a stopped machine's disks: a raw or qcow2 image
-  is opened where it lies, a qcow2 backing chain composes with every
-  backing file claimed immutable, a blank disk is an answer rather
-  than an error, and every write stands on a durable undo journal —
-  an interrupted commit is reconciled at the image's next open,
-  wholly the old image or wholly the new one. An image is identified,
-  then loaded into a session as one medium under a declared device
-  type (`mbr-sector-hd`: an MBR-partitioned drive addressed by
-  cylinder, head and sector, which is what a DOS workflow's disks
-  are), and its content is reached through the partitions that medium
-  bears; releasing the medium ends the claim.
-
-  **Reliquary keeps its policy and every surface above it**: the
-  DOS-only recognition claim and its refusal wording, the
-  whole-disk-or-none rule, guest-address (8.3) validation, the
-  recorded drive report's shape, the rule ids, and the
-  `UnreadableImage` / `ImageLocked` mapping onto
-  `drive.image-unreadable` and `image.locked`.
-
-  On the host, **`qemu-nbd` is no longer used**: the NBD client, the
-  at-rest qcow2 snapshot and the staged raw copy left with the
-  transport they served. A drive image something else holds is still
-  refused by name (`image.locked`), and two readers may now share a
-  disk where each used to exclude the other.
-
-  Four recorded facts moved in the details. The drive record's
-  `cylinders` is the BPB's own answer, present only where the stated
-  track geometry divides the volume's sector count exactly, where it
-  used to be derived by dividing the disk size. Sector 0's
-  classification is the dependency's answer rather than a local
-  derivation from `blank`, `partitions` and `volumes`. A declared FAT
-  row composing no readable volume refuses the disk by name, where
-  the old shape could have passed it by. And a volume's stable id is
-  the inspection report's own value, so it is opaque where it used to
-  be a spelling. A volume's label still falls back to the boot
-  record's copy where the root directory carries no label entry —
-  read whole at the filesystem seam, "NO NAME" included — and nothing
-  here restates that rule any more. An image in a format that is
-  neither raw nor qcow2 now reads as raw bytes and is refused as
-  unreadable (`drive.image-unreadable`) rather than by the retired
-  `image.format-not-at-rest` probe.
 
 - **CLI list tables use Rich** for consistent terminal-cell alignment and
   wrapping. Long paths, addresses, property values, and other wide data fold
@@ -590,6 +533,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   machine's own directory) remain importable as before.
 
 ### Removed
+
+- **A machine's file content leaves Reliquary, and the volume mapping
+  goes with it** (D108). Seven commands and their twins are deleted
+  rather than deprecated — `describe-drives`, `refresh-drives`,
+  `put-file`, `get-file`, `put-files`, `get-files` and `list-files`
+  — together with drive-letter mapping, guest-address parsing, the
+  recorded drive report (`volumes` and `geometry` in `machine.json`),
+  at-rest disk access, and the `at_rest` / `at_rest_write` backend
+  capability flags. Reliquary declares a machine's drives,
+  materializes them and moves their media; **what is inside a volume
+  is the caller's**, reached with the caller's own tools.
+
+  **Three routes across the boundary remain**, none of which asks
+  Reliquary to look inside a filesystem: a directory-source media
+  attaching a host directory as a drive, `insert-media --file`
+  swapping a whole image live (U20, untouched — its launch-size
+  guard is a file size and never read a volume), and the machine
+  directory `get-machine-dir` returns, which is now the route rather
+  than a convenience.
+
+  **The `remanence` dependency is gone** with the layer that wrapped
+  it, and is the tool named for the work: a consumer that needs a
+  file out of a drive image uses it directly. The runtime closure is
+  now tier 1 throughout except `qemu.qmp`.
+
+  Vision moved with the code: **U14** no longer claims a file as the
+  product, **P16** gains a file-content carve-out naming this as a
+  boundary rather than a gap, and **P17** and **P27** are struck.
+  Pledged **F41** is withdrawn.
+
 
 - **`Session.set_machine_var` is gone** — removed as a defect,
   not deprecated. Machine variables are the guest's report

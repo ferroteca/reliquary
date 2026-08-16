@@ -427,7 +427,6 @@ dependencies = [
     { name = "lark" },
     { name = "pillow" },
     { name = "qemu-qmp" },
-    { name = "remanence" },
     { name = "rich" },
 ]
 
@@ -444,7 +443,6 @@ requires-dist = [
     { name = "lark" },
     { name = "pillow" },
     { name = "qemu-qmp" },
-    { name = "remanence", specifier = "==0.0.1a5" },
     { name = "rich" },
 ]
 
@@ -452,15 +450,6 @@ requires-dist = [
 dev = [
     { name = "jsonschema" },
     { name = "pytest", specifier = ">=8.4" },
-]
-
-[[package]]
-name = "remanence"
-version = "0.0.1a5"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ee/df/576fd287ca6011d893d9bd194e5a7530177442db8e32a07e7dfe7fdc485c/remanence-0.0.1a5.tar.gz", hash = "sha256:4a25d954983d02755f6d3f7499365dd3c6388a6b563b6a906e4a1a78fbba3fd2", size = 3083237, upload-time = "2026-08-16T01:20:52.264Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/93/1f92c759d76ee90c58ae1d4727caaf07f1eafe46ad422dafadc800c524f9/remanence-0.0.1a5-cp310-abi3-win_amd64.whl", hash = "sha256:b76d7d348ded36b54c35db448153b147089b5dc3ade92da0123fe6ea8a6a0b08", size = 1217610, upload-time = "2026-08-16T01:20:50.58Z" },
 ]
 
 [[package]]

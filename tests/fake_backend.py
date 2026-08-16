@@ -80,8 +80,6 @@ class FakeAdapter(BackendAdapter):
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
-            at_rest=True,
-            at_rest_write=True,
         )
         self.images = []
         self.starts = []

@@ -348,9 +348,9 @@ around it being settled; and how the bytes leave the guest. The
 material for the second is named and none of it is chosen — both
 reference backends can point a UART at a host file, `serial-console`
 sits in the control-plane vocabulary (`document.py`) with nothing
-implementing it, and a dump written to a drive is readable by the
-at-rest reader that already exists, at the price of arriving after
-the machine stops. **The journey lands with the pledge**: the steps
+implementing it, and a dump written to a drive is the caller's to
+read on the host, at the price of arriving after the machine stops
+and of Reliquary supplying the drive rather than the bytes (D108). **The journey lands with the pledge**: the steps
 an author follows, each flagged by the feature delivering it, are
 what this draft owes the landing bar.
 
@@ -476,15 +476,15 @@ not a near-term schedule request. What makes it worth numbering
 now is what it would *demand* if pledged: it is the first case
 that would put in-force weight behind the backlogged guest-agent
 work (D33 demoted it for lack of exactly this) — and behind
-**P16** and **P17**, both in force since D62 and D47
-respectively. The in-band file operations it would have needed
-scheduled are already delivered (D62), so what is left to demand
-is the guest-agent half: a developer driving a Linux guest from
-Windows cannot
-reach around Reliquary into the guest's own filesystem, and
-would name that guest's files in the guest's own terms. Reliquary self-hosting
-its own cross-platform tests is the motivating instance; the
-case is general.
+**P16**. **D108 sharpened what it demands**, because the route it
+would have leaned on is gone: Reliquary places no file on a
+machine's drives, so a code-in/results-out loop for a Linux guest
+is either the guest-agent half or the caller's own tooling against
+a drive Reliquary supplied. Pledging this case is therefore an
+argument about which, and a demand for in-band file access back is
+argued as an amendment to P16's carve-out rather than assumed by
+it. Reliquary self-hosting its own cross-platform tests is the
+motivating instance; the case is general.
 
 > - **U18 — Test on the platform the host isn't.** A developer's
 >   code has paths that only run on an operating system they are
@@ -692,14 +692,7 @@ spellings shown; every step has its CLI twin (U9).
    renderer is the validator), so a machine that materializes is
    one whose device argument renders at every start.
 
-6. **Learn the guest's own names.**
-   `reliquary.describe_drives(machine="driver-rig-0",
-   context=ctx)` — `rlq describe-drives -m driver-rig-0` — and
-   the report's mapping says the work drive is one FAT volume at
-   `D:` (D83). That letter is the address every later
-   step speaks (P17); nothing is inferred from a boot screen.
-
-7. **Boot, and let the guest say ready.**
+6. **Boot, and let the guest say ready.**
    `reliquary.run_script("ready", machine="driver-rig-0",
    context=ctx)` resolves the blueprint's `scripts` map, starts
    the stopped machine as the script's own `start` directs, waits
@@ -707,7 +700,7 @@ spellings shown; every step has its CLI twin (U9).
    `reliquary.get_machine_var("ready", machine="driver-rig-0",
    context=ctx)` reads back `"yes"`.
 
-8. **Load the driver — setup whose output is nothing and whose
+7. **Load the driver — setup whose output is nothing and whose
    success is everything.** In order, once per session, each
    checked (D89):
 
@@ -729,24 +722,26 @@ spellings shown; every step has its CLI twin (U9).
    probe: its honest scope is commands that ran and signalled
    failure.
 
-9. **Exercise, and read the results back.**
+8. **Exercise, and read the results back.**
    `rows = reliquary.exec(r"D:\DRVTEST.EXE 48",
    machine="driver-rig-0", timeout=30, context=ctx)` returns the
    screen rows, and parsing them is the caller's business (P18) —
    Reliquary attaches no meaning. Bulkier results are redirected
-   in-guest to the work drive (`DRVTEST -v > D:\RUN.LOG`) and
-   retrieved after a stop with
-   `reliquary.get_file(r"D:\RUN.LOG", "results/run.log",
-   machine="driver-rig-0", context=ctx)` — named in guest terms,
-   both directions.
+   in-guest to the work drive (`DRVTEST -v > D:\RUN.LOG`), and
+   the caller reads them **off its own host directory** once the
+   machine stops: the work drive *is* that directory, so nothing
+   has to be fetched back (D108). The guest letter `D:` is the
+   author's own — it is written in the guest commands above
+   because the author built the machine, never because Reliquary
+   reported it.
 
-10. **Iterate, then dispose.** Rebuild the driver; the
+9. **Iterate, then dispose.** Rebuild the driver; the
     directory-source work drive re-reads at the next start, so a
-    round is `stop_machine` → `run_script("ready")` → load →
-    exercise — or U20's live `insert-media --file` swap when
-    reboot-per-round is the bottleneck. When the work ends,
-    `reliquary.destroy_machine("driver-rig-0", ctx)`: nothing
-    durable remains but the retrieved results (U14).
+   round is `stop_machine` → `run_script("ready")` → load →
+   exercise — or U20's live `insert-media --file` swap when
+   reboot-per-round is the bottleneck. When the work ends,
+   `reliquary.destroy_machine("driver-rig-0", ctx)`: nothing
+   durable remains but the results the caller kept (U14).
 
 ### Pending clarifications
 

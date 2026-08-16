@@ -2214,24 +2214,18 @@ keeps every quoted string in a script on one side of one
 boundary: string content is guest-facing text, never a host
 path.
 
-In-band file operations **are a CLI/API capability, not a
-language one**: `put-file` / `get-file` (milestone 9), and
-`put-files` / `get-files` / `list-files` for whole trees and
-listings (D62) — twins `put_file` / `get_file` / `put_files` /
-`get_files` / `list_files`. All five address their target the way
-the guest names it — `A:\TEST.EXE`, or `A:\OUT` and `A:\` for a
-directory, per **P17**, in force since D47, and not
-the `<drive-key>:<path>` form D5 had roughed — over a
-directory-source drive or a drive image worked at rest,
-stopped-only, with a filesystem or a backend that cannot answer
-failing closed naming the gap (P11). The
-letter map is built from the machine's declared platform and
-reliquary's own drive assignment, never by inspecting a guest
-(P10), and places every drive on the one-volume-per-disk assumption
-(D71). Future live guest-agent transfer would get its own
-distinct capability with an explicitly stronger guarantee. None of
-this lands in the *language*: the omission above stands, and
-reopening it is a language decision under the growth goals.
+**Nor is it a CLI/API capability** (D108). Reliquary places no
+file on a machine's drives, reads none back and maps no volume to
+a guest letter, on any surface: a machine's file content is out of
+purview by design (**P16**'s carve-out). A caller that needs a
+file in or out supplies the drive and moves the file itself — a
+directory-source media attaching a host directory, an image
+swapped live with `insert-media --file` (U20), or the machine
+directory `get-machine-dir` reports, opened with the caller's own
+tools. Future live guest-agent transfer would get its own distinct
+capability with an explicitly stronger guarantee. None of this
+lands in the *language*: the omission above stands, and reopening
+it is a language decision under the growth goals.
 
 ### `start` and `stop`
 
@@ -2520,9 +2514,9 @@ observed screen text, machine state, and an automatic screenshot
 when available.
 
 A run's **product is the consumer's**, never a record Reliquary
-keeps: the value returned, a file the caller retrieves in-band
-(guest-terms addressing), a small value read from a machine
-variable, or a whole disk image swapped out. Reliquary attaches
+keeps: the value returned, a small value read from a machine
+variable, or a whole disk image swapped out and read by the
+caller's own tools. Reliquary attaches
 no meaning to any of it and has no test-result vocabulary — no
 pass/fail schema, no result parsing (G2). A primitive-driven
 loop needs no bracket to be recorded: the caller's own driving
@@ -2553,10 +2547,10 @@ U14's unit-test loop is served without it: per-run test selection
 travels as ordinary script properties (`--property` / the
 `properties=` mapping, interpolated by property references);
 granular results are a caller-authored artifact (JUnit XML, TAP)
-the caller takes directly — retrieved in-band by guest-terms
-address (U14), swapped out as a disk image (U20), read from a
-directory-source results drive at rest, or captured as text through
-`exec` — and keeps on its own side of the seam. Reliquary has
+the caller takes directly — swapped out as a disk image and opened
+with its own tools (U20), read off a directory-source results
+drive on the host, or captured as text through `exec` — and keeps
+on its own side of the seam. Reliquary has
 deliberately no test-result vocabulary — no pass/fail schema, no
 result parsing (G2). Granularity comes from run structure: one
 iteration is one returned output.

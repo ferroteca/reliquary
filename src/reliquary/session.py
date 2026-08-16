@@ -149,16 +149,6 @@ class Session:
         """Return a machine whose VM is gone to the ready phase."""
         return machines.mark_stopped(machine_id, self._context)
 
-    def describe_drives(self, *, machine=None, blueprint=None):
-        """Return the machine's drive report, from the record."""
-        return machines.describe_drives(
-            machine=machine, blueprint=blueprint, context=self._context)
-
-    def refresh_drives(self, *, machine=None, blueprint=None):
-        """Re-read a stopped machine's drives and return the report."""
-        return machines.refresh_drives(
-            machine=machine, blueprint=blueprint, context=self._context)
-
     def insert_media(self, machine_id, slot, media=None, *, file=None,
                      events=None, cancelled=None):
         """Insert a declared media or an anonymous ``file`` image."""
@@ -184,43 +174,6 @@ class Session:
         return machines.exec(
             command, machine=machine, blueprint=blueprint,
             timeout=timeout, check=check, context=self._context)
-
-    # The in-band file family.
-
-    def put_file(self, source, destination, *, machine=None,
-                 blueprint=None):
-        """Copy one host file to a guest address."""
-        return machines.put_file(
-            source, destination, machine=machine, blueprint=blueprint,
-            context=self._context)
-
-    def get_file(self, source, destination, *, machine=None,
-                 blueprint=None):
-        """Copy one guest file to a host path."""
-        return machines.get_file(
-            source, destination, machine=machine, blueprint=blueprint,
-            context=self._context)
-
-    def put_files(self, source, destination, *, machine=None,
-                  blueprint=None):
-        """Copy a host tree's contents to a guest directory."""
-        return machines.put_files(
-            source, destination, machine=machine, blueprint=blueprint,
-            context=self._context)
-
-    def get_files(self, source, destination, *, machine=None,
-                  blueprint=None):
-        """Copy a guest directory's contents to a host directory."""
-        return machines.get_files(
-            source, destination, machine=machine, blueprint=blueprint,
-            context=self._context)
-
-    def list_files(self, address, *, recursive=False, machine=None,
-                   blueprint=None):
-        """List a guest directory as the file verbs address it."""
-        return machines.list_files(
-            address, recursive=recursive, machine=machine,
-            blueprint=blueprint, context=self._context)
 
     # The machine-variable family. Read-only by design: the script
     # `set` verb is the channel's only writer (docs/spec/cli.md,

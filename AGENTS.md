@@ -143,9 +143,7 @@ workflow:
   map under the op lock, cleared at `start` so a variable always
   reports the current boot, the `rlq`/`reliquary` key namespaces
   reserved; the script `set` verb is the channel's only writer —
-  the host side only reads, per the CLI spec); the drive layer —
-  the report and the in-band file family alike — is `drives.py`'s
-  (below);
+  the host side only reads, per the CLI spec);
   where a machine lives, what serializes it and how one is named is
   `machine_state.py`'s (below); each mutating op carries an
   operation generation and writes the transitional phases
@@ -169,51 +167,20 @@ workflow:
   machine like any other write of that order, and the run fails naming
   what it could not undo rather than the state document gaining a
   writer under a different rule, D104),
-  `drives.py` is **what a stopped machine's disks hold, and how the
-  guest names them** — one module for one question asked two ways.
-  `describe_drives` is the window onto all of it (D83): one
-  machine-level report — declared and chosen facts per drive, the
-  at-rest read per disk (backing, partitions, per-volume
-  filesystem/label/BPB geometry), and the letter map with its
-  undetermined drives — never phase-refused, because it answers from
-  the record in `machine.json`: **read at every start's first step**
-  (`read_drive_record`, the one edge `machines.py` has into this
-  module), before the backend is engaged, so a running machine
-  answers with this boot's starting state (`recorded: true`); the
-  call reads a disk only when the machine is down and no record
-  exists yet, and `refresh_drives` is the explicit stopped-only
-  re-read for a layout changed behind the record. The in-band file
-  family is the other half — `put_file` / `get_file`,
-  `put_files` / `get_files` (a tree's contents, recursive, a copy and
-  never a mirror) and `list_files` (one level or `recursive=`,
-  returning a flat array of `{address, name, kind, size}` sorted by
-  address, whose addresses the other four accept). All five address
-  in guest terms — P17 — over a directory-source drive, stopped-only,
-  with a non-vvfat target and an unmapped letter failing closed
-  naming the gap (P11); one address form serves all of them, a
-  directory spelled as a file is and the drive root sayable as `A:\`
-  (`platform_dos.split_address` / `split_directory_address` /
-  `join_address`), and the letter map itself is
-  `platform_dos.drive_letters`, built from declared facts *and the
-  volumes each disk actually holds* — read on the host, one letter
-  per volume, a disk holding none taking none, cached per-drive in
-  `machine.json` and cleared at every start (a guest repartitions
-  only while running). A disk whose volumes cannot be read leaves
-  every letter behind it unplaced and answers with the reason it
-  could not be read, never the symptom — P10, D71 closed. **The two
-  halves are one module because they answer from the same three
-  facts**, and `_blocking_disk` is where that shows: which unread
-  disk accounts for the unplaceable letters is chosen once, and only
-  the wording — a list of unplaced drives, or one refused address —
-  belongs to each caller. The drive seam is `_HostDirectory` and
-  `_ImageVolume`, two adapters behind one interface (`writable`,
-  `path`, `kind`, `entries`, `copy_out`, `write_file`,
-  `make_directory`, `commit`, `close`) that `_resolve_address`
-  chooses between; a directory-source drive *is* its host directory,
-  and an image is opened where it lies through `at_rest` (P27) and
-  never copied to be read. It stands on `machine_state` alone, never
-  on the lifecycle, and `machines.py` re-exports its verbs as the
-  layer's front door,
+  **There is no drive layer and no file family** (D108): reliquary
+  declares a machine's drives, materializes them and moves their
+  media, and reaches inside no volume — no `describe_drives`, no
+  `put_file`/`get_file` family, no drive-letter map, no at-rest
+  disk access, and no `remanence` dependency. What is inside a
+  volume is the caller's, reached with the caller's own tools
+  against `get_machine_dir`'s directory, which makes P16's
+  file-content carve-out the boundary rather than a gap. Two
+  Reliquary-supplied routes stay in-band and neither opens a
+  filesystem: a directory-source media attaching a host directory
+  through vvfat, and `insert_media(file=)` swapping a whole image
+  live. `test_old_surface_purge.py` keeps the seven command words
+  retired, and `test_command_manifest.py` catches a twin coming back
+  as an unclassified session method.
   `machine_state.py` is **the substrate the machine layer stands on** —
   where a machine lives (`machine_dir_path`, `machine_disks_dir`,
   `backend_dir`), how one is named (`machine_id_for` /
@@ -226,13 +193,13 @@ workflow:
   selector resolution `--blueprint` / `--machine` reach it by
   (`resolve_machine` / `list_machines` / `machines_for_blueprint`).
   It knows nothing of what a machine *is*: no backend, no adapter, no
-  drive, no media. **Only what both halves need lives there** — phase
-  transitions have one consumer and stay with the lifecycle above —
+  drive, no media. **It stayed a separate module after its second
+  consumer left** — `drives.py` was the other half and D108 deleted
+  it — because `machine_handle.py` needs `read_vm_state` and would
+  otherwise be back in a cycle with the lifecycle. Phase
+  transitions have one consumer and stay with the lifecycle above,
   and `machines.py` remains the layer's **front door**, re-exporting
-  these names so a consumer above it reaches them in one place. The
-  one module taking them from the substrate directly is `machine_handle.py`,
-  which needs `read_vm_state` alone and would otherwise be back in a
-  cycle with the lifecycle,
+  these names so a consumer above it reaches them in one place,
   `backends.py` is **the backend adapter seam** — the provider contract behind the semantic surface
   (design: `planning/design/backend-adapter.md`), deliberately *not* one of the application surfaces:
   the `BackendAdapter` contract (discovery, capability report, image materialization, start/stop, and the
@@ -253,27 +220,9 @@ workflow:
   validates and renders, which is what makes a section a create accepted one a start applies, and it renders
   last so a caller's own arguments are the tail of the logged command line), the owned launch with its identity verification, `Qmp`,
   the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
-  hatch `QemuSession.native()`. At-rest access is **not** this adapter's: opening a stopped machine's disk
-  belongs to `at_rest.py`, and the adapter contributes only its `capabilities().at_rest` declaration.
-  `at_rest.py` is **the at-rest translation layer** over the `remanence` dependency (P27), which is the one
-  deep module for direct disk access: Remanence opens a raw or qcow2 image where it lies (the format decided
-  by the bytes), claims it for the length of the access under its declared intent, composes and claims a
-  backing chain immutable, discovers geometry, reads and writes FAT volumes reached through the partitions
-  the loaded medium bears — each carrying the stable volume id its inspection report issued — and stands a
-  durable undo journal beneath `commit()` so an interrupted commit is
-  reconciled at the image's next open (D77). The image is loaded into a session as one medium under a
-  declared device type (`mbr-sector-hd`: reliquary's drives are DOS's, MBR-partitioned and CHS-addressed),
-  because a raw or qcow2 image says nothing about the drive that recorded it; releasing the medium ends the
-  claim. What `at_rest.py` keeps is reliquary's policy: **the
-  recognition claim** (D83) — FAT12, FAT16 and FAT16B over standard MBR primary/extended partitioning,
-  everything else, FAT32 included, a named refusal in reliquary's own vocabulary, **partition types pinned
-  value by value**; **the whole-disk rule** — a partition Remanence reports as unreadable refuses the disk,
-  because a disk with a partition reliquary cannot account for is one whose volume ordering it cannot vouch
-  for; **guest-address validation** — a name a DOS guest could not type is refused, never mangled; and the
-  error vocabulary — Remanence's stable categories restated as `UnreadableImage` / `ImageLocked`, which the
-  drive seam maps onto the standing rule ids. `geometry()` reports the drive's shape (partitions with their
-  declared types, volume count, and the BPB's own CHS where it states one) as P10's *read on the host*
-  source, blank-as-an-answer included.
+  hatch `QemuSession.native()`. **No adapter opens a disk's
+  contents**: an adapter creates the images a machine runs on and
+  exposes nothing that reads inside one (D108).
   `backend_virtualbox.py` is the VirtualBox adapter (F50 lifecycle
   and VDI; F52 agentless-display carriers and FreeDOS parity).
   `backend_stubs.py` holds the two unbuilt adapters (VMware
@@ -370,9 +319,9 @@ workflow:
   a machine is addressed by its materialization directory, the adapter named in the recorded identity supplies
   the session (`Machine.session()` / `console()`), and `Machine.qmp()` is the QEMU-scoped escape hatch that
   refuses any other backend,
-  `platform_dos.py` owns DOS provisioning and facades plus the guest-address mapping (`drive_letters` —
-  floppies to A:/B: by slot, hard disks C: onward, CD-ROMs after them, from Reliquary's own drive assignment
-  and never from a guest; `split_address`). The
+  `platform_dos.py` owns DOS provisioning and facades, and is down to `program_name` alone — the letter map
+  and the guest-address grammar went with the volume mapping (D108), so nothing here translates a host path
+  into a drive letter. The
   `.rlqs` language is four layers: `script_nodes.py` (the lexer and its diagnostics),
   `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
   `load_script`), `script_validation.py` (the V-numbered static rules, each diagnostic citing its id),
@@ -526,8 +475,8 @@ workflow:
   screenshot above, applied to the other artifact a run can leave
   behind. `cli.py` owns command parsing, exit codes
   (`errors.exit_code` over one `ReliquaryError` arm), and the
-  output discipline. `_build_parser()` registers the 48 commands
-  through ten family builders and returns `(parser, commands)`, and
+  output discipline. `_build_parser()` registers the 42 commands
+  through nine family builders and returns `(parser, commands)`, and
   **`_COMMANDS` is derived from that rather than declared** — it was
   a hand-kept frozenset, which is one more list of the same words to
   keep in step; do not restore it. **Builder call order is `--help`
@@ -1020,8 +969,8 @@ Doctrine to preserve:
   `pytest --integration` asks for the tier: a marker says the tier
   was chosen, where a skip could not say whether it was chosen or
   suffered. So **any** skip is a defect to fix, not a configuration
-  to tolerate. That the two runs differ — 2,140 tests from the
-  repository, 2,086 from an sdist, two deselected in each — is the
+  to tolerate. That the two runs differ — 2,102 tests from the
+  repository, 2,048 from an sdist, two deselected in each — is the
   isolation working; neither skips. Selecting the tier on a host
   without the backend is a **failure naming the gap** (P11) and not a
   skip either: the run was asked for.
@@ -1115,15 +1064,17 @@ most likely to cost the project something it cannot get back.
 Build-time and development dependencies are **out of scope entirely** — they are not distributed, so their licences
 impose nothing. The tiers govern what a `pip install reliquary` pulls in.
 
-**A first-party dependency sits outside the tiers.** `remanence` is GPL-3.0-only and imported, which the table would
-refuse — but the tiers exist to protect the relicensing reservation from code the project cannot acquire title to,
-and remanence is the owner's own work: copyright held whole by Paul Galbraith, contributions assigned under that
-project's own CLA, published from `ferroteca/remanence-lib`. Exercising the reservation relicenses both works
-together, so nothing is forfeited. The qualifying test is **ownership, not licence**, and it is conditional:
-first-party standing holds only while the dependency's copyright stays whole in the same hands, and one that stops
-qualifying reverts to the table — where GPL-imported is tier 3.
+**A first-party dependency would sit outside the tiers**, and the rule is kept written down because the project
+has used it and will again. A GPL-3.0-only package the project *imports* is what the table refuses — but the tiers
+exist to protect the relicensing reservation from code the project cannot acquire title to, so the owner's own
+work qualifies: copyright held whole by Paul Galbraith, contributions assigned under that project's own CLA.
+Exercising the reservation relicenses both works together, so nothing is forfeited. The qualifying test is
+**ownership, not licence**, and it is conditional: first-party standing holds only while the dependency's
+copyright stays whole in the same hands, and one that stops qualifying reverts to the table — where GPL-imported
+is tier 3. `remanence` stood here until D108 removed at-rest disk access and the layer that wrapped it; a
+consumer needing that capability now depends on it directly, which is nothing to the tiers.
 
-The current runtime closure is tier 1 throughout except `remanence` (first-party, above) and `qemu.qmp`, which is
+The current runtime closure is tier 1 throughout except `qemu.qmp`, which is
 tier 2 and discussed under prior art
 below. Verify a new dependency's whole transitive closure, not just the package named — a tier-1 package that pulls a
 tier-3 one is a tier-3 problem.
@@ -1219,8 +1170,8 @@ $env:PYTHONPATH = "src"; pytest
 That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
 unittest tests` is no longer the entry point, and with the conversion finished (F60) it collects nothing at all —
 the hook that made it work is gone. It was taken because pytest is packaged everywhere a packager works. Expect
-**2,086 tests, two deselected and none
-skipped**, against the repository's 2,140 ("Test expectations", above): the difference is `tests/source_tree/`, which
+**2,048 tests, two deselected and none
+skipped**, against the repository's 2,102 ("Test expectations", above): the difference is `tests/source_tree/`, which
 ships nowhere, and a *skip* there is a defect exactly as it is here. `tests/conftest.py` ships with the suite, so the
 integration tier is deselected in a stranger's run exactly as it is here. Install the wheel into a clean environment and check it by using it —
 `rlq --version` and an import — since it carries no suite to run.
@@ -1304,10 +1255,6 @@ Milestone-9 guarantees needing the same care:
 - a bound secret never reaches the event stream, and it suppresses automatic screenshots afterwards
 - a cancellation ends at a boundary with an in-flight input delivered whole
 - a machine variable is cleared by `start`
-- a non-vvfat or unmapped in-band file target fails closed naming the gap —
-  on every one of the five verbs, an image drive being P16's standing residue
-- a listing's addresses are the ones the file verbs accept, and a missing
-  guest directory is an error rather than an empty listing
 
 ### The test idiom
 

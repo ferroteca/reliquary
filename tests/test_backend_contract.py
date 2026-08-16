@@ -51,7 +51,6 @@ class _QemuDriver:
     name = "qemu"
     extension = ".qcow2"
     vvfat = True
-    at_rest = True
     #: The command that would reach a VM the identity check must stop
     #: short of.
     destructive = "quit"
@@ -129,7 +128,6 @@ class _VirtualBoxDriver:
     name = "virtualbox"
     extension = ".vdi"
     vvfat = False
-    at_rest = False
     destructive = "controlvm"
 
     def executable(self, root):
@@ -203,15 +201,14 @@ def test_the_adapter_answers_to_one_name_everywhere(driver, adapter):
 
 def test_the_capability_report_claims_only_what_is_built(driver, adapter):
     # Both adapters serve the same DOS machine today; where they
-    # genuinely differ is at-rest access and vvfat, which the driver
-    # states so a backend cannot quietly claim either.
+    # genuinely differ is vvfat, which the driver states so a backend
+    # cannot quietly claim it.
     report = adapter.capabilities()
     assert report.control_planes == ("agentless-display",)
     assert report.media == ("floppy", "hdd", "cdrom")
     assert report.controllers == ("ide",)
     assert report.materialize == ("new", "difference", "copy", "use")
     assert report.vvfat is driver.vvfat
-    assert report.at_rest is driver.at_rest
 
 
 def test_an_image_is_named_in_the_backends_own_format(driver, adapter,

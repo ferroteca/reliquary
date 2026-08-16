@@ -707,64 +707,6 @@ def _add_state_commands(subcommands):
     command.add_argument("--interval", type=float, default=None,
                          help="seconds between reads (default 1)")
 
-    command = subcommands.add_parser(
-        "describe-drives",
-        help="report a machine's drives and what they hold")
-    _add_selectors(command)
-
-    command = subcommands.add_parser(
-        "refresh-drives",
-        help="re-read a stopped machine's disks into the drive record")
-    _add_selectors(command)
-
-
-def _add_file_commands(subcommands):
-    """Register in-band file exchange."""
-    command = subcommands.add_parser(
-        "put-file",
-        help="copy a host file into a stopped machine's guest")
-    _add_selectors(command)
-    command.add_argument("source", help="the host file to place")
-    command.add_argument(
-        "destination",
-        help=r"the guest address to place it at (e.g. A:\TEST.EXE)")
-
-    command = subcommands.add_parser(
-        "get-file",
-        help="retrieve a file from a stopped machine's guest")
-    _add_selectors(command)
-    command.add_argument(
-        "source", help=r"the guest address to read (e.g. A:\RESULT.TXT)")
-    command.add_argument("destination", help="the host path to write")
-
-    command = subcommands.add_parser(
-        "list-files",
-        help="list what a stopped machine's guest directory holds")
-    _add_selectors(command)
-    command.add_argument(
-        "address", help=r"the guest directory to list (e.g. A:\ or A:\OUT)")
-    command.add_argument(
-        "--recursive", action="store_true",
-        help="walk the tree instead of listing one directory level")
-
-    command = subcommands.add_parser(
-        "put-files",
-        help="copy a host directory tree into a stopped machine's guest")
-    _add_selectors(command)
-    command.add_argument("source", help="the host directory to place")
-    command.add_argument(
-        "destination",
-        help=r"the guest directory its contents land in (e.g. A:\)")
-
-    command = subcommands.add_parser(
-        "get-files",
-        help="retrieve a directory tree from a stopped machine's guest")
-    _add_selectors(command)
-    command.add_argument(
-        "source", help=r"the guest directory to read (e.g. A:\OUT)")
-    command.add_argument(
-        "destination", help="the host directory its contents land in")
-
 
 def _add_console_commands(subcommands):
     """Register the guest-console family (script-language identity)."""
@@ -856,7 +798,6 @@ def _build_parser():
     _add_listing_commands(subcommands)
     _add_cache_commands(subcommands)
     _add_state_commands(subcommands)
-    _add_file_commands(subcommands)
     _add_console_commands(subcommands)
     return parser, frozenset(subcommands.choices)
 
@@ -1427,128 +1368,6 @@ def _wait_machine_var(arguments, session):
     return _emit(arguments, value, lambda: print(value))
 
 
-def _describe_drives(arguments, session):
-    report = session.describe_drives(
-        machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
-    return _emit(arguments, report, lambda: _render_drive_report(report))
-
-
-def _refresh_drives(arguments, session):
-    report = session.refresh_drives(
-        machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
-    return _emit(arguments, report, lambda: _render_drive_report(report))
-
-
-def _render_drive_report(report):
-    """The drive report's human rendering; ``--json`` is the record."""
-    recorded = "  (recorded)" if report.get("recorded") else ""
-    print(f"{report['machine']}  blueprint {report['blueprint']}  "
-          f"{report['platform']}  {report['phase']}{recorded}")
-    for drive in report.get("drives") or []:
-        media = drive.get("media") or "(empty)"
-        mode = drive.get("materialize") or "-"
-        line = (f"{drive['key']}  {drive['medium']} slot "
-                f"{drive['slot']}  {media}  {mode}")
-        record = drive.get("geometry")
-        if record is None:
-            print(line)
-            continue
-        unread = record.get("unread")
-        if unread is not None:
-            print(line)
-            print(f"  unread — {unread['id']}: {unread['reason']}")
-            continue
-        volumes = record.get("volumes") or []
-        plural = "" if len(volumes) == 1 else "s"
-        backing = record.get("backing") or "-"
-        read_at = record.get("read-at") or "-"
-        print(f"{line}  {backing}  {len(volumes)} volume{plural}  "
-              f"read {read_at}")
-        for entry in record.get("partitions") or []:
-            logical = " logical" if entry.get("logical") else ""
-            print(f"  partition {entry['number']}: type "
-                  f"0x{entry['type']:02X} {entry['declares']}"
-                  f"{logical}  {entry['size']} bytes")
-        for volume in volumes:
-            parts = [f"  [{volume['index']}]"]
-            if volume.get("filesystem"):
-                parts.append(volume["filesystem"])
-            if volume.get("label"):
-                parts.append(f"label {volume['label']}")
-            if volume.get("size") is not None:
-                parts.append(f"{volume['size']} bytes")
-            if volume.get("heads"):
-                parts.append(f"heads {volume['heads']}")
-            if volume.get("sectors-per-track"):
-                parts.append(
-                    f"sectors/track {volume['sectors-per-track']}")
-            if len(parts) == 1:
-                parts.append("(composed by the backend at attach)")
-            print("  ".join(parts))
-    mapping = report.get("mapping") or {}
-    unmapped = mapping.get("unmapped")
-    if unmapped is not None:
-        print(f"mapping: {unmapped['reason']}")
-        return
-    for letter, placed in (mapping.get("letters") or {}).items():
-        print(f"{letter}: {placed['drive']} [{placed['volume']}]")
-    for entry in mapping.get("undetermined") or []:
-        print(f"?: {entry['drive']} — {entry['id']}: {entry['reason']}")
-
-
-def _put_file(arguments, session):
-    address = session.put_file(
-        arguments.source, arguments.destination,
-        machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
-    return _emit(arguments, address, lambda: print(address))
-
-
-def _get_file(arguments, session):
-    path = session.get_file(
-        arguments.source, arguments.destination,
-        machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
-    return _emit(arguments, path, lambda: print(path))
-
-
-def _list_files(arguments, session):
-    entries = session.list_files(
-        arguments.address, recursive=arguments.recursive,
-        machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
-
-    def render():
-        if not entries:
-            print("(no files)")
-            return
-        _print_table(("SIZE", "ADDRESS"),
-                     [("<DIR>" if entry["size"] is None
-                       else entry["size"], entry["address"])
-                      for entry in entries])
-    return _emit(arguments, entries, render)
-
-
-def _put_files(arguments, session):
-    addresses = session.put_files(
-        arguments.source, arguments.destination,
-        machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
-    return _emit(arguments, addresses,
-                 lambda: _print_names(addresses, "(no files)"))
-
-
-def _get_files(arguments, session):
-    paths = session.get_files(
-        arguments.source, arguments.destination,
-        machine=getattr(arguments, "machine", None),
-        blueprint=getattr(arguments, "blueprint", None))
-    return _emit(arguments, paths,
-                 lambda: _print_names(paths, "(no files)"))
-
-
 def _eject_media(arguments, session):
     machine_id = _require_machine_selector(arguments, session)
     session.eject_media(machine_id, arguments.slot)
@@ -1627,20 +1446,6 @@ def _dispatch(arguments, session, context):
         return _get_machine_var(arguments, session)
     if arguments.command == "wait-machine-var":
         return _wait_machine_var(arguments, session)
-    if arguments.command == "describe-drives":
-        return _describe_drives(arguments, session)
-    if arguments.command == "refresh-drives":
-        return _refresh_drives(arguments, session)
-    if arguments.command == "put-file":
-        return _put_file(arguments, session)
-    if arguments.command == "get-file":
-        return _get_file(arguments, session)
-    if arguments.command == "list-files":
-        return _list_files(arguments, session)
-    if arguments.command == "put-files":
-        return _put_files(arguments, session)
-    if arguments.command == "get-files":
-        return _get_files(arguments, session)
     if arguments.command == "start-machine":
         machine_id = _require_machine_selector(arguments, session)
         started = session.start_machine(

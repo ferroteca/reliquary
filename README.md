@@ -320,13 +320,11 @@ guest program's raw output, and interpreting it is left to the caller.
    `press` / `select` against it, then `rlq stop-machine`.
 4. **Take the results.** A run returns its output to you and keeps
    nothing of its own. A small value comes back through a machine
-   variable (`rlq get-machine-var`); a file comes back by its guest
-   address (`rlq get-file "A:\RESULT.TXT" .
-esult.txt`); a whole
-   image comes back by swapping it out. Out of band, `rlq
-   get-machine-dir` prints the machine directory: while the machine is
-   stopped, its directory-source and image drives are ordinary host
-   state to read or prepare.
+   variable (`rlq get-machine-var`); a whole image comes back by
+   swapping it out. Files are yours to move: `rlq get-machine-dir`
+   prints the machine directory, and while the machine is stopped its
+   directory-source and image drives are ordinary host state to read
+   or prepare with your own tools.
 5. **Recreate freely.** `destroy-machine` deletes a machine entirely and
    `recreate-machine` rebuilds it under the same id; `apply-blueprint`
    adopts blueprint edits into a stopped machine.
@@ -576,13 +574,7 @@ command — removing one means editing the blueprint that declares it.)
 ```text
 rlq run-script LABEL (--blueprint NAME | --machine ID) [--progress MODE]
 rlq get-machine-var KEY (--blueprint NAME | --machine ID)
-rlq describe-drives (--blueprint NAME | --machine ID)
-rlq refresh-drives (--blueprint NAME | --machine ID)
-rlq put-file HOST-PATH GUEST-ADDRESS (--blueprint NAME | --machine ID)
-rlq get-file GUEST-ADDRESS HOST-PATH (--blueprint NAME | --machine ID)
-rlq put-files HOST-DIR GUEST-DIR (--blueprint NAME | --machine ID)
-rlq get-files GUEST-DIR HOST-DIR (--blueprint NAME | --machine ID)
-rlq list-files GUEST-DIR [--recursive] (--blueprint NAME | --machine ID)
+rlq get-machine-dir (--blueprint NAME | --machine ID)
 rlq insert-media SLOT --file PATH (--blueprint NAME | --machine ID)
 ```
 
@@ -599,44 +591,36 @@ current boot produced. Readiness rides the same channel — your own
 ready script sets a variable and you poll for it; Reliquary ships no
 readiness script of its own.
 
-Files come back **by their guest address** — `A:\RESULT.TXT`, the way
-the guest names it, never a host image path. One file moves with
-`put-file` / `get-file` and a whole tree with `put-files` /
-`get-files`, whose addresses name a directory the same way (`A:\` is
-the drive itself); `list-files` says what is over there, printing
-addresses the other four accept. All of them work while the machine is
-stopped, at whatever letter the drive lands on — including behind an
-installed `C:`. Over a directory-source drive the backend snapshots
-that directory at attach, so a stopped machine is what makes a put
-visible and a guest write flushed; over a **drive image** Reliquary
-mounts the disk on the host and works the filesystem inside it, so
-files move into and out of an installed `C:` with no guest running.
-A write is staged and swapped in at the end, so an interrupted one
-leaves the disk as it was.
+**Files are yours to move, and Reliquary supplies the drives they
+cross on.** It puts no file on a machine's drives, reads none back,
+and never tells you which letter the guest gave a disk — what is
+inside a volume is yours, reached with your own tools. There are
+three ways across, and none of them asks Reliquary to look inside a
+filesystem:
 
-The letters themselves are learnable, not guessed at:
-`describe-drives` reports what the machine's drives are and what
-they actually hold — per disk the partitions and volumes as read
-from the image (filesystem, label, geometry), and the resulting
-letter map, letter to drive and volume. Every start reads the
-disks as its first step, so a running machine's report describes
-what this boot started from — and says so, with each disk stamped
-by when it was read. Changed a disk while the machine was down?
-`refresh-drives` re-reads and reports in one step. A disk
-Reliquary cannot read is named as undetermined with the reason,
-never mapped by guesswork.
+- **A directory-source drive.** Point a media at a host directory and
+  the guest sees it as a drive. You write into that directory and the
+  guest reads it; the guest writes and you read it back on the host.
+  The backend snapshots the directory at attach, so a stopped machine
+  is what makes a change visible either way.
+- **A whole image, swapped live.** `insert-media --file` mounts an
+  image you built, without a reboot, and ejecting flushes the guest's
+  writes back to that same file. Build and read it with whatever
+  image library you like — [remanence][remanence] opens raw and qcow2
+  disks in place and reads and writes the FAT volumes inside them.
+- **The machine directory.** `get-machine-dir` prints it. While the
+  machine is stopped its drives are plain files: a directory-source
+  drive *is* its directory, and an image drive is a raw or qcow2
+  file.
 
-When a reboot per round costs too much, swap the medium instead:
-`insert-media --file` mounts an image you built, live, and ejecting
-flushes the guest's writes back to that same file.
+[remanence]: https://pypi.org/project/remanence/
 
 ```powershell
-rlq put-files .\suite "A:\" --machine rig-0
+rlq insert-media floppy0 --file .\round-7.img --machine rig-0
 rlq run-script test --machine rig-0 --progress jsonl > run.jsonl
 rlq get-machine-var result --machine rig-0
 rlq stop-machine --machine rig-0
-rlq list-files "A:\OUT" --recursive --machine rig-0
-rlq get-files "A:\OUT" .\out --machine rig-0
+rlq get-machine-dir --machine rig-0
 ```
 
 `--progress` selects the live rendering: `pretty` for a person,

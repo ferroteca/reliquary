@@ -230,8 +230,6 @@ appears in none of them.
 | `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the out-of-band door | [instance model](instance-model.md) |
 | `get-machine-var` | `get_machine_var(key)` — reads a machine variable a script `set` (a `machine.json` field cleared on start; the script→host scalar channel, U14/U20) | script spec |
 | `wait-machine-var` | `wait_machine_var(key, value=None, *, timeout=120, interval=1)` — the same read on a loop, for a variable **another actor** sets (a run on another thread, or one being followed): a blocking `run_script` leaves its variables final, so contract those with its `expect=` instead. `value=None` waits for any value. Expiry raises `WaitExpired`, both a `RunFailure` (exit `4`) and a Python `TimeoutError`, so a caller holding the loop asks again | [cli.md](cli.md) |
-| `describe-drives` / `refresh-drives` | `describe_drives()` — the drive report (D83): declared and chosen facts per drive, the at-rest read per disk, and the platform's letter map over them, answered from the record (read at every start's first step; a disk never yet recorded is read once, machine down); `refresh_drives()` — the explicit stopped-only re-read, returning the same report fresh (U14; P11, P17) | [cli.md](cli.md#describing-drives) |
-| `put-file` / `get-file` / `put-files` / `get-files` / `list-files` | the same names with underscores; `list_files(address, recursive=False)` returns the flat entry array — guest-terms addressed (P17) in one vocabulary across all five, over a vvfat drive, stopped-only, non-vvfat fails closed by name (P11). Single files landed at milestone 9, the trees and the listing with D62 (U14, U20; P16) | [cli.md](cli.md) |
 | `list-machines` / `list-blueprints` / `list-scripts` / `list-media` | `list_<noun>` — **one verb per noun, and the noun names the set**: each lists yours and none reports a codex entry (`list-codex` is the library's own, above). There is no `search-<noun>`: matching a term is filtering, which the shell does and `--json` makes trivial in any language (D88) | family semantics: [cli.md](cli.md); each noun's returns: that noun's spec, as they land |
 | `get-property` / `set-property` / `unset-property` / `list-properties` | `get_property()` / `set_property()` / `unset_property()` / `list_properties()` | [script properties](script-properties.md) |
 | guest-console family (`type` / `enter` / `press` / `select` / `wait` / `screen` / `screenshot` / `hmp`) | today's `Machine` and module functions; twins land with the control-plane design — the script-language-identity exception (CLI spellings settled 2026-07-21). `exec` has left the deferral: its session twin shipped with the exec-run landing (D36), so it rides the identity rule like any twin | [script spec](script-spec.md) (verbs); the control-plane design (twins) |
@@ -291,15 +289,19 @@ The implemented binding uses the settled family:
 `stop_cached_machine` / `machines.start` spellings).
 `lifecycle.py`'s legacy `start_machine(config)` name collision
 dies with the root-home model, whose `Runner` / `MachineConfig`
-surface is superseded by the blueprint machine model
-(file exchange is settled 2026-07-22 and completed by D62:
-in-band verbs cover single files, whole trees and listings —
-`put_file` / `get_file` / `put_files` / `get_files` /
-`list_files`, all guest-terms addressed and stopped-only, and
-none of them a script verb. Out-of-band host access to a stopped
-machine's drives remains possible and is now convenience alone
-(P16): the machine directory reported by `get_machine_dir`, the
-user's own image tooling. vvfat is the mechanism a
-directory-source media attaches through, and an image drive has
-no in-band route until an adapter grows at-rest filesystem
-access — a gap named rather than hidden, P11).
+surface is superseded by the blueprint machine model.
+
+**There is no file family, and no drive report** (D108). The
+binding places no file on a machine's drives, reads none back,
+lists none, and maps no volume to a guest letter: what is inside a
+volume is the caller's, reached with the caller's own tools
+against the machine directory `get_machine_dir` returns — the
+out-of-band door, which is the sanctioned route rather than a
+fallback (P16's file-content carve-out). What the binding does
+supply is the drives themselves: a directory-source media
+attaches a host directory through vvfat, and `insert_media(file=)`
+mounts an image the caller built (U20). `describe_drives` /
+`refresh_drives` / `put_file` / `get_file` / `put_files` /
+`get_files` / `list_files` are deleted rather than deprecated, and
+`list_machines` carries the declared drive facts for anything that
+read the report for those.

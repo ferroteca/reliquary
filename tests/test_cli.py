@@ -821,7 +821,7 @@ def test_add_media_writes_a_declaration_for_a_local_file(plain_home):
     assert os.path.isfile(payload)
 
 
-# The exec-run commands: machine variables and file exchange.
+# The exec-run commands: machine variables and live media.
 
 @pytest.fixture
 def rig_home(home):
@@ -865,88 +865,6 @@ def test_an_unset_variable_is_null_under_json(rig_home):
                            "--machine", "rig-0", "--json")
     assert code == 0
     assert json.loads(out) is None
-
-
-def test_put_and_get_round_trip_by_guest_address(rig_home):
-    home, _exchange = rig_home
-    source = os.path.join(home, "TEST.EXE")
-    with open(source, "wb") as handle:
-        handle.write(b"MZ")
-    code, out, _err = _out("--home-dir", home, "put-file", source,
-                           r"A:\TEST.EXE", "--machine", "rig-0")
-    assert code == 0
-    assert out.strip() == r"A:\TEST.EXE"
-    back = os.path.join(home, "back.exe")
-    code, out, _err = _out("--home-dir", home, "get-file", r"A:\TEST.EXE",
-                           back, "--machine", "rig-0")
-    assert code == 0
-    assert out.strip() == os.path.abspath(back)
-    with open(back, "rb") as handle:
-        assert handle.read() == b"MZ"
-
-
-def test_an_unformatted_image_target_exits_three(rig_home):
-    # hdd0 in this rig is a blank the fake adapter never wrote, so
-    # there is no filesystem to reach. PREFLIGHT ERROR: the gap
-    # names itself rather than answering as though it were empty
-    # (P11).
-    home, _exchange = rig_home
-    source = os.path.join(home, "x.txt")
-    with open(source, "w", encoding="ascii") as handle:
-        handle.write("x")
-    code, _out_text, err = _out("--home-dir", home, "put-file", source,
-                                r"C:\X.TXT", "--machine", "rig-0")
-    assert code == 3
-    assert "cannot be read at rest" in err
-
-
-def test_put_files_and_get_files_move_a_whole_tree(rig_home):
-    home, _exchange = rig_home
-    suite = os.path.join(home, "suite")
-    os.makedirs(os.path.join(suite, "CASES"))
-    for path, text in ((os.path.join(suite, "RUN.BAT"), "GO"),
-                       (os.path.join(suite, "CASES", "ONE.DAT"), "1")):
-        with open(path, "w", encoding="ascii") as handle:
-            handle.write(text)
-    code, out, _err = _out("--home-dir", home, "put-files", suite, "A:\\",
-                           "--machine", "rig-0")
-    assert code == 0
-    assert out.split() == [r"A:\CASES\ONE.DAT", r"A:\RUN.BAT"]
-    results = os.path.join(home, "back")
-    code, out, _err = _out("--home-dir", home, "get-files", "A:\\", results,
-                           "--machine", "rig-0")
-    assert code == 0
-    assert os.path.join(results, "CASES", "ONE.DAT") in out
-    with open(os.path.join(results, "RUN.BAT"), encoding="ascii") as handle:
-        assert handle.read() == "GO"
-
-
-def test_list_files_prints_addresses_and_serializes_entries(rig_home):
-    home, exchange = rig_home
-    os.makedirs(os.path.join(exchange, "OUT"))
-    with open(os.path.join(exchange, "OUT", "RESULT.TXT"), "w",
-              encoding="ascii") as handle:
-        handle.write("PASS")
-    code, out, _err = _out("--home-dir", home, "list-files", "A:\\",
-                           "--recursive", "--machine", "rig-0")
-    assert code == 0
-    assert r"A:\OUT\RESULT.TXT" in out
-    assert "<DIR>" in out
-    code, out, _err = _out("--home-dir", home, "list-files", r"A:\OUT",
-                           "--machine", "rig-0", "--json")
-    assert code == 0
-    assert json.loads(out) == [
-        {"address": r"A:\OUT\RESULT.TXT", "name": "RESULT.TXT",
-         "kind": "file", "size": 4}]
-
-
-def test_an_empty_guest_directory_says_so(rig_home):
-    home, exchange = rig_home
-    os.makedirs(os.path.join(exchange, "EMPTY"))
-    code, out, _err = _out("--home-dir", home, "list-files", r"A:\EMPTY",
-                           "--machine", "rig-0")
-    assert code == 0
-    assert "no files" in out
 
 
 def test_insert_media_mounts_a_file_by_path(rig_home):

@@ -375,8 +375,7 @@ differently under the new wording — is mere documentation work.
   machine *is* — platform, backend, control plane — comes from
   the blueprint, and probes select among what is configured
   rather than guessing what is inside. **Guessing is the
-  violation, and assuming is guessing**: the one-volume-per-disk
-  letter map (D71) is the standing instance, filed as a defect.
+  violation, and assuming is guessing.**
   Three sources answer instead, and a fact from any of them is
   known rather than guessed — what the blueprint **declares**,
   what Reliquary can **read** on the host (an image's format, a
@@ -450,59 +449,31 @@ differently under the new wording — is mere documentation work.
   drives are plain host state and always will be — and what is
   forbidden is *requiring* it, so a violation is a missing verb
   rather than a user's behaviour. The mechanism is invisible to
-  the test: that a file verb is served out of a vvfat directory
-  is plumbing, and the question is only ever whether a Reliquary
+  the test: that a live media swap is a monitor command is
+  plumbing, and the question is only ever whether a Reliquary
   verb answers the need. Foreseeable means a use case **in force
   or pledged**, so a citation points at a U-number rather than an
   intuition. It does not govern what leaves Reliquary's purview
-  by design (`export-machine`, P1), the guest's own world, how
+  by design (`export-machine`, P1; **a machine's file content**,
+  below), the guest's own world, how
   authored input arrives (that is P15), or escape hatches no use
-  case requires (`--display`, `hmp`). (Pledged by D57 and armed
-  by D62, which delivered the two operations that were in
-  violation — listing and whole-tree transfer, and reading *and
-  writing* a drive image at rest. Rests on U14 and U20. No residue
-  filed: a filesystem or a backend that cannot answer says so by
-  name rather than hiding it (P11).)
-- **P17 — Guest files are named in the guest's terms.** A
-  file action against a machine addresses its target as the
-  guest OS does — that system's paths, separators, and roots —
-  never as the host stores it: not an image file, an offset,
-  or a staging directory. How the address resolves is
-  Reliquary's plumbing and may change with the backend; what
-  the user writes may not. The mapping is built from declared
-  facts — the blueprint's platform and Reliquary's own drive
-  assignment — never from inspecting a guest (P10). Where the
-  declared facts leave an address ambiguous, the call fails
-  closed naming the ambiguity (P11).
-  **Every drive has a letter, and none of them is a guess.**
-  Disks take letters from `C:` in slot order, each consuming one
-  letter per volume it actually holds, and the count is **read
-  off the image on the host** — the partition table, and past it
-  the FAT volume — which is no more guest inspection than
-  reading an image's format is. A disk holding no volumes takes
-  no letter, as on DOS itself. The count is recorded in the
-  machine's state and cleared at every start, a guest being able
-  to repartition only while it runs. This closed D71's assumption
-  that each disk holds one volume, which was a P10 violation
-  filed as a defect: it was silent when wrong, naming the wrong
-  drive rather than failing, and that silence is what kept it a
-  defect rather than a documented limit. A wrong address and an
-  unknowable one remain different failures, and the refusals
-  still say which — a disk whose volumes cannot be read leaves
-  every letter behind it unplaced, and answers with the reason it
-  could not be read. The **online** route stays available and
-  unbuilt: ask the guest which letters it has, an observation
-  rather than an inference (P10), bounded by the boot it was
-  taken in. What may never grow is a *declaration* of the guest's
-  own arrangement: a blueprint saying how a disk was partitioned
-  would carry a spec's authority over an assertion the guest can
-  silently contradict, which is worse than the gap it closes.
-  `get-machine-dir` is the
-  named exemption: the out-of-band door returns a host path by
-  definition (D5). (docs/spec/script-spec.md, the in-band file
-  capability; docs/spec/api.md's transport table; D36, D37.)
+  case requires (`--display`, `hmp`).
+  **A machine's file content is out of purview, and that is a
+  boundary rather than a gap** (D108). Reliquary declares the
+  drives, materializes them, swaps their media live, and hands
+  back the directory they live in (`get-machine-dir`, D5); what
+  is *inside* a volume is the caller's, reached with the caller's
+  own tools. So a missing file verb is not a defect against this
+  principle and no use case demands one — which is the whole
+  content of the carve-out, since without it the next reader
+  files exactly that. What the principle still governs is
+  everything a machine *is*: its lifecycle, its drives and their
+  media, its screen, its input, and the values it hands back.
+  (Pledged by D57. Rests on U14 and U20. No residue filed: a
+  backend that cannot answer says so by name rather than hiding
+  it (P11).)
 - **P18 — Mechanism, not content.** Reliquary provides
-  mechanism — machines, drive and file transports, the value
+  mechanism — machines, the drives they carry, the value
   channels in and out — and **relies on no content of its own
   to function**. Nothing it ships is load-bearing: every verb
   works identically in a home holding not one codex file, and
@@ -694,51 +665,6 @@ differently under the new wording — is mere documentation work.
   session respell is deferred to the control-plane design, and
   [docs/spec/api.md](docs/spec/api.md)'s guest-console row is the
   deferral's record.)
-- **P27 — Remanence owns at-rest disk access.** Direct disk-image
-  access belongs to Remanence, not to Reliquary: the `remanence`
-  dependency — pinned to one exact release, `0.0.1a3` today — is
-  the one deep module for opening raw and qcow2 drive images at
-  rest. An image is opened where it lies, a backing chain is
-  composed with every backing file claimed immutable, complete
-  partition and volume geometry is discovered with a blank disk
-  an answer, files in FAT volumes are read and written by a
-  stable volume identity the geometry report shares, and every
-  commit stands on a durable undo journal — an interrupted write
-  is reconciled on the next access, work is proportional to
-  touched data, and contention fails by name (D77's guarantees,
-  now the dependency's to keep). Reliquary keeps the policy
-  Remanence cannot own: the DOS-only FAT12/FAT16/FAT16B
-  recognition claim and its refusal vocabulary, the
-  whole-disk-or-none rule, guest-address mapping, rule ids, and
-  translation into the recorded drive report (D83). The
-  dependency earns the whole layer or none of it: a hybrid that
-  keeps an NBD client, a `qemu-nbd` lifecycle, qcow2 snapshot
-  orchestration, staged raw access, an MBR reader, or a FAT
-  reader/writer as a fallback is refused, because it leaves two
-  authorities for the same disk facts (P21; D83). D73's refusal
-  to write and maintain a qcow2 reader inside Reliquary is
-  honored by the declared dependency, whose standing under the
-  licence tiers is first-party ownership (D82; AGENTS.md
-  "Dependency licence tiers"). A different Remanence release is a
-  fresh verification against this principle's guarantees on the
-  delivered host (P11), never a substitution. The image is loaded
-  as one medium under a **declared device type** —
-  `mbr-sector-hd`, an MBR-partitioned drive addressed by cylinder,
-  head and sector, which is what a DOS workflow's disks are —
-  because a raw or qcow2 image carries nothing that says which
-  drive recorded it, and the block-addressed sibling would read
-  the same table under an addressing story nothing here observed.
-  **One known residue, named rather than hidden (D48):** an image
-  in a format the dependency does not recognize is refused as
-  unreadable raw bytes rather than by the retired format probe —
-  an accurate refusal that names neither the format nor the
-  remedy. The `0.0.1a3` pin narrowed it: every format the release
-  *does* recognize is now refused by name at the load, and the
-  BPB-label residue the `0.0.1a2` pin carried is closed — the
-  dependency reads the boot record's label copy where the root
-  directory carries no entry.
-  (`at_rest.py` is the translation layer; `test_at_rest.py`
-  pins the policy; delivered as F40.)
 
 
 ## The cross-cutting prose
@@ -765,10 +691,11 @@ never builds its own: agents may not exist for some operating
 systems, but writing one would be a whole project unto itself,
 outside Reliquary's scope. The same logic binds the host end
 (D36, D68): a transport faster than the agentless one needs
-cooperation at both ends, and Reliquary supplies neither — only
-the file-transfer seam (P17's addressing, P11's selection), the
-transport itself sourced externally, an existing tool before a
-dedicated project. The line is the agent, not the side: a
+cooperation at both ends, and Reliquary supplies neither — the
+drives a file crosses on and nothing inside them (P16's
+file-content carve-out), the transport itself sourced externally,
+an existing tool before a dedicated project. The line is the agent,
+not the side: a
 client module inside Reliquary speaking a protocol the guest
 already runs is Reliquary, and a second long-running process is
 the thing it will not build.

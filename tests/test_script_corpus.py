@@ -236,14 +236,13 @@ SHARED_IDS = {
     # than inventing a second name for it, which is the pattern this
     # check exists to hold: one condition, one answer, whichever
     # layer noticed.
-    "machine.must-be-stopped": 7,
+    "machine.must-be-stopped": 5,
     "machine.not-running": 3,
     "machine.no-selector": 3,
     "machine.no-vm-identity": 3,
     "media.unknown": 2,
     "name.duplicate-property": 2,
     "name.property-reserved-namespace": 2,
-    "platform.verb-not-implemented": 2,
 }
 
 
