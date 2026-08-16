@@ -563,6 +563,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   boundary rather than a gap, and **P17** and **P27** are struck.
   Pledged **F41** is withdrawn.
 
+  **The transcript corpus kept all seven fixtures, and two were
+  re-recorded against a live FreeDOS guest** to get there. Both
+  rested on the deleted transport: `freedos-ready.rlqt` captures a
+  codex script whose text changed, and
+  `freedos-exec-echo-lookalike.rlqt` was staged by the host writing a
+  file onto the guest's disk. The guest types that file into
+  `COPY CON` now — the only way, since DOS redirection cannot emit
+  the `>` its last line turns on — and **the screen comes out
+  byte-identical**, so what the fixture pins is unchanged: the same
+  empty result with no error that `rlq exec` still gives a file whose
+  last line reads like the echo of the command printing it. Retiring
+  the transport cost the corpus nothing.
 
 - **`Session.set_machine_var` is gone** — removed as a defect,
   not deprecated. Machine variables are the guest's report
