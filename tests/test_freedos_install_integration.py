@@ -32,7 +32,7 @@ from reliquary.library import seed_blueprint
 from reliquary.machine_handle import Machine
 from reliquary.machines import (get_machine_var, load_machine_state,
                                 machine_dir_path, stop_machine)
-from reliquary.script_runner import run_script
+from reliquary.script_runner import resolve_key, run_script
 from reliquary.transcript import RecordingSession, _TranscriptWriter
 from tests import live_external_effects
 
@@ -87,13 +87,18 @@ def _plant_echo_lookalike(home, machine_id):
     turns on — there is no escape for it in any DOS shell. Typing it
     at the guest costs a few keystrokes and needs no capability
     beyond the one this whole tier is about.
+
+    The Ctrl-Z that ends `COPY CON` goes through `resolve_key`
+    because this is the **carrier** seam, whose vocabulary is the
+    backend's qcode set: a combo is a *list* of those names, and the
+    language's own `ctrl+z` spelling reaches QEMU as a key literally
+    named `+` (D103's three layers, entered at the wrong one).
     """
     machine = Machine(machine_dir_path(machine_id, home))
     machine.send_text(r"COPY CON C:\ECHOLIKE.TXT")
     for line in _ECHO_LOOKALIKE:
         machine.send_text(line)
-    machine.send_keys(["ctrl+z"])
-    machine.send_keys(["ret"])
+    machine.send_keys([resolve_key("ctrl+z"), resolve_key("enter")])
 
 
 def _capture_exec(home, machine_id, name, command, timeout):
