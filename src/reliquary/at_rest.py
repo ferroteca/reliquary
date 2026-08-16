@@ -247,7 +247,7 @@ class Image:
                                                  writable=writable)
             self._medium = self._session.load_discovery_as(discovery,
                                                            _DEVICE)
-        except remanence.RemanenceError as error:
+        except remanence.Error as error:
             _refuse(self.path, error)
         try:
             #: ``"raw"`` or ``"qcow2"`` -- the recorded ``backing``
@@ -255,7 +255,7 @@ class Image:
             self.format = self._medium.format
             self.size = self._medium.size
             self._geometry, self.volumes = self._read()
-        except remanence.RemanenceError as error:
+        except remanence.Error as error:
             self.close()
             _refuse(self.path, error)
         except Exception:
@@ -345,7 +345,7 @@ class Image:
         """
         try:
             self._medium.commit()
-        except remanence.RemanenceError as error:
+        except remanence.Error as error:
             _refuse(self.path, error)
 
     def close(self):
@@ -406,7 +406,7 @@ class Volume:
     def _call(self, verb, *arguments):
         try:
             return verb(*arguments)
-        except remanence.RemanenceError as error:
+        except remanence.Error as error:
             _refuse(self._path_of_image, error)
 
     @staticmethod

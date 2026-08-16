@@ -233,6 +233,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Remanence moves to `0.0.1a5`, and its exception is
+  `remanence.Error`.** The dependency renamed the class from
+  `RemanenceError` with no compatibility alias, so `at_rest.py` catches
+  the new name; its `category` attribute, which is what the refusal
+  translator reads to tell a locked image from an unreadable one, is
+  unchanged. Nothing a reliquary user meets behaves differently, and
+  the suite reports the same 2,259 tests either side of the move.
+
+  **`0.0.1a4` is skipped deliberately.** Its Windows wheel links
+  `libpython3.dll` rather than `python3.dll` and fails at `import` on
+  any stock CPython, so no reliquary could have been installed beside
+  it. `0.0.1a5` is that wheel rebuilt correctly and carries no other
+  change.
+
 - **The suite is pytest-native throughout** (F60, the last of the
   sweeps; D106). The remaining twenty modules convert — the CLI and
   document surface, the core helpers, the home and asset machinery,
