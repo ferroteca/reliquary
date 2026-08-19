@@ -11,6 +11,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## 0.1.0a2 - 2026-08-19
+
 ### Added
 
 - **The interpretation layer has a conformance corpus** (F43), and it
