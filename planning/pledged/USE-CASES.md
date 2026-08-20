@@ -90,3 +90,27 @@ did. Text verbatim as drafted:
 >   at the second developer's host: a precisely shared
 >   definition only helps if the machine can be built where
 >   that developer is.
+
+**U10 — The install is the thing under test** — pledged 2026-08-19
+(owner). Drafted 2026-07-23: the control-plane arc's prose already
+named install-testing ("os-autoinst-style, where the install is the
+thing under test") but no numbered case owned it, and it is the use
+that makes agentless operation permanently essential rather than a
+bootstrap convenience. The pledge carries the citation it promised:
+the arc's prose (ARCHITECTURE.md) and the two agentless-permanence
+statements that derive from it — P2 (ARCHITECTURE.md) and G1
+(docs/spec/script-spec.md) — now name U10. Nothing is built yet; the
+case is met when a script can drive and observe an install run to a
+pass/fail verdict with the machine discarded, purely agentlessly.
+Text verbatim as drafted:
+
+> - **U10 — The install is the thing under test.** An installer
+>   or media maintainer runs an install to prove the install:
+>   the screen is the assertion surface, the run record is the
+>   verdict, and the machine is discarded. Agentless operation
+>   is essential here, not a fallback — until the install
+>   succeeds there is nothing in the guest to cooperate, and
+>   the moments before an agent could exist are exactly the
+>   ones under test. The same script observes a changed
+>   installer honestly, failing with the screen it actually
+>   saw.

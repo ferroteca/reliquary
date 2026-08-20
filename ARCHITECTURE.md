@@ -314,7 +314,8 @@ differently under the new wording — is mere documentation work.
   never the product. ("What Reliquary is" above; prose below.)
 - **P2 — Agentless operation is permanent.** No feature may
   depend on guest cooperation; agentless is the default and
-  the fallback, forever. (AGENTS.md "Agentless operation".)
+  the fallback, forever. (AGENTS.md "Agentless operation";
+  U10.)
 - **P3 — The control-plane arc.** Agentless operation prepares
   a guest; once a native agent exists inside it, that agent is
   the better work plane. Reliquary consumes the agents that
@@ -683,7 +684,7 @@ arc (P3): agentless operation is at its most useful preparing a
 machine — installing the OS (U1) and bringing the guest to the
 point where an agent exists inside it — and for testing
 installations themselves, os-autoinst-style, where the install is the
-thing under test and the screen is the assertion surface. Once a
+thing under test and the screen is the assertion surface (U10). Once a
 guest holds an agent, that agent is the better work plane;
 agentless remains the permanent fallback for guests that can
 never cooperate. Reliquary consumes native guest agents and

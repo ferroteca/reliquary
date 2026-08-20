@@ -66,7 +66,7 @@ so a proposed feature can be rejected by naming the goal it costs.
 - **G1 — Agentless at the guest seam.** The guest is a black box
   that cannot be configured, only watched and typed at. No feature
   may depend on guest cooperation. This is a permanent requirement
-  ([AGENTS.md](../../AGENTS.md)), not a current limitation.
+  ([AGENTS.md](../../AGENTS.md); U10), not a current limitation.
 - **G2 — Non-computational.** No expressions, variables,
   arithmetic, functions, or general-purpose loops. Anything
   computational belongs in Python via the embedding API, which

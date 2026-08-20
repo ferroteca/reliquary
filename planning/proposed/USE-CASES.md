@@ -409,26 +409,6 @@ would.
 >   Reliquary machine stays disposable precisely because the
 >   durable exit exists.
 
-**U10 — The install is the thing under test** — drafted (add,
-2026-07-23). The gap: the control-plane arc's prose already
-names install-testing ("os-autoinst-style, where the install
-is the thing under test") but no numbered case owns it — and
-it is the use that makes agentless operation permanently
-essential rather than a bootstrap convenience. On pledge,
-the arc's prose cites U10, as do the agentless-permanence
-statements.
-
-> - **U10 — The install is the thing under test.** An installer
->   or media maintainer runs an install to prove the install:
->   the screen is the assertion surface, the run record is the
->   verdict, and the machine is discarded. Agentless operation
->   is essential here, not a fallback — until the install
->   succeeds there is nothing in the guest to cooperate, and
->   the moments before an agent could exist are exactly the
->   ones under test. The same script observes a changed
->   installer honestly, failing with the screen it actually
->   saw.
-
 **U16 + U17 — split U4** — drafted (supersede U4, 2026-07-23,
 the decomposition sweep). U4 bundled the sharing journey with
 the residency rule; the residency rule is already the
