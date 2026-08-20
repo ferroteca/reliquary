@@ -116,6 +116,20 @@ def test_a_keyword_is_a_plain_name_outside_node_position():
         ("enter",), ("ctrl+alt+delete",), ("insert",), ("hdd0", "cdrom0")]
 
 
+def test_font_takes_one_or_more_at_or_dollar_references():
+    script = parse_script(
+        _HEAD + "machine stopped\nfont @guest $installer-font\n")
+    (font,) = script.statements
+    assert font.verb == "font"
+    assert font.arguments == (
+        ("media", "guest"), ("property", "installer-font"))
+
+
+def test_font_with_no_name_is_a_syntax_error():
+    with pytest.raises(ScriptParseError):
+        parse_script(_HEAD + "machine stopped\nfont\n")
+
+
 def test_the_renamed_vocabulary_parses():
     script = parse_script(
         "platform dos\nentry go\n"

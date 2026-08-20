@@ -645,20 +645,29 @@ class VirtualBoxSession:
             action="screenshot")
         return png
 
-    def text_screen(self):
+    def text_screen(self, font_banks=()):
         """Screenshot + shared fixed-font recognizer (F51).
 
         Read through **this host's** VirtualBox fonts rather than the
         bundled bank, which is not what drew the screen — and through
         all of them, since a run paints in more than one.
+
+        ``font_banks`` (F61) are the authored fonts a script's `font`
+        statement named, tried **before** the host's own — labelled
+        ``"host"`` in the failure report's "fonts tried" rather than
+        individually, since a screenshot cannot say which of a host's
+        several installed fonts actually painted a cell.
         """
         with tempfile.NamedTemporaryFile(
                 suffix=".png", delete=False) as handle:
             path = handle.name
         try:
             self.screenshot(path)
+            host_banks = tuple(
+                text_recognize.Bank(one, source="host")
+                for one in guest_glyph_banks(self._cache))
             return text_recognize.recognize(
-                path, bank=guest_glyph_banks(self._cache))
+                path, bank=tuple(font_banks) + host_banks)
         finally:
             try:
                 os.remove(path)

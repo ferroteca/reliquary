@@ -257,13 +257,81 @@ def test_one_font_alone_misreads_a_screen_the_other_drew():
     assert "W" not in rows[0]
 
 
-def test_shared_glyphs_are_scored_once():
-    """Supporting several fonts costs only where they disagree."""
-    stored, installed = _two_fonts()
-    one = recognize._all_glyph_bits((stored,))
-    both = recognize._all_glyph_bits((stored, installed))
-    assert len(one) == 256
-    assert len(both) == 256 + 1
+def test_order_can_override_a_later_banks_exact_match():
+    """The new priority, sharper than the old tie-break.
+
+    Under the old global-nearest scan, order only broke *exact*
+    ties; an exact match anywhere always beat a mere near-miss
+    elsewhere, whichever bank held it. Here ``leading`` holds only a
+    *near* match (a couple of bits off) for the drawn glyph — its
+    own copy of that shape is deliberately replaced with something
+    unrecognizable — while ``trailing`` holds an *exact* one at a
+    different code. The near-miss inside the leading bank still
+    decides, because first-inside-the-threshold is what the match
+    order now means (F61, D109): whichever bank leads wins, not
+    whichever bank is closest.
+    """
+    stored = recognize.glyph_bank()
+    standard_w = stored[0x57 * 16:0x58 * 16]
+    near_w = bytearray(standard_w)
+    near_w[0] ^= 0x03  # a couple of bits off: inside `_MAX_DISTANCE`
+    leading = bytearray(stored)
+    leading[0x57 * 16:0x58 * 16] = DISTINCT  # no exact match here at all
+    leading[0x55 * 16:0x56 * 16] = bytes(near_w)
+    leading = bytes(leading)
+    trailing = stored  # the exact 'W' shape, untouched, at 0x57
+
+    image = recognize.render(_screen("W"))  # drawn with the standard shape
+    rows, _ = recognize.recognize(image, bank=(leading, trailing))
+    assert rows[0][0] == "U"  # the leading bank's near-miss, code 0x55
+
+    rows, _ = recognize.recognize(image, bank=(trailing, leading))
+    assert rows[0][0] == "W"  # now-leading trailing bank's exact match
+
+
+def test_a_banks_own_codepage_decodes_its_match():
+    """An authored font's declared codepage governs its own matches.
+
+    The host banks keep today's mapping unconditionally (D109) —
+    `_cp437_char`'s identity passthrough for the high half, not a
+    real CP437 decode — so 0x9B reads as its own code point through
+    a bank with no declared codepage, and as CP850's glyph (an 'o'
+    with a stroke) through one that declares it.
+    """
+    stored = recognize.glyph_bank()
+    authored = recognize.Bank(stored, codepage="cp850", source="@guest")
+    image = recognize.render(_screen(chr(0x9B)), bank=stored)
+    text, _attrs = recognize.recognize(image, bank=(authored,))
+    assert text[0] == bytes([0x9B]).decode("cp850")
+    assert text[0] != chr(0x9B)  # the legacy host mapping's answer
+
+
+def test_bank_is_a_bytes_subclass_carrying_extra_facts():
+    stored = recognize.glyph_bank()
+    authored = recognize.Bank(stored, cell_rows=8, codepage="cp850",
+                              source="@guest")
+    assert authored == stored           # a Bank still compares as bytes
+    assert isinstance(authored, bytes)  # and slices/indexes like one
+    assert authored.cell_rows == 8
+    assert authored.codepage == "cp850"
+    assert authored.source == "@guest"
+
+
+def test_as_banks_keeps_a_banks_extra_facts():
+    stored = recognize.glyph_bank()
+    authored = recognize.Bank(stored, codepage="cp850", source="@guest")
+    (kept,) = recognize.as_banks(authored)
+    assert kept.codepage == "cp850"
+    (kept,) = recognize.as_banks([authored, stored])[:1]
+    assert kept.codepage == "cp850"
+
+
+def test_screen_reports_the_fonts_it_was_read_through():
+    stored = recognize.glyph_bank()
+    authored = recognize.Bank(stored, source="@guest")
+    image = recognize.render(_screen("ok"))
+    screen = recognize.recognize(image, bank=(authored, stored))
+    assert screen.fonts_tried == ("@guest", "default")
 
 
 def test_an_override_table_behind_a_bank_yields_a_second_font():

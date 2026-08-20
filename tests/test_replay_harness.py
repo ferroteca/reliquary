@@ -135,7 +135,7 @@ class _EchoingGuest:
     def native(self):
         raise AssertionError("no native session in a fake guest")
 
-    def text_screen(self):
+    def text_screen(self, font_banks=()):
         if self._reads_since_command is not None:
             self._reads_since_command += 1
             if self._reads_since_command == 3:

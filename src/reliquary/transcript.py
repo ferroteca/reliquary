@@ -405,7 +405,7 @@ class RecordingSession:
             "send_keys",
             fields={"combos": list(list(c) for c in combos)})
 
-    def text_screen(self):
+    def text_screen(self, font_banks=()):
         """Return the screen, and offer every read to the transcript.
 
         **Every** read is offered, including one identical to the
@@ -413,9 +413,11 @@ class RecordingSession:
         sample count is only known once the screen changes, and a read
         dropped here would be a sample the transcript could never
         count. A keyframe after every sampling gap (a call) bounds the
-        damage when a reporter is missing.
+        damage when a reporter is missing. ``font_banks`` (F61) passes
+        straight through — the recording carries only rows and
+        attributes, never which fonts produced them.
         """
-        rows, attributes = self._inner.text_screen()
+        rows, attributes = self._inner.text_screen(font_banks)
         # Copy the mutable lists the adapter hands back, so what the
         # transcript holds cannot be edited from underneath it.
         rows = list(rows)
@@ -620,7 +622,10 @@ class ReplaySession:
         return sum(1 for entry in self._entries[self._index:]
                    if entry.kind == "call")
 
-    def text_screen(self):
+    def text_screen(self, font_banks=()):
+        # A replay reproduces the captured rows regardless of what a
+        # live font prefix would have been — the recognizer already
+        # ran, once, when the capture was taken.
         if self._remaining > 0:
             # The frame is still standing: it was read this many more
             # times when it was captured, at the moments it recorded.

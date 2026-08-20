@@ -37,7 +37,7 @@ class FakeSession:
     def send_keys(self, combos, delay=0.06):
         self.keys.extend(list(combo) for combo in combos)
 
-    def text_screen(self):
+    def text_screen(self, font_banks=()):
         return list(self.rows), [list(row) for row in self.attributes]
 
     def screenshot(self, path):

@@ -56,6 +56,7 @@ _SIGNATURES = {
     "insert": (), "eject": (), "set_boot": (), "set_var": (),
     "start": (), "stop": (),
     "goto": (), "finish": (),
+    "font_stmt": (),
 }
 
 # Grammar rule names back to the spelling an author wrote, so a
@@ -65,7 +66,7 @@ _DISPLAY = {
     "always_handler": "always", "type_text": "type",
     "set_boot": "set-boot", "set_var": "set", "property_def": "property",
     "http_def": "http", "content_def": "content",
-    "http_control": "http",
+    "http_control": "http", "font_stmt": "font",
 }
 
 # Modifiers whose value must be a duration. They are also the
@@ -944,6 +945,19 @@ class _Builder(Transformer):
 
     def stop(self, children):
         return self._simple("stop", "stop", children, ())
+
+    def font_stmt(self, children):
+        # A name list, `insert`'s own `("media"|"property", name)`
+        # shape per reference rather than the single-slot pairing
+        # `_insert_arguments` returns: `font` names no slot, only the
+        # fonts a later screen read tries first (D109).
+        refs = [child for child in children[1:]
+               if isinstance(child, LarkToken)
+               and child.type in ("MEDIA_REF", "PROP_REF")]
+        arguments = tuple(
+            ("media" if ref.type == "MEDIA_REF" else "property", str(ref))
+            for ref in refs)
+        return self._simple("font", "font_stmt", children, arguments)
 
     # -- scopes --------------------------------------------------
     def scope_block(self, children):

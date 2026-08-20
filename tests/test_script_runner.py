@@ -82,12 +82,14 @@ class _FakeConsole:
                 self.screens.pop(0)
         return current
 
-    def screen(self):
+    def screen(self, font_banks=()):
         """The same screens, as the seam's (rows, attributes) pair.
 
         These scripts say what the guest displayed; the attribute half
         is uniform because nothing here turns on a highlight, and a
         screen that stops changing therefore reads as settled.
+        ``font_banks`` (F61) is accepted and ignored: nothing here
+        recognizes pixels to read a font prefix through.
         """
         rows = self.screen_text()
         return rows, [[0x07] * 80 for _ in range(len(rows))]
@@ -363,7 +365,7 @@ def test_an_unreadable_screen_is_a_sample_the_wait_looks_past(runtime):
     splashes = [2]
     inner = runtime.console.screen
 
-    def screen():
+    def screen(font_banks=()):
         if splashes[0]:
             splashes[0] -= 1
             runtime.console.reads += 1
@@ -866,6 +868,57 @@ def test_insert_from_a_property_is_not_bound_yet(runtime):
     assert "has no bound value" in str(caught.value)
 
 
+def test_font_resolves_named_banks_and_sets_the_prefix(runtime):
+    engine = runtime.engine("font @guest @second\n")
+    with mock.patch("reliquary.script_runner._fonts") as fonts:
+        fonts.load_font_bank.side_effect = lambda name, context: f"bank-{name}"
+        runtime.run_linear(engine)
+    assert engine._font_prefix == ("bank-guest", "bank-second")
+    fonts.load_font_bank.assert_any_call("guest", "/tmp/home")
+    fonts.load_font_bank.assert_any_call("second", "/tmp/home")
+
+
+def test_a_second_font_replaces_rather_than_appends(runtime):
+    # D109: a prefix in force from that point forward, not an
+    # accumulating list — an author who wants both names them
+    # together on the one statement.
+    engine = runtime.engine("font @a\nfont @b\n")
+    with mock.patch("reliquary.script_runner._fonts") as fonts:
+        fonts.load_font_bank.side_effect = lambda name, context: f"bank-{name}"
+        runtime.run_linear(engine)
+    assert engine._font_prefix == ("bank-b",)
+
+
+def test_font_from_a_property_resolves_at_run_time(runtime):
+    engine = runtime.engine(
+        "property media chosen\nfont $chosen\n",
+        bindings=BoundProperties({"chosen": "guest"}, {"chosen": "flag"}))
+    with mock.patch("reliquary.script_runner._fonts") as fonts:
+        fonts.load_font_bank.side_effect = lambda name, context: name
+        runtime.run_linear(engine)
+    fonts.load_font_bank.assert_called_once_with("guest", "/tmp/home")
+
+
+def test_font_from_an_unbound_property_fails_at_run_time(runtime):
+    engine = runtime.engine("property media chosen\nfont $chosen\n")
+    with mock.patch("reliquary.script_runner._fonts"):
+        with pytest.raises(ScriptRuntimeError) as caught:
+            runtime.run_linear(engine)
+    assert "has no bound value" in str(caught.value)
+
+
+def test_the_font_action_is_reported_with_at_sigils(runtime):
+    stream = _events.EventStream()
+    engine = runtime.engine("font @guest @second\n", events=stream)
+    with mock.patch("reliquary.script_runner._fonts") as fonts:
+        fonts.load_font_bank.side_effect = lambda name, context: name
+        runtime.run_linear(engine)
+    actions = [event for event in stream.events
+              if event["kind"] == _events.ACTION_START
+              and event.get("verb") == "font"]
+    assert actions[0]["detail"] == "@guest @second"
+
+
 def test_set_records_a_machine_variable(runtime):
     engine = runtime.engine('set result "PASS"\n')
     with mock.patch("reliquary.script_runner._machines") as machines:
@@ -1018,7 +1071,7 @@ def test_the_report_says_how_much_of_the_screen_was_a_guess(runtime):
     rows = ["nothing here"]
     attributes = [[0x07] * 80 for _ in rows]
 
-    def screen():
+    def screen(font_banks=()):
         runtime.console.reads += 1
         return text_recognize.Screen(
             rows, attributes, unreadable=((0, 4), (0, 5), (3, 9)))
@@ -1377,6 +1430,16 @@ class _Preflight:
                         "location": {"local": f"/{name}.iso"}}
                        for name in names], handle)
 
+    def write_font(self, name, cell_rows=16, codepage="cp437"):
+        """Declare an authored font in the home so `@name` preflights."""
+        fonts_dir = os.path.join(self.home, "fonts")
+        os.makedirs(fonts_dir, exist_ok=True)
+        with open(os.path.join(fonts_dir, f"{name}.rlqf"), "w",
+                  encoding="utf-8") as handle:
+            json.dump({"cell-rows": cell_rows, "codepage": codepage}, handle)
+        with open(os.path.join(fonts_dir, f"{name}.bin"), "wb") as handle:
+            handle.write(bytes(4096))
+
     def write_state(self, phase="ready", drives=None):
         root = os.path.join(self.home, "cache", "machines",
                             self.machine_id)
@@ -1442,6 +1505,25 @@ def test_a_property_media_reference_is_not_preflighted(preflight):
         "insert cdrom0 $disk\n")
     state = {"id": preflight.machine_id, "phase": "ready",
              "drives": {"cdrom0": {"medium": "cdrom", "slot": 0}}}
+    _preflight_machine_rules(script, state, "<script>", preflight.home)
+
+
+def test_an_unknown_font_reference_fails_before_execution(preflight):
+    preflight.write_font("guest")
+    preflight.write_state()
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(_HEAD + "machine stopped\nfont @guestt\n")
+    message = str(caught.value)
+    assert "no font named 'guestt'" in message
+    assert "did you mean 'guest'" in message
+
+
+def test_a_property_font_reference_is_not_preflighted(preflight):
+    preflight.write_state()
+    script = parse_script(
+        _HEAD + "machine stopped\nproperty media chosen\n"
+        "font $chosen\n")
+    state = {"id": preflight.machine_id, "phase": "ready", "drives": {}}
     _preflight_machine_rules(script, state, "<script>", preflight.home)
 
 

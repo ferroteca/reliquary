@@ -297,3 +297,29 @@ number they superseded.
      `rlq run-script` command: the medium the failed attempt
      inserted is out of the drive, and the boot arrangement it made
      is off the machine.
+
+- **U27 — Automate an installer that paints in its own font.** An
+  installer paints its first screen in a face of its own and never
+  offers a prompt to ask about it: there is no moment in that boot
+  when the guest could be asked what it loaded, and the run ends at
+  a timeout saying how much of the screen could not be read. The
+  author holds the face — it came off the installer's own media, or
+  off a guest of the same build — and states it as the font the
+  screen is read through from the point the installer takes the
+  screen over, the firmware having painted what came before in a
+  different one. From there the wait matches the text that was on
+  the screen all along.
+
+  Precondition: the blueprint copied out of the library —
+  `rlq seed-blueprint <name>` (U11).
+
+  1. **Declare the face, and what its bytes cannot say.**
+     `installer.rlqf` in the fonts directory — the cell size, and
+     the codepage its indices mean — with the font file beside it
+     as `installer.bin`.
+  2. **Name it where the installer takes the screen over.** In the
+     script, `font @installer` at the phase where the installer's
+     own screens begin: the font named is tried first and the
+     host's follow.
+  3. **Run the install.** `rlq run-script install --blueprint
+     <name>`.

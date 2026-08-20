@@ -31,6 +31,7 @@ from urllib.parse import urlsplit
 from . import text_recognize
 from .binding import bind_properties, console_asker, describe_sources
 from .document import load_document
+from . import fonts as _fonts
 from .errors import (PreflightError, ReliquaryError, RunCancelled,
                      RunFailure, StaticError, UnreadableScreen,
                      exit_code, outcome)
@@ -371,6 +372,10 @@ class _Sample:
     #: `unreadable` above cannot express: that one says no screen
     #: arrived, this one says one did and part of it is a guess.
     unclear: int = 0
+    #: The fonts this read was matched through, in try order (F61) —
+    #: empty for a backend that scrapes resolved characters, which
+    #: recognizes nothing and so consults no font.
+    fonts: tuple = ()
 
 
 class _Observation:
@@ -457,6 +462,9 @@ class _ScriptEngine:
         self._script_path = script_path
         self._running = False
         self._display = False
+        #: The banks a `font` statement's names resolved to, tried
+        #: before the host's own — empty until a script names one.
+        self._font_prefix = ()
         self._now = clock
         self._sleep = sleep
         self._step = 0
@@ -674,6 +682,7 @@ class _ScriptEngine:
             **{"nearest-miss": self._nearest_miss(),
                "unreadable-screen": self._unreadable_screen(),
                "unreadable-cells": self._unreadable_cells(),
+               "fonts-tried": self._fonts_tried(),
                "screenshot": self._failure_screenshot(),
                "next-command": self._next_command()})
         self._terminal(error)
@@ -728,6 +737,18 @@ class _ScriptEngine:
         if not self._last_sample or not self._last_sample.unclear:
             return None
         return self._last_sample.unclear
+
+    def _fonts_tried(self):
+        """The fonts the last read was matched through, in try order.
+
+        Beside `unreadable-cells`' count: an author who named the
+        wrong font is told what was actually consulted rather than
+        left with a silent timeout (F61, P11). Silent at empty —
+        the ordinary case, and a scraped read's always.
+        """
+        if not self._last_sample or not self._last_sample.fonts:
+            return None
+        return self._last_sample.fonts
 
     def _failure_screenshot(self):
         """Capture the failing screen, unless a secret has been typed.
@@ -1084,6 +1105,8 @@ class _ScriptEngine:
                 self._stop(statement)
             elif verb == "set":
                 self._set(statement)
+            elif verb == "font":
+                self._font(statement)
             else:
                 raise self._error(f"unknown statement: {verb}",
                                   statement,
@@ -1109,6 +1132,32 @@ class _ScriptEngine:
             raise self._error(str(exc), statement,
                               rule_id=exc.rule_id) from exc
         self._completed(statement, "set")
+
+    def _font(self, statement):
+        """Replace the font prefix (F61, D109).
+
+        `font @name...` states from this point forward: the named
+        fonts are tried before the host's own, in the order given. A
+        second `font` **replaces** the prefix rather than appending
+        to it — it is not an accumulating list, and an author who
+        wants both names them together on the one statement.
+        """
+        names = []
+        for kind, name in statement.arguments:
+            if kind == "property":
+                try:
+                    name = self._bindings[name]
+                except KeyError:
+                    raise _PropertyUnbound(name) from None
+            names.append(name)
+        self._action(statement, "font", " ".join(f"@{n}" for n in names))
+        try:
+            self._font_prefix = tuple(
+                _fonts.load_font_bank(name, self._context) for name in names)
+        except ReliquaryError as exc:
+            raise self._error(str(exc), statement,
+                              rule_id=exc.rule_id) from exc
+        self._completed(statement, "font")
 
     # -- observation ---------------------------------------------
 
@@ -1468,7 +1517,7 @@ class _ScriptEngine:
             with self._console() as console:
                 self._recognized_screens = getattr(
                     console, "recognizes_text", False)
-                frame = console.screen()
+                frame = console.screen(self._font_prefix)
             rows = frame[0]
         except (OSError, ConnectionError):
             # The QEMU process is gone: the guest powered itself off,
@@ -1495,7 +1544,8 @@ class _ScriptEngine:
         return self._sampled(
             _Sample(tuple(_normalize_row(row) for row in rows), False,
                     frame,
-                    unclear=len(text_recognize.unreadable_cells(frame))))
+                    unclear=len(text_recognize.unreadable_cells(frame)),
+                    fonts=getattr(frame, "fonts_tried", ())))
 
     def _sampled(self, sample):
         """Keep the latest reading, which the failure report needs."""
@@ -1862,6 +1912,14 @@ def _no_such_media(name, namespace):
     return f"no media named {name!r} in the active source{hint}"
 
 
+def _no_such_font(name, namespace):
+    """The diagnostic for a font reference the namespace lacks."""
+    close = difflib.get_close_matches(name, namespace, n=3, cutoff=0.6)
+    hint = ("; did you mean " + ", ".join(repr(other) for other in close)
+            if close else "")
+    return f"no font named {name!r} in the active source{hint}"
+
+
 def _preflight_machine_rules(script, machine_state, script_path,
                              context=None):
     """Fail before any guest input when a script names something the
@@ -1883,10 +1941,28 @@ def _preflight_machine_rules(script, machine_state, script_path,
     lazily: a script inserting nothing by name never pays for it.
     The slot is checked before the media on the same statement, in
     the order the author wrote them.
+
+    A third: a ``font`` naming no font the source defines (F61) —
+    checked the same way, a literal ``@name`` only, its own namespace
+    loaded lazily and separately from media's, since a script naming
+    no font never resolves one.
     """
     drives = machine_state.get("drives", {})
     namespace = None
+    font_namespace = None
     for statement in _walk(script):
+        if statement.verb == "font":
+            for kind, name in statement.arguments:
+                if kind != "media":
+                    continue
+                if font_namespace is None:
+                    font_namespace = _fonts.load_font_namespace(context)
+                if name not in font_namespace:
+                    raise ScriptPreflightError(
+                        _no_such_font(name, font_namespace),
+                        statement=statement, path=script_path,
+                        rule_id="font.unknown")
+            continue
         if statement.verb in ("insert", "eject"):
             slots = (statement.arguments[0],)
             removable_only = True

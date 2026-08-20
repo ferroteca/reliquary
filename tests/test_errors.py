@@ -322,7 +322,7 @@ EXEMPT = {"InternalError", "RunCancelled", "_PropertyUnbound",
 #: and did until this test was written.
 RETURNING = {"_startup_error", "_unbound_failure", "_chaining_failure",
              "_unbound", "_diagnose", "_error", "_expired",
-             "_unassigned", "_not_running"}
+             "_unassigned", "_not_running", "_field_error"}
 
 
 def test_every_deliberate_raise_names_a_rule():

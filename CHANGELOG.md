@@ -11,6 +11,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **A guest's own font is an authored asset, and a script can put it
+  in front of the host's** (F61; D109). The agentless display plane
+  used to read every screen through the *host's* hypervisor fonts
+  alone (`text_recognize.banks_from_binary`) — a guest that loaded a
+  face of its own, a localized installer painting in a codepage the
+  host never offers, was read through fonts that did not include it,
+  and a `wait` on that screen timed out. `<name>.rlqf` is the fix: a
+  JSON5 declaration beside its `<name>.bin` bank, resolving out of a
+  `fonts/` directory under the home (`docs/spec/asset-resolution.md`)
+  and sharing the one collision-checked `@` pool media names already
+  occupy. The declaration states exactly what 4096 bytes cannot —
+  the cell geometry (256 glyphs of 16 rows and 512 of 8 are the same
+  length) and the codepage its indices mean, decoded through Python's
+  own codec registry. `font @guest` is the new statement: a prefix in
+  force from that point in the run forward, replaced rather than
+  appended by a second `font`, and deliberately not a `with` head —
+  a font changes nothing on the machine and has nothing to put back.
+
+  **The match order is now a real priority, not a tie-break.** The
+  recognizer used to union every bank's shapes and take the globally
+  nearest match, order breaking ties alone — under which naming a
+  font could only ever *add* one more chance for a near-match to beat
+  the true glyph. It now tries banks in order and stops at the first
+  whose best match is inside the distance threshold, which is what
+  makes naming a font narrow the answer and makes a per-font codepage
+  well defined. The host's own fonts keep today's mapping
+  unconditionally, so no recorded transcript, fixture, or corpus
+  entry moved to land this. A wrong font now says so: the failure
+  report's unread-cell count gains the fonts the last read was
+  matched through, in the order they were tried (P11).
+
+  This is **U27's whole delivery** — promoted to root
+  [USE-CASES.md](USE-CASES.md) in this change (D34) — and half of
+  **U25**'s, which stays pledged until F62's DOS-side dump lands
+  beside it.
+
 ## 0.1.0a2 - 2026-08-19
 
 ### Added

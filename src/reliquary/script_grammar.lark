@@ -99,6 +99,7 @@ action: KW_ENTER STRING modifier* _NL                   -> enter
       | KW_SET NAME STRING modifier* _NL                -> set_var
       | KW_START modifier* _NL                          -> start
       | KW_STOP modifier* _NL                           -> stop
+      | KW_FONT media_arg+ modifier* _NL                -> font_stmt
 
 ?media_arg: MEDIA_REF | PROP_REF
 
@@ -114,5 +115,6 @@ _close: _BLOCK_CLOSE _NL
 %declare KW_WAIT KW_ON KW_ALWAYS
 %declare KW_GOTO KW_FINISH KW_ENTER KW_TYPE KW_PRESS KW_SELECT
 %declare KW_SCREENSHOT KW_INSERT KW_EJECT KW_SET_BOOT KW_SET KW_START KW_STOP
+%declare KW_FONT
 %declare NAME STRING REGEX DURATION MEDIA_REF PROP_REF MOD_NAME TRIPLE CONTENT_TEXT
 %declare _NL _BLOCK_OPEN _BLOCK_CLOSE

@@ -658,8 +658,14 @@ class QemuSession:
                 keys=[{"type": "qcode", "data": key} for key in combo])
             time.sleep(delay)
 
-    def text_screen(self):
-        """The native text readback: (character rows, attribute rows)."""
+    def text_screen(self, font_banks=()):
+        """The native text readback: (character rows, attribute rows).
+
+        ``font_banks`` (F61) is accepted and ignored: a native
+        text-memory read recognizes no pixels, so a script's `font`
+        statement has nothing to change here (`recognizes_text` below
+        is what tells a caller so).
+        """
         return vga_screen(self._qmp)
 
     def screenshot(self, path):

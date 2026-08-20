@@ -491,6 +491,7 @@ Statements:
 | `set` | variable key, string | — | — |
 | `start` | — | — | — |
 | `stop` | — | — | — |
+| `font` | one or more `@font`/`$property` references | — | — |
 
 And the two block declarations, the phase and the scope:
 
@@ -607,7 +608,10 @@ action          = "enter" , string , [ pacing-mod ] , eol
                 | "set-boot" , slot , { slot } , eol
                 | "set" , variable-key , string , eol
                 | "start" , eol
-                | "stop" , eol ;
+                | "stop" , eol
+                | "font" ,
+                  ( media-ref | property-ref ) ,
+                  { media-ref | property-ref } , eol ;
 
 block-open      = "{" , eol ;
 block-close     = "}" , eol ;
@@ -2197,6 +2201,51 @@ An unset variable and a machine that never ran still read alike
 through `get-machine-var`, deliberately; what the two verbs above
 add is a way to say that the silence was not expected.
 
+### `font`
+
+```rlqs
+font @guest
+font @installer $localized-face
+```
+
+`font` states a **prefix**, in force from that point in the run
+forward: the named fonts (`.rlqf`, an authored asset resolved
+through the ordinary catalog — [asset-resolution.md](asset-resolution.md))
+are tried before the host's own, in the order given (F61, D109). A
+second `font` **replaces** the prefix outright rather than appending
+to it — an author who wants two fonts in force at once names them
+together on the one statement. It takes one or more `@font` or
+`$property` references, the same typed pair `insert` accepts; a
+literal `@name` naming no font in the active source fails static
+preflight, before any guest input, exactly like `insert`'s
+`media.unknown` (below).
+
+**The match order is a real priority, not a tie-break.** The
+recognizer tries the first font in the (authored, then host) list
+whose best match for a cell is inside its distance threshold and
+stops there; a bank named later is consulted only when every
+earlier one misses. That is what makes naming a font *narrow* the
+answer rather than merely add one more candidate shape to a global
+scan, and it is also what makes a per-font codepage well defined:
+without an ordered decision, "the font that matched" names nothing.
+A font's declaration states what its bytes cannot — the cell
+geometry and the codepage its indices mean — and a cell matched
+through it decodes through that codepage; the host's own fonts keep
+today's mapping unconditionally.
+
+It is deliberately not a `with` head: the three the language has
+are all durable machine changes the scope exists to undo, and a
+font changes nothing on the machine and has nothing to put back
+(see [Scoped machine-state changes](#scoped-machine-state-changes)
+above). It is equally not a header declaration, which cannot say
+*when* in the boot the painting authority changes — only the script
+knows that.
+
+**A wrong font says so.** The failure report's unread-cell count
+gains the fonts the last read was matched through, in the order
+they were tried, so a script that named the wrong face is told what
+was actually consulted rather than left with a silent timeout (P11).
+
 ### File exchange — a named omission
 
 The language deliberately has no file-exchange verbs (owner,
@@ -2258,6 +2307,8 @@ scope, preflight further rejects, naming what it needed:
 
 - media references (`@name`) naming no media the namespace
   defines (the media namespace);
+- `font` references (`@name`) naming no font the source defines
+  (`font.unknown`, the font namespace — F61);
 - `insert`/`eject` slots and `set-boot` drives the target
   machine does not declare — a `with` head answering to the rule
   of the action it spells, and a scoped `boot` prefix to
@@ -2382,9 +2433,10 @@ ids that enforce each rule, which is where a reader goes from one
 to the other. The prefix is the subject, never the error class or
 the surface, because the namespace is shared across both: `obs.`,
 `wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
-`node.`, `http.`, `media.`, `machine.`, `platform.`, `progress.`,
-`store.`, `lex.`, `syn.`, `ref.`, `value.`, `field.`, `drive.`,
-`blueprint.`, `image.`, `screen.`, `script.`, `dir.`, `command.`.
+`node.`, `http.`, `media.`, `font.`, `machine.`, `platform.`,
+`progress.`, `store.`, `lex.`, `syn.`, `ref.`, `value.`, `field.`,
+`drive.`, `blueprint.`, `image.`, `screen.`, `script.`, `dir.`,
+`command.`.
 
 Every subject past the script language's own is a noun the rest of
 the model already uses, rather than a name invented for the

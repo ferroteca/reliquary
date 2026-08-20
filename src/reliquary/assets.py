@@ -32,22 +32,23 @@ this same seam.
 import os
 
 from .errors import PreflightError
-from .home import blueprints_dir, scripts_dir
+from .home import blueprints_dir, fonts_dir, scripts_dir
 
 
 # Authored-asset file extensions by kind. ``.json`` is the accepted
 # legacy spelling for blueprints; scripts have no legacy form.
 #
-# Two kinds are deliberately absent, both reserved in
-# docs/spec/asset-resolution.md rather than declared here. ``.rlqm``
+# One kind is deliberately absent, reserved in
+# docs/spec/asset-resolution.md rather than declared here: ``.rlqm``
 # retired with the composed model — a media is a spec inside a
-# ``.rlqb`` (D30). ``.rlql`` landmarks are unbuilt: nothing requests
-# the kind, and there is no ``landmarks`` working directory to
-# resolve one from, so declaring it would only advertise a
-# resolution that cannot happen.
+# ``.rlqb`` (D30). ``.rlql`` landmarks stay reserved there too —
+# nothing requests the kind yet — but ``.rlqf`` fonts (F61) are no
+# longer in that state: `fonts.py` requests them, and `fonts_dir`
+# resolves the directory they read from.
 KIND_EXTENSIONS = {
     "blueprint": (".rlqb", ".json"),
     "script": (".rlqs",),
+    "font": (".rlqf",),
 }
 
 
@@ -111,6 +112,7 @@ class DirectorySource(AssetSource):
     _DIRS = {
         "blueprint": blueprints_dir,
         "script": scripts_dir,
+        "font": fonts_dir,
     }
 
     def __init__(self, context=None):

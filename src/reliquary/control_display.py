@@ -307,9 +307,15 @@ class DisplayConsole:
         """Return the guest's text screen as character rows."""
         return self._session.text_screen()[0]
 
-    def screen(self):
-        """Return the screen as (character rows, attribute rows)."""
-        return self._session.text_screen()
+    def screen(self, font_banks=()):
+        """Return the screen as (character rows, attribute rows).
+
+        ``font_banks`` (F61) are authored fonts a script's `font`
+        statement named, tried before whatever fonts the session
+        itself reads through — a scraping session (QEMU's native
+        text-memory read) recognizes no pixels and simply ignores it.
+        """
+        return self._session.text_screen(font_banks)
 
     def cursor_menu_select(self, item, timeout=30, exclude=()):
         """Steer a cursor-key menu onto a matching item and press ENTER.

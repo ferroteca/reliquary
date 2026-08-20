@@ -22,7 +22,12 @@ BIOS installs its bank with an override table applied and draws its
 own messages that way, while a DOS guest loads its own font and
 draws with that. A framebuffer records only pixels, so nothing in a
 screenshot says which was in the VGA — every font a host offers is
-therefore collected, and a cell is matched against all of them.
+therefore collected, and a cell is matched against them **in
+order**, the first bank whose best match is inside the distance
+threshold deciding (F61, D109) — never a global nearest-of-all-of-
+them scan, which is what makes naming one first (:class:`Bank`, an
+authored font's declaration folded onto its bytes — ``fonts.py``)
+a real priority rather than one more candidate shape.
 """
 
 from __future__ import annotations
@@ -57,6 +62,53 @@ CLASSIC_A = bytes([
     0x00, 0x00, 0x10, 0x38, 0x6c, 0xc6, 0xc6, 0xfe,
     0xc6, 0xc6, 0xc6, 0xc6, 0x00, 0x00, 0x00, 0x00,
 ])
+
+
+class Bank(bytes):
+    """A glyph bank plus what its bytes cannot say (F61, D109).
+
+    A ``bytes`` subclass — every existing caller that reads a bank
+    as bytes (slicing, :func:`check_bank`, :func:`glyph_bitmap`)
+    keeps working unmodified, and a bare ``bytes`` bank compares
+    and hashes equal to a :class:`Bank` wrapping the same data with
+    the same geometry and codepage — carrying three facts an
+    authored font's declaration states and a host-extracted bank
+    leaves at their defaults: ``cell_rows`` (16 or 8 — the same
+    4096 bytes read as 256 or 512 glyphs), ``codepage`` (``None``
+    keeps today's :func:`_cp437_char` mapping unconditionally; a
+    name is decoded through Python's own codec registry), and
+    ``source`` (a label for the failure report's "fonts tried").
+
+    Equality and hashing fold in ``cell_rows``/``codepage`` rather
+    than trusting raw bytes alone: two authored fonts that happen to
+    ship the same bank under different codepages must never collide
+    in the per-bank glyph cache and silently decode through the
+    wrong one. ``source`` is excluded on purpose — a display label
+    only, it must not fork the cache or the matching identity.
+    """
+
+    def __new__(cls, data, cell_rows=16, codepage=None, source=None):
+        self = super().__new__(cls, data)
+        self.cell_rows = cell_rows
+        self.codepage = codepage
+        self.source = source
+        return self
+
+    def __eq__(self, other):
+        if isinstance(other, Bank):
+            return (bytes(self) == bytes(other)
+                    and self.cell_rows == other.cell_rows
+                    and self.codepage == other.codepage)
+        if isinstance(other, (bytes, bytearray)):
+            return bytes(self) == bytes(other)
+        return NotImplemented
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        return result if result is NotImplemented else not result
+
+    def __hash__(self):
+        return hash((bytes(self), self.cell_rows, self.codepage))
 
 
 def check_bank(data, source):
@@ -317,13 +369,26 @@ def glyph_bank():
 
 
 def glyph_bitmap(code, bank=None):
-    """8×16 boolean rows for CP437 code ``code`` (0..255)."""
+    """8×16 boolean rows for CP437 code ``code`` (0..255).
+
+    ``bank``'s own ``cell_rows`` (a plain ``bytes`` bank is always
+    16, matching every host-extracted and shipped font) decides how
+    the 4096 bytes slice: 16 rows read 256 glyphs directly, 8 rows
+    read 512 and address only the first 256 (Reliquary's codes are
+    always the 8-bit CP437 range) — row-doubled here so an 8-row
+    glyph still compares against the fixed 8×16 captured cell every
+    match runs against.
+    """
     data = glyph_bank() if bank is None else bank
-    base = (code & 0xFF) * _CELL_H
+    cell_rows = getattr(bank, "cell_rows", 16) if bank is not None else 16
+    base = (code & 0xFF) * cell_rows
     rows = []
-    for y in range(_CELL_H):
+    for y in range(cell_rows):
         byte = data[base + y]
         rows.append([(byte >> (7 - x)) & 1 for x in range(_CELL_W)])
+    if cell_rows < _CELL_H:
+        scale = _CELL_H // cell_rows
+        rows = [row for row in rows for _ in range(scale)]
     return rows
 
 
@@ -386,54 +451,42 @@ def as_banks(bank):
     A caller may name one font or several, and passing ``None`` means
     Reliquary's own. Several is the honest case for a live guest: a
     run paints in more than one font and a framebuffer does not say
-    which (see :func:`banks_from_binary`).
+    which (see :func:`banks_from_binary`). A :class:`Bank` instance
+    passes through unchanged rather than being coerced to plain
+    ``bytes`` — coercing would strip the geometry and codepage an
+    authored font's declaration attached.
     """
     if bank is None:
         return (glyph_bank(),)
+    if isinstance(bank, Bank):
+        return (bank,)
     if isinstance(bank, (bytes, bytearray)):
         return (bytes(bank),)
-    return tuple(bytes(one) for one in bank)
+    return tuple(one if isinstance(one, Bank) else bytes(one) for one in bank)
 
 
-@lru_cache(maxsize=4)
-def _all_glyph_bits(banks):
-    """Every glyph of every bank as flat bits, as ``(code, bits)`` pairs.
+@lru_cache(maxsize=32)
+def _bank_glyph_bits(bank):
+    """One bank's 256 glyphs as flat bits, as ``(code, bits)`` pairs.
 
-    The union, not a concatenation: a code whose shape is the same in
-    two banks appears once. That is what makes supporting several
-    fonts nearly free — the shapes they share cost nothing, and only
-    the glyphs they actually disagree about are scored twice.
-
-    Cached on the banks' own bytes rather than on nothing, so a host
-    that drives two backends with different BIOS fonts in one process
-    does not read the second through the first one's glyphs.
+    Per bank, not a union: the match order is a real priority (F61,
+    D109) — the first bank whose best match is inside the threshold
+    decides, so a later bank's shapes must never be folded in with
+    the leading one's. Cached on the bank's own identity (its bytes
+    *and* its declared geometry/codepage, via :class:`Bank`'s own
+    equality) so a host driving two backends with different fonts in
+    one process never mixes them, and two authored fonts that happen
+    to share a bank under different codepages never collide either.
     """
-    entries = []
-    seen = set()
-    for bank in banks:
-        for code in range(_GLYPHS):
-            bits = tuple(_glyph_bits(code, bank))
-            if (code, bits) in seen:
-                continue
-            seen.add((code, bits))
-            entries.append((code, bits))
-    return tuple(entries)
+    return tuple((code, tuple(_glyph_bits(code, bank)))
+                 for code in range(_GLYPHS))
 
 
-def _match_glyph_with_distance(bits, banks):
-    """Best CP437 code and its Hamming distance for ``bits``.
-
-    Whichever font drew the cell, the code is the same — an override
-    table gives a glyph a different shape, not a different meaning —
-    so scoring every shape and keeping the nearest reads a screen
-    without knowing which font is loaded. Ties go to the first bank,
-    which keeps two runs on the same host agreeing.
-    """
-    if not any(bits):
-        return 0x20, 0
+def _match_in_bank(bits, bank):
+    """Best CP437 code and its Hamming distance, within one bank alone."""
     best_code = 0x20
     best_dist = _CELL_W * _CELL_H + 1
-    for code, glyph in _all_glyph_bits(banks):
+    for code, glyph in _bank_glyph_bits(bank):
         dist = sum(a != b for a, b in zip(bits, glyph))
         if dist < best_dist:
             best_dist = dist
@@ -443,30 +496,56 @@ def _match_glyph_with_distance(bits, banks):
     return best_code, best_dist
 
 
+def _match_glyph_with_distance(bits, banks):
+    """Best code, the bank it came from, and its Hamming distance.
+
+    **The first bank whose best match is inside the threshold
+    decides** (F61, D109): banks are tried in the order given, and a
+    bank past the threshold is not consulted further once an earlier
+    one already believes it. Only a universal miss falls through
+    every bank, and even then the closest guess across all of them
+    is returned — never acted on as a real match (:func:`_match_cell`
+    substitutes a space past the threshold regardless of code), but
+    honest about how close the nearest wrong answer was.
+    """
+    if not any(bits):
+        return 0x20, banks[0] if banks else None, 0
+    best_code, best_bank, best_dist = 0x20, None, _CELL_W * _CELL_H + 1
+    for bank in banks:
+        code, dist = _match_in_bank(bits, bank)
+        if dist < best_dist:
+            best_code, best_bank, best_dist = code, bank, dist
+        if dist <= _MAX_DISTANCE:
+            break
+    return best_code, best_bank, best_dist
+
+
 def _match_cell(pixels, width, height, banks):
-    """``(cp437_code, fg, bg, matched)`` for one cell.
+    """``(cp437_code, fg, bg, matched, bank)`` for one cell.
 
     ``matched`` is False where the nearest glyph was too far to be
     believed and a space was substituted. That is not the same fact
     as "this cell is blank", and conflating the two is how a screen
     drawn in an unknown font reads as ordinary text (see
-    :func:`recognize`).
+    :func:`recognize`). ``bank`` is the bank the winning match came
+    from — ``None`` when unmatched, since the substituted space is
+    decoded the same way regardless of codepage.
     """
     primary, secondary = _cell_colours(pixels)
     if primary == secondary:
-        return 0x20, primary, primary, True
+        return 0x20, primary, primary, True, banks[0] if banks else None
     # Try both polarities: glyph ink may be the minority colour
     # (normal text) or the majority (an inverted highlight bar).
     candidates = []
     for fg, bg in ((secondary, primary), (primary, secondary)):
         bits = _binarize_as(pixels, fg, bg, width, height)
-        code, dist = _match_glyph_with_distance(bits, banks)
-        candidates.append((dist, code, fg, bg))
+        code, bank, dist = _match_glyph_with_distance(bits, banks)
+        candidates.append((dist, code, fg, bg, bank))
     candidates.sort(key=lambda item: item[0])
-    dist, code, fg, bg = candidates[0]
+    dist, code, fg, bg, bank = candidates[0]
     if dist > _MAX_DISTANCE:
-        return 0x20, secondary, primary, False
-    return code, fg, bg, True
+        return 0x20, secondary, primary, False, None
+    return code, fg, bg, True, bank
 
 
 def _cp437_char(code):
@@ -478,6 +557,23 @@ def _cp437_char(code):
     # High CP437: expose as Latin-1 so fixtures can round-trip box
     # drawing as the same code points the bank uses.
     return chr(code)
+
+
+def _decode(code, bank):
+    """Character for a matched code, through ``bank``'s own codepage.
+
+    ``None`` (every host-extracted or shipped bank, and the
+    unmatched-cell case) keeps :func:`_cp437_char`'s mapping
+    unconditionally (D109: nothing already recorded moves). A
+    :class:`Bank` with an explicit ``codepage`` decodes through
+    Python's own codec registry instead — validated when the
+    declaration was read, so a lookup failure here would be this
+    module's own bug rather than a caller's mistake.
+    """
+    codepage = getattr(bank, "codepage", None) if bank is not None else None
+    if codepage is None:
+        return _cp437_char(code)
+    return bytes([code & 0xFF]).decode(codepage, errors="replace")
 
 
 class Screen(tuple):
@@ -494,9 +590,16 @@ class Screen(tuple):
     neither is anywhere near the pixels.
     """
 
-    def __new__(cls, text_rows, attribute_rows, unreadable=()):
+    def __new__(cls, text_rows, attribute_rows, unreadable=(),
+               fonts_tried=()):
         screen = super().__new__(cls, (text_rows, attribute_rows))
         screen.unreadable = tuple(unreadable)
+        #: The banks this read was matched against, in try order —
+        #: each bank's ``source`` label, or ``"default"`` for one
+        #: that carries none. Empty for a screen built with none of
+        #: this (the ``(rows, attrs)`` tuple form other callers still
+        #: construct directly).
+        screen.fonts_tried = tuple(fonts_tried)
         return screen
 
 
@@ -587,15 +690,17 @@ def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
             for y in range(cell_h):
                 base = (y0 + y) * image.width + x0
                 cell.extend(pixels[base:base + cell_w])
-            code, fg, bg, matched = _match_cell(
+            code, fg, bg, matched, cell_bank = _match_cell(
                 cell, cell_w, cell_h, banks)
             if not matched:
                 unreadable.append((row, col))
-            chars.append(_cp437_char(code))
+            chars.append(_decode(code, cell_bank))
             attrs.append(attribute_token(fg, bg))
         text_rows.append("".join(chars).rstrip())
         attr_rows.append(attrs)
-    return Screen(text_rows, attr_rows, unreadable)
+    fonts_tried = tuple(getattr(one, "source", None) or "default"
+                        for one in banks)
+    return Screen(text_rows, attr_rows, unreadable, fonts_tried)
 
 
 def render(text_rows, attribute_rows=None, *,

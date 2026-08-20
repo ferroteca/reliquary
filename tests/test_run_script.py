@@ -215,7 +215,7 @@ def _run_engine(home):
         def screen_text(self):
             return ["Hello"]
 
-        def screen(self):
+        def screen(self, font_banks=()):
             rows = self.screen_text()
             return rows, [[0x07] * 80 for _ in range(len(rows))]
 
@@ -568,7 +568,7 @@ def _poll_gaps(tmp_path, **recording):
     @contextlib.contextmanager
     def blank():
         class _Console:
-            def screen(self):
+            def screen(self, font_banks=()):
                 return [""] * 25, [[0x07] * 80 for _ in range(25)]
 
             def screen_text(self):

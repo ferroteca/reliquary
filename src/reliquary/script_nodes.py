@@ -60,7 +60,7 @@ KEYWORDS = (
     "pacing", "stability",
     "property", "http", "content", "phase", "with", "wait", "on", "always",
     "goto", "finish", "enter", "type", "press", "select", "screenshot",
-    "insert", "eject", "set-boot", "set", "start", "stop",
+    "insert", "eject", "set-boot", "set", "start", "stop", "font",
 )
 
 
