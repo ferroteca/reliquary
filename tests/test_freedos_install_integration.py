@@ -27,11 +27,13 @@ import pytest
 
 from reliquary.backend_qemu import find_qemu, find_qemu_img
 from reliquary.errors import RunFailure
+from reliquary.home import blueprints_dir
 from reliquary.interaction_agentless import AgentlessGuestExec
-from reliquary.library import seed_blueprint
+from reliquary.library import seed_blueprint, seed_script
 from reliquary.machine_handle import Machine
-from reliquary.machines import (get_machine_var, load_machine_state,
-                                machine_dir_path, stop_machine)
+from reliquary.machines import (apply_blueprint, get_machine_var,
+                                load_machine_state, machine_dir_path,
+                                stop_machine)
 from reliquary.script_runner import resolve_key, run_script
 from reliquary.transcript import RecordingSession, _TranscriptWriter
 from tests import live_external_effects
@@ -196,3 +198,63 @@ def test_freedos_plain_install_and_verify(integration_home):
                 "never installed on the exec adapter's session")
 
         stop_machine(handed_off.machine_id, context=home)
+
+
+def _add_font_dump_drive(home, exchange_dir):
+    """Give the seeded freedos blueprint the slot F62's script writes
+    through.
+
+    The codex blueprint declares none (D108, P16) — a host directory
+    is the author's own path — so a real test supplies one exactly as
+    the docs tell an author to: editing the seeded copy rather than
+    the codex source, which stays untouched.
+    """
+    path = os.path.join(blueprints_dir(home), "freedos.rlqb")
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    location = exchange_dir.replace("\\", "/")
+    text = text.replace(
+        '"cdrom0": null',
+        '"cdrom0": null,\n      "floppy0": {\n        "type": "media",\n'
+        f'        "location": "{location}",\n        "materialize": "use"\n'
+        '      }',
+        1)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
+def test_freedos_dump_font(integration_home):
+    """F62: the guest is asked for the live font it loaded.
+
+    A fresh install rather than a reused machine: the drive this
+    script needs is not part of the codex shape, so the blueprint is
+    changed and adopted (`apply-blueprint`) before the machine ever
+    starts, which the shape baseline only accepts from stopped.
+    """
+    find_qemu()
+    find_qemu_img()
+    home = integration_home
+
+    with live_external_effects():
+        seed_blueprint("freedos", context=home)
+        seed_script("freedos-dump-font", context=home)
+
+        exchange = os.path.join(home, "font-dump-exchange")
+        os.makedirs(exchange, exist_ok=True)
+        _add_font_dump_drive(home, exchange)
+
+        installed = run_script("install", blueprint="freedos", context=home,
+                               record=_capture(home, "dump-font-install"))
+        assert installed.machine_phase == "ready"
+
+        apply_blueprint(machine=installed.machine_id, context=home)
+
+        run_script("freedos-dump-font", machine=installed.machine_id,
+                  context=home, record=_capture(home, "dump-font"))
+
+        written = os.listdir(exchange)
+        assert len(written) == 1, (
+            f"expected one dumped file in {exchange}, found {written}")
+        assert os.path.getsize(os.path.join(exchange, written[0])) == 4096
+
+        stop_machine(installed.machine_id, context=home)

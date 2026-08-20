@@ -13,6 +13,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The DOS control plane can ask a guest for the font it loaded**
+  (F62; D109), completing **U25** — promoted to root
+  [USE-CASES.md](USE-CASES.md) in this change (D34), F61 having
+  already delivered its other half. `INT 10h AH=11h AL=30h` with
+  `BH=03h` returns a pointer to the *live* 8x16 character table the
+  guest installed, not a fixed ROM address, all 256 glyphs in 4096
+  bytes — guest-specific by nature, so the dumper is a codex script
+  (`freedos-dump-font.rlqs`) rather than any one author's script's
+  business. `DEBUG`, already on every codex FreeDOS install's `PATH`,
+  is typed a stub that makes the call, copies the table to a fixed
+  offset in its own segment, and writes it out; nothing programmatic
+  is staged, and nothing remains in the guest once the stub has run
+  and the machine is off (P2, P3).
+
+  **The bytes cross on a drive the author supplies.** The codex
+  blueprint declares no such drive (P16, D108) — a host directory is
+  the author's own path — so the script writes through `floppy0`,
+  a slot whose DOS letter (`A:`) is fixed independently of whatever
+  else the machine has attached. A blueprint that never gained the
+  slot reads honestly from the guest's own DOS rather than
+  succeeding into an empty directory: the write fails the way an
+  empty floppy always has, and the run ends there naming exactly
+  that (P11) — a directory-source drive carries no image for a live
+  insert or eject to swap against, so there is no cheaper preflight
+  than the guest's own answer.
+
 - **A guest's own font is an authored asset, and a script can put it
   in front of the host's** (F61; D109). The agentless display plane
   used to read every screen through the *host's* hypervisor fonts

@@ -39,6 +39,49 @@ host directory with `materialize: use`, and name it from a drive: that
 directory *is* the drive, readable and writable while the machine is
 stopped.
 
+## Reading the guest's own font
+
+A screen is read through the fonts the *host's* hypervisor installs by
+default, and a guest that loads a face of its own — a prepared
+codepage, a localized shell — is read through fonts that do not
+include it. The guest is the only party that knows what it loaded, and
+on DOS it can be asked: `rlq seed-script freedos-dump-font` (U11)
+brings in a codex script that boots to a prompt, reads the live VGA
+character table, and writes it out as 4096 raw bytes.
+
+The bytes cross on a drive you supply — the codex blueprint declares
+none, because a host directory is your own path (see above). Add a
+`floppy0` drive whose media is a host directory before running the
+script:
+
+```json
+"drives": {
+  "floppy0": {
+    "type": "media",
+    "location": "./font-exchange",
+    "materialize": "use"
+  }
+}
+```
+
+`rlq apply-blueprint --blueprint <name>` hands a stopped machine a
+drive its blueprint gained, then `rlq run-script freedos-dump-font
+--blueprint <name>` boots the guest, writes `FONT.BIN` into that
+directory, and powers the machine off. Floppy lettering is fixed by
+DOS independently of whatever else the machine has attached, so a
+lone `floppy0` is always `A:` regardless of how many hard disks or
+CD-ROMs are also declared. A blueprint that never gained the slot
+fails the run the same way a real, empty floppy drive would — there
+is no cheaper check than the guest's own answer, since a
+directory-source drive carries no image for a live insert or eject
+to preflight against.
+
+The dumped bytes are the cell bitmaps alone; declaring what they
+*mean* — the cell geometry and the codepage the indices decode
+through — is a `<name>.rlqf` authored font
+([asset resolution](spec/asset-resolution.md)), read through with a
+script's `font @name` statement.
+
 ## Example workflow
 
 ```powershell

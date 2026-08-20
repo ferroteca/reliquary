@@ -266,6 +266,44 @@ number they superseded.
      medium as those phases begin.
   3. **Run it.** `rlq run-script install --blueprint <name>`.
 
+- **U25 — Automate a guest that paints in its own font.** A script
+  waits for text the author can plainly see on the screen, and the
+  wait never matches. The guest has loaded a face of its own — a
+  prepared codepage, a localized shell — and the screen is being
+  read against the fonts the *host's* hypervisor installed, which
+  do not include it; the run ends at a timeout saying how much of
+  the screen could not be read. The guest is the only party that
+  knows what it loaded, and wherever a script can reach a prompt it
+  can be asked: the face comes out of the running guest, is kept as
+  an asset of its own, and is named from the point in the run where
+  the guest takes the screen over — the firmware painted the
+  earlier screens, and painted them in a different face. From there
+  the wait matches the text that was on the screen all along, and
+  the guest automates on any host that will run it (U7).
+
+  Precondition: an installed machine (U12), and the dumper copied
+  out of the library — `rlq seed-script freedos-dump-font` (U11).
+
+  1. **Give the machine somewhere to put the dump.** In the
+     blueprint, a drive whose media is a host directory — the drive
+     the file crosses on, with nothing of Reliquary's inside it
+     (U14) — and `rlq apply-blueprint --blueprint <name>`, which is
+     what hands the stopped machine a drive its blueprint gained.
+  2. **Ask the guest for the font it loaded.** `rlq run-script
+     freedos-dump-font --blueprint <name>`: it boots to a prompt,
+     reads the live glyph table, writes it to that drive as
+     `FONT.BIN`, and powers the machine off. The 4096 bytes are in
+     the author's own directory when the run returns.
+  3. **Declare what the bytes cannot say.** `guest.rlqf` in the
+     fonts directory — the cell size, and the codepage the bank's
+     indices mean — with the dumped file beside it as `guest.bin`.
+  4. **Name it where the guest takes the screen over.** In the
+     script, `font @guest` at the phase that follows the guest's
+     own font load: the font named is tried first and the host's
+     follow.
+  5. **Run the script.** `rlq run-script <script> --blueprint
+     <name>`.
+
 - **U26 — Iterate on an install script without repairing the
   machine between attempts.** Writing an install script is a loop
   of failed runs: a wait whose screen never arrives, a menu that

@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: GPL-3.0-only
+
+description "Ask the guest for its live VGA font and write it to FONT.BIN"
+platform    dos
+machine     stopped
+timeout     2m
+
+# The guest is the only party that knows which font it loaded (U25,
+# D109). `INT 10h AH=11h AL=30h` with `BH=03h` returns a pointer
+# (ES:BP) to the live 8x16 character table the guest installed — not
+# a fixed ROM address — all 256 glyphs, 4096 bytes. DEBUG is present
+# on every codex FreeDOS install (`C:\FREEDOS\BIN`, on PATH), so the
+# call is made by typing a stub at its prompt rather than staging a
+# program (P2, P3): the stub runs once and goes with the machine.
+#
+# `floppy0` is the slot this script writes through — undeclared on
+# the codex blueprint (P16, D108): a host directory is the author's
+# own path, so give the machine one before running this
+# (docs/dos-automation.md). Floppy lettering is fixed by DOS
+# independently of whatever else the machine has attached, so a lone
+# floppy0 is always A: — no insert or eject appears here, because a
+# directory-source (vvfat) drive carries no image for a live swap to
+# match sizes against (`machines._medium_size`), so attaching it is
+# the blueprint's job, done once, before start. A blueprint that
+# never gained the slot reads honestly from the guest's own DOS: `A:`
+# was never a real drive, so writing to it fails the same way an
+# empty floppy would, and the run ends at this script's `wait` rather
+# than with a corrupt or missing FONT.BIN (P11).
+start
+wait "C:\>"
+enter "DEBUG"
+wait /^-$/
+enter "A 100"
+enter "mov ah,11"
+enter "mov al,30"
+enter "mov bh,3"
+enter "int 10"
+# ES:BP now points at the live table. Copying it down to a fixed
+# offset in this program's own segment (CS:0300, well past the stub)
+# means the write below never has to know that segment's number —
+# DEBUG's `W` always writes relative to CS unless told otherwise.
+enter "mov si,bp"
+enter "mov ax,es"
+enter "mov ds,ax"
+enter "mov ax,cs"
+enter "mov es,ax"
+enter "mov di,300"
+enter "mov cx,1000"
+enter "cld"
+enter "rep movsb"
+enter "int 3"
+enter ""
+wait /^-$/
+enter "G=100"
+wait "Unexpected breakpoint interrupt"
+# BX:CX is the byte count DEBUG's `W` writes when the target file is
+# new — 0000:1000 (4096) — set explicitly rather than trusted from
+# whatever the registers already held.
+enter "N A:\FONT.BIN"
+enter "R BX"
+enter "0"
+enter "R CX"
+enter "1000"
+enter "W 300"
+wait "Writing 1000 bytes"
+enter "Q"
+wait "C:\>"
+enter "fdapm poweroff"
+wait machine=stopped timeout=2m
