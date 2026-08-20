@@ -144,6 +144,15 @@ fixed-font recognizer** over the captured framebuffer. The
 recognizer is written once, not per adapter, and lives with the
 control plane, not behind the seam.
 
+**Its whole input is what the host's hypervisor binaries carry** —
+the banks a backend's own BIOS ships, read off the installation and
+cached, never vendored. So a guest that loads a face of its own is
+read through fonts that do not include it, which is **U25**'s
+demand: the guest's font among the ones the screen is read through,
+taken from the guest where a script can reach a prompt or supplied
+by the author where it cannot (**U27**), and named from the point in
+the run where the guest takes the screen over.
+
 The snapshot contract that makes this portable: **character rows
 plus opaque, equality-comparable per-cell attribute tokens.** The
 cursor-menu machinery never interprets attribute values — it

@@ -1386,9 +1386,9 @@ activation (the phase deadline's scope), a span per observation
   with rows has a nearest miss; a screen with none — a guest
   painting in a video mode the display plane cannot describe — has
   the captured shape instead; and a screen that *arrived* but was
-  drawn in a font the host does not hold has rows that were partly
-  substituted, so its nearest miss is measured against text that
-  was never read. A recognized screen is a measurement, and one
+  drawn in a font the host does not hold (**U25**) has rows that
+  were partly substituted, so its nearest miss is measured against
+  text that was never read. A recognized screen is a measurement, and one
   reporting no confidence cannot be told from a good one; an
   expiry therefore never reports silence where it had a reason,
   nor certainty it does not have. A backend that scrapes resolved

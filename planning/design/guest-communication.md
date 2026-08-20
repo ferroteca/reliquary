@@ -117,7 +117,12 @@ backends supply their native input injection and framebuffer
 capture as adapter carriers, and text readback there runs **one
 shared fixed-font recognizer** over the captured framebuffer
 (owner, 2026-07-21) — a control-plane composition over adapter
-carriers, never a per-backend reimplementation. The portable
+carriers, never a per-backend reimplementation. The fonts it reads
+through are the *host's* own, which is **U25**'s gap: a guest
+painting in a face the host does not hold is read through banks that
+do not include it, and the pledged answer is an authored font asset
+named from the point in the run where the guest takes the screen
+over. The portable
 snapshot contract — character rows plus opaque,
 equality-comparable per-cell attribute tokens — is in
 [backend-adapter.md](backend-adapter.md).

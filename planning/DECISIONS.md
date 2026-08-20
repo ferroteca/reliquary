@@ -178,6 +178,100 @@ is waiting on an answer today.
 
 ## Decided
 
+- D109 — THE GUEST'S OWN FONT IS AN AUTHORED ASSET, AND ITS BYTES
+  CROSS ON A DRIVE — DECIDED (owner, 2026-08-19, the U25 pledge
+  round). Supports **U25** and **U27**; P10, P12, P14, P16, S3, S8.
+  Adopts
+  [design/authored-binary-assets.md](design/authored-binary-assets.md)'s
+  shape for its second kind, which is the proposal that document
+  said each adopting kind still owes. Bounded by **D108**, whose
+  file-content carve-out it applies rather than reopens.
+
+  Four calls, and the draft named the two it left open: what a
+  font's declaration states, and how the bytes leave the guest.
+  Both are answered here, because the journey lands with the pledge
+  and a journey names commands.
+
+  **The demand is two use cases, not one with two doors.** U25 as
+  drafted named a font *taken from the guest* and a font *the author
+  supplies*, deliberately, because neither door covers what the
+  other does: asking needs a prompt, and an installer paints before
+  any prompt exists in that boot. But a journey states one path —
+  the fewest steps that reach the goal, options belonging to a guide
+  — so the second door became **U27**, a goal someone pursues in its
+  own right rather than a branch inside U25's steps. Neither half
+  changed in substance, and **F61 delivers both**; only the dump
+  (F62) is U25's alone. This is the U24/U26 shape, one round later
+  and for the same reason.
+
+  **The bytes cross on a drive the author supplied.** A
+  directory-source media attaches a host directory, the guest writes
+  `FONT.BIN` into it, and the author reads it off their own disk —
+  exactly what D108 settled for a file crossing the boundary, and it
+  costs no new mechanism at all. Two prices are accepted and named
+  rather than argued away: directory-source drives are QEMU-only, so
+  the *dump* is bound to QEMU while the asset it produces is
+  portable to every backend; and the file lands once the machine
+  stops, which an authoring act performed once per guest font can
+  afford.
+
+  WEIGHED AND DECLINED: **a UART pointed at a host file.** It is the
+  better transport on the merits — portable across both reference
+  backends, raw bytes, no filesystem tooling — and it is declined
+  for what it drags in rather than for what it does. `serial-console`
+  sits in the control-plane vocabulary (`document.py`) with nothing
+  behind it; a declared serial device is new blueprint surface plus
+  endpoint lifecycle, a feature of its own, and a write-only file
+  sink bolted on for one authoring act would settle the serial
+  plane's shape sideways, before the plane is argued. Also declined:
+  **an image swapped live and opened with the author's own tools** —
+  portable and equally mechanism-free, but getting 4096 bytes out of
+  a FAT image is a step the journey cannot state as one command.
+
+  WHAT WOULD REOPEN IT: the serial plane being designed for its own
+  reasons, or a directory-source drive reaching a second backend.
+  Either makes the dump portable, and the QEMU bound above is the
+  only thing this call is paying.
+
+  **A script names the font with `font @name`, a statement stating a
+  prefix.** From that point in the run forward the fonts named are
+  tried first and the host's follow; a second `font` replaces the
+  prefix rather than appending. It is a new action kind in an
+  existing node shape, which is what G7 prices cheaply.
+
+  WEIGHED AND DECLINED: **a `with font @name { … }` head.** The
+  scoped block is the obvious neighbour, and it is wrong on the
+  construct's own terms: the head vocabulary is closed at three
+  names, every one of them a durable machine change the scope exists
+  to *undo* (D104), and a font changes nothing on the machine, so
+  there is nothing to put back and no reason for the block. Also
+  declined: **a header declaration.** Cheapest of the three and
+  statically obvious, and it cannot express the finding the case
+  rests on — the painting authority changes mid-boot, the firmware
+  paints the earlier screens in a different face, and only the
+  script knows when.
+
+  **The declaration states the codepage, and the match order becomes
+  a priority.** Beyond the cell size — 256 glyphs of 16 rows and 512
+  of 8 being the same 4096 bytes, so geometry is declared and never
+  inferred (P10) — a bank declares what its indices *mean*, and a
+  cell matched in an authored bank decodes through it. The host's
+  own banks keep today's mapping, so nothing already recorded moves.
+  The two halves are one call: the recognizer currently unions every
+  bank's shapes and takes the globally nearest, with order breaking
+  ties alone, and under that rule "the bank that matched" names
+  nothing and a named font could only *add* a chance for a
+  near-match to beat the true glyph. First-bank-inside-the-threshold
+  is what makes both the narrowing and the decode mean anything.
+
+  WEIGHED AND DECLINED: **cell size alone**, leaving matched codes
+  with today's meanings. Materially smaller — nothing in the text
+  pipeline, the transcripts, or the fixtures moves — but it meets
+  the case only for a guest whose face differs while its code points
+  do not, and "a prepared codepage, a localized installer" is the
+  case's own example: the glyph would be found and the wait would
+  still miss.
+
 - D108 — A MACHINE'S FILE CONTENT LEAVES RELIQUARY, AND THE VOLUME
   MAPPING GOES WITH IT — DECIDED (owner, 2026-08-16). Supports
   U14, U20; P16, P18. Amends **U14** and **P16**, strikes **P17**

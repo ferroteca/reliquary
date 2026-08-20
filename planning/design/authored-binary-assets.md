@@ -16,7 +16,13 @@ SPDX-License-Identifier: GPL-3.0-only
 > a second, and **U6**'s recorder captures a third. **It authorizes
 > no implementation.** A kind adopting the shape still arrives as
 > its own proposal and takes the surface-change rule
-> ([SURFACES.md](../SURFACES.md)) for the vocabulary it adds.
+> ([SURFACES.md](../SURFACES.md)) for the vocabulary it adds. **The
+> font kind has now done exactly that** (2026-08-19): U25 and U27
+> are pledged, and **F61**
+> ([pledged/FEATURES.md](../pledged/FEATURES.md)) is the entry that
+> adopts this shape — `.rlqf` beside its bank, one `@` pool, the
+> declaration owning the cell size and the codepage the bytes cannot
+> state (D109).
 
 ## The question
 
