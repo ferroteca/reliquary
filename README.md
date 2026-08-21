@@ -291,6 +291,13 @@ Reliquary therefore works **agentlessly**:
 The guest needs no Reliquary software, network driver, serial driver, or background service. This makes the harness
 useful even while the guest is partially configured or broken.
 
+A blueprint may also select the `vnc` control plane (QEMU only for
+now): the machine starts with a loopback VNC server, keys arrive as
+VNC key events, and the screen is read off the framebuffer by
+Reliquary's fixed-font recognizer. Nothing changes in the guest, so
+it is equally agentless — see `control-planes` in the
+[blueprint field reference](docs/blueprint-reference.md).
+
 Any DOS with a bootable image works. A machine's drives each name a
 **media** component, and the media owns its content — a blank
 `materialize: new` disk of `size`, a `difference`/`copy` over a

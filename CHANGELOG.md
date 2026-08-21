@@ -13,6 +13,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The VNC control plane, on QEMU: screen and keyboard** (F63;
+  D110), serving **U5**. `control-planes: ["vnc"]` is honored end
+  to end on a QEMU machine: the launch adds a loopback VNC server
+  on an allocated display (`-vnc 127.0.0.1:<display>`, no
+  authentication — the endpoint is loopback-only and identity is
+  the management interface's job), records its port in the VM
+  identity beside the QMP port, and probes it under the same
+  startup deadline. A session on such a machine reads the screen
+  off the RFB framebuffer through the shared fixed-font recognizer
+  (the composition the VirtualBox display plane already used) and
+  sends keys as RFB key events through a qcode → X11 keysym table;
+  media movement stays on QMP, and identity is still verified over
+  the QMP session — with `query-vnc` cross-checking the recorded
+  endpoint — before the RFB socket is opened. Nothing changes in
+  the guest, so the plane is as agentless as the default (P2). The
+  wire is an in-tree minimal RFB 3.8 client
+  (`src/reliquary/rfb.py`): security type None, a forced 32-bit
+  true-colour pixel format, Raw-only framebuffer updates, and
+  `KeyEvent` — no new dependency, and no `PointerEvent` until the
+  pointer feature arrives.
+
+- **The declared `control-planes` list is now an ordered
+  preference** (F63; blueprint surface S4,
+  [docs/spec/blueprint-model.md](docs/spec/blueprint-model.md)).
+  The requirement semantics are unchanged — every declared plane
+  must appear in the assigned backend's capability report, failing
+  closed naming the plane and the backend — and the **first**
+  entry now drives the run: the session's guest-facing carriers
+  are the first declared plane's. The default policy stays
+  `["agentless-display"]`, so existing blueprints are unmoved.
+  QEMU's capability report claims `vnc`; on every other backend a
+  declared `vnc` still fails assignment closed.
+
 - **The DOS control plane can ask a guest for the font it loaded**
   (F62; D109), completing **U25** — promoted to root
   [USE-CASES.md](USE-CASES.md) in this change (D34), F61 having

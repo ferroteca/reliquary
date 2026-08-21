@@ -205,11 +205,36 @@ is waiting on an answer today.
   one piece is being pledged, so renumbering work that stays
   proposed would spend the sequence on nothing. The full split
   still happens where it belongs: piece by piece, at each later
-  pledge. The design calls made in the same round — the in-tree
-  RFB client, the loopback-no-auth endpoint, the ordered plane
-  preference — live with their rejected alternatives in
-  [pledged/design/vnc-plane.md](pledged/design/vnc-plane.md), the
-  ruling's normative home, not here.
+  pledge.
+
+  THE DESIGN CALLS made in the same round, kept here with their
+  rejected alternatives now that the delivery swept the design
+  document that first carried them (the norm is
+  docs/spec/blueprint-model.md; the mechanism is
+  `src/reliquary/rfb.py` and the QEMU adapter):
+
+  - **An in-tree minimal RFB client, no new dependency.** The
+    subset is pinned because Reliquary launches the server it
+    connects to: the 3.8 handshake, security None, forced 32bpp
+    true colour, Raw-only updates, `KeyEvent` — no `PointerEvent`
+    until the pointer feature pledges. WEIGHED AND DECLINED:
+    `vncdotool` (drags in Twisted for a subset we control both
+    ends of) and `asyncvnc` (an asyncio surface and a thin
+    ecosystem for the same subset).
+  - **Loopback, no VNC auth**, identity staying QMP's job with
+    `query-vnc` cross-checking the recorded endpoint. WEIGHED AND
+    DECLINED: a per-start password via `set_password` — VNC auth
+    is single-DES, security theater on loopback, and the threat it
+    would answer (another local process racing the port) is what
+    the identity verification detects; one more secret with
+    custody rules for no gain.
+  - **The declared `control-planes` list is an ordered
+    preference**: requirement semantics unchanged, the first entry
+    driving the session's carriers, the default unmoved. WEIGHED
+    AND DECLINED: refusing more than one declared plane until a
+    readiness waterfall exists — a vocabulary restriction that
+    would take a second surface change to lift, for no protection
+    the capability check does not already give.
 
 - D109 — THE GUEST'S OWN FONT IS AN AUTHORED ASSET, AND ITS BYTES
   CROSS ON A DRIVE — DECIDED (owner, 2026-08-19, the U25 pledge

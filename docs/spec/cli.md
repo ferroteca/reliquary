@@ -225,7 +225,7 @@ form (`cdrom,hdd`, `floppy,hdd`).
 --cdrom <media>                   CD-ROM naming an existing media
 --floppy <media>                  floppy naming an existing media
 --boot <order>                    comma-separated drive keys, e.g. cdrom,hdd
---control-planes <list>           comma-separated, e.g. guest-agent,agentless-display
+--control-planes <list>           comma-separated, e.g. vnc,agentless-display
 ```
 
 For drives beyond the first slot, controller types, or anything

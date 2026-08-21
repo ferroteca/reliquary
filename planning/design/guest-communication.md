@@ -18,11 +18,10 @@ SPDX-License-Identifier: GPL-3.0-only
 > ([backend-adapter.md](backend-adapter.md)). Native-agent
 > control planes remain **backlog work**
 > (planning/proposed/FEATURES.md F4 "Guest agent communication");
-> the VNC plane's first cut is **pledged** — F63, screen and
-> keyboard on QEMU
-> ([../pledged/FEATURES.md](../pledged/FEATURES.md), design in
-> [../pledged/design/vnc-plane.md](../pledged/design/vnc-plane.md))
-> — with the rest of the GUI era still proposed (F5). This
+> the VNC plane's screen-and-keyboard half is **delivered on
+> QEMU** (F63; the adjudications are D110, the norm is
+> docs/spec/blueprint-model.md), with pointer input and the rest
+> of the GUI era still proposed (F5). This
 > document does not by itself
 > authorize further implementation.
 
@@ -139,10 +138,13 @@ pack), and VMware Workstation can expose VNC servers; Hyper-V
 cannot. VNC gives a backend-independent wire for display automation
 where available, at the cost of pixel-level text recognition. It is
 diagnostic and installer-automation machinery, not a general guest
-communication path. The screen-and-keyboard half on QEMU is pledged
-as F63; its design — the in-tree RFB client, the loopback
-endpoint, the ordered plane preference — is
-[../pledged/design/vnc-plane.md](../pledged/design/vnc-plane.md).
+communication path. The screen-and-keyboard half is delivered on
+QEMU (F63): the in-tree RFB client is `src/reliquary/rfb.py`, the
+QEMU adapter owns the endpoint and the carriers, and the
+ordered-preference selection is normative in
+docs/spec/blueprint-model.md; the adjudicated calls and their
+rejected alternatives are recorded under D110. Pointer input and
+the other backends' endpoints stay with F5.
 
 ### Serial console
 

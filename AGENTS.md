@@ -220,7 +220,26 @@ workflow:
   validates and renders, which is what makes a section a create accepted one a start applies, and it renders
   last so a caller's own arguments are the tail of the logged command line), the owned launch with its identity verification, `Qmp`,
   the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
-  hatch `QemuSession.native()`. **No adapter opens a disk's
+  hatch `QemuSession.native()`. **It serves two display planes over
+  the one carrier seam** (F63): the agentless default scrapes VGA
+  text memory over QMP, and the VNC plane (`control-planes:
+  ["vnc"]`, the first declared plane driving the session) launches
+  `-vnc 127.0.0.1:<display>` — loopback, no VNC auth, the port and
+  the driving plane recorded in the identity's endpoint beside the
+  QMP port — and reads the RFB framebuffer through the shared
+  recognizer with `guest_glyph_banks`, sending keys through the
+  qcode → X11 keysym table (`keysym_for`, D103's adapter-side
+  layer, VirtualBox's `scancodes_for` twin). Identity stays QMP's
+  job: `query-vnc` cross-checks the recorded endpoint after the
+  ordinary verification, at launch and again before any session
+  opens the RFB socket, and `change_medium` rides QMP whatever
+  plane drives the screen. `rfb.py` is the wire — an in-tree
+  minimal RFB 3.8 client (security None, forced 32bpp true colour,
+  Raw-only updates full and incremental, `KeyEvent`; no
+  `PointerEvent` until the pointer feature lands, D110's
+  no-new-dependency ruling) that knows no machine and verifies no
+  identity, which is why it stays a separate module below the
+  adapter. **No adapter opens a disk's
   contents**: an adapter creates the images a machine runs on and
   exposes nothing that reads inside one (D108).
   `backend_virtualbox.py` is the VirtualBox adapter (F50 lifecycle
@@ -255,9 +274,14 @@ workflow:
   rather than choosing. `bank=` accepts one bank or many (`as_banks`); `_all_glyph_bits` unions
   them per code, so shapes the fonts agree on are scored once and the cost is proportional to
   how much they actually differ — 275 entries against 256 for a stock VirtualBox, about 5% on a
-  read. Ties go to the first bank, which keeps two runs on one host agreeing. This would bite
-  QEMU identically if anything ever recognized a QEMU screenshot rather than scraping its text
-  memory. Each backend answers the font question the same way — `guest_glyph_banks(cache)` on
+  read. Ties go to the first bank, which keeps two runs on one host agreeing. QEMU's VNC plane
+  (F63) *does* recognize QEMU framebuffers, and survives QEMU offering only the merged bank
+  because the 19 patched glyphs sit close to the classic designs they replaced: measured
+  pairwise (diff the two banks a stock VirtualBox yields, which are the merged and unpatched
+  sets), every ASCII pair is within the recognizer's 24-bit match threshold — `W` the worst at
+  22 — and only `₧` (0x9E, at 39) falls outside it, so a guest-drawn screen reads correctly
+  through the host's one font at a slimmer margin, not by a second bank. A QEMU build whose
+  fonts drift would move that margin; re-measure before reasoning about one. Each backend answers the font question the same way — `guest_glyph_banks(cache)` on
   `backend_virtualbox` and `backend_qemu` alike — with `banks_from_files` / `banks_from_binary`
   collecting every bank in the installation's binaries **plus every variant an override table
   behind one would install**, anchored on the classic `A` every CP437 bank shares and failing
@@ -726,6 +750,13 @@ The current transport is:
 - prompt detection for command completion
 - QMP `screendump` for screenshots
 
+A blueprint may instead drive the same machine over the VNC plane
+(`control-planes: ["vnc"]`, QEMU only today): RFB key events for
+input, the framebuffer read through the shared fixed-font
+recognizer for output. It is equally agentless — nothing changes
+in the guest — and everything above the carrier seam runs
+unmodified over either plane.
+
 Never make a feature depend on guest cooperation. A future guest-agent transport may be optional, but agentless behavior
 must remain the default and fallback.
 
@@ -969,8 +1000,8 @@ Doctrine to preserve:
   `pytest --integration` asks for the tier: a marker says the tier
   was chosen, where a skip could not say whether it was chosen or
   suffered. So **any** skip is a defect to fix, not a configuration
-  to tolerate. That the two runs differ — 2,102 tests from the
-  repository, 2,048 from an sdist, two deselected in each — is the
+  to tolerate. That the two runs differ — 2,167 tests from the
+  repository, 2,113 from an sdist, four deselected in each — is the
   isolation working; neither skips. Selecting the tier on a host
   without the backend is a **failure naming the gap** (P11) and not a
   skip either: the run was asked for.
@@ -1170,8 +1201,8 @@ $env:PYTHONPATH = "src"; pytest
 That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
 unittest tests` is no longer the entry point, and with the conversion finished (F60) it collects nothing at all —
 the hook that made it work is gone. It was taken because pytest is packaged everywhere a packager works. Expect
-**2,048 tests, two deselected and none
-skipped**, against the repository's 2,102 ("Test expectations", above): the difference is `tests/source_tree/`, which
+**2,113 tests, four deselected and none
+skipped**, against the repository's 2,167 ("Test expectations", above): the difference is `tests/source_tree/`, which
 ships nowhere, and a *skip* there is a defect exactly as it is here. `tests/conftest.py` ships with the suite, so the
 integration tier is deselected in a stranger's run exactly as it is here. Install the wheel into a clean environment and check it by using it —
 `rlq --version` and an import — since it carries no suite to run.
@@ -1195,14 +1226,17 @@ the default suite; need network for the LiveCD on a cold home). `--integration`
 selects the tier, and it is the whole gate — naming the module without it
 deselects it just the same. QEMU is the default backend; VirtualBox (F52) pins
 ``backend: virtualbox`` on the seeded blueprint and needs ``VBoxManage`` on
-``PATH``. Give the two runs *separate* reuse homes — the same machine id cannot
-span backends:
+``PATH``; the VNC run (F63) pins ``control-planes: ["vnc"]`` on it and runs on
+QEMU. Give the three runs *separate* reuse homes — the same machine id cannot
+span backends, and the plane run's seeded blueprint and materialized machine
+carry a different policy than the plain QEMU run's:
 
 ```powershell
 # optional: reuse a home so cache/media survives reruns
 # $env:RELIQUARY_INTEGRATION_HOME = "C:\Temp\reliquary-integration"
 uv run pytest --integration tests/test_freedos_install_integration.py
 uv run pytest --integration tests/test_freedos_virtualbox_integration.py
+uv run pytest --integration tests/test_freedos_vnc_integration.py
 ```
 
 ## Test expectations

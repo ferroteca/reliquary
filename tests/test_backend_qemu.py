@@ -62,6 +62,7 @@ class _FakeQmp:
     commands = []
     name = "reliquary-machine"
     vm_uuid = "00000000-0000-0000-0000-000000000000"
+    vnc_service = None
 
     def __init__(self, port):
         self.port = port
@@ -78,6 +79,11 @@ class _FakeQmp:
             return {"name": self.name}
         if name == "query-uuid":
             return {"UUID": self.vm_uuid}
+        if name == "query-vnc":
+            if self.vnc_service is None:
+                return {"enabled": False}
+            return {"enabled": True, "host": "127.0.0.1",
+                    "service": self.vnc_service}
         return None
 
 
@@ -93,6 +99,7 @@ def fake_qmp():
     _FakeQmp.commands = []
     _FakeQmp.name = "reliquary-machine"
     _FakeQmp.vm_uuid = "00000000-0000-0000-0000-000000000000"
+    _FakeQmp.vnc_service = None
     return _FakeQmp
 
 
@@ -601,6 +608,328 @@ def test_a_binary_that_will_not_report_a_version_is_still_available():
     assert probe.available
     assert probe.version is None
     assert probe.executable == "/usr/bin/qemu-system-i386"
+
+
+# The VNC plane (F63): the launch contribution, the endpoint record,
+# and the carriers behind the same seam.
+
+class _FakeRfb:
+    """A scripted RFB client standing where the socket one would."""
+
+    def __init__(self, image=None):
+        self.events = []
+        self.refreshed = 0
+        self.closed = False
+        self._image = image
+
+    def key_event(self, keysym, down):
+        self.events.append((keysym, down))
+
+    def refresh(self, incremental=False):
+        self.refreshed += 1
+
+    def image(self):
+        return self._image
+
+    def close(self):
+        self.closed = True
+
+
+def _vnc_identity(plane="vnc", vnc_port=5901):
+    identity = _identity()
+    identity["endpoint"]["vnc-port"] = vnc_port
+    if plane is not None:
+        identity["endpoint"]["plane"] = plane
+    return identity
+
+
+def test_launch_serves_vnc_and_records_the_endpoint(fake_qmp, root):
+    proc = _FakeProcess()
+    fake_qmp.vnc_service = "5901"
+    with mock.patch.object(qemu_module, "available_port",
+                           side_effect=[54321, 5901]), \
+            mock.patch.object(qemu_module, "port_in_use",
+                              return_value=False), \
+            mock.patch.object(qemu_module.uuid, "uuid4",
+                              return_value=uuid.UUID(int=0)), \
+            mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.rfb, "probe") as probe, \
+            mock.patch.object(qemu_module.subprocess, "Popen",
+                              return_value=proc) as popen:
+        identity = qemu_module.launch_owned_qemu(
+            ["qemu", "-name", "reliquary-machine"],
+            vm_name="reliquary-machine", log_dir=root, vnc=True)
+
+    args = popen.call_args.args[0]
+    # QEMU takes a display number; the endpoint records the port.
+    assert args[args.index("-vnc") + 1] == "127.0.0.1:1"
+    assert identity["endpoint"] == {"port": 54321, "vnc-port": 5901}
+    assert "query-vnc" in fake_qmp.commands
+    probe.assert_called_once_with("127.0.0.1", 5901)
+
+
+def test_launch_without_vnc_neither_serves_nor_probes_it(fake_qmp, root):
+    proc = _FakeProcess()
+    with mock.patch.object(qemu_module, "available_port",
+                           return_value=54321), \
+            mock.patch.object(qemu_module, "port_in_use",
+                              return_value=False), \
+            mock.patch.object(qemu_module.uuid, "uuid4",
+                              return_value=uuid.UUID(int=0)), \
+            mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.rfb, "probe") as probe, \
+            mock.patch.object(qemu_module.subprocess, "Popen",
+                              return_value=proc) as popen:
+        identity = qemu_module.launch_owned_qemu(
+            ["qemu", "-name", "reliquary-machine"],
+            vm_name="reliquary-machine", log_dir=root)
+
+    assert "-vnc" not in popen.call_args.args[0]
+    assert identity["endpoint"] == {"port": 54321}
+    assert "query-vnc" not in fake_qmp.commands
+    probe.assert_not_called()
+
+
+def test_launch_terminates_child_on_a_vnc_endpoint_mismatch(fake_qmp,
+                                                            root):
+    proc = _FakeProcess()
+    fake_qmp.vnc_service = "5999"  # this QEMU serves VNC elsewhere
+    with mock.patch.object(qemu_module, "available_port",
+                           side_effect=[54321, 5901]), \
+            mock.patch.object(qemu_module, "port_in_use",
+                              return_value=False), \
+            mock.patch.object(qemu_module.uuid, "uuid4",
+                              return_value=uuid.UUID(int=0)), \
+            mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.subprocess, "Popen",
+                              return_value=proc):
+        with pytest.raises(PreflightError) as caught:
+            qemu_module.launch_owned_qemu(
+                ["qemu", "-name", "reliquary-machine"],
+                vm_name="reliquary-machine", log_dir=root, vnc=True)
+
+    assert caught.value.rule_id == "machine.vnc-endpoint-mismatch"
+    assert "127.0.0.1:5901" in str(caught.value)
+    assert proc.terminated
+
+
+def test_launch_terminates_child_when_vnc_never_answers(fake_qmp, root):
+    proc = _FakeProcess()
+    fake_qmp.vnc_service = "5901"
+    with mock.patch.object(qemu_module, "available_port",
+                           side_effect=[54321, 5901]), \
+            mock.patch.object(qemu_module, "port_in_use",
+                              return_value=False), \
+            mock.patch.object(qemu_module.uuid, "uuid4",
+                              return_value=uuid.UUID(int=0)), \
+            mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.rfb, "probe",
+                              side_effect=OSError("refused")), \
+            mock.patch.object(qemu_module.time, "sleep"), \
+            mock.patch.object(qemu_module.time, "monotonic",
+                              side_effect=[0, 10, 20]), \
+            mock.patch.object(qemu_module.subprocess, "Popen",
+                              return_value=proc):
+        with pytest.raises(RunFailure) as caught:
+            qemu_module.launch_owned_qemu(
+                ["qemu", "-name", "reliquary-machine"],
+                vm_name="reliquary-machine", log_dir=root, vnc=True)
+
+    assert "127.0.0.1:5901" in str(caught.value)
+    assert proc.terminated
+
+
+@pytest.mark.parametrize("planes,vnc,plane_recorded", [
+    (["vnc"], True, True),
+    (["vnc", "agentless-display"], True, True),
+    (["agentless-display", "vnc"], True, False),
+    (["agentless-display"], False, False),
+    (None, False, False),
+], ids=["vnc-first", "vnc-then-agentless", "agentless-then-vnc",
+        "agentless-only", "defaulted"])
+def test_start_serves_vnc_when_named_and_the_first_plane_drives(
+        planes, vnc, plane_recorded, root):
+    """The resolved policy reaches the launch and the endpoint.
+
+    A named plane is served; the *first* one drives the session's
+    carriers, recorded in the endpoint beside the ports — and the
+    default plane needs no record.
+    """
+    adapter = qemu_module.QemuAdapter()
+    state = {"id": "plain-0", "backend-id": "reliquary-plain-0",
+             "memory": 32, "boot": [], "drives": {}}
+    if planes is not None:
+        state["control-planes"] = planes
+    launched = {"backend": "qemu", "backend-id": "reliquary-plain-0",
+                "token": "t", "endpoint": {"port": 54321}}
+    if vnc:
+        launched["endpoint"]["vnc-port"] = 5901
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu",
+                              return_value=launched) as launch:
+        identity = adapter.start(state, machine_dir=root,
+                                 backend_dir=os.path.join(root, "qemu"))
+    assert launch.call_args.kwargs["vnc"] is vnc
+    assert identity["endpoint"].get("plane") == (
+        "vnc" if plane_recorded else None)
+
+
+def test_a_session_serves_the_recorded_driving_plane(fake_qmp):
+    adapter = qemu_module.QemuAdapter()
+    fake_qmp.vnc_service = "5901"
+    client = _FakeRfb()
+    with mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.rfb, "RfbClient",
+                              return_value=client) as connect:
+        with adapter.session(_vnc_identity(), cache="cache") as session:
+            assert isinstance(session, qemu_module.QemuVncSession)
+            assert session.recognizes_text is True
+    connect.assert_called_once_with("127.0.0.1", 5901)
+    assert "query-vnc" in fake_qmp.commands
+    assert client.closed
+
+
+def test_a_session_without_a_recorded_plane_stays_agentless(fake_qmp):
+    adapter = qemu_module.QemuAdapter()
+    with mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.rfb, "RfbClient") as connect:
+        with adapter.session(_vnc_identity(plane=None)) as session:
+            assert type(session) is qemu_module.QemuSession
+    connect.assert_not_called()
+
+
+def test_a_vnc_session_still_verifies_identity_first(fake_qmp):
+    """A VNC connection never authorizes a command: QMP verifies
+    before the RFB socket is even opened."""
+    adapter = qemu_module.QemuAdapter()
+    fake_qmp.name = "unrelated-vm"
+    with mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.rfb, "RfbClient") as connect:
+        with pytest.raises(PreflightError, match="identity mismatch"):
+            with adapter.session(_vnc_identity()):
+                pass
+    connect.assert_not_called()
+
+
+def test_a_session_refuses_a_moved_vnc_endpoint(fake_qmp):
+    adapter = qemu_module.QemuAdapter()
+    fake_qmp.vnc_service = "5999"
+    with mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.rfb, "RfbClient") as connect:
+        with pytest.raises(PreflightError) as caught:
+            with adapter.session(_vnc_identity()):
+                pass
+    assert caught.value.rule_id == "machine.vnc-endpoint-mismatch"
+    connect.assert_not_called()
+
+
+def test_a_vnc_plane_without_a_recorded_port_fails_closed(fake_qmp):
+    adapter = qemu_module.QemuAdapter()
+    identity = _identity()
+    identity["endpoint"]["plane"] = "vnc"
+    with mock.patch.object(qemu_module, "Qmp", fake_qmp):
+        with pytest.raises(PreflightError) as caught:
+            with adapter.session(identity):
+                pass
+    assert caught.value.rule_id == "machine.endpoint-invalid"
+
+
+def test_an_unknown_recorded_plane_fails_closed():
+    adapter = qemu_module.QemuAdapter()
+    identity = _identity()
+    identity["endpoint"]["plane"] = "serial-console"
+    with pytest.raises(PreflightError) as caught:
+        with adapter.session(identity):
+            pass
+    assert caught.value.rule_id == "machine.endpoint-invalid"
+
+
+def test_an_unreachable_vnc_endpoint_names_itself(fake_qmp):
+    adapter = qemu_module.QemuAdapter()
+    fake_qmp.vnc_service = "5901"
+    with mock.patch.object(qemu_module, "Qmp", fake_qmp), \
+            mock.patch.object(qemu_module.rfb, "RfbClient",
+                              side_effect=ConnectionRefusedError()):
+        with pytest.raises(PreflightError) as caught:
+            with adapter.session(_vnc_identity()):
+                pass
+    assert caught.value.rule_id == "machine.vnc-unreachable"
+    assert "127.0.0.1:5901" in str(caught.value)
+
+
+# The VNC carriers, over scripted RFB and QMP doubles.
+
+def test_vnc_keys_go_down_in_order_and_up_in_reverse():
+    client = _FakeRfb()
+    session = qemu_module.QemuVncSession(mock.Mock(), client)
+    with mock.patch.object(qemu_module.time, "sleep"):
+        session.send_keys([["shift", "a"]])
+    shift, a = 0xffe1, ord("a")
+    assert client.events == [(shift, True), (a, True),
+                             (a, False), (shift, False)]
+
+
+def test_the_keysym_table_covers_the_seam_vocabulary():
+    """Every seam key VirtualBox translates, the VNC plane translates.
+
+    The two adapters own D103's third layer each; this is what keeps
+    them covering the same seam names rather than drifting apart one
+    key at a time.
+    """
+    from reliquary import backend_virtualbox as vbox
+    for name in vbox._SCANCODES:
+        assert isinstance(qemu_module.keysym_for(name), int)
+
+
+@pytest.mark.parametrize("wrong", ["enter", "space"])
+def test_a_language_key_name_is_not_a_seam_key_name(wrong):
+    # The seam speaks qcodes (`ret`, `spc`); the language's portable
+    # names never reach it (D103).
+    with pytest.raises(StaticError) as caught:
+        qemu_module.keysym_for(wrong)
+    assert caught.value.rule_id == "key.no-mapping"
+
+
+def test_the_vnc_text_screen_recognizes_through_the_hosts_fonts():
+    from reliquary import text_recognize
+    rows = ["C:\\>", "", "Welcome to FreeDOS"]
+    client = _FakeRfb(image=text_recognize.render(rows))
+    session = qemu_module.QemuVncSession(mock.Mock(), client,
+                                         cache="cache-root")
+    with mock.patch.object(
+            qemu_module, "guest_glyph_banks",
+            return_value=(text_recognize.glyph_bank(),)) as banks:
+        screen = session.text_screen()
+    banks.assert_called_once_with("cache-root")
+    assert client.refreshed == 1
+    assert screen[0][:3] == rows
+    assert screen.fonts_tried == ("host",)
+
+
+def test_the_vnc_screenshot_writes_the_framebuffer_as_png(root):
+    from PIL import Image
+    client = _FakeRfb(image=Image.new("RGB", (4, 2), (7, 8, 9)))
+    session = qemu_module.QemuVncSession(mock.Mock(), client)
+    png = os.path.join(root, "shots", "a.png")
+    written = session.screenshot(png)
+    assert written == png
+    assert client.refreshed == 1
+    with Image.open(png) as image:
+        assert image.size == (4, 2)
+        assert image.getpixel((0, 0)) == (7, 8, 9)
+
+
+def test_the_vnc_session_moves_media_over_qmp():
+    """`change_medium` is a machine operation and stays on the
+    management interface whatever plane drives the screen."""
+    qmp = mock.Mock()
+    client = _FakeRfb()
+    session = qemu_module.QemuVncSession(qmp, client)
+    session.change_medium("cdrom0", "C:\\images\\live.iso")
+    assert qmp.hmp.call_args.args[0] == (
+        "change cdrom0 C:/images/live.iso raw")
+    assert session.native() is qmp
 
 
 # The package root exposes the seam and not the backend: the adapter

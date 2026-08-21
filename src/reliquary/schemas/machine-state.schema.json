@@ -202,7 +202,7 @@
       "additionalProperties": false
     },
     "vmState": {
-      "description": "The running VM's identity, as every backend adapter records it. backend names the adapter that owns the VM; backend-id is that backend's own machine identifier (QEMU's readable -name, shared across same-numbered machines of one blueprint; a VirtualBox machine UUID; a .vmx path; a Hyper-V VM Id); token is the per-start identifier that disambiguates them (QEMU's -uuid), required because an addressable endpoint outlives its owner; endpoint is the adapter-shaped address of the management interface (QEMU: {port}); pid is the launched process id where the backend runs as one.",
+      "description": "The running VM's identity, as every backend adapter records it. backend names the adapter that owns the VM; backend-id is that backend's own machine identifier (QEMU's readable -name, shared across same-numbered machines of one blueprint; a VirtualBox machine UUID; a .vmx path; a Hyper-V VM Id); token is the per-start identifier that disambiguates them (QEMU's -uuid), required because an addressable endpoint outlives its owner; endpoint is the adapter-shaped address of the management interface (QEMU: {port}, plus vnc-port and the driving plane where the VNC control plane is served); pid is the launched process id where the backend runs as one.",
       "type": "object",
       "properties": {
         "backend": {"type": "string", "minLength": 1},

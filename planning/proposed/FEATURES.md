@@ -45,9 +45,8 @@ input typed into a backend's own display window never passes
 through Reliquary and cannot be followed, so the Reliquary-owned
 viewer over the `vnc` control plane is the recording prerequisite
 on **every** backend, QEMU included
-([design/recorder.md](design/recorder.md)). That plane's first cut
-is pledged — **F63** ([../pledged/FEATURES.md](../pledged/FEATURES.md)),
-screen and keyboard on QEMU — and the viewer additionally needs
+([design/recorder.md](design/recorder.md)). That plane's screen-and-keyboard
+half is delivered on QEMU (F63) — and the viewer additionally needs
 the pointer input and interactive display still with the GUI era
 (**F5**). This entry's former sequencing note claimed a
 text-mode half depending on nothing unpledged, and **that was wrong
@@ -154,9 +153,8 @@ passes byte-for-byte.
 > the platform workflows — while **U7** already reached the last
 > two adapters (D65). In the same act the first cut left this
 > entry: **F63**, the VNC control plane on QEMU, screen and
-> keyboard ([../pledged/FEATURES.md](../pledged/FEATURES.md)),
-> this entry keeping its number and the remainder under D110's
-> cut ruling. Every deliverable below now stands on pledged
+> keyboard — since **delivered** — this entry keeping its number
+> and the remainder under D110's cut ruling. Every deliverable below now stands on pledged
 > demand and stays here until pledged — a pledged use case makes
 > a feature pledgeable and pledges nothing itself (D65).
 >
@@ -257,12 +255,12 @@ Decide first:
 
 Deliverables:
 
-1. The VNC control plane beyond **F63**'s QEMU cut: the
+1. The VNC control plane beyond **F63**'s delivered QEMU cut: the
    VirtualBox (extension pack) and VMware Workstation endpoint
    configuration behind the same plane, pointer events over the
    in-tree RFB client (the client, framebuffer capture and key
-   events are F63's, design in
-   [../pledged/design/vnc-plane.md](../pledged/design/vnc-plane.md)),
+   events are delivered — `src/reliquary/rfb.py` and the QEMU
+   adapter's VNC carriers; the adjudicated calls are D110),
    and the capability error naming Hyper-V where the plane cannot
    exist.
 2. The three portable input primitives exposed at the

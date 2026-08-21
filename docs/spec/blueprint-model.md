@@ -158,15 +158,22 @@ cannot carry.
   Omitted, the order is the slot-0 floppy,
   else the slot-0 hard disk, else the first cdrom; the resolved
   order is recorded.
-- **`control-planes`** entries are unique — one listed twice
-  fails validation. The vocabulary is the model's whole set and
-  the parser accepts all of it, but a plane Reliquary has not
-  built is **refused at materialization**, naming it: the policy
-  is every plane Reliquary may use, so recording one nothing can
-  probe would make the state lie (P11). Omitted, it resolves to
-  the platform's default, which is `["agentless-display"]` for
-  every platform today — the universal, cooperation-free plane.
-  Defaults that differ by platform arrive with the adapter seam.
+- **`control-planes`** is an **ordered preference**. Entries are
+  unique — one listed twice fails validation — and **the first
+  entry drives the run**: the session's guest-facing carriers are
+  the first declared plane's. Every entry must appear in the
+  assigned backend's capability report, failing closed at
+  materialization naming the plane and the backend (P11): the
+  policy is every plane Reliquary may use, so recording one
+  nothing can probe would make the state lie. The vocabulary is
+  the model's whole set and the parser accepts all of it; whether
+  a plane can be honored is the backend's answer — `vnc` is
+  served on QEMU and refused where a backend cannot provide it,
+  and a plane no backend has built is refused everywhere.
+  Omitted, it resolves to the platform's default, which is
+  `["agentless-display"]` for every platform today — the
+  universal, cooperation-free plane. Defaults that differ by
+  platform arrive with the planes that justify them.
 - **`backend-settings`** is the **only** place backend-specific
   configuration may appear, which is what makes a blueprint
   without it portable by construction. One section per backend

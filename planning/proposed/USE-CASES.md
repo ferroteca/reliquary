@@ -213,8 +213,8 @@ vocabulary the code declares is the vocabulary it emits" — a
 documented reservation keeping the recorder's shape growable, not
 delivery. The blocking dependency is total rather than partial:
 recording requires Reliquary to *be* the console, so the whole of
-F1 waits on the VNC plane — whose first cut is pledged as F63
-(screen and keyboard on QEMU), the viewer additionally needing the
+F1 waits on the VNC plane — whose screen-and-keyboard half is
+delivered on QEMU (F63), the viewer additionally needing the
 pointer input still with F5 — text mode included. Text verbatim as adopted:
 
 > - **U6 — Author a script by doing the task once.** A user

@@ -12,6 +12,13 @@ The management interface is QMP — a private tool of this adapter, and
 never a control plane (planning/design/guest-communication.md). It
 reaches the world only through the named native escape hatch,
 ``QemuSession.native()``, which is explicitly backend-scoped.
+
+Two display planes are served over one carrier seam: the agentless
+display's carriers scrape VGA text memory over QMP, and the VNC
+plane's read the RFB framebuffer (:mod:`reliquary.rfb`) through the
+shared fixed-font recognizer, with media movement riding QMP either
+way. The machine state's resolved ``control-planes`` policy decides
+which set a session serves — the first declared plane drives.
 """
 
 import asyncio
@@ -30,10 +37,11 @@ from PIL import Image
 from qemu.qmp import ConnectError, ExecuteError, QMPClient
 
 from . import backends
+from . import rfb
 from . import text_recognize
 from .backends import Availability, BackendAdapter, Capabilities
-from .errors import (PreflightError, ReliquaryError, RunFailure,
-                     StaticError)
+from .errors import (InternalError, PreflightError, ReliquaryError,
+                     RunFailure, StaticError)
 from .home import effective_home
 
 
@@ -77,6 +85,7 @@ RESERVED_ARGUMENTS = {
     "name": "the recorded VM identity",
     "uuid": "the recorded VM identity",
     "qmp": "reliquary's own control channel",
+    "vnc": "the machine's `control-planes` policy",
     "display": "the display choice a start is given",
     "nographic": "the display choice a start is given",
 }
@@ -435,20 +444,62 @@ def _endpoint_port(vm):
     return port
 
 
+def _allocate_vnc_port(host="127.0.0.1"):
+    """A free loopback port for QEMU's VNC server, above the VNC base.
+
+    Allocated the way the QMP port is — an ephemeral port the OS
+    hands out — with one extra demand: QEMU takes a *display number*
+    and serves port ``5900 + display``, so a port at or below 5900
+    would render as a negative display and is re-drawn. Ephemeral
+    ranges start far above 5900 on every supported host, so the
+    retry never triggers in practice.
+    """
+    for _ in range(64):
+        port = available_port()
+        if port > 5900:
+            return port
+    raise InternalError(
+        f"could not allocate a VNC port above 5900 on {host}")
+
+
+def _check_vnc_endpoint(qmp, vnc_port):
+    """Fail closed unless this QEMU serves VNC where it was recorded.
+
+    Asked over the already identity-verified QMP session: RFB carries
+    no machine identity, so ``query-vnc`` is what ties the recorded
+    VNC endpoint to the VM the QMP identity check just proved.
+    """
+    reply = qmp.cmd("query-vnc")
+    enabled = reply.get("enabled") if isinstance(reply, dict) else None
+    service = reply.get("service") if isinstance(reply, dict) else None
+    if enabled is not True or service != str(vnc_port):
+        found = (f"port {service}" if enabled
+                 else "no enabled VNC server")
+        raise PreflightError(
+            "QEMU's VNC endpoint does not match the recorded one\n"
+            f"  expected: 127.0.0.1:{vnc_port}\n"
+            f"  found:    {found}",
+            rule_id="machine.vnc-endpoint-mismatch")
+
+
 def launch_owned_qemu(args, *, vm_name, display=False, port=None,
-                      current_vm=None, log_dir=None):
+                      vnc=False, current_vm=None, log_dir=None):
     """Launch an owned QEMU process and return its verified identity.
 
     ``args`` is the command line including the QEMU binary and
-    ``-name``, but excluding ``-qmp`` / ``-display`` / ``-uuid`` (added
-    here). ``current_vm`` is the machine's previously recorded VM
-    identity (or ``None``): a still-reachable one refuses the launch so
-    a live VM is never orphaned; a stale one is ignored (the caller
-    overwrites the recorded identity). ``log_dir`` receives
-    ``qemu-stderr.log`` — the machine's backend subdirectory. Returns
-    the generic identity record (:func:`backends.identity`) whose
-    endpoint is this QEMU's QMP port; the caller persists it,
-    atomically with the machine phase.
+    ``-name``, but excluding ``-qmp`` / ``-display`` / ``-uuid`` /
+    ``-vnc`` (added here). ``vnc`` asks for a loopback VNC server on
+    an allocated display: its port lands in the endpoint beside the
+    QMP port, ``query-vnc`` cross-checks it once the identity is
+    verified, and the readiness probe waits it out under the same
+    startup deadline. ``current_vm`` is the machine's previously
+    recorded VM identity (or ``None``): a still-reachable one refuses
+    the launch so a live VM is never orphaned; a stale one is ignored
+    (the caller overwrites the recorded identity). ``log_dir``
+    receives ``qemu-stderr.log`` — the machine's backend
+    subdirectory. Returns the generic identity record
+    (:func:`backends.identity`) whose endpoint is this QEMU's QMP
+    port; the caller persists it, atomically with the machine phase.
     """
     automatic_port = port is None
     port = available_port() if automatic_port else port
@@ -483,6 +534,10 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
     command = list(args)
     command += ["-uuid", token]
     command += ["-qmp", f"tcp:127.0.0.1:{port},server,nowait"]
+    vnc_port = None
+    if vnc:
+        vnc_port = _allocate_vnc_port()
+        command += ["-vnc", f"127.0.0.1:{vnc_port - 5900}"]
     if not display:
         command += ["-display", "none"]
     kwargs = {}
@@ -503,6 +558,8 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
         try:
             with Qmp(port) as qmp:
                 verify_vm(qmp, port, vm_name, token)
+                if vnc_port is not None:
+                    _check_vnc_endpoint(qmp, vnc_port)
             if proc.poll() is not None:
                 raise _startup_error(
                     proc, stderr_log, port, automatic_port,
@@ -520,12 +577,33 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
         except ReliquaryError:
             _terminate_started_process(proc)
             raise
+    while vnc_port is not None:
+        # The readiness probe the VNC endpoint owes before the launch
+        # is called up, bounded by the same startup deadline.
+        try:
+            rfb.probe("127.0.0.1", vnc_port)
+            break
+        except OSError:
+            if time.monotonic() > deadline:
+                _terminate_started_process(proc)
+                raise _startup_error(
+                    proc, stderr_log, port, automatic_port,
+                    "QEMU did not serve its VNC endpoint "
+                    f"127.0.0.1:{vnc_port} before the startup deadline",
+                    command)
+            time.sleep(0.5)
+        except ReliquaryError:
+            _terminate_started_process(proc)
+            raise
+    endpoint = {"port": port}
+    if vnc_port is not None:
+        endpoint["vnc-port"] = vnc_port
     print(f"rlq: QEMU started: {vm_name} (QMP on 127.0.0.1:{port})",
           file=sys.stderr)
     print(f"rlq: command line: {subprocess.list2cmdline(command)}",
           file=sys.stderr)
     return backends.identity(
-        "qemu", vm_name, token, {"port": port}, pid=proc.pid)
+        "qemu", vm_name, token, endpoint, pid=proc.pid)
 
 
 def stop(vm):
@@ -711,6 +789,124 @@ class QemuSession:
         self._qmp.hmp(f"change {drive_key} {target}{fmt}")
 
 
+#: Seam key names (QEMU qcodes — see ``control_display`` /
+#: ``script_runner``) → X11 keysyms for RFB ``KeyEvent``. The VNC
+#: plane's own third layer of key mapping (D103), exactly as
+#: VirtualBox owns ``scancodes_for``: keyed by `ret`, `spc`, `pgup`
+#: and `pgdn`, with no entry for `enter` or `space`. Letters and
+#: digits are not listed — their keysym is their character code,
+#: which :func:`keysym_for` computes.
+_KEYSYMS = {
+    "esc": 0xff1b, "ret": 0xff0d, "tab": 0xff09, "backspace": 0xff08,
+    "ctrl": 0xffe3, "shift": 0xffe1, "alt": 0xffe9,
+    "spc": 0x0020, "minus": 0x002d, "equal": 0x003d,
+    "bracket_left": 0x005b, "bracket_right": 0x005d,
+    "semicolon": 0x003b, "apostrophe": 0x0027,
+    "grave_accent": 0x0060, "backslash": 0x005c,
+    "comma": 0x002c, "dot": 0x002e, "slash": 0x002f,
+    "f1": 0xffbe, "f2": 0xffbf, "f3": 0xffc0, "f4": 0xffc1,
+    "f5": 0xffc2, "f6": 0xffc3, "f7": 0xffc4, "f8": 0xffc5,
+    "f9": 0xffc6, "f10": 0xffc7, "f11": 0xffc8, "f12": 0xffc9,
+    "home": 0xff50, "up": 0xff52, "pgup": 0xff55,
+    "left": 0xff51, "right": 0xff53,
+    "end": 0xff57, "down": 0xff54, "pgdn": 0xff56,
+    "insert": 0xff63, "delete": 0xffff,
+}
+
+
+def keysym_for(name):
+    """The X11 keysym for one seam key name, or fail closed naming it."""
+    keysym = _KEYSYMS.get(name)
+    if keysym is not None:
+        return keysym
+    if len(name) == 1 and (name.islower() or name.isdigit()):
+        # Latin-1 keysyms are the character codes themselves.
+        return ord(name)
+    raise StaticError(f"no VNC keysym for key {name!r}",
+                      rule_id="key.no-mapping")
+
+
+def _endpoint_vnc_port(vm):
+    """The recorded VNC port of a QEMU VM record, or fail closed."""
+    endpoint = (vm or {}).get("endpoint") or {}
+    port = endpoint.get("vnc-port")
+    if (not isinstance(port, int) or isinstance(port, bool)
+            or not 1 <= port <= 65535):
+        raise PreflightError(
+            "the recorded endpoint selects the VNC plane but carries "
+            f"no usable VNC port: {endpoint!r}",
+            rule_id="machine.endpoint-invalid")
+    return port
+
+
+class QemuVncSession(QemuSession):
+    """The VNC plane's carriers: RFB screen and keys, QMP for the rest.
+
+    Behind the same seam :class:`QemuSession` serves, so everything
+    above it is untouched by construction. The screen carriers read
+    the RFB framebuffer — `text_screen` through the shared fixed-font
+    recognizer, the composition the VirtualBox display plane built —
+    and `send_keys` speaks RFB ``KeyEvent``. `change_medium` and the
+    native escape hatch stay inherited: media movement is a machine
+    operation, not a display one, and it rides the management
+    interface whatever plane drives the screen.
+    """
+
+    #: Like the VirtualBox display plane, this `text_screen`
+    #: interprets a framebuffer rather than reading resolved
+    #: characters, which costs the better part of a second and sets
+    #: how coarsely a caller may quantize its cadence
+    #: (`screen_stability.GUI_CADENCE_STEP`).
+    recognizes_text = True
+
+    def __init__(self, qmp, client, cache=None):
+        super().__init__(qmp)
+        self._rfb = client
+        self._cache = cache
+
+    def send_keys(self, combos, delay=0.06):
+        """Inject key combinations as RFB key events.
+
+        A combo's keys go down in order and up in reverse, the same
+        expansion VirtualBox's scancode carrier performs.
+        """
+        for combo in combos:
+            keysyms = [keysym_for(name) for name in combo]
+            for keysym in keysyms:
+                self._rfb.key_event(keysym, True)
+            for keysym in reversed(keysyms):
+                self._rfb.key_event(keysym, False)
+            time.sleep(delay)
+
+    def text_screen(self, font_banks=()):
+        """Framebuffer + shared fixed-font recognizer.
+
+        Read through **this host's** QEMU font — the merged bank its
+        BIOS draws with, which is also near enough to the classic
+        design a DOS guest loads to stay inside the recognizer's
+        match threshold. ``font_banks`` are the authored fonts a
+        script's `font` statement named, tried **before** the host's
+        own, labelled ``"host"`` in the failure report's "fonts
+        tried".
+        """
+        self._rfb.refresh()
+        host_banks = tuple(
+            text_recognize.Bank(one, source="host")
+            for one in guest_glyph_banks(self._cache))
+        return text_recognize.recognize(
+            self._rfb.image(), bank=tuple(font_banks) + host_banks)
+
+    def screenshot(self, path):
+        """Capture the framebuffer to ``path`` as a PNG."""
+        png = os.path.abspath(os.fspath(path))
+        parent = os.path.dirname(png)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        self._rfb.refresh()
+        self._rfb.image().save(png)
+        return png
+
+
 class QemuAdapter(BackendAdapter):
     """QEMU: the delivered backend, and the seam's source."""
 
@@ -732,15 +928,16 @@ class QemuAdapter(BackendAdapter):
     def capabilities(self):
         """What QEMU provides today — built, not merely intended.
 
-        Only ``agentless-display`` is listed because only it is built;
-        the VNC, serial-console and guest-agent planes are named in the
-        blueprint vocabulary and unbuilt, so claiming them here would
-        promise what nothing can honor (P11). The same reading governs
-        controllers: the drive renderer wires ``ide`` alone.
+        ``agentless-display`` and ``vnc`` are listed because both are
+        built here; the serial-console and guest-agent planes are
+        named in the blueprint vocabulary and unbuilt, so claiming
+        them would promise what nothing can honor (P11). The same
+        reading governs controllers: the drive renderer wires ``ide``
+        alone.
         """
         return Capabilities(
             backend="qemu",
-            control_planes=("agentless-display",),
+            control_planes=("agentless-display", "vnc"),
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
@@ -799,9 +996,17 @@ class QemuAdapter(BackendAdapter):
             args += ["-boot", f"order={boot}"]
         args += settings_args(
             (state.get("backend-settings") or {}).get(self.name))
-        return launch_owned_qemu(
+        planes = state.get("control-planes") or ["agentless-display"]
+        identity = launch_owned_qemu(
             args, vm_name=vm_name, display=display, current_vm=current,
-            log_dir=backend_dir)
+            log_dir=backend_dir, vnc="vnc" in planes)
+        if planes[0] == "vnc":
+            # The first declared plane drives the session's carriers
+            # (blueprint-model.md); recording it beside the ports is
+            # what lets a session serve it without re-reading the
+            # policy. The default plane needs no record.
+            identity["endpoint"]["plane"] = "vnc"
+        return identity
 
     def stop(self, vm):
         return stop(vm)
@@ -810,17 +1015,49 @@ class QemuAdapter(BackendAdapter):
     def session(self, vm, cache=None):
         """Yield an identity-verified session over the recorded VM.
 
-        ``cache`` goes unused: this adapter reads VGA text memory,
-        where the guest has already resolved its characters, so it
-        needs no font extracted from the host to recognize glyphs by.
+        The endpoint's recorded ``plane`` picks the carriers: the VNC
+        plane's where the start recorded it as the driving plane, and
+        the agentless display's otherwise. Either way identity is
+        QMP's job and comes first — a VNC connection never authorizes
+        a command, and the RFB socket is opened only after the
+        machine behind it is verified, with ``query-vnc``
+        cross-checking that the recorded endpoint is the one this
+        QEMU serves.
+
+        ``cache`` reaches the VNC plane's recognizer as the host-font
+        cache; the agentless plane reads VGA text memory, where the
+        guest has already resolved its characters, and ignores it.
         """
         port = _endpoint_port(vm)
         name = vm["backend-id"]
         token = vm["token"]
+        plane = (vm.get("endpoint") or {}).get("plane")
+        if plane not in (None, "agentless-display", "vnc"):
+            raise PreflightError(
+                "the recorded endpoint names a control plane this "
+                f"adapter does not serve: {plane!r}",
+                rule_id="machine.endpoint-invalid")
         try:
             with Qmp(port) as qmp:
                 verify_vm(qmp, port, name, token)
-                yield QemuSession(qmp)
+                if plane != "vnc":
+                    yield QemuSession(qmp)
+                else:
+                    vnc_port = _endpoint_vnc_port(vm)
+                    _check_vnc_endpoint(qmp, vnc_port)
+                    try:
+                        client = rfb.RfbClient("127.0.0.1", vnc_port)
+                    except OSError as refused:
+                        raise PreflightError(
+                            "the recorded VNC endpoint is not "
+                            "reachable\n"
+                            f"  expected: 127.0.0.1:{vnc_port}",
+                            rule_id="machine.vnc-unreachable"
+                        ) from refused
+                    try:
+                        yield QemuVncSession(qmp, client, cache=cache)
+                    finally:
+                        client.close()
         except (OSError, ConnectError) as error:
             # The recorded VM is gone. The adapter owns no state, so
             # it does not clear it here — the caller (a lifecycle

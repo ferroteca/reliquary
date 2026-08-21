@@ -277,9 +277,11 @@ def test_the_default_backend_is_qemu_and_is_recorded(rig, declared):
     assert load_machine_state(machine_id, rig.home)["backend"] == "qemu"
 
 
-def test_unimplemented_control_plane_fails_closed(rig):
-    # A wired plane in the list excuses nothing: the policy is
-    # every plane Reliquary may use, so each has to exist.
+def test_a_plane_the_backend_cannot_provide_fails_closed(rig):
+    # A provided plane in the list excuses nothing: the policy is
+    # every plane Reliquary may use, so the assigned backend must
+    # honor each entry (the rig's fake claims agentless-display
+    # alone, so vnc is as unhonorable here as guest-agent).
     rig.write("vnc", {"platform": "dos",
                       "drives": {"hdd0": "blank"},
                       "control-planes": ["agentless-display", "vnc",

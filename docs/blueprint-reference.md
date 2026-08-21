@@ -720,42 +720,50 @@ which is why the table above is a caution rather than a refusal.
 
 The ordered control-plane policy: which control planes Reliquary
 may use for guest-facing operations on this machine, in preference
-order. Reliquary probes readiness in this order and never uses a
-control plane the policy doesn't list. Entries are unique — a
-control plane listed twice fails validation.
+order. **The first entry drives the run** — the session's screen
+and keyboard carriers are the first declared plane's — and
+Reliquary never uses a control plane the policy doesn't list.
+Entries are unique — a control plane listed twice fails
+validation.
 
 Working name set:
 
 | name                | mechanism                                  | built |
 |---------------------|--------------------------------------------|-------|
 | `agentless-display` | keyboard injection + screen readback; no guest cooperation needed | yes |
-| `vnc`               | framebuffer and input over VNC             | no    |
+| `vnc`               | framebuffer and input over VNC             | on QEMU |
 | `serial-console`    | text console on an emulated serial port    | no    |
 | `guest-agent`       | structured agent protocol (QGA profile)    | no    |
 
 The names are the model's whole vocabulary and the parser accepts
-them all; only `agentless-display` exists today, so a blueprint
-listing any of the others is refused at materialization —
-`create-machine` and `apply-blueprint` fail closed naming the plane
-rather than recording a policy Reliquary cannot honor. A plane that
-is built is one Reliquary can probe, so the refusal is what keeps
-the state's list truthful. Listing a working plane alongside an
-unbuilt one does not excuse it: the policy is every plane Reliquary
-may use.
+them all; whether a plane can be honored is the assigned backend's
+answer, so `create-machine` and `apply-blueprint` fail closed
+naming the plane and the backend rather than recording a policy
+nothing can honor. `vnc` is served by QEMU: the machine starts
+with a loopback VNC server QEMU itself provides, the screen is
+read off the framebuffer through the shared fixed-font
+recognizer, and keys arrive as VNC key events — nothing changes
+in the guest, so the plane is as agentless as the default. A
+plane no backend has built (`serial-console`, `guest-agent`) is
+refused everywhere. Listing a working plane alongside an
+unhonorable one does not excuse it: the policy is every plane
+Reliquary may use.
 
 Defaults by platform (DOS: `["agentless-display"]`); the resolved
 default appears in the state. Backends that cannot provide a
 listed control plane fail capability checking (e.g. `vnc` on
-Hyper-V).
+VirtualBox today).
 
 ```json
-{"control-planes": ["agentless-display"]}
+{"control-planes": ["vnc"]}
 ```
 
-Today that is the only list a machine can be built from. The
-preference order the field exists for — `["guest-agent",
+Selects the VNC plane end to end on QEMU: the same script drives
+the machine over the framebuffer instead of the VGA text scrape.
+The fall-back shape the order also anticipates — `["guest-agent",
 "agentless-display"]`, meaning *try the agent, fall back to the
-display* — is the shape it takes once a second plane is built.
+display* — arrives with a readiness waterfall once a plane that
+can be unready is built; today the first entry decides alone.
 
 ---
 

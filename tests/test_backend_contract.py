@@ -51,6 +51,7 @@ class _QemuDriver:
     name = "qemu"
     extension = ".qcow2"
     vvfat = True
+    control_planes = ("agentless-display", "vnc")
     #: The command that would reach a VM the identity check must stop
     #: short of.
     destructive = "quit"
@@ -128,6 +129,7 @@ class _VirtualBoxDriver:
     name = "virtualbox"
     extension = ".vdi"
     vvfat = False
+    control_planes = ("agentless-display",)
     destructive = "controlvm"
 
     def executable(self, root):
@@ -201,10 +203,10 @@ def test_the_adapter_answers_to_one_name_everywhere(driver, adapter):
 
 def test_the_capability_report_claims_only_what_is_built(driver, adapter):
     # Both adapters serve the same DOS machine today; where they
-    # genuinely differ is vvfat, which the driver states so a backend
-    # cannot quietly claim it.
+    # genuinely differ — vvfat, and the VNC plane QEMU alone wires —
+    # the driver states the claim so a backend cannot quietly widen it.
     report = adapter.capabilities()
-    assert report.control_planes == ("agentless-display",)
+    assert report.control_planes == driver.control_planes
     assert report.media == ("floppy", "hdd", "cdrom")
     assert report.controllers == ("ide",)
     assert report.materialize == ("new", "difference", "copy", "use")

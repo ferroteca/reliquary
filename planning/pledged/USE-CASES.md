@@ -53,8 +53,9 @@ substance, milestone 8's parameterization machinery, went current
 under that number, and what remains is the journey none of which is
 built: the localized-installer seam is compositional, the half no
 value can reach. Its carrier divides now as the demand does: the
-first cut, **F63** (the VNC control plane on QEMU, screen and
-keyboard), is pledged in the same act, and the rest of the GUI era
+first cut — the VNC control plane on QEMU, screen and keyboard —
+was pledged in the same act as F63 and is **delivered**, and the
+rest of the GUI era
 — pointer input, landmarks, the platform workflows — stands in
 [proposed/FEATURES.md](../proposed/FEATURES.md) (F5) on this
 pledge, each piece still moving by its own decision (D65). Text
