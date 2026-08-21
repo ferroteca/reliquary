@@ -16,9 +16,13 @@ SPDX-License-Identifier: GPL-3.0-only
 > backend-neutral: `GuestExec` and the control-plane vocabulary
 > apply to every backend adapter
 > ([backend-adapter.md](backend-adapter.md)). Native-agent
-> control planes and the VNC plane are both **backlog work**
-> (planning/proposed/FEATURES.md F4 "Guest agent communication" and the GUI
-> era), unscheduled since 2026-07-23 (DECISIONS.md D33). This
+> control planes remain **backlog work**
+> (planning/proposed/FEATURES.md F4 "Guest agent communication");
+> the VNC plane's first cut is **pledged** — F63, screen and
+> keyboard on QEMU
+> ([../pledged/FEATURES.md](../pledged/FEATURES.md), design in
+> [../pledged/design/vnc-plane.md](../pledged/design/vnc-plane.md))
+> — with the rest of the GUI era still proposed (F5). This
 > document does not by itself
 > authorize further implementation.
 
@@ -118,10 +122,10 @@ capture as adapter carriers, and text readback there runs **one
 shared fixed-font recognizer** over the captured framebuffer
 (owner, 2026-07-21) — a control-plane composition over adapter
 carriers, never a per-backend reimplementation. The fonts it reads
-through are the *host's* own, which is **U25**'s gap: a guest
-painting in a face the host does not hold is read through banks that
-do not include it, and the pledged answer is an authored font asset
-named from the point in the run where the guest takes the screen
+through are the *host's* own plus whatever the script's `font`
+statement names — **U25**'s delivered answer to a guest painting
+in a face the host does not hold: an authored font asset, tried
+first from the point in the run where the guest takes the screen
 over. The portable
 snapshot contract — character rows plus opaque,
 equality-comparable per-cell attribute tokens — is in
@@ -135,7 +139,10 @@ pack), and VMware Workstation can expose VNC servers; Hyper-V
 cannot. VNC gives a backend-independent wire for display automation
 where available, at the cost of pixel-level text recognition. It is
 diagnostic and installer-automation machinery, not a general guest
-communication path.
+communication path. The screen-and-keyboard half on QEMU is pledged
+as F63; its design — the in-tree RFB client, the loopback
+endpoint, the ordered plane preference — is
+[../pledged/design/vnc-plane.md](../pledged/design/vnc-plane.md).
 
 ### Serial console
 

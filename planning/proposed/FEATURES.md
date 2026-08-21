@@ -45,8 +45,11 @@ input typed into a backend's own display window never passes
 through Reliquary and cannot be followed, so the Reliquary-owned
 viewer over the `vnc` control plane is the recording prerequisite
 on **every** backend, QEMU included
-([design/recorder.md](design/recorder.md)). That plane arrives with
-the GUI era (**F5**). This entry's former sequencing note claimed a
+([design/recorder.md](design/recorder.md)). That plane's first cut
+is pledged — **F63** ([../pledged/FEATURES.md](../pledged/FEATURES.md)),
+screen and keyboard on QEMU — and the viewer additionally needs
+the pointer input and interactive display still with the GUI era
+(**F5**). This entry's former sequencing note claimed a
 text-mode half depending on nothing unpledged, and **that was wrong
 against its own design** — what text mode avoids is the landmark
 and click work, which is F5's GUI asset spec and pointer input,
@@ -144,37 +147,18 @@ passes byte-for-byte.
 > 2026-07-23): the former Milestone 13, not yet scheduled —
 > sequenced alongside the Horizon items below when its turn comes.
 >
-> **This entry cites no demand, and is the only feature that
-> doesn't** — confirmed by the demand-citation sweep of
-> 2026-07-27, which found it the one live violation across 22
-> features and 5 design documents. It is the **D33 pattern in its
-> purest form**: a settled design outrunning the argument for it.
-> The traceability rule's remedy is *find the demand or delete the
-> work*, and neither is an audit's to choose — it is an
-> adjudication, left open deliberately rather than papered over
-> with a citation written to fit. Two things point at demand
-> without being it: **U5**'s customized-Windows scenario waits on
-> this feature, and **U6**'s recorder (**F1**) needs the console
-> viewer that rides the VNC plane — the whole of F1 does, not the
-> GUI half only (D61). Both now sit in `proposed/` alongside this
-> entry — U5 as of D64 (2026-07-28), which cut its delivered half
-> away as U21 and left exactly the half that waits here — so
-> neither reference runs up the lifecycle, the same resolution D61
-> reached for F1. Whoever adjudicates starts there.
->
-> **The gap narrowed on 2026-07-28 and did not close** (D65). This
-> entry is two features wearing one number, and U7's pledge reaches
-> only one of them: U7 names Hyper-V outright — "a Windows laptop
-> with Hyper-V already enabled" — so the *last two adapters* below
-> now stand on pledged demand like F2 did and like F50–F52 (cut
-> from F3) do. **GUI automation
-> itself still cites nothing.** The VNC plane, the landmark asset
-> spec, and pointer input answer to no use case in force or
-> pledged, and U7 does not reach them: materializing on the host's
-> hypervisor says nothing about driving a graphical installer. The
-> honest reading is that the split D42 would force at pledge is
-> also where the demand divides, which is a finding for whoever
-> adjudicates rather than the adjudication itself.
+> **The demand adjudication closed 2026-08-21** (D110): **U5**'s
+> customized-installation remainder is pledged
+> ([../pledged/USE-CASES.md](../pledged/USE-CASES.md)) and
+> underwrites the GUI half — the plane, pointer input, landmarks,
+> the platform workflows — while **U7** already reached the last
+> two adapters (D65). In the same act the first cut left this
+> entry: **F63**, the VNC control plane on QEMU, screen and
+> keyboard ([../pledged/FEATURES.md](../pledged/FEATURES.md)),
+> this entry keeping its number and the remainder under D110's
+> cut ruling. Every deliverable below now stands on pledged
+> demand and stays here until pledged — a pledged use case makes
+> a feature pledgeable and pledges nothing itself (D65).
 >
 > **The Hyper-V wire is not missing, only different** (prior-art
 > research, 2026-07-28; not adjudicated). The body below drew the
@@ -273,15 +257,14 @@ Decide first:
 
 Deliverables:
 
-1. The VNC control plane: per-backend endpoint configuration
-   contributed to launch config, endpoint artifacts under the
-   machine cache, a readiness probe, and an RFB client —
-   framebuffer capture, key events, pointer events — behind the
-   same input and screen capabilities as agentless display,
-   reusing the pixel-level text recognition built for the
-   VirtualBox display plane (F51 / F52).
-   `control-planes: ["vnc"]` honored end to end, with a
-   capability error naming Hyper-V where it cannot exist.
+1. The VNC control plane beyond **F63**'s QEMU cut: the
+   VirtualBox (extension pack) and VMware Workstation endpoint
+   configuration behind the same plane, pointer events over the
+   in-tree RFB client (the client, framebuffer capture and key
+   events are F63's, design in
+   [../pledged/design/vnc-plane.md](../pledged/design/vnc-plane.md)),
+   and the capability error naming Hyper-V where the plane cannot
+   exist.
 2. The three portable input primitives exposed at the
    control-plane seam, with pacing control-plane-owned.
 3. Landmarks implemented per
@@ -296,12 +279,11 @@ Deliverables:
 5. The VMware Workstation adapter.
 6. The Hyper-V adapter, last, on its decided screen strategy.
 
-Done when: the FreeDOS install script runs unmodified on QEMU
-with the VNC control plane selected in place of agentless
-display, pixel-recognition text observation matching the
-VGA-scraping results on the same screens; and a GUI-era install
-script drives a setup end to end through landmarks on QEMU over
-VNC and on Hyper-V through its decided screen strategy.
+Done when: a GUI-era install script drives a setup end to end
+through landmarks on QEMU over VNC and on Hyper-V through its
+decided screen strategy. (The FreeDOS-unmodified-over-VNC
+criterion, with recognition matching the VGA scrape, went with
+F63 as its done-when.)
 
 ## F6 — Asynchronous runs
 
@@ -470,8 +452,9 @@ real violation of every one:
 * every planning section cites a U/P/G demand — *12 of 34 sections
   in the then-current roadmap cited none; re-run by hand
   2026-07-27 over what replaced it, **2 of 27**, and both already
-  known ([F5](#f5--the-gui-era-vnc-gui-scripting-and-the-last-backends)
-  and `backend-adapter.md`, the latter closed 2026-07-28). The improvement is not
+  known ([F5](#f5--the-gui-era-vnc-gui-scripting-and-the-last-backends),
+  closed 2026-08-21 by D110, and `backend-adapter.md`, closed
+  2026-07-28). The improvement is not
   vigilance but construction — the restructure wrote each entry
   with its demand — which is the argument for a linter rather than
   against one: what construction fixed once, drift returns*;

@@ -45,6 +45,38 @@ SPDX-License-Identifier: GPL-3.0-only
 > [proposed/USE-CASES.md](../proposed/USE-CASES.md); its U-number is
 > the search key.
 
+**U5 — Custom installation** — pledged 2026-08-21 (owner), the
+demand adjudication F5's banner left open, recorded slim as D110.
+Re-pledged rather than first pledged: withdrawn 2026-07-28 as the
+residue of the split that promoted **U21** (D64) — the delivered
+substance, milestone 8's parameterization machinery, went current
+under that number, and what remains is the journey none of which is
+built: the localized-installer seam is compositional, the half no
+value can reach. Its carrier divides now as the demand does: the
+first cut, **F63** (the VNC control plane on QEMU, screen and
+keyboard), is pledged in the same act, and the rest of the GUI era
+— pointer input, landmarks, the platform workflows — stands in
+[proposed/FEATURES.md](../proposed/FEATURES.md) (F5) on this
+pledge, each piece still moving by its own decision (D65). Text
+verbatim as reshaped by D64:
+
+> - **U5 — Custom installation.** A user wants the German
+>   version of Windows. The codex will not carry such flavors —
+>   there are too many variants — so it defines one standard
+>   Windows install. The user finds that blueprint easily (U11),
+>   seeds a local copy, and customizes it. The author has
+>   foreseen the need, and the seam this one takes is
+>   compositional rather than a value: a localized edition is a
+>   different installer showing different text, which no
+>   parameter can reach. The blueprint already names both
+>   halves — the media it installs from and the scripts that
+>   drive it — so the customized copy points both at the
+>   localized pair, each script standing alone against the media
+>   it was written for. The user changes what the blueprint
+>   names, outside the script, and proceeds. The values an author
+>   *can* parameterize are U21's; this is the case values cannot
+>   reach.
+
 **U7 — Materialize on the hypervisor the host provides** — pledged
 2026-07-28 (owner). Drafted 2026-07-23 by the mapping sweep, which
 found the multi-backend pillar demand-free: no use case in force

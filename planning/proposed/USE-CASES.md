@@ -199,42 +199,6 @@ parked condensation below still applies. Text verbatim as adopted:
 >   rewritten). The import flow's job is to present these choices,
 >   not bury them.
 
-**U5 — Custom installation** — withdrawn (2026-07-28; pledged
-2026-07-26 by the restructure, moved off the current list
-2026-07-23, and re-tested onto the shelf 2026-07-27 by D61),
-reshaped to the residue of the split that promoted **U21**. Its
-delivered substance was the value seam and the secret custody
-behind it — milestone 8's parameterization machinery, real and
-shipped, which is what carried it past D61's re-test the previous
-day. That substance now stands as U21, in force under its own
-number, so the pledge it justified is discharged rather than
-abandoned. **What remains is the journey, and none of it is
-built.** The codex carries two blueprints, freedos and openbsd;
-there is no standard Windows install to seed from, no shipped
-blueprint declares a seam at all, and the localized-installer seam
-is compositional — the half no value can reach, which is why the
-machinery landing did not deliver it. Its only carrier is the GUI
-era (**F5**), itself proposed and under an open demand
-adjudication that names this use case as one of its two threads.
-Reshaped text:
-
-> - **U5 — Custom installation.** A user wants the German
->   version of Windows. The codex will not carry such flavors —
->   there are too many variants — so it defines one standard
->   Windows install. The user finds that blueprint easily (U11),
->   seeds a local copy, and customizes it. The author has
->   foreseen the need, and the seam this one takes is
->   compositional rather than a value: a localized edition is a
->   different installer showing different text, which no
->   parameter can reach. The blueprint already names both
->   halves — the media it installs from and the scripts that
->   drive it — so the customized copy points both at the
->   localized pair, each script standing alone against the media
->   it was written for. The user changes what the blueprint
->   names, outside the script, and proceeds. The values an author
->   *can* parameterize are U21's; this is the case values cannot
->   reach.
-
 **U6 — Author a script by doing the task once** — withdrawn
 (2026-07-27; pledged 2026-07-26 by the restructure, moved off the
 current list 2026-07-23). Its whole delivery is the authoring
@@ -249,8 +213,9 @@ vocabulary the code declares is the vocabulary it emits" — a
 documented reservation keeping the recorder's shape growable, not
 delivery. The blocking dependency is total rather than partial:
 recording requires Reliquary to *be* the console, so the whole of
-F1 waits on the VNC plane that arrives with the GUI era (F5), text
-mode included. Text verbatim as adopted:
+F1 waits on the VNC plane — whose first cut is pledged as F63
+(screen and keyboard on QEMU), the viewer additionally needing the
+pointer input still with F5 — text mode included. Text verbatim as adopted:
 
 > - **U6 — Author a script by doing the task once.** A user
 >   performs the task by hand — going through a Windows install,

@@ -36,9 +36,9 @@ nothing is ever reissued.
 
 ## The marks
 
-- **The next D-number to issue is D110** — decisions, recorded in
+- **The next D-number to issue is D111** — decisions, recorded in
   [DECISIONS.md](DECISIONS.md).
-- **The next F-number to issue is F63** — features, drafted in
+- **The next F-number to issue is F64** — features, drafted in
   [proposed/FEATURES.md](proposed/FEATURES.md) or cut straight to
   [pledged/FEATURES.md](pledged/FEATURES.md) on pledge.
 - **The next G-number to issue is G8** — the authored language's

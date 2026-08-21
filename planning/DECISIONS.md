@@ -178,6 +178,39 @@ is waiting on an answer today.
 
 ## Decided
 
+- D110 — GUI AUTOMATION'S DEMAND IS U5; F63 IS CUT OUT AND F5
+  KEEPS ITS NUMBER — DECIDED (owner, 2026-08-21). Supports U5.
+  The pledges of U5 and F63 are lifecycle acts and are not
+  recorded here (D63); this is what was adjudicated in their
+  course — the adjudication F5's banner had left open since the
+  2026-07-27 sweep.
+
+  THE DEMAND. U5's customized-installation remainder underwrites
+  the GUI half of the era: a localized installer is a different
+  installer showing different text — on a graphical setup,
+  different pixels — which is exactly what the plane, pointer
+  input, and landmarks exist to drive. WEIGHED AND DECLINED:
+  reading U10's "the screen is the assertion surface" as reaching
+  graphical installs — U10 is agentless install-testing, pledged
+  after the banner was written, and stretching it would be the
+  citation-written-to-fit the banner warns against; it reopens
+  only if a GUI install-test scenario arrives as its own demand.
+  ALSO DECLINED: pledging U6 alongside — it commits the whole
+  recorder (F1) for a plane U5 already demands.
+
+  THE CUT. F63 (the VNC control plane on QEMU, screen and
+  keyboard) is cut out and pledged; **F5 keeps its number and the
+  remainder**, the U5/U21 shape (D64) rather than the F3 full
+  split — a full split spends a fresh number per piece, and only
+  one piece is being pledged, so renumbering work that stays
+  proposed would spend the sequence on nothing. The full split
+  still happens where it belongs: piece by piece, at each later
+  pledge. The design calls made in the same round — the in-tree
+  RFB client, the loopback-no-auth endpoint, the ordered plane
+  preference — live with their rejected alternatives in
+  [pledged/design/vnc-plane.md](pledged/design/vnc-plane.md), the
+  ruling's normative home, not here.
+
 - D109 — THE GUEST'S OWN FONT IS AN AUTHORED ASSET, AND ITS BYTES
   CROSS ON A DRIVE — DECIDED (owner, 2026-08-19, the U25 pledge
   round). Supports **U25** and **U27**; P10, P12, P14, P16, S3, S8.
@@ -1142,7 +1175,9 @@ is waiting on an answer today.
   moves in it: a feature may not be pledged ahead of its demand,
   which is the error D61 undid and the reason F2 waited five days.
 
-  F5's DEMAND GAP NARROWED AND DID NOT CLOSE. The 2026-07-27 sweep
+  F5's DEMAND GAP NARROWED AND DID NOT CLOSE. [It closed
+  2026-08-21: D110 adjudicates U5 as the GUI half's demand.] The
+  2026-07-27 sweep
   found F5 the one live traceability violation. U7 reaches part of
   it — U7 names Hyper-V outright, so the last two adapters now
   stand on pledged demand — and reaches none of the rest: the VNC
