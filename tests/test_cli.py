@@ -786,6 +786,80 @@ def test_a_selected_machine_carries_its_directory(plain_home):
     assert machine_home.endswith("plain-0")
 
 
+# `wait` is the script language's verb: its conditions are parsed by
+# the language's own parser and lowered to the handle stratum (D116).
+
+@pytest.mark.parametrize("text,expected", [
+    ("C:\\>", ("screen", re.escape("C:\\>"))),
+    ("Welcome    to   FreeDOS", ("screen", re.escape("Welcome to FreeDOS"))),
+    ('say "hi"', ("screen", re.escape('say "hi"'))),
+    ('"C:\\>"', ("screen", re.escape("C:\\>"))),
+    ("/installed [0-9]+ of [0-9]+/", ("screen", "installed [0-9]+ of [0-9]+")),
+    ("machine=stopped", ("machine", None)),
+], ids=["bare-literal", "normalized", "embedded-quote", "quoted-through",
+        "regex", "machine-channel"])
+def test_a_wait_condition_is_the_languages_spelling_less_the_shells_quotes(
+        text, expected):
+    assert cli._wait_condition(text) == expected
+
+
+def test_a_wait_condition_refuses_what_the_language_refuses():
+    with pytest.raises(cli.StaticError, match="not a wait condition"):
+        cli._wait_condition("/unterminated")
+    with pytest.raises(cli.StaticError, match="property reference"):
+        cli._wait_condition("${prompt}")
+
+
+def test_wait_lowers_a_literal_and_drives_the_handle(plain_home):
+    machine_home = _running_machine(plain_home)
+    with mock.patch("reliquary.cli.wait_text") as wait:
+        result, _o, err = _out("--home-dir", plain_home, "wait", "C:\\>",
+                               "--machine", "plain-0", "--timeout", "30")
+    assert result == 0
+    wait.assert_called_once_with(re.escape("C:\\>"), 30, home=machine_home)
+    assert "matched" in err
+
+
+def test_an_expired_wait_names_the_condition_as_typed(plain_home):
+    from reliquary.errors import WaitExpired
+    _running_machine(plain_home)
+    lowered = re.escape("NOT ON SCREEN")
+    with mock.patch("reliquary.cli.wait_text",
+                    side_effect=WaitExpired(
+                        f"timed out after 3s waiting for screen to match: "
+                        f"{lowered}", rule_id="screen.no-match")):
+        result, _o, err = _out("--home-dir", plain_home, "wait",
+                               "NOT ON SCREEN", "--machine", "plain-0")
+    assert result == 4
+    assert "match: NOT ON SCREEN" in err
+    assert lowered not in err
+
+
+def test_wait_on_the_machine_channel_observes_then_marks(plain_home):
+    _running_machine(plain_home)
+    with mock.patch("reliquary.machine_handle.Machine.wait_stopped") as gone, \
+            mock.patch("reliquary.session.Session.mark_stopped") as mark:
+        result, _o, err = _out("--home-dir", plain_home, "wait",
+                               "machine=stopped", "--machine", "plain-0")
+    assert result == 0
+    gone.assert_called_once_with(60)
+    mark.assert_called_once_with("plain-0")
+    assert "stopped" in err
+
+
+def test_wait_on_the_machine_channel_is_satisfied_by_a_stopped_machine(
+        plain_home):
+    # a shell that starts the wait a moment late is answered, not
+    # refused: the machine *is* stopped
+    _out("--home-dir", plain_home, "create-machine", "--blueprint", "plain")
+    with mock.patch("reliquary.machine_handle.Machine.wait_stopped") as gone:
+        result, _o, err = _out("--home-dir", plain_home, "wait",
+                               "machine=stopped", "--blueprint", "plain")
+    assert result == 0
+    gone.assert_not_called()
+    assert "stopped" in err
+
+
 def test_clean_media_passes_an_optional_name(plain_home):
     with mock.patch("reliquary.session.Session.clean_media",
                     return_value=[]) as clean:

@@ -1599,13 +1599,54 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
     the price of the twin-name identity rule: the CLI command *is*
     ``exec``. Nothing here calls the builtin.)
     """
+    guest = _running_guest("exec", machine, blueprint, context)
+    return guest.execute(command, timeout, check=check)
+
+
+def wait_ready(*, machine=None, blueprint=None, timeout=90, prompt=None,
+               context=None):
+    """Wait until a running guest is ready for commands.
+
+    ``exec``'s precondition, as its own twin (D114): ``start_machine``
+    returns when the backend is up, not when the guest is, and what
+    stands between the two is the boot. This waits it out at the
+    platform's own readiness evidence — on DOS, the standard prompt
+    on the bottom row, or exactly the text ``prompt`` declares for a
+    guest whose ``AUTOEXEC.BAT`` customized it (D113) — so a harness
+    holds one call between ``start_machine`` and its first ``exec``
+    and spells no screen pattern of its own. A workflow whose
+    "ready" means more than a prompt says so in a script and sets a
+    variable; this is the script-free form of the same handoff.
+
+    Expiry raises :class:`~reliquary.errors.WaitExpired`, a
+    ``RunFailure`` *and* a ``TimeoutError`` (D90): the prompt not
+    arriving is the work not happening (exit ``4`` at the CLI),
+    while the boot may still finish, so a caller holding the loop
+    asks again.
+
+    The platform workflow owns readiness, so anything but DOS fails
+    closed rather than borrowing DOS assumptions.
+    """
+    guest = _running_guest("wait-ready", machine, blueprint, context)
+    return guest.wait_ready(timeout, prompt=prompt)
+
+
+def _running_guest(verb, machine, blueprint, context):
+    """The agentless guest of a running DOS machine, or a refusal.
+
+    What ``exec`` and ``wait_ready`` share before either touches the
+    screen: the selector resolved, the platform one with a delivered
+    workflow, the machine running, and a VM identity on record to
+    verify the connection against. The refusals name the verb that
+    was asked.
+    """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
     state = load_machine_state(machine_id, context)
     platform = state.get("platform")
     if platform != "dos":
         raise PreflightError(
-            f"exec is not implemented for platform {platform!r}; DOS "
+            f"{verb} is not implemented for platform {platform!r}; DOS "
             "is the delivered workflow",
             rule_id="platform.verb-not-implemented")
     phase = state.get("phase")
@@ -1619,8 +1660,7 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
         raise PreflightError(
             f"machine {machine_id} is running but has no recorded VM "
             "identity", rule_id="machine.no-vm-identity")
-    return AgentlessGuestExec(
-        Machine(machine_home)).execute(command, timeout, check=check)
+    return AgentlessGuestExec(Machine(machine_home))
 
 
 def destroy_machine(machine_id, context=None):

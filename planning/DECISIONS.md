@@ -178,6 +178,96 @@ is waiting on an answer today.
 
 ## Decided
 
+- D116 — `rlq wait` IS THE VERB, ON EVERY AXIS — DECIDED (owner,
+  2026-08-22) and delivered the same day, striking T31. Supports
+  U14; P6, P11. Completes the script-language-identity exception for
+  one verb.
+
+  The manifest maps `wait` to `wait_text` as the language's verb
+  spelled on the CLI, and cli.md promised the verb's spellings — yet
+  the command shipped a different wait on four axes: always a
+  regex, across the joined screen, un-normalized, on sight, no
+  machine channel; the references said `REGEX`. T31 filed the gate;
+  the round found the rest. **The whole verb closes**, because S1
+  says the CLI owns no semantics and the Interaction spec says each
+  verb is defined once and referenced: the argument is parsed by
+  `parse_script("wait <text>")` — the grammar by construction, no
+  second condition parser — and lowered to the handle stratum,
+  `wait_text` matching one normalized row under the stability gate
+  and `Machine.wait_stopped` observing the VM gone, the lifecycle
+  marking the phase after, the runtime's own split.
+
+  TWO RULINGS THAT RODE ALONG: **the shell eats the language's
+  quotes**, so bare text is the literal spelling and is re-quoted
+  with the language's escapes, a `${key}` keeping the language's
+  meaning (refused: properties are a script's); and **`wait_stopped`
+  is a `Machine` method with no module-level export**, because the
+  family table has one face per command and the family's true twins
+  are the control-plane design's — REOPENS there.
+
+  WEIGHED AND DECLINED: **gate and expiry only** (T31 as filed) —
+  the spec would keep claiming a verb the command was not;
+  **screen channel only, the machine channel refused** — one
+  spelling left script-only for no reason the spec could state.
+
+- D115 — THE STABILITY RULE BINDS READINESS — DECIDED (owner,
+  2026-08-22) and delivered the same day, striking T30. Supports
+  U14; P11. Extends D75's rule to the readiness wait.
+
+  `wait_ready` was the one prompt wait in the system that answered
+  on sight: `execute` holds a prompt until the screen under it
+  settles (F45, D75), the script `wait` verb gates every
+  observation by default, and the menu machinery reads twice. T30
+  asked whether the rule binds readiness, the hazard being weaker —
+  nothing sliced, a caller merely early. **It binds**, because the
+  rule is about the screen and not the actor: what the caller does
+  next does not change whether the screen was finished, and the
+  case that needs it is exactly D113's customized guest, whose
+  `AUTOEXEC.BAT` with `ECHO ON` paints the prompt and then the
+  command on one row, the standard shape matching in between.
+
+  WEIGHED AND DECLINED: **a lighter "held for one quiescence
+  window"** — it is the same gate, `ScreenStability`'s default
+  window being that window; no second mechanism exists to build.
+  **A finding that the boot does not need it** — stock FreeDOS
+  runs `@ECHO OFF`, so a hands-on boot reads fine either way, which
+  is why that observation cannot carry the decision. **Tuning on
+  the twin** (`stable=`/`stability=`) — `execute` exposes none; the
+  axis is the language's. OBSERVED, NOT TAKEN: `rlq wait` /
+  `Machine.wait_text` answer on sight while the verb they are the
+  face of gates — filed as **T31**, decided by **D116**.
+
+- D114 — READINESS IS A TWIN, NOT THE EMBEDDING-ONLY EXCEPTION —
+  DECIDED (owner, 2026-08-22) and delivered the same day, striking
+  T29. Supports U14; P6. Sharpens D90 at the adapter.
+
+  `AgentlessGuestExec.wait_ready` had no CLI face, and T29 asked
+  whether the twin was owed or the method was the carve-out P6
+  tolerates. **The twin is owed**: P6 refuses a capability absent
+  from one surface "unless another principle in force forbids it
+  crossing", and no principle does — the one standing exception,
+  the codex verbs, has P18 behind it and this had nothing. The
+  shell's nearest spelling, `rlq wait "C:\>"`, is a weaker wait
+  (a pattern, anywhere on screen) and not a respelling, so S1's
+  "universal automation path" genuinely lacked the capability.
+  `Session.exec` was already this exact veneer over the sibling
+  method, so the twin is `rlq wait-ready` ↔ `Session.wait_ready`
+  by the identity rule, sharing `exec`'s preflight.
+
+  THE RULING THAT RODE ALONG: the adapter's expiry becomes
+  `WaitExpired` (D90) rather than plain `RunFailure` — it is a wait
+  and the boot may still arrive; the class subclasses `RunFailure`,
+  so no caller's handler changes.
+
+  WEIGHED AND DECLINED: **the carve-out** — it would amend P6 with
+  a second named exception resting on no principle, and grow the
+  manifest an exception class for a method on a type, which its
+  shape does not have because the gap escaped the suite only by
+  `AgentlessGuestExec` being classified as a type. REOPENS when an
+  agent-backed adapter lands whose readiness is reported rather
+  than observed: the twin's `prompt=` is then meaningless on that
+  platform and the flag's contract needs restating.
+
 - D113 — READINESS LEARNS A CUSTOMIZED PROMPT FROM THE CALLER —
   DECIDED (owner, 2026-08-22) and delivered the same day, striking
   T28. Supports U14; P10, P11. Completes D112 at the public
@@ -207,8 +297,8 @@ is waiting on an answer today.
   api.md's first principle says every public capability has —
   pre-existing, and `exec` never needs it (its precondition is
   "running"); and `wait_ready` confirms no stability under a
-  prompt where `execute` does (F45). Filed as **T29** and **T30**
-  (owner, 2026-08-22).
+  prompt where `execute` does (F45). Filed as **T29** (decided by
+  **D114**) and **T30** (decided by **D115**) (owner, 2026-08-22).
 
   WEIGHED AND DECLINED:
 

@@ -28,6 +28,7 @@ from reliquary.errors import (PreflightError, RunFailure, StaticError,
 from reliquary.interaction_agentless import (AgentlessGuestExec,
                                              _command_output)
 from reliquary.machines import exec as machines_exec
+from reliquary.machines import wait_ready as machines_wait_ready
 from reliquary.machines import (apply_blueprint, create_machine,
                                 destroy_machine, eject_media,
                                 get_machine_dir, get_machine_var,
@@ -1399,6 +1400,27 @@ def test_the_command_output_is_returned(rig):
     # The outcome check is opt-in, so the twin passes it through
     # explicitly rather than leaving the adapter to assume.
     run.assert_called_once_with("DIR", 30, check=False)
+
+
+# --- readiness is exec's precondition, as its own twin (D114) -------
+
+def test_readiness_refuses_a_stopped_machine_like_exec(rig):
+    machine_id = _plain_rig(rig)
+    with pytest.raises(PreflightError) as caught:
+        machines_wait_ready(machine=machine_id, context=rig.home)
+    assert "is not running" in str(caught.value)
+
+
+def test_readiness_forwards_the_declared_prompt_to_the_adapter(rig):
+    machine_id = _plain_rig(rig)
+    rig.force(machine_id, "running", vm=True)
+    with mock.patch(
+            "reliquary.interaction_agentless.AgentlessGuestExec"
+            ".wait_ready", return_value=None) as wait:
+        result = machines_wait_ready(machine=machine_id, timeout=30,
+                                     prompt="[C:\\]>", context=rig.home)
+    assert result is None
+    wait.assert_called_once_with(30, prompt="[C:\\]>")
 
 
 # --- agentless capture: the rows between the echo and the prompt -----

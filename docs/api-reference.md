@@ -167,6 +167,22 @@ no meaning to what travels through them.
   `RunFailure` (exit `4` at the CLI — the work did not happen) and a
   Python `TimeoutError` (nothing broke, ask again). CLI twin:
   `wait-machine-var`.
+- `wait_ready(*, machine=None, blueprint=None, timeout=90,
+  prompt=None)` - Wait until a running guest is ready for commands:
+  `start_machine` returns when the backend is up, not when the guest
+  is, and this waits the boot out at the platform's own readiness
+  evidence — on DOS a prompt on the bottom row, the standard shape or
+  exactly the text `prompt` declares for a guest whose `AUTOEXEC.BAT`
+  customized it (D113). `exec`'s precondition as its own twin (D114):
+  one call between `start_machine` and the first `exec`, no screen
+  pattern spelled by the caller. A prompt is a candidate until the
+  screen under it settles (D115), the rule `exec` holds its completion
+  to. Returns nothing. Expiry raises
+  `WaitExpired` — a `RunFailure` (exit `4`) and a `TimeoutError`,
+  as `wait_machine_var`'s does — naming what it waited for. A
+  machine that is not running, or a non-DOS platform, raises
+  `PreflightError` before any screen is read. CLI twin:
+  `wait-ready`.
 - `exec(command, *, machine=None, blueprint=None, timeout=120,
   check=False)` - Run one command in a running guest
   and return the
@@ -194,7 +210,8 @@ no meaning to what travels through them.
   so it costs one extra command at the prompt and sees only commands
   that *ran* and signalled failure; a mistyped one escapes it. CLI
   twin: `exec --check`.
-  Non-DOS platforms raise `NotImplementedError`. CLI twin: `exec`.
+  Non-DOS platforms raise `PreflightError`
+  (`platform.verb-not-implemented`). CLI twin: `exec`.
   (As a session method the name shadows nothing; the twin-name
   identity rule settled the spelling, and `builtins.exec` is
   untouched.)
@@ -391,7 +408,21 @@ sent. There is no port to pass.
   got.
 - `Machine.screen_text()` /
   `Machine.wait_text(pattern, timeout=60)` - Read or wait on the
-  guest text screen.
+  guest text screen. `wait_text` is the script language's `wait`
+  verb at the API (D116): `pattern` is a regular expression searched
+  in each visible row after normalization (padding trimmed,
+  whitespace collapsed — never across rows), a match is a candidate
+  until the screen under it settles (D115), and the matching screen
+  comes back as one newline-joined string. Expiry raises
+  `WaitExpired`. CLI: `rlq wait`, whose bare-text spelling lowers
+  to `re.escape` of the normalized text.
+- `Machine.wait_stopped(timeout=60)` - The verb's machine channel,
+  `machine=stopped`: returns once the backend reports the VM gone
+  (the session refusing the recorded identity, or the connection
+  failing). Observation only — reconciling the phase is
+  `Session.mark_stopped`, which `rlq wait machine=stopped` calls
+  after it. No module-level form: the family's true twins land with
+  the control-plane design.
 - `Machine.send_keys(combos, delay=0.06)` /
   `Machine.send_text(text, enter=True)` - Keyboard input.
 - `Machine.cursor_menu_select(item, timeout=30, exclude=())` -
@@ -413,7 +444,12 @@ whose `AUTOEXEC.BAT` sets `PROMPT [$P]$G` is reported ready,
 `wait_ready(prompt="[C:\\]>")`, since no earlier screen exists to
 read a customized prompt off the way `execute` does (D112, D113).
 A time-bearing prompt (`$T`) matches no exact text and is the one
-stated residue, for `execute` as well. How a platform answers
+stated residue, for `execute` as well. A prompt is ready once the
+screen under it has settled, as `execute`'s completion is (D115).
+Its expiry is `WaitExpired` (D90). The same capability through the
+session is
+`Session.wait_ready` (CLI `wait-ready`, D114), which resolves the
+machine and checks it is running first. How a platform answers
 `check` is its own business: DOS
 probes ERRORLEVEL, an agent would read an exit status, and what
 every adapter owes is the same answer.

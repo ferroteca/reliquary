@@ -17,14 +17,23 @@ import sys
 import time
 
 from . import backends
+from . import screen_stability
 from . import text_recognize
 # Only the recorded VM identity is wanted here, and it lives in the
 # substrate — so this module no longer imports the lifecycle, and the
 # two stop importing each other.
 from .machine_state import read_vm_state
-from .control_display import DisplayConsole
-from .errors import PreflightError, RunFailure, StaticError
+from .control_display import DisplayConsole, normalize_row
+from .errors import PreflightError, StaticError, WaitExpired
 from .home import effective_home
+
+#: How often the screen is read while nothing matches, and once a
+#: match is on screen and the question is whether it settled — the
+#: same two rates the readiness wait uses, for the same reason: a
+#: wait is seconds to minutes with nothing to catch along the way,
+#: and dense reads are spent only where the verdict needs them.
+_MATCH_POLL = 2.0
+_SETTLE_POLL = 0.1
 
 
 def validate_screenshot_name(name):
@@ -157,20 +166,78 @@ class Machine:
             return screen[0]
 
     def wait_text(self, pattern, timeout=60):
-        """Wait until the guest text screen matches a regular expression.
+        """Wait until a row of the guest text screen matches ``pattern``.
 
-        Returns the matching screen as one newline-joined string.
+        **The screen channel of the script language's `wait` verb, at
+        the handle stratum** (D116) — the face `rlq wait` drives, so
+        the semantics are the verb's and not a second definition:
+        ``pattern`` is a regular expression searched in each visible
+        row after normalization (trailing padding trimmed, whitespace
+        runs collapsed — script-spec "Normalized text matching"), and
+        never across rows; a literal spelling lowers to its escaped,
+        normalized text before it reaches here. A match is a candidate
+        until the screen under it has settled (D115), as every other
+        wait in the system holds its evidence. Returns the matching
+        screen as one newline-joined string, as the guest drew it.
+
+        Expiry raises :class:`~reliquary.errors.WaitExpired` — a
+        ``RunFailure`` and a ``TimeoutError`` (D90) — saying when a
+        match was seen but never settled.
         """
         with self.console() as console:
             deadline = time.monotonic() + timeout
+            settling = screen_stability.ScreenStability()
+            unsettled = None
             while time.monotonic() < deadline:
-                screen = "\n".join(console.screen_text())
-                if re.search(pattern, screen):
-                    return screen
-                time.sleep(2)
-        raise RunFailure(
+                now = time.monotonic()
+                frame = console.screen()
+                reading = settling.observe(frame, now=now)
+                candidate = any(re.search(pattern, normalize_row(row))
+                                for row in frame[0])
+                if candidate and reading.stable:
+                    return "\n".join(frame[0])
+                if candidate:
+                    unsettled = reading
+                time.sleep(_SETTLE_POLL if candidate else _MATCH_POLL)
+        raise WaitExpired(
             f"timed out after {timeout}s waiting for screen to match: "
-            f"{pattern}", rule_id="screen.no-match")
+            f"{pattern}{screen_stability.unsettled_note(unsettled)}",
+            rule_id="screen.no-match")
+
+    def wait_stopped(self, timeout=60):
+        """Wait until this machine's VM is gone.
+
+        **The machine channel of the `wait` verb** — ``machine=stopped``
+        — at the handle stratum (D116): how a caller waits out a
+        guest-initiated power-off. It *observes* only, exactly as the
+        script runtime's sample does: the backend's session refusing
+        the recorded identity, or the connection failing, is the
+        machine down. Reconciling the machine's phase is the
+        lifecycle's act (``Session.mark_stopped``), which the CLI
+        performs after this returns, as the runtime does after the
+        same observation; this handle knows no lifecycle.
+
+        Expiry raises :class:`~reliquary.errors.WaitExpired` (D90).
+        """
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                with self.console() as console:
+                    console.screen()
+            except (OSError, ConnectionError):
+                return
+            except PreflightError as refused:
+                if refused.rule_id in ("machine.vm-unreachable",
+                                       "machine.no-active-vm"):
+                    return
+                raise
+            now = time.monotonic()
+            if now >= deadline:
+                raise WaitExpired(
+                    f"timed out after {timeout}s waiting for the machine "
+                    "to stop: its VM is still answering",
+                    rule_id="machine.still-running")
+            time.sleep(min(_MATCH_POLL, max(0.0, deadline - now)))
 
 
 def _narrate_unreadable(screen):

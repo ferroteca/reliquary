@@ -74,6 +74,17 @@ _PLAIN = {
 }
 
 
+def normalize_row(text):
+    """One screen row as matching sees it (script-spec, "Normalized
+    text matching"): trailing padding trimmed and every run of
+    whitespace collapsed to one space. The script runtime and the
+    handle stratum's ``wait_text`` match through this same function,
+    which is what makes ``rlq wait`` and a script's ``wait`` one
+    verb (D116).
+    """
+    return " ".join(text.split())
+
+
 def char_keys(character):
     """Map one character to a simultaneous key-name combination.
 

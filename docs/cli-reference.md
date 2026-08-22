@@ -642,9 +642,12 @@ Select an entry in a cursor-key driven text menu.
 
 Print the current 80-by-25 text screen.
 
-### `rlq wait REGEX`
+### `rlq wait CONDITION`
 
-Wait until the screen contains a regular expression.
+Wait for the script language's `wait` condition: bare text is a
+normalized literal matched within one screen row, `/regex/` a
+regular expression, `machine=stopped` the machine powering off.
+The match must hold on a settled screen. Exit `4` on expiry.
 
 ### `rlq screenshot [NAME]`
 

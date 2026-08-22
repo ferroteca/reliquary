@@ -473,8 +473,13 @@ business. The machine stays running until you stop it. Add
 prompt before running commands:
 
 ```powershell
-rlq wait "C:\\\\>" --blueprint freedos
+rlq wait-ready --blueprint freedos
 ```
+
+A guest whose `AUTOEXEC.BAT` customizes the prompt says what it draws —
+`rlq wait-ready --prompt "[C:\]>" --blueprint freedos`; the standard
+prompt is always recognized. For any other boot-time evidence,
+`rlq wait <pattern>` is the general wait over the whole screen.
 
 ### 4. Run DOS commands
 
@@ -685,7 +690,7 @@ Use the global `--timeout SECONDS` option to change the 30-second navigation tim
 
 ```text
 rlq screen
-rlq wait REGEX
+rlq wait CONDITION
 rlq screenshot [NAME]
 ```
 
@@ -738,9 +743,11 @@ the exact text the guest draws — because readiness has no earlier screen to re
 reading the prompt off the screen it types into.
 
 `Machine` also exposes the VGA text screen directly: `machine.screen_text()`
-returns the 80x25 rows, and `machine.wait_text(pattern, timeout=60)` polls until the screen matches a regular
-expression (returning the matching screen)
-or raises `TimeoutError`. This is how to block on specific output, such as a boot menu:
+returns the 80x25 rows, and `machine.wait_text(pattern, timeout=60)` polls until one row of the screen matches a
+regular expression (whitespace-collapsed, never across rows) and the screen under it has settled, returning the
+matching screen — or raises `WaitExpired`, which is both a `RunFailure` and a `TimeoutError`. It is the script
+language's `wait` at the API, as `rlq wait` is on the CLI. This is how to block on specific output, such as a boot
+menu:
 
 ```python
 machine.wait_text(r"Welcome to FreeDOS")

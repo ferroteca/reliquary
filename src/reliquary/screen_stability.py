@@ -101,6 +101,32 @@ MAX_ANIMATION_WINDOW = 5.0
 _EDGE = 1e-9
 
 
+def unsettled_note(reading):
+    """Why a condition that *was* seen never ended a wait.
+
+    A wait expires two ways that look identical from outside: the
+    thing waited for never came, or it came only on screens still
+    being drawn. The second is baffling without help — a screenshot
+    taken at the time shows it plainly — so a failure says which, and
+    names the region set aside as decoration, that being what makes
+    the message locate the problem rather than restate the expiry.
+    Every gated wait appends this to its expiry (`execute`,
+    `wait_ready`, `wait_text`); ``None`` — nothing was ever seen —
+    adds nothing.
+    """
+    if reading is None:
+        return ""
+    note = ("; a match was on screen but what sits under it never "
+            "settled")
+    if reading.stability is None:
+        return f"{note} (never read often enough to tell)"
+    note += f" (stability {reading.stability:.3f}"
+    if reading.animated:
+        note += (f", outside a {len(reading.animated)}-cell animated "
+                 "region")
+    return f"{note})"
+
+
 def viable_cadence(window=DEFAULT_ANIMATION_WINDOW,
                    repeats=DEFAULT_ANIMATION_REPEATS,
                    margin=DEFAULT_CADENCE_MARGIN):

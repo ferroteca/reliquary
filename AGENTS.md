@@ -138,7 +138,13 @@ workflow:
   stopped machine, reconciling absorbable diffs and failing closed on a changed size/materialize of an
   already-materialized media image) / `get_machine_dir` (the out-of-band door) /
   `list_machines` /
-  `resolve_machine` / the exec-run family — `get_machine_var`
+  `resolve_machine` / the exec-run family — `wait_ready` (`exec`'s
+  precondition as its own twin, D114: the shared `_running_guest`
+  preflight — selector, DOS, running, VM identity on record — then
+  the adapter's readiness wait — a prompt held as a candidate until
+  `screen_stability` says the screen under it settled, as `execute`
+  holds its completion, D115 — whose expiry is `WaitExpired`),
+  `exec`, `get_machine_var`
   (the script→host scalar channel: a `machine.json` `variables`
   map under the op lock, cleared at `start` so a variable always
   reports the current boot, the `rlq`/`reliquary` key namespaces

@@ -11,8 +11,54 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Fixed
+
+- **`rlq wait` is the script language's `wait` verb** (D116; T31).
+  The command claimed the verb's identity — the manifest maps it to
+  `wait_text` as the script-language-identity exception — while
+  shipping a different wait: a regex always, searched across the
+  newline-joined screen, un-normalized, answering on sight, with no
+  machine channel, and the references said `rlq wait REGEX` where
+  the spec said the language's spellings. Now the argument is parsed
+  by the language's own parser (bare text is the normalized literal
+  with the quotes the shell ate, `/regex/` the regex,
+  `machine=stopped` the machine channel), `Machine.wait_text`
+  matches one normalized row at a time and holds a match until the
+  screen under it settles (D115), expiry is `WaitExpired` (D90), and
+  the new `Machine.wait_stopped` observes a VM gone so the CLI can
+  wait out a guest power-off and reconcile the phase as a script
+  does. A `${key}` in the text is refused: properties are a
+  script's.
+- **Readiness waits for the screen under the prompt to settle**
+  (D115; T30). `wait_ready` returned the instant the bottom row
+  matched a prompt, while `execute` holds a prompt as a candidate
+  until `screen_stability` says the screen under it settled and the
+  script `wait` verb gates every observation — and the boot is the
+  screen likeliest to still be moving: an `AUTOEXEC.BAT` with
+  `ECHO ON` paints the prompt and then the command on the same row,
+  so a caller proceeded early and its first command read a screen
+  still painting. Readiness now holds a prompt to the same rule, on
+  every face, polling densely only once a prompt is on screen; an
+  expiry says when a prompt was seen but never settled, as `exec`'s
+  does.
+
 ### Added
 
+- **`rlq wait-ready` / `Session.wait_ready` — readiness as its own
+  twin** (D114; T29). `AgentlessGuestExec.wait_ready` was reachable
+  from Python alone, against P6's rule that no capability is
+  unreachable from the CLI; the shell's nearest spelling,
+  `rlq wait "C:\\\\>"`, is a weaker wait (a pattern, matched
+  anywhere on screen) rather than the same one. The twin is `exec`'s
+  precondition as a command — one call between `start-machine` and
+  the first `exec`, `--timeout` and `--prompt` mirroring the
+  method's parameters, the same preflight as `exec` (DOS, running,
+  identity on record) — and the manifest declares it, so the suite
+  holds both faces to it. Readiness expiry is now `WaitExpired`
+  (D90) on every face: a `RunFailure` still, exit `4`, and Python's
+  `TimeoutError` too, since the boot may yet finish. The README and
+  `docs/dos-automation.md` teach `wait-ready` where they taught the
+  regex wait.
 - **`wait_ready(prompt=)` — readiness at a customized prompt**
   (D113; T28). `AgentlessGuestExec.wait_ready` recognized the
   standard DOS prompt alone, and with D112 making a customized

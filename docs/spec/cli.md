@@ -657,9 +657,11 @@ exception: the vocabulary is the script language's own
 ([script-spec.md](script-spec.md), "Input verbs") — a capability
 spells the same on both surfaces, each verb defined once, in the
 spec, and referenced, never redefined, by the CLI. The CLI adds
-exactly two commands scripts deliberately lack: `screen` (scripts
-observe; humans and programs read) and `exec` (a composite
-convenience; in a script, completion is an explicit observation).
+exactly three commands scripts deliberately lack: `screen` (scripts
+observe; humans and programs read), `wait-ready` (the platform's
+readiness evidence, named; in a script, ready is whatever the
+workflow waits for) and `exec` (a composite convenience; in a
+script, completion is an explicit observation).
 Every interaction command requires `--blueprint <name>` or
 `--machine <id>` to identify the machine. There is no "active
 machine" shortcut. The family's API twins land with the
@@ -691,6 +693,66 @@ rlq enter "dir C:\" -b freedos
 rlq press ctrl+alt+delete -m freedos-0
 ```
 
+### Reaching the prompt
+
+```
+rlq wait-ready (--blueprint <name> | --machine <id>)
+    [--timeout <seconds>] [--prompt <text>]
+```
+
+Twin `wait_ready`. `start-machine` returns when the backend is up,
+not when the guest is, and what stands between the two is the boot;
+`wait-ready` waits it out at the platform workflow's own readiness
+evidence — on DOS, a prompt on the bottom row — so a harness holds
+one command between `start-machine` and its first `exec` and spells
+no screen pattern of its own (D114). It is `exec`'s precondition as
+a command: a script-free handoff, where the codex `ready` script is
+the scripted one — a workflow whose "ready" means more than a
+prompt (a driver bound, a TSR resident) says so in a script, waits
+for its own evidence, and sets a variable the host reads.
+
+**What a prompt is here is what `exec` knows, less one thing.**
+`exec` recognizes the standard DOS prompt or exactly the prompt the
+guest was at when the command was typed (D112); readiness has no
+earlier screen to read a customized prompt off, so the caller
+declares it (D113): `--prompt <text>` is the exact bottom-row text
+the guest draws, and the standard shape stays recognized beside it.
+A time-bearing prompt (`$T`) equals no text and is the stated
+residue. `wait "C:\>"` is not the same wait: it matches anywhere on
+the screen, by pattern, and is the general authored wait for any
+other boot-time evidence.
+
+```powershell
+rlq start-machine -b freedos
+rlq wait-ready -b freedos
+rlq exec "ver" -b freedos
+
+rlq wait-ready -b custom-dos --prompt "[C:\]>" --timeout 180
+```
+
+**A prompt is not ready the moment it appears** (D115). The boot
+is the screen likeliest to still be moving — an `AUTOEXEC.BAT`
+with `ECHO ON` paints the prompt and then the command on the same
+row, and the standard shape matches the row in between — so a
+prompt is a readiness candidate until the screen under it has
+settled, the same quiescence rule `exec` holds its completion to
+and the script language's `wait` applies to every observation
+(F45). What the caller does next does not change whether the
+screen was finished. No `stable=`/`stability=` tuning rides on the
+command, as none rides on `exec`; that axis is the language's.
+
+**An expired wait exits `4`**, as `wait-machine-var`'s does: the
+twin raises `WaitExpired`, both a `RunFailure` (the work did not
+happen) and Python's `TimeoutError` (nothing about the machine
+went wrong and the boot may still finish, so a caller holding the
+loop asks again), and the message names what it waited for — and
+says so when a prompt *was* on screen but what sat under it never
+settled, since a screenshot taken at the time shows the prompt
+plainly. A
+machine that is not running, or whose platform has no delivered
+workflow, is refused before any screen is read — preflight, as for
+`exec`.
+
 ### Executing guest commands
 
 ```
@@ -708,7 +770,10 @@ capability above the language, not a language concept.
 
 **Completion means this command finished**, not that a prompt is
 visible: the guest was already at one before the command was sent,
-so detection requires evidence the command landed. What `exec`
+so detection requires evidence the command landed — and a prompt
+that came back is a candidate until the screen under it has settled
+(F45; D75), since one arriving mid-scroll would slice the output at
+a boundary that never existed. What `exec`
 returns is the command's own output or a failure — never text it
 cannot attribute. A command that scrolls more than a screenful
 leaves only its tail, which is agentless capture's documented
@@ -786,19 +851,39 @@ rlq screenshot [<name>] (--blueprint <name> | --machine <id>)
 
 `screen` prints the current text screen (80x25 rows on VGA
 guests) — the read twin of the language's default observation
-channel. `wait` blocks until a condition matches, in the
-language's condition spellings: `"..."` is a normalized literal
-match (decoded, trimmed, whitespace-collapsed — no regex
-escaping), `/.../` an opt-in regex, and `machine=stopped` the
-machine channel — how a shell waits out a guest-initiated
-power-off. `screenshot` captures the framebuffer.
+channel. `wait` **is the language's `wait` verb**, one condition,
+and its argument is parsed by the language's own parser (D116) —
+the CLI has no condition grammar of its own. **The shell consumes
+the language's outer quotes**, so the argument is the condition
+with those quotes eaten: bare text is the normalized literal,
+`/.../` the regex, `machine=stopped` the machine channel, and text
+handed over still carrying its quotes is taken as written. A
+literal is a normalized substring of one visible row and a regex
+is searched in one normalized row — trailing padding trimmed,
+whitespace runs collapsed, never spanning rows
+([script-spec.md](script-spec.md#normalized-text-matching)). A
+`${key}` in the text is the language's property reference, and is
+refused here: properties are a script's. A match is a candidate
+until the screen under it has settled, exactly as in a script
+(F45; D115). `machine=stopped` — how a shell waits out a
+guest-initiated power-off — completes when the backend reports
+the VM gone, and the machine's phase is then reconciled as a
+script's observation reconciles it; a machine already stopped
+satisfies it at once. `screenshot` captures the framebuffer.
+
+**An expired wait exits `4`** (`WaitExpired`, both a `RunFailure`
+and a `TimeoutError`, D90), saying when a match was on screen but
+what sat under it never settled.
 
 ```powershell
 rlq screen -b freedos
 # 25 lines of screen content printed to stdout
 
 rlq wait "C:\>" -b freedos --timeout 30
-# blocks until the DOS prompt appears
+# blocks until a row holds the DOS prompt and the screen settles
+
+rlq wait "/installed [0-9]+ of [0-9]+/" -b freedos
+# the regex spelling, quoted for the shell
 
 rlq wait machine=stopped -b freedos
 # returns when the guest powers itself off

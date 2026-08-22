@@ -257,6 +257,7 @@ _VENEERS = {
     "eject_media": machines.eject_media,
     "set_boot_order": machines.set_boot_order,
     "exec": machines.exec,
+    "wait_ready": machines.wait_ready,
     "get_machine_var": machines.get_machine_var,
     "wait_machine_var": machines.wait_machine_var,
     "fetch_media": media.fetch_media,

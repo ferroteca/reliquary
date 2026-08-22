@@ -95,7 +95,7 @@ rlq create-machine --blueprint my-dos
 rlq start-machine --blueprint my-dos
 
 # Wait for the DOS prompt, run a program, then stop.
-rlq wait "C:\\\\>" --blueprint my-dos
+rlq wait-ready --blueprint my-dos
 rlq exec "myprog.exe > result.log" --blueprint my-dos
 rlq stop-machine --blueprint my-dos
 ```

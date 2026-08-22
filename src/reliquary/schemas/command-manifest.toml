@@ -51,6 +51,7 @@ twins = [
     "stop-machine",
     "unset-property",
     "wait-machine-var",
+    "wait-ready",
 ]
 
 # Session methods that are not command twins: the ambient

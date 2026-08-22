@@ -7,7 +7,7 @@ import sys
 import time
 
 from . import screen_stability
-from .errors import RunFailure
+from .errors import RunFailure, WaitExpired
 from .machine_handle import Machine
 
 
@@ -31,6 +31,12 @@ _PROMPT_POLL = 2.0
 #: has become "is this screen finished?", and never for the whole of a
 #: long command.
 _SETTLE_POLL = 0.1
+
+#: How often the screen is read while a boot is still under way. A
+#: boot is seconds to minutes with nothing to catch along the way, so
+#: it is waited out at the slow rate and the dense one is spent only
+#: once a prompt is on screen and the question is whether it settled.
+_READY_POLL = 2.0
 
 #: The outcome probe, and the word it looks for. `IF ERRORLEVEL n` is
 #: true for *n or greater* and is portable across DOS shells in a way
@@ -61,21 +67,50 @@ class AgentlessGuestExec:
         ``wait "C:\\>"`` stance, at the API. The text is the bottom
         row as the guest draws it, compared exactly; a pattern is
         the wider door D112 refused.
+
+        **A prompt is not ready the moment it appears** (D115). The boot
+        is the screen likeliest to still be moving — an
+        ``AUTOEXEC.BAT`` with ``ECHO ON`` paints the prompt and then
+        the command on the same row, and the standard shape matches
+        the row in between — so a prompt is a candidate until the
+        screen under it has settled (:mod:`screen_stability`), the
+        same rule :meth:`execute` holds its completion to. The
+        hazard is weaker here (nothing is sliced, a caller merely
+        proceeds early and its first command reads a screen still
+        painting), and the rule is the same because what the actor
+        does next does not change whether the screen was finished.
+
+        Expiry raises :class:`~reliquary.errors.WaitExpired` — a
+        ``RunFailure`` *and* a ``TimeoutError`` (D90, D114): the
+        prompt not arriving is the work not happening, while nothing
+        about the machine went wrong and the boot may still finish,
+        so a caller holding the loop asks again. A prompt that was
+        seen but never settled is said to be, as :meth:`execute`
+        says it.
         """
         print("rlq: waiting for a DOS prompt...", file=sys.stderr)
         with self._machine.console() as console:
             deadline = time.monotonic() + timeout
+            settling = screen_stability.ScreenStability()
+            unsettled = None
             while time.monotonic() < deadline:
-                rows = [row for row in console.screen_text() if row]
-                if rows and _is_prompt(rows[-1], prompt):
+                now = time.monotonic()
+                frame = console.screen()
+                reading = settling.observe(frame, now=now)
+                rows = [row for row in frame[0] if row]
+                candidate = bool(rows and _is_prompt(rows[-1], prompt))
+                if candidate and reading.stable:
                     print(f"rlq: at DOS prompt: {rows[-1]}",
                           file=sys.stderr)
                     return
-                time.sleep(2)
+                if candidate:
+                    unsettled = reading
+                time.sleep(_SETTLE_POLL if candidate else _READY_POLL)
         declared = f" or for {prompt!r}" if prompt else ""
-        raise RunFailure(
+        raise WaitExpired(
             f"timed out after {timeout}s waiting for a DOS prompt"
-            f"{declared}", rule_id="screen.no-match")
+            f"{declared}{_settling_note(unsettled)}",
+            rule_id="screen.no-match")
 
     def execute(self, command: str, timeout: float = 120, *,
                 check: bool = False):
@@ -203,26 +238,13 @@ def _poll_interval(confirming, elapsed):
 
 
 def _settling_note(reading):
-    """Why a completion that *was* seen never ended the wait.
+    """Why a prompt that *was* seen never ended the wait.
 
-    A wait now expires two ways that look identical from outside: the
-    prompt never came, or it came only on screens still being drawn.
-    The second is baffling without help — a screenshot taken at the
-    time shows the prompt plainly — so the failure says which, and
-    names the region it set aside as decoration, that being what makes
-    the message locate the problem rather than restate the expiry.
+    The shared note (:func:`screen_stability.unsettled_note`) in
+    this adapter's words: what was on screen here is a prompt.
     """
-    if reading is None:
-        return ""
-    note = ("; a prompt was on screen but what sits under it never "
-            "settled")
-    if reading.stability is None:
-        return f"{note} (never read often enough to tell)"
-    note += f" (stability {reading.stability:.3f}"
-    if reading.animated:
-        note += (f", outside a {len(reading.animated)}-cell animated "
-                 "region")
-    return f"{note})"
+    return screen_stability.unsettled_note(reading).replace(
+        "a match was on screen", "a prompt was on screen", 1)
 
 
 def _screen_width(frame):

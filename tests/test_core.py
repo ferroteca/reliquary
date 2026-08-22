@@ -31,7 +31,7 @@ from reliquary import interaction_agentless as agentless_module
 from reliquary import machine_handle as machine_module
 from reliquary import machines as machines_module
 from reliquary.errors import (InternalError, PreflightError, RunFailure,
-                              StaticError)
+                              StaticError, WaitExpired)
 from tests import fake_backend
 
 
@@ -213,21 +213,103 @@ def test_the_console_sends_keys_through_the_session():
     session.send_keys.assert_called_once_with([["ret"]], 0.06)
 
 
-def test_wait_text_returns_the_matching_screen():
-    console = mock.Mock()
-    console.screen_text.return_value = ["Welcome to FreeDOS 1.4 (LiveCD)"]
-    with _over(console), mock.patch.object(machine_module.time, "sleep"):
-        screen = machine_module.Machine().wait_text(r"Welcome to FreeDOS")
+def _wait_against(frames, pattern, timeout=60):
+    """Wait for ``pattern`` over a guest painting ``frames`` in turn.
 
+    The painting guest and deterministic clock the command path and
+    the readiness wait are tested over (below), so a wait_text test
+    says what the guest drew and when, and reads the same stability
+    verdict (D115, D116).
+    """
+    guest = _PaintingGuest(frames)
+    console = mock.Mock()
+    console.screen.side_effect = guest.screen
+    console.screen_text.side_effect = guest.screen_text
+    clock = _GuestClock()
+    with _over(console), \
+            mock.patch.object(machine_module.time, "sleep", clock.sleep), \
+            mock.patch.object(machine_module.time, "monotonic",
+                              clock.monotonic):
+        screen = machine_module.Machine().wait_text(pattern, timeout)
+    return screen, console, clock
+
+
+def test_wait_text_returns_the_matching_screen():
+    screen, _, _ = _wait_against([["Welcome to FreeDOS 1.4 (LiveCD)"]],
+                                 r"Welcome to FreeDOS")
     assert "FreeDOS 1.4" in screen
 
 
 def test_wait_text_times_out_without_a_match():
+    # an expiry is a wait's (D90): both a RunFailure and the
+    # TimeoutError a caller holding the loop catches
+    with pytest.raises(WaitExpired, match="FreeDOS") as expired:
+        _wait_against([[""]], "FreeDOS", timeout=0)
+    assert isinstance(expired.value, RunFailure)
+    assert isinstance(expired.value, TimeoutError)
+
+
+def test_wait_text_matches_one_normalized_row_and_never_spans_rows():
+    # the verb's matching (script-spec "Normalized text matching"):
+    # whitespace runs collapse before the pattern is searched, and a
+    # pattern never crosses a row boundary
+    screen, _, _ = _wait_against([["Welcome    to   FreeDOS"]],
+                                 r"Welcome to FreeDOS")
+    assert "Welcome    to   FreeDOS" in screen     # returned as drawn
+    with pytest.raises(WaitExpired):
+        _wait_against([["Welcome to", "FreeDOS"]], r"to\nFreeDOS",
+                      timeout=0)
+
+
+def test_wait_text_holds_a_match_until_the_screen_under_it_settles():
+    # the gate every other wait applies (D115), now here (D116): a
+    # matching row on a screen still painting is a candidate, not an
+    # answer
+    painting = []
+    for step in range(12):
+        rows = ["Welcome to FreeDOS"] + [""] * 24
+        rows[1 + step % 20] = "x" * 40 + str(step)
+        painting.append(rows)
+    _, console, clock = _wait_against(painting + [painting[-1]],
+                                      r"Welcome to FreeDOS")
+    assert clock.now >= 12 * machine_module._SETTLE_POLL
+    assert console.screen.call_count > 12
+
+
+def test_wait_text_says_when_a_match_never_settled():
+    frames = []
+    for step in range(200):
+        rows = ["Welcome to FreeDOS"] + [""] * 24
+        rows[1 + step % 20] = "x" * 40 + str(step)
+        frames.append(rows)
+    with pytest.raises(WaitExpired) as expired:
+        _wait_against(frames, r"Welcome", timeout=5)
+    assert "never settled" in str(expired.value)
+
+
+def test_wait_stopped_returns_when_the_vm_is_gone():
+    # the machine channel observes only: the session refusing the
+    # recorded identity, or the connection failing, is the machine
+    # down — marking the phase is the lifecycle's act (D116)
+    for gone in (ConnectionRefusedError(), OSError("pipe"),
+                 PreflightError("gone", rule_id="machine.vm-unreachable")):
+        console = mock.Mock()
+        console.screen.side_effect = gone
+        with _over(console), \
+                mock.patch.object(machine_module.time, "sleep"):
+            machine_module.Machine().wait_stopped(timeout=5)
+
+
+def test_wait_stopped_expires_while_the_vm_still_answers():
     console = mock.Mock()
-    console.screen_text.return_value = [""]
-    with _over(console), mock.patch.object(machine_module.time, "sleep"):
-        with pytest.raises(RunFailure, match="FreeDOS"):
-            machine_module.Machine().wait_text("FreeDOS", timeout=0)
+    console.screen.return_value = ([""] * 25, [[0x07] * 80] * 25)
+    clock = _GuestClock()
+    with _over(console), \
+            mock.patch.object(machine_module.time, "sleep", clock.sleep), \
+            mock.patch.object(machine_module.time, "monotonic",
+                              clock.monotonic):
+        with pytest.raises(WaitExpired, match="still answering"):
+            machine_module.Machine().wait_stopped(timeout=5)
 
 
 class _MenuClock:
@@ -822,40 +904,50 @@ def test_unselectable_row_raises_when_the_cursor_cannot_reach_it():
 
 # Booting to a DOS prompt.
 
-def test_reaches_an_existing_prompt_without_typing():
-    console = mock.Mock()
-    console.screen_text.return_value = ["A:\\>"] + [""] * 24
-    with _over(console), \
-            mock.patch.object(agentless_module.time, "sleep"):
-        agentless_module.AgentlessGuestExec(
-            machine_module.Machine()).wait_ready()
+def _ready_against(frames, timeout=90, prompt=None):
+    """Wait for readiness over a guest painting ``frames`` in turn.
 
+    The same deterministic clock and painting guest the command
+    path is tested over (below), so a readiness test says what the boot
+    drew and when, and reads the same stability verdict.
+    """
+    guest = _PaintingGuest(frames)
+    console = mock.Mock()
+    console.screen.side_effect = guest.screen
+    console.screen_text.side_effect = guest.screen_text
+    clock = _GuestClock()
+    with _over(console), \
+            mock.patch.object(agentless_module.time, "sleep", clock.sleep), \
+            mock.patch.object(agentless_module.time, "monotonic",
+                              clock.monotonic):
+        agentless_module.AgentlessGuestExec(
+            machine_module.Machine()).wait_ready(timeout, prompt=prompt)
+    return console, clock
+
+
+def test_reaches_an_existing_prompt_without_typing():
+    console, _ = _ready_against([["A:\\>"]])
     console.send_text.assert_not_called()
 
 
 def test_times_out_without_a_prompt():
-    console = mock.Mock()
-    console.screen_text.return_value = [""] * 25
-    with _over(console), \
-            mock.patch.object(agentless_module.time, "sleep"):
-        with pytest.raises(RunFailure, match="DOS prompt"):
-            agentless_module.AgentlessGuestExec(
-                machine_module.Machine()).wait_ready(timeout=0)
+    # an expiry is a wait's (D90): the work did not happen, and the
+    # boot may still finish — so it is both a RunFailure and the
+    # ordinary TimeoutError a caller holding the loop catches
+    with pytest.raises(WaitExpired, match="DOS prompt") as expired:
+        _ready_against([[""]], timeout=0)
+    assert isinstance(expired.value, RunFailure)
+    assert isinstance(expired.value, TimeoutError)
 
 
 def test_a_customized_prompt_is_ready_only_when_the_caller_declares_it():
     # no earlier screen to read it off (D112), so the caller says
     # what the guest draws (D113) — exactly, as the bottom row
-    console = mock.Mock()
-    console.screen_text.return_value = ["[C:\\]>"] + [""] * 24
-    with _over(console), \
-            mock.patch.object(agentless_module.time, "sleep"):
-        guest = agentless_module.AgentlessGuestExec(machine_module.Machine())
-        with pytest.raises(RunFailure) as undeclared:
-            guest.wait_ready(timeout=0)
-        guest.wait_ready(prompt="[C:\\]>")
-        with pytest.raises(RunFailure) as wrong:
-            guest.wait_ready(timeout=0, prompt="[C:\\FREEDOS]>")
+    with pytest.raises(RunFailure) as undeclared:
+        _ready_against([["[C:\\]>"]], timeout=0)
+    console, _ = _ready_against([["[C:\\]>"]], prompt="[C:\\]>")
+    with pytest.raises(RunFailure) as wrong:
+        _ready_against([["[C:\\]>"]], timeout=0, prompt="[C:\\FREEDOS]>")
 
     assert repr("[C:\\]>") not in str(undeclared.value)
     assert repr("[C:\\FREEDOS]>") in str(wrong.value)
@@ -865,12 +957,42 @@ def test_a_customized_prompt_is_ready_only_when_the_caller_declares_it():
 def test_a_declared_prompt_does_not_unseat_the_standard_shape():
     # declaring one adds evidence; a guest at the standard prompt
     # is still ready
-    console = mock.Mock()
-    console.screen_text.return_value = ["C:\\>"] + [""] * 24
-    with _over(console), \
-            mock.patch.object(agentless_module.time, "sleep"):
-        agentless_module.AgentlessGuestExec(
-            machine_module.Machine()).wait_ready(prompt="[C:\\]>")
+    _ready_against([["C:\\>"]], prompt="[C:\\]>")
+
+
+def test_a_prompt_is_ready_only_once_the_screen_under_it_settles():
+    # the boot paints on under a prompt-shaped bottom row — an
+    # AUTOEXEC with ECHO ON draws the prompt, then the command on the
+    # same row — so a prompt is a candidate until the screen holds
+    # still (D115), exactly as execute holds its completion
+    painting = []
+    for step in range(12):
+        rows = [""] * 24 + ["C:\\>"]
+        rows[step % 20] = "AUTOEXEC step " + "x" * 40 + str(step)
+        painting.append(rows)
+    settled = [painting[-1]]
+    console, clock = _ready_against(painting + settled)
+    # Twelve moving frames at the settle poll, then the window the
+    # verdict needs: readiness arrived after the painting stopped,
+    # not on the first prompt-shaped row.
+    assert clock.now >= 12 * agentless_module._SETTLE_POLL
+    assert console.screen.call_count > 12
+
+
+def test_a_prompt_that_never_settles_says_so_when_readiness_expires():
+    # the same two-way expiry execute reports: a screenshot at the
+    # time shows the prompt plainly, so the failure says the screen
+    # under it never held still
+    frames = []
+    for step in range(200):
+        rows = [""] * 24 + ["C:\\>"]
+        rows[step % 20] = "x" * 40 + str(step)
+        frames.append(rows)
+    with pytest.raises(WaitExpired) as expired:
+        _ready_against(frames, timeout=5)
+    message = str(expired.value)
+    assert "DOS prompt" in message
+    assert "never settled" in message
 
 
 # The interaction adapters, and what the package exposes.

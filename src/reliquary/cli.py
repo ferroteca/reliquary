@@ -8,6 +8,7 @@ import getpass
 import importlib.metadata
 import json
 import os
+import re
 import sys
 import traceback
 
@@ -32,14 +33,15 @@ from .library import (list_codex, locate_script, seed_blueprint,
                       seed_script)
 from . import backends
 from .errors import (InternalError, PreflightError, ReliquaryError,
-                     StaticError, UNEXPECTED, exit_code)
+                     StaticError, UNEXPECTED, WaitExpired, exit_code)
 from .machines import read_vm_state
 from .credentials import CredentialError
 from .progress import MODES as _PROGRESS_MODES
 from .properties import is_secret
 from .script_runner import resolve_key
 from .script_nodes import ScriptParseError
-from .script_parser import load_script
+from .script_parser import load_script, parse_script
+from .control_display import normalize_row
 from .session import Session
 
 
@@ -727,6 +729,16 @@ def _add_console_commands(subcommands):
     command.add_argument("names", nargs="+")
 
     command = subcommands.add_parser(
+        "wait-ready", help="wait until the guest is at a prompt")
+    _add_selectors(command)
+    command.add_argument("--timeout", type=float, default=None,
+                         help="seconds to wait (default 90)")
+    command.add_argument(
+        "--prompt", default=None,
+        help="the exact bottom-row text a customized prompt draws; "
+             "the standard DOS prompt is always recognized")
+
+    command = subcommands.add_parser(
         "exec", help="enter a command and wait for the prompt")
     _add_selectors(command)
     command.add_argument("dos_command")
@@ -748,9 +760,14 @@ def _add_console_commands(subcommands):
     _add_selectors(command)
 
     command = subcommands.add_parser(
-        "wait", help="wait until the screen matches a pattern")
+        "wait", help="wait for a condition, in the script language's "
+                     "spellings")
     _add_selectors(command)
-    command.add_argument("pattern")
+    command.add_argument(
+        "condition",
+        help="bare text (a normalized literal), /regex/, or "
+             "machine=stopped — the language's spelling less the quotes "
+             "the shell consumed")
     command.add_argument("--timeout", type=int, default=None)
 
     command = subcommands.add_parser(
@@ -1368,6 +1385,100 @@ def _wait_machine_var(arguments, session):
     return _emit(arguments, value, lambda: print(value))
 
 
+def _wait_condition(text):
+    """One `wait` condition, parsed by the language's own parser.
+
+    The CLI owns no condition grammar (S1): the argument is handed to
+    :func:`parse_script` as the one-statement script ``wait <text>``,
+    so the spellings are the language's by construction (D116). The
+    shell consumes the language's outer quotes, so bare text is the
+    literal spelling and is re-quoted here — its backslashes and
+    quotes escaped as the language escapes them, a ``${key}`` left
+    to mean what the language says it means — while text that
+    still carries its quotes, a ``/regex/`` and ``machine=stopped``
+    go through as written.
+
+    Returns ``(channel, pattern)``: ``("machine", None)`` for the
+    machine channel, else ``("screen", regex)`` — a literal lowered
+    to its normalized text, escaped, which is the spec's own
+    equivalence (a normalized substring of a normalized row).
+    """
+    spelled = text
+    if not (text.startswith('"') or text.startswith("/")
+            or text.startswith("machine=")):
+        spelled = '"' + (text.replace("\\", "\\\\")
+                         .replace('"', '\\"')) + '"'
+    try:
+        script = parse_script(f"wait {spelled}", path="<wait>")
+    except ScriptParseError as error:
+        raise StaticError(
+            f"not a wait condition: {text!r} — bare text, /regex/, or "
+            f"machine=stopped ({error})",
+            rule_id="condition.unparsable") from error
+    condition = script.statements[0].conditions[0]
+    if condition.channel == "machine":
+        return "machine", None
+    if condition.kind == "regex":
+        return "screen", condition.value
+    literal = condition.value
+    if literal.interpolated:
+        raise StaticError(
+            f"a property reference in a wait condition is a script's: "
+            f"{text!r}", rule_id="condition.property-reference")
+    return "screen", re.escape(normalize_row(literal.text))
+
+
+def _wait(arguments, session, timeout):
+    """The `wait` verb on the CLI: one condition, either channel.
+
+    The machine channel answers on a machine that is already stopped
+    — the wait a shell starts a moment late is satisfied, not
+    refused — and after the handle observes the VM gone, the
+    lifecycle reconciles the phase, as the script runtime does after
+    the same observation (D116).
+    """
+    channel, pattern = _wait_condition(arguments.condition)
+    if channel == "machine":
+        machine_id = _require_machine_selector(arguments, session)
+        state = session.load_machine_state(machine_id)
+        if state.get("phase") == "running":
+            Machine(session.machine_dir_path(machine_id)).wait_stopped(
+                timeout)
+            session.mark_stopped(machine_id)
+        return _emit(arguments, {}, lambda: _narrate("stopped"))
+    machine_home = _interaction_target(arguments, session)
+    try:
+        wait_text(pattern, timeout, home=machine_home)
+    except WaitExpired as expired:
+        # The handle names the regex it searched for; the caller typed
+        # a condition, and the expiry should name that.
+        raise WaitExpired(
+            str(expired).replace(pattern, arguments.condition, 1),
+            rule_id=expired.rule_id) from expired
+    return _emit(arguments, {}, lambda: _narrate("matched"))
+
+
+def _wait_ready(arguments, session):
+    """Wait the boot out.
+
+    A void twin: the prompt the guest reached is narration on stderr
+    (the adapter says it), as `wait`'s "matched" is, and `--json`
+    prints `{}`. An expired wait is the twin's ``WaitExpired``, exit
+    4 through the ordinary arm (D90). Only the flags the caller gave
+    are forwarded, so the twin's defaults stay the twin's.
+    """
+    keywords = {}
+    if getattr(arguments, "timeout", None) is not None:
+        keywords["timeout"] = arguments.timeout
+    if getattr(arguments, "prompt", None) is not None:
+        keywords["prompt"] = arguments.prompt
+    session.wait_ready(
+        machine=getattr(arguments, "machine", None),
+        blueprint=getattr(arguments, "blueprint", None),
+        **keywords)
+    return _emit(arguments, {}, lambda: None)
+
+
 def _eject_media(arguments, session):
     machine_id = _require_machine_selector(arguments, session)
     session.eject_media(machine_id, arguments.slot)
@@ -1484,6 +1595,11 @@ def _dispatch(arguments, session, context):
     if arguments.command == "get-machine-dir":
         return _get_machine_dir(arguments, session)
 
+    if arguments.command == "wait":
+        # Resolves its own target: the machine channel must answer on
+        # a machine that has already stopped, which the interaction
+        # target's running check would refuse.
+        return _wait(arguments, session, timeout or 60)
     machine_home = _interaction_target(arguments, session)
     if arguments.command == "type":
         send_text(arguments.text, enter=False, home=machine_home)
@@ -1495,6 +1611,8 @@ def _dispatch(arguments, session, context):
         combos = [resolve_key(name) for name in arguments.names]
         send_keys(combos, home=machine_home)
         return _emit(arguments, {}, lambda: None)
+    if arguments.command == "wait-ready":
+        return _wait_ready(arguments, session)
     if arguments.command == "exec":
         # The twin resolves the selector, the platform, and the VM
         # identity itself, and returns the command's output.
@@ -1514,9 +1632,6 @@ def _dispatch(arguments, session, context):
     if arguments.command == "screen":
         rows = screen_text(home=machine_home)
         return _emit(arguments, rows, lambda: print("\n".join(rows)))
-    if arguments.command == "wait":
-        wait_text(arguments.pattern, timeout or 60, home=machine_home)
-        return _emit(arguments, {}, lambda: _narrate("matched"))
     if arguments.command == "screenshot":
         screenshot(arguments.name, machine_home)
         return _emit(arguments, {}, lambda: None)

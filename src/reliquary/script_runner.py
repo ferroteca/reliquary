@@ -37,7 +37,7 @@ from .errors import (PreflightError, ReliquaryError, RunCancelled,
                      exit_code, outcome)
 from .home import cache_dir as _resolve_cache_dir
 from .library import locate_blueprint, locate_script
-from .control_display import char_keys
+from .control_display import char_keys, normalize_row
 from .machine_handle import Machine, validate_screenshot_name
 from .progress import interactive as _interactive, stream_for
 from .resolve import load_namespace
@@ -106,7 +106,7 @@ _QEMU_KEY_NAMES = {
 
 def _normalize_row(text):
     """Collapse a screen row's whitespace, as matching defines it."""
-    return " ".join(text.split())
+    return normalize_row(text)
 
 
 def resolve_key(spelling):

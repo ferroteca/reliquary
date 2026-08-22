@@ -175,6 +175,13 @@ class Session:
             command, machine=machine, blueprint=blueprint,
             timeout=timeout, check=check, context=self._context)
 
+    def wait_ready(self, *, machine=None, blueprint=None, timeout=90,
+                   prompt=None):
+        """Wait until a running guest is ready for commands."""
+        return machines.wait_ready(
+            machine=machine, blueprint=blueprint, timeout=timeout,
+            prompt=prompt, context=self._context)
+
     # The machine-variable family. Read-only by design: the script
     # `set` verb is the channel's only writer (docs/spec/cli.md,
     # "the host side only reads"), so the session carries no
