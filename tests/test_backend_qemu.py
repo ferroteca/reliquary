@@ -34,7 +34,8 @@ except ModuleNotFoundError:
 
 import reliquary
 from reliquary import backend_qemu as qemu_module
-from reliquary.errors import PreflightError, RunFailure, StaticError
+from reliquary.errors import (InternalError, PreflightError, RunFailure,
+                              StaticError)
 
 
 class _FakeProcess:
@@ -388,6 +389,54 @@ def test_the_boot_order_becomes_firmware_letters():
               "cdrom0": {"medium": "cdrom", "slot": 0, "path": None}}
     assert qemu_module._boot_order(["cdrom0", "hdd0"], drives) == "dc"
     assert qemu_module._boot_order(["hdd0", "cdrom0"], drives) == "cd"
+
+
+# The system binary is chosen by the machine's declared platform,
+# because the wrong one is not a degraded run but a reboot loop: an
+# amd64 kernel triple-faults on the 32-bit binary, and the loop looks
+# exactly like a guest that never got going. Declared, never read off
+# an image (P10), and DOS stays on the binary its delivered workflow
+# is tested against.
+
+@pytest.mark.parametrize("platform, stem", [
+    ("dos", "qemu-system-i386"),
+    ("win9x", "qemu-system-i386"),
+    ("winnt", "qemu-system-x86_64"),
+    ("openbsd", "qemu-system-x86_64"),
+])
+def test_the_platform_chooses_the_system_binary(platform, stem):
+    assert qemu_module._platform_binary(platform).startswith(stem)
+
+
+def test_an_unstated_platform_keeps_the_compatibility_default():
+    # A machine caught mid-create carries no platform yet, and DOS is
+    # the compatibility default: the binary is the one it always was.
+    assert qemu_module._platform_binary(None).startswith("qemu-system-i386")
+
+
+def test_an_unmapped_platform_refuses_rather_than_guessing():
+    # The defect this table exists to prevent was a silent wrong
+    # binary, so a platform the schema gains and this table misses
+    # names itself instead of triple-faulting in the guest (P11).
+    with pytest.raises(InternalError, match="plan9"):
+        qemu_module._platform_binary("plan9")
+
+
+def test_start_asks_for_the_binary_its_platform_needs(root):
+    adapter = qemu_module.QemuAdapter()
+    state = {
+        "id": "openbsd-0", "backend-id": "reliquary-openbsd-0",
+        "platform": "openbsd", "memory": 512, "boot": ["hdd0"],
+        "drives": {"hdd0": {"medium": "hdd", "slot": 0,
+                            "path": _image(root, "disk.qcow2")}},
+    }
+    with mock.patch.object(qemu_module, "_find_qemu_tool",
+                           side_effect=lambda binary: binary), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=root,
+                      backend_dir=os.path.join(root, "qemu"))
+
+    assert launch.call_args.args[0][0].startswith("qemu-system-x86_64")
 
 
 def test_start_renders_the_state_and_launches_it(root):

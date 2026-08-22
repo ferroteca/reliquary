@@ -150,8 +150,17 @@ class BackendAdapter:
 
     # -- discovery and capability ---------------------------------
 
-    def discover(self):
-        """Probe the host: is this backend usable here, and which?"""
+    def discover(self, platform=None):
+        """Probe the host: is this backend usable here, and which?
+
+        ``platform`` is the guest platform of the machine about to
+        start, or ``None`` for a bare availability probe. A backend
+        whose host tooling differs by guest architecture — QEMU, which
+        ships one system binary per architecture — answers for the
+        tooling *that* machine will use, so a preflight can never pass
+        on one binary and then launch another. A backend with a single
+        host tool ignores it.
+        """
         raise NotImplementedError
 
     def capabilities(self):

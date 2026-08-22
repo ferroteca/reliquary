@@ -95,10 +95,15 @@ class FakeAdapter(BackendAdapter):
         self.start_error = None
         self.stop_error = None
         self.session_error = None
+        self.discovered_for = None
 
     # -- discovery and capability ---------------------------------
 
-    def discover(self):
+    def discover(self, platform=None):
+        # The seam offers the machine's platform for a backend whose
+        # host tooling differs by guest architecture; this one has a
+        # single fake tool and records what it was asked for.
+        self.discovered_for = platform
         if not self.available:
             return Availability(self.name, False,
                                 detail=f"no {self.name} on this host")

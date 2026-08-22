@@ -555,6 +555,20 @@ def test_start_hands_the_state_to_the_adapter_and_sets_running(rig):
     assert state["vm"]["backend-id"] == f"reliquary-{machine_id}"
 
 
+def test_start_probes_the_backend_for_this_machines_platform(rig):
+    # QEMU ships one system binary per guest architecture, so a bare
+    # probe would judge a different binary than the start launches —
+    # and the preflight would pass on one while the guest boots on
+    # the other. The platform crosses the seam with the question.
+    machine_id = rig.create(
+        "bootable", {"platform": "dos", "drives": {"hdd0": "blank"},
+                     "boot": ["hdd0"]},
+        media=[_BLANK])
+    start_machine(machine_id, context=rig.home)
+
+    assert rig.backend.discovered_for == "dos"
+
+
 def test_start_refuses_when_the_recorded_backend_is_absent(rig):
     # A machine carries its backend for life; a host that no
     # longer has it is told so, and nothing is launched.

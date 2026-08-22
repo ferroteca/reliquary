@@ -1129,7 +1129,10 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
         state["memory"] = _PLATFORM_MEMORY.get(state.get("platform"), 16)
     backend = state.get("backend") or "qemu"
     adapter = backends.adapter(backend)
-    probe = adapter.discover()
+    # Probed for *this machine's* platform: QEMU's system binary is
+    # one per guest architecture, so a bare probe would judge a
+    # different binary than the start is about to launch.
+    probe = adapter.discover(state.get("platform"))
     if not probe.available:
         raise PreflightError(
             f"machine {machine_id} was materialized on backend "

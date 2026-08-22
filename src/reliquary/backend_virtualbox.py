@@ -695,7 +695,9 @@ class VirtualBoxAdapter(BackendAdapter):
     name = "virtualbox"
     settings_keys = ()
 
-    def discover(self):
+    def discover(self, platform=None):
+        # One host tool whatever the guest is, so the platform the
+        # seam offers is not asked for here.
         try:
             executable = find_vboxmanage()
         except PreflightError as missing:

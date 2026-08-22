@@ -891,9 +891,19 @@ answer is still free.
 > `qemu-system-x86_64` reach the installer prompt in about 75
 > seconds**, and the dmesg on the way names the fact this entry
 > bets on: `wsdisplay0 at vga1 mux 1: console (80x25, vt100
-> emulation)` — 80×25 text, so the agentless VGA scrape applies and
-> the "if the console leaves text mode" branch below is closed as
-> *not taken*. Two lesser findings, from the same run: the recipe's
+> emulation)`. **That reading was taken off a framebuffer capture,
+> and taking it off the text plane instead reverses the conclusion**
+> (measured after the fix, below): the console is 80×25 text to the
+> *guest*, but wscons attaches `vga1` with an aperture and paints
+> through it, so reliquary's VGA **text-memory** scrape freezes at
+> the moment the kernel banner ends and never sees the installer
+> prompt at all. The same machine on `control-planes: ["vnc"]` reads
+> perfectly through the fixed-font recognizer — dmesg, prompt and
+> cursor. So **the OpenBSD dialect runs on the VNC plane**, which is
+> equally agentless (P2) and already delivered on QEMU (F63); the
+> agentless-display default is blind to this guest and the entry's
+> text-memory assumption does not survive. Two lesser findings, from
+> the same run: the recipe's
 > `boot> a` types the installer's answer at the *boot loader*, which
 > reads it as a kernel name (`cannot open cd0a:a`) and falls back —
 > the loader wants `enter` and the `(A)utoinstall` answer belongs at
@@ -926,10 +936,14 @@ in, text memory at `0xb8000` out, `screendump` for pictures, the
 VNC plane with the fixed-font recognizer as the equally agentless
 fallback should the console ever leave text mode. P2 is honoured
 with no new carrier, and the dialect is the only thing that
-differs — **and spike 0 confirmed it** (above): the installer kernel
-brings the console up as `wsdisplay0 at vga1 mux 1: console (80x25,
-vt100 emulation)`, so text-memory scraping applies and neither the
-VNC fallback nor the font-recognition stop is in play.
+differs — **and spike 0 settled which plane carries it** (above):
+not the agentless display's text-memory scrape, which OpenBSD's
+wscons leaves frozen at the boot banner, but the **VNC plane**,
+where the fixed-font recognizer reads the console exactly as it
+reads DOS. The font-recognition stop this entry feared is not in
+play; the plane, however, is not the default one, so every clause
+below reads over `control-planes: ["vnc"]` and a machine left on the
+default plane is blind rather than merely slower.
 
 **What a platform owns is a dialect, not a transport** — the
 design is [design/platform-dialect.md](design/platform-dialect.md),

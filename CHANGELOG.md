@@ -13,6 +13,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The QEMU adapter launches the system binary the guest's
+  architecture needs** (F64's spike 0). It launched
+  `qemu-system-i386` for every machine, whatever the blueprint's
+  `platform` said, so an amd64 guest's kernel triple-faulted on load
+  and the machine reboot-looped through its firmware — a guest that
+  never booted, with nothing naming the cause. The binary is now
+  chosen from the machine's **declared** platform (P10, never read
+  off an image): DOS and win9x keep `i386` — DOS on exactly the
+  binary its delivered workflow is tested against — while openbsd
+  and winnt take `x86_64`. A platform the schema admits and the
+  table has not learned raises rather than guessing, because a
+  silent wrong binary is the shape P11 forbids.
+- **The start preflight probes the binary it is about to launch.**
+  `BackendAdapter.discover()` now takes the machine's platform, so
+  QEMU answers for that guest's own system binary: the availability
+  check and the `using qemu: …` narration named `qemu-system-i386`
+  while the launch used another. A backend with one host tool —
+  VirtualBox — ignores the argument. The seam is internal, so this
+  changes no world-facing surface.
+
 - **`rlq wait` is the script language's `wait` verb** (D116; T31).
   The command claimed the verb's identity — the manifest maps it to
   `wait_text` as the script-language-identity exception — while

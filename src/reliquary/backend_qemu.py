@@ -45,8 +45,55 @@ from .errors import (InternalError, PreflightError, ReliquaryError,
 from .home import effective_home
 
 
-_QEMU_BIN = "qemu-system-i386.exe" if os.name == "nt" else "qemu-system-i386"
+def _system_binary(arch):
+    """QEMU's system binary for one CPU architecture, host-spelled."""
+    return f"qemu-system-{arch}.exe" if os.name == "nt" else f"qemu-system-{arch}"
+
+
+#: The architecture each guest platform's system binary must emulate.
+#: **QEMU's system binaries are not interchangeable**, and getting this
+#: wrong is not a degraded run: a 64-bit kernel triple-faults on the
+#: 32-bit binary and the machine reboot-loops through its firmware
+#: forever, which reads as a guest that never booted rather than as a
+#: configuration error. DOS keeps `i386` — the binary its delivered
+#: workflow is tested against — and nothing here is read off an image
+#: or a screen: the platform is the one the blueprint declared (P10).
+_PLATFORM_ARCH = {
+    "dos": "i386",
+    "win9x": "i386",
+    "winnt": "x86_64",
+    "openbsd": "x86_64",
+}
+
+#: What an unstated platform gets. A machine caught mid-create carries
+#: no resolved platform yet, and DOS is the compatibility default
+#: (AGENTS.md, "Platform selection"), so the answer is the binary this
+#: adapter has always launched.
+_DEFAULT_ARCH = "i386"
+
+_QEMU_BIN = _system_binary(_DEFAULT_ARCH)
 _QEMU_IMG_BIN = "qemu-img.exe" if os.name == "nt" else "qemu-img"
+
+
+def _platform_binary(platform):
+    """The QEMU system binary a guest platform needs.
+
+    A platform the schema admits and this table has not learned is an
+    **internal gap that names itself** rather than a guess: guessing
+    is what produced the reboot loop this table exists to prevent, and
+    a silent wrong binary is exactly the shape P11 forbids.
+    """
+    if platform is None:
+        return _system_binary(_DEFAULT_ARCH)
+    try:
+        return _system_binary(_PLATFORM_ARCH[platform])
+    except KeyError:
+        raise InternalError(
+            f"no QEMU system binary is mapped for platform "
+            f"{platform!r}; the qemu adapter cannot choose one, and "
+            "guessing would boot the guest on the wrong emulator"
+        ) from None
+
 
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 
@@ -149,9 +196,15 @@ def _find_qemu_tool(binary):
         rule_id="machine.backend-not-found")
 
 
-def find_qemu():
-    """Locate the QEMU system binary from configuration and common paths."""
-    return _find_qemu_tool(_QEMU_BIN)
+def find_qemu(platform=None):
+    """Locate the QEMU system binary from configuration and common paths.
+
+    ``platform`` is the guest platform the machine declared, which is
+    what decides *which* system binary is wanted (:data:`_PLATFORM_ARCH`);
+    omitting it asks for the compatibility default, which is what a
+    bare availability probe wants.
+    """
+    return _find_qemu_tool(_platform_binary(platform))
 
 
 #: Where QEMU keeps the VGA BIOS whose font a guest paints with,
@@ -925,10 +978,18 @@ class QemuAdapter(BackendAdapter):
 
     # -- discovery and capability ---------------------------------
 
-    def discover(self):
+    def discover(self, platform=None):
+        """Probe for the system binary this guest's architecture needs.
+
+        Answering for the *machine's* platform rather than for a fixed
+        binary is what keeps the preflight honest: QEMU ships one
+        system binary per architecture, so probing one and launching
+        another would report a host as ready and then fail — or refuse
+        a host that holds exactly the binary the machine wants.
+        """
         try:
-            executable = find_qemu()
-        except PreflightError as missing:
+            executable = find_qemu(platform)
+        except (PreflightError, InternalError) as missing:
             return Availability("qemu", False, detail=str(missing))
         return Availability("qemu", True, version=_qemu_version(executable),
                             executable=executable,
@@ -999,7 +1060,11 @@ class QemuAdapter(BackendAdapter):
         """
         memory = state.get("memory") or 16
         vm_name = state.get("backend-id") or f"reliquary-{state['id']}"
-        args = [find_qemu(), "-name", vm_name, "-m", str(memory)]
+        # The binary comes first because it is chosen, not fixed: a
+        # guest's architecture decides which system emulator can run
+        # it at all (_PLATFORM_ARCH).
+        args = [find_qemu(state.get("platform")), "-name", vm_name,
+                "-m", str(memory)]
         args += drive_args(state.get("drives", {}))
         boot = _boot_order(state.get("boot", []), state.get("drives", {}))
         if boot is not None:
