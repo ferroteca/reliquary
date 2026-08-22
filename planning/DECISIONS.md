@@ -85,19 +85,6 @@ what gates nothing in particular.
 
 ### Still needed
 
-- **Cross-script reuse**: whether repeated behavior eventually
-  justifies a constrained include mechanism. There is deliberately
-  no handler-splicing macro in the initial language; real scripts
-  must establish the need and a design that preserves local control
-  flow and transcript provenance. A named user desire is now on
-  record (owner, 2026-07-21, the bundling wrinkle): complex
-  scripts split into multiple interacting files, like programming
-  source files. Asset *factoring* — several scripts, catalog
-  landmarks, and media definitions referencing each other through
-  one asset root — is already served by authored-asset
-  resolution; what stays open is behavior reuse, and any future
-  include must preserve the static graph (G3), the
-  non-computational surface (G2), and transcript provenance.
 - **Blueprint computational constructs**: which bounded
   declarative constructs the blueprint format eventually grows.
   Computational expansion is an anticipated growth area, and its
@@ -177,6 +164,42 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D117 — NO INCLUDE MECHANISM; THE CORPUS HAS NOT EARNED ONE —
+  DECIDED (owner, 2026-08-22), closing the "cross-script reuse"
+  open question. Supports (none) — a refusal; argued from G2, G3,
+  G6 and D104's construct bar.
+
+  The question asked whether repeated behaviour justifies a
+  constrained include, with real scripts to establish the need,
+  and a named desire on record (owner, 2026-07-21): complex
+  scripts split into interacting files, like source files.
+  **Measured, the corpus does not establish it**: seven scripts
+  (four codex, three of the owner's) repeat exactly two idioms —
+  boot to prompt (`start` / `wait "C:\>"`) and power off
+  (`enter "fdapm poweroff"` / `wait machine=stopped`), two lines
+  each at three sites — and the one larger candidate, the owner's
+  install script, is the codex's *diverged* copy (a different
+  loader, an `eject` moved), which P18's copy-out makes the
+  expected pattern. A construct to save two lines fails D104's
+  bar, and G6 makes surface the scarce resource. What "interacting
+  files" can mean here is already served outside the language,
+  where G2 puts composition: a harness runs `ready`, its own
+  steps, then `verify`; `machine` headers state each script's
+  precondition; variables and properties carry data.
+
+  WEIGHED AND DECLINED — **`run @script`, script-as-statement**:
+  a verb executing a *linear* script in place, headers checked
+  statically, recursion refused so the graph stays a finite tree
+  (G3), no parameters (G2), every statement keeping its file and
+  line plus the call site. The least-bad shape, recorded so a
+  reopening starts from it rather than from a handler-splicing
+  macro or a phase import (whose `goto` targets couple it to the
+  importer, and whose decoupling is a function). REOPENS on a
+  script in the corpus reusing a unit that is **larger than an
+  idiom, identical across its sites rather than a diverged copy,
+  and self-contained without transition coupling** — evidence,
+  not desire.
 
 - D116 — `rlq wait` IS THE VERB, ON EVERY AXIS — DECIDED (owner,
   2026-08-22) and delivered the same day, striking T31. Supports
