@@ -85,11 +85,6 @@ what gates nothing in particular.
 
 ### Still needed
 
-- **Friendly machine aliases**: machine identity is already
-  human-readable (`<blueprint>-<n>`); still open is whether
-  listings and selectors additionally offer docker-style generated
-  word aliases, or whether numbered ids plus blueprint selection
-  make them unnecessary.
 
 ### Deferred to 1.0
 

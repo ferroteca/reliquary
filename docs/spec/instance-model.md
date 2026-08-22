@@ -295,7 +295,14 @@ under an asset root.
 Machines are never renamed because the id is the whole identity:
 `<blueprint>-<n>`, assigned at `create` (lowest free number) and
 reused after `destroy`. Manual renames of machine directories under
-`cache/machines/` are unsupported.
+`cache/machines/` are unsupported. **And there is no alias**,
+generated or chosen: the id is already the readable pair a
+generated word would stand in for, and a second spelling of one
+identity is a map to keep in step. A blueprint's several machines
+are interchangeable instances of what it declares (P1) — one that
+differs in kind is a different blueprint — so nothing Reliquary
+knows tells them apart beyond the number, and what a machine is
+*for* is the caller's to keep on its own side of the seam (P4).
 
 ## JSON remains the format
 
