@@ -345,6 +345,21 @@ def test_a_cdrom_takes_the_ide_slot_after_the_last_disk(root):
     assert "if=ide,index=1" in cdrom[0]
 
 
+def test_every_drive_carries_its_slot_key_as_its_id(root):
+    # Floppies and cdroms always did, for a live insert/eject; a hard
+    # disk now does too, because the slot key is how the settings
+    # hatch addresses one drive's options — `-set drive.hdd0.…` (D118)
+    drives = {
+        "hdd0": {"medium": "hdd", "slot": 0,
+                 "path": _image(root, "blank.qcow2")},
+        "floppy0": {"medium": "floppy", "slot": 0, "path": None},
+        "cdrom0": {"medium": "cdrom", "slot": 0, "path": None},
+    }
+    values = _drive_values(qemu_module.drive_args(drives))
+    for key in drives:
+        assert any(v.endswith(f"id={key}") for v in values), key
+
+
 def test_an_empty_removable_slot_renders_a_medium_less_drive():
     drives = {"cdrom0": {"medium": "cdrom", "slot": 0, "path": None}}
     assert _drive_values(qemu_module.drive_args(drives)) == [
@@ -462,6 +477,36 @@ def test_an_option_and_its_value_in_one_element_is_still_caught():
     with pytest.raises(StaticError) as caught:
         qemu_module.settings_args({"args": ["-m 64"]})
     assert caught.value.rule_id == "machine.settings-reserved-argument"
+
+
+@pytest.mark.parametrize("args", [
+    ["-set", "drive.hdd0.cache=none"],
+    ["-set drive.hdd0.cache=none"],
+    ["-set", "drive.cdrom0.serial=RLQ1"],
+    ["-set", "device.x.foo=1"],
+], ids=["two-elements", "one-element", "cdrom-serial", "other-group"])
+def test_a_per_drive_option_reaches_a_drive_through_set(args):
+    # The machine-scoped hatch addresses one drive through QEMU's own
+    # `-set drive.<slot>.<property>` — which is why a drive-scoped
+    # section was declined (D118)
+    assert qemu_module.settings_args({"args": args}) == args
+
+
+@pytest.mark.parametrize("target", [
+    "drive.hdd0.file=C:\\other.img",
+    "drive.hdd0.if=scsi",
+    "drive.cdrom0.media=disk",
+    "drive.hdd0.index=3",
+    "drive.floppy0.id=x",
+], ids=["file", "if", "media", "index", "id"])
+def test_set_on_a_rendered_drive_property_is_refused_naming_drives(target):
+    # `-drive` is refused because `drives` renders it; `-set` reaching
+    # the same property is the same second source for one fact
+    for args in (["-set", target], [f"-set {target}"]):
+        with pytest.raises(StaticError) as caught:
+            qemu_module.settings_args({"args": args})
+        assert caught.value.rule_id == "machine.settings-reserved-argument"
+        assert "drives" in str(caught.value)
 
 
 def test_the_hatch_still_passes_a_device_and_a_cpu_model():

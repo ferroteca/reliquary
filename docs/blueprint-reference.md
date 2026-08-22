@@ -830,6 +830,7 @@ arguments are refused, each naming its owner:
 | `-smp` | [`cpus`](#cpus) |
 | `-boot` | [`boot`](#boot) |
 | `-drive`, `-hda`…`-hdd`, `-fda`, `-fdb`, `-cdrom` | [`drives`](#drives) |
+| `-set drive.<slot>.<property>` for a property `drives` renders (`file`, `if`, `index`, `media`, `id`, `format`, `bus`, `unit`) | [`drives`](#drives) |
 | `-machine`, `-M` | this section's own `machine` key |
 | `-name`, `-uuid`, `-qmp` | the recorded VM identity |
 | `-display`, `-nographic` | the display choice a start is given |
@@ -849,9 +850,29 @@ wherever it is honored, and a second source for it in the hatch
 would have to be unpicked the day the adapter renders it. The gap
 is the adapter's to close, not the hatch's to work around.
 
+**One drive's options** are reached through QEMU's own per-drive
+addressing rather than a drive-scoped section (D118): every drive
+Reliquary renders carries `id=<slot>` — `hdd0`, `cdrom0`,
+`floppy0` — so `-set drive.<slot>.<option>=<value>` sets an option
+on exactly that drive, after the `-drive` that defined it. The
+properties `drives` itself renders are refused through `-set` as
+`-drive` is refused (the table above); everything else — `cache`,
+`aio`, `discard`, `serial`, … — is yours, and QEMU refuses an
+option it does not know by name, or a value this host cannot honor
+(`cache=none` asks for unbuffered I/O a qcow2 on Windows cannot
+give, and QEMU reports it against the drive):
+
+```json
+{
+  "backend-settings": {
+    "qemu": { "args": ["-set", "drive.hdd0.cache=writethrough"] }
+  }
+}
+```
+
 This section renders **last**, after everything Reliquary owns, so
 in the launch command line Reliquary logs, your own arguments are
-the tail.
+the tail — which is also what lets `-set` find the drive it names.
 
 ---
 

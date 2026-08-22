@@ -90,6 +90,16 @@ RESERVED_ARGUMENTS = {
     "nographic": "the display choice a start is given",
 }
 
+#: The `-drive` properties Reliquary renders for every drive, and so
+#: refuses through ``-set drive.<slot>.<property>`` as it refuses
+#: ``-drive`` itself: the same second source for one fact, reached
+#: by QEMU's own per-drive addressing (D118). Every other drive
+#: property — ``cache``, ``aio``, ``discard``, ``serial``, … — is
+#: the caller's, and QEMU judges its value as it judges the rest of
+#: the hatch.
+RESERVED_DRIVE_PROPERTIES = frozenset(
+    {"file", "if", "index", "media", "id", "format", "bus", "unit"})
+
 
 def _qemu_fallback_dirs():
     if os.name == "nt":
@@ -1098,18 +1108,47 @@ def _boot_order(boot_keys, drives):
     return "".join(letters) or None
 
 
-def _reserved_argument(item):
-    """What owns ``item``'s option, or ``None`` if the caller does.
+def _option(item):
+    """An argv element as ``(name, inline_value)``, or ``(None, None)``.
 
-    Reads the option name out of one argv element the way QEMU would:
-    leading dashes stripped, and anything past a ``=`` or a space
-    ignored — so ``-m 64`` written as a single element is caught here
+    Reads the option name the way QEMU would: leading dashes
+    stripped, and anything past a ``=`` or a space the inline value —
+    so ``-m 64`` written as a single element is caught as ``-m``
     rather than handed to QEMU as an argument it cannot parse.
     """
     if not item.startswith("-"):
-        return None
-    name = re.split(r"[=\s]", item.lstrip("-"), maxsplit=1)[0]
+        return None, None
+    parts = re.split(r"[=\s]", item.lstrip("-"), maxsplit=1)
+    name = parts[0] or None
+    inline = parts[1] if len(parts) > 1 and parts[1] else None
+    return name, inline
+
+
+def _reserved_argument(item):
+    """What owns ``item``'s option, or ``None`` if the caller does."""
+    name, _inline = _option(item)
     return RESERVED_ARGUMENTS.get(name) if name else None
+
+
+def _reserved_set(value):
+    """What owns a ``-set`` target, or ``None`` if the caller does.
+
+    ``-set group.id.property=value`` is QEMU's own per-item addressing,
+    and for the ``drive`` group it reaches exactly what ``-drive`` would
+    have — so a property Reliquary renders is refused here as ``-drive``
+    is refused, naming ``drives``; the rest is the caller's (D118). A
+    value that is not of that shape is left to QEMU to refuse.
+    """
+    if not isinstance(value, str):
+        return None
+    target = value.split("=", 1)[0]
+    parts = target.split(".")
+    if len(parts) != 3 or parts[0] != "drive":
+        return None
+    if parts[2] in RESERVED_DRIVE_PROPERTIES:
+        return (f"the machine's `drives` (`{parts[2]}` of drive "
+                f"{parts[1]!r} is what `drives` renders)")
+    return None
 
 
 def settings_args(settings):
@@ -1159,6 +1198,14 @@ def settings_args(settings):
                     f"non-empty string, got: {item!r}",
                     rule_id="value.not-a-string")
             owner = _reserved_argument(item)
+            if owner is None:
+                name, inline = _option(item)
+                if name == "set":
+                    # The target is inline (`-set drive.x.cache=none` in
+                    # one element) or the next element.
+                    following = extra[index + 1] if index + 1 < len(
+                        extra) else None
+                    owner = _reserved_set(inline or following)
             if owner is not None:
                 raise StaticError(
                     f"backend-settings.qemu.args[{index}] is {item!r}, "
@@ -1199,14 +1246,19 @@ def drive_args(drives):
 
     hdds = [(k, v) for k, v in drives.items()
             if v["medium"] == "hdd"]
-    for _key, drive in sorted(hdds, key=lambda kv: kv[1]["slot"]):
+    for key, drive in sorted(hdds, key=lambda kv: kv[1]["slot"]):
         path = drive["path"]
         is_dir = os.path.isdir(path)
         source = (f"fat:rw:{path},format=raw,"
                   if is_dir else path + ",")
         inferred = "" if is_dir else format_options(path)
+        # id=<key> as on every other drive: a hard disk is never
+        # swapped live, but the slot key is how the settings hatch
+        # addresses one drive's options — `-set drive.hdd0.cache=…`
+        # (D118) — so every drive is addressable the same way.
         args += ["-drive",
-                 f"file={source}{inferred}if=ide,index={drive['slot']}"]
+                 f"file={source}{inferred}if=ide,index={drive['slot']},"
+                 f"id={key}"]
 
     cdroms = [(k, v) for k, v in drives.items()
               if v["medium"] == "cdrom"]

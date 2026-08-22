@@ -85,12 +85,6 @@ what gates nothing in particular.
 
 ### Still needed
 
-- **Per-drive backend settings**: whether they are ever needed
-  beyond the top-level `backend-settings` scope. Sharpened by D92,
-  which made that top-level scope real: adapters honor it now, so
-  the question is no longer about an unbuilt field — it is whether
-  a drive-scoped section has a case the machine-scoped one cannot
-  serve.
 - **Promoting runtime changes**: whether a convenience command
   copies a state-side runtime change (e.g. attached media) back
   into the blueprint, or users always edit the blueprint by hand.
@@ -151,6 +145,35 @@ is waiting on an answer today.
   the semantics in one document both specs present.
 
 ## Decided
+
+- D118 — NO DRIVE-SCOPED SETTINGS SECTION; A DRIVE IS ADDRESSED
+  THROUGH THE BACKEND'S OWN HATCH — DECIDED (owner, 2026-08-22)
+  and delivered the same day, closing the "per-drive backend
+  settings" open question. Supports U22; P25. Extends D92's
+  overlap rule.
+
+  The question was whether a drive-scoped section has a case the
+  machine-scoped one cannot serve. **It does not**: every per-drive
+  knob is one backend's spelling (QEMU's `cache=`, `aio=`,
+  `serial=`; VirtualBox's `--nonrotational`), so P25 keeps all of
+  them behind the backend's pin, and the backend's own addressing
+  reaches a drive from there — QEMU's `-set drive.<slot>.<option>=
+  <value>`, verified on the installed QEMU to target a named drive
+  and to refuse unknown options and ids itself. What stood in the
+  way was the adapter's: hard disks rendered without `id=`, and
+  the overlap rule did not see through `-set`. Both close with
+  this — every drive carries `id=<slot>`, and a `-set` on a
+  property `drives` renders is refused naming `drives`, the same
+  second-source rule as `-drive`. No blueprint anywhere uses
+  `backend-settings` yet, so this is settled on the design's terms
+  rather than a case.
+
+  WEIGHED AND DECLINED: **a drive-scoped section** — two places
+  for one backend's vocabulary, with the overlap rule to restate
+  per scope. REOPENS on a backend whose per-drive configuration
+  has no addressable form from its machine-level hatch;
+  VirtualBox's hatch is empty today and will be judged when it
+  exists.
 
 - D117 — NO INCLUDE MECHANISM; THE CORPUS HAS NOT EARNED ONE —
   DECIDED (owner, 2026-08-22), closing the "cross-script reuse"

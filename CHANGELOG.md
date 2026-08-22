@@ -44,6 +44,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Per-drive QEMU options through the machine-scoped hatch**
+  (D118). A drive-scoped `backend-settings` section was declined:
+  QEMU's own `-set drive.<slot>.<option>=<value>` addresses one
+  drive from the section that exists. Every drive the adapter
+  renders now carries `id=<slot>` (hard disks did not), and the
+  overlap rule sees through `-set` — a property `drives` renders
+  (`file`, `if`, `index`, `media`, `id`, `format`, `bus`, `unit`)
+  is refused naming `drives`, as `-drive` itself is; `cache`,
+  `aio`, `discard`, `serial` and the rest are the caller's. The
+  blueprint reference documents the idiom.
 - **`rlq wait-ready` / `Session.wait_ready` — readiness as its own
   twin** (D114; T29). `AgentlessGuestExec.wait_ready` was reachable
   from Python alone, against P6's rule that no capability is

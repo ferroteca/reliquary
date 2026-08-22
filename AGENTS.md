@@ -222,7 +222,10 @@ workflow:
   `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the drive
   and boot rendering a machine's state lowers into, the `backend-settings.qemu` hatch (`SETTINGS_KEYS` = `machine` /
   `args`, `RESERVED_ARGUMENTS` = what a blueprint field or the VM identity owns — case-sensitively, `-m`
-  being memory and `-M` the machine type, and deliberately *not* `-device` or `-cpu`; `settings_args` both
+  being memory and `-M` the machine type, and deliberately *not* `-device` or `-cpu`, with
+  `RESERVED_DRIVE_PROPERTIES` the `-drive` properties `drives` renders and so refuses through
+  `-set drive.<slot>.<property>` too — QEMU's own per-drive addressing, every drive carrying `id=<slot>`, is the
+  route to one drive's options and the reason no drive-scoped section exists, D118; `settings_args` both
   validates and renders, which is what makes a section a create accepted one a start applies, and it renders
   last so a caller's own arguments are the tail of the logged command line), the owned launch with its identity verification, `Qmp`,
   the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
