@@ -85,11 +85,6 @@ what gates nothing in particular.
 
 ### Still needed
 
-- **Machine cache cleaning**: whether a `clean machines` command
-  reclaims cached materializations of stopped machines wholesale
-  (they regenerate like everything else under `cache/`), or
-  whether `recreate-machine`/`destroy-machine` per machine is
-  enough.
 - **Friendly machine aliases**: machine identity is already
   human-readable (`<blueprint>-<n>`); still open is whether
   listings and selectors additionally offer docker-style generated

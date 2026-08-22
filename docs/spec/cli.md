@@ -597,6 +597,19 @@ rlq recreate-machine --machine freedos-0
 # destroys freedos-0, creates new freedos-0 from its blueprint
 ```
 
+(There is no `clean-machines`, and the machine family is not a
+cache family. A media payload is reclaimable because it comes back
+byte for byte — pinned, fetched again — which is the whole of what
+`clean-media` promises. A machine directory is the machine: its
+disks hold what an install and every run since left there, and a
+recreate brings back only the blueprint's blank shape. Reclaiming
+one is destroying it, a choice P1 licenses and the user makes, one
+machine at a time with `destroy-machine`; the bulk form is the
+shell's loop over `list-machines --json`, the answer D88 gives
+wherever a set is the argument. That the default layout places
+machines under `cache/` says where they live, not what they are —
+`--machines-dir` places them anywhere.)
+
 ### Listing machines
 
 ```
