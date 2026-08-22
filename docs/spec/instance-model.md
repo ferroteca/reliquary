@@ -195,7 +195,19 @@ digest updated; contradictions the machine cannot absorb without
 regenerating (such as a changed `size` on an existing image) fail
 closed naming both sides, leaving `recreate` as the honest
 alternative. Applying a newer blueprint never happens implicitly at
-`start`.
+`start`. **And the reverse never happens**: no command writes a
+machine's divergence — an inserted medium, a changed boot order —
+back into its blueprint. The blueprint is the authored artifact,
+written by Reliquary once at most (`new-blueprint`, `add-media`)
+and only ever read after; a shape an author settles on at a
+machine is typed into the blueprint and adopted with `apply`, the
+one direction there is. An arrangement a run needed is not a fact
+about the machine (U24), and a machine left as a run arranged it
+is what the `with` scope and `apply` exist to undo (U26), so a
+verb copying state into the declaration would be writing the
+wrong one of the two (D30, D41). The one case where a machine's
+shape must be *captured* is a VM Reliquary did not build, and that
+is `import-vm`'s, which writes a new blueprint once.
 
 `clone` creates a new machine under the next free
 `<blueprint>-<n>` id. It retains the same

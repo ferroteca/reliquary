@@ -85,9 +85,6 @@ what gates nothing in particular.
 
 ### Still needed
 
-- **Promoting runtime changes**: whether a convenience command
-  copies a state-side runtime change (e.g. attached media) back
-  into the blueprint, or users always edit the blueprint by hand.
 - **Machine cache cleaning**: whether a `clean machines` command
   reclaims cached materializations of stopped machines wholesale
   (they regenerate like everything else under `cache/`), or
