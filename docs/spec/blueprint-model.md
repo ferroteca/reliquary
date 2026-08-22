@@ -1033,6 +1033,12 @@ permanently.
   stay plain `enum`s and are **never widened to admit a reference
   pattern**: that is what the reach trim buys, and the editor
   completion it protects is the point.
-- **Parked:** a succinct extraction short-circuit for long
-  itemized child lists — wanted, not now, and never at the cost
-  of static names.
+- **Parked:** the two candidate value-enriching constructs the
+  growth rule admits (above, "Format stability"), neither with a
+  case yet: a succinct extraction short-circuit for long itemized
+  child lists — wanted, not now, and never at the cost of static
+  names — and a variant matrix for near-identical blueprints
+  differing in a localized medium's location and hash. Each is
+  designed against the real case when one arrives, and argued
+  under the surface-change rule then; nothing here pre-commits
+  either.
