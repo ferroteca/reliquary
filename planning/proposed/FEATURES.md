@@ -880,17 +880,43 @@ answer is still free.
 > the install's whole product being inert). Honours **P2**: nothing
 > below depends on guest cooperation.
 
+> **Spike 0 ran, 2026-08-22, and found the blocker one layer below
+> this entry: the QEMU backend launches `qemu-system-i386` for every
+> machine** (`backend_qemu.py`, `_QEMU_BIN`), so the codex's amd64
+> kernel triple-faults on load and the machine reboot-loops —
+> SeaBIOS → iPXE → CDBOOT → `boot>` about every 13 seconds, which is
+> what `openbsd-install`'s `wait "boot>"` was matching and why the
+> recipe has never completed. It is not a script defect and not a
+> console-mode one. **The same disk and ISO driven by
+> `qemu-system-x86_64` reach the installer prompt in about 75
+> seconds**, and the dmesg on the way names the fact this entry
+> bets on: `wsdisplay0 at vga1 mux 1: console (80x25, vt100
+> emulation)` — 80×25 text, so the agentless VGA scrape applies and
+> the "if the console leaves text mode" branch below is closed as
+> *not taken*. Two lesser findings, from the same run: the recipe's
+> `boot> a` types the installer's answer at the *boot loader*, which
+> reads it as a kernel name (`cannot open cd0a:a`) and falls back —
+> the loader wants `enter` and the `(A)utoinstall` answer belongs at
+> the installer's own prompt; and the header's 30-second default
+> reaches every `wait`, including the set extraction, so the long
+> ones need their own `timeout=`. **A binary-selection defect blocks
+> this feature and is not part of it**: it belongs in the queue as
+> its own work, against the platform model AGENTS.md already states,
+> and every clause below is written as if it were fixed. Evidence:
+> a private home under this session's scratchpad, the failing
+> `.rlqt` transcripts, and the x86_64 screendump.
+
 **What exists, and what is unknown.** The codex holds `openbsd`
 (7.9 amd64, 512M, a 4G blank), `openbsd-installer` (the pinned
 ISO) and `openbsd-install` (autoinstall over the run-scoped HTTP
 server, answering root's password, hostname `openbsd`, ssh allowed,
 sets from `cd0`). The machine layer materializes and boots it; the
 schema admits the platform; the memory floor is recorded. The unit
-tier pins the ISO hash and the seed closure — **nothing on record
-says the install has ever completed for real.** The script's own
-`wait "boot>"` and `wait "CONGRATULATIONS…"` presuppose the one fact
-everything below rests on, so it is the first thing to measure
-rather than argue (spike 0, below).
+tier pins the ISO hash and the seed closure — and nothing on record
+said the install had ever completed for real, which spike 0 then
+measured rather than argued (above): it has not, and the reason is
+the backend's hardcoded i386 binary rather than anything in the
+recipe or the platform.
 
 **The transport is the one already built, and that is the whole
 bet.** OpenBSD amd64 booted by BIOS on QEMU's `-vga std` takes its
@@ -900,10 +926,10 @@ in, text memory at `0xb8000` out, `screendump` for pictures, the
 VNC plane with the fixed-font recognizer as the equally agentless
 fallback should the console ever leave text mode. P2 is honoured
 with no new carrier, and the dialect is the only thing that
-differs. If spike 0 finds the console in a framebuffer mode after
-boot, the VNC plane is the route and the bet still holds; if the
-recognizer cannot read OpenBSD's console font, that is the stop,
-and this entry shrinks to recording why.
+differs — **and spike 0 confirmed it** (above): the installer kernel
+brings the console up as `wsdisplay0 at vga1 mux 1: console (80x25,
+vt100 emulation)`, so text-memory scraping applies and neither the
+VNC fallback nor the font-recognition stop is in play.
 
 **What a platform owns is a dialect, not a transport** — the
 design is [design/platform-dialect.md](design/platform-dialect.md),
@@ -990,10 +1016,11 @@ the same reason; `win9x` and `winnt` (no recipe, no text console
 to bet on); any in-guest component; and the GUI era (F5).
 
 **Proof.** Integration, asked for by name as the DOS boots are:
-spike 0 is the install completing for real (a 700 MB ISO and a
-45-minute deadline, paid once — the product is the disk, P20);
-then a boot, `wait_ready`, `exec "uname -a"` reading back the
-kernel line, `exec "false", check=True` raising
+first the install completing for real behind the fixed binary
+selection (a 762 MiB ISO and a 45-minute deadline, paid once — the
+product is the disk, P20), which spike 0 has taken as far as the
+installer prompt; then a boot, `wait_ready`, `exec "uname -a"`
+reading back the kernel line, `exec "false", check=True` raising
 `command.signalled-failure` and `exec "nosuch"` raising the same,
 a row slice that does not include the boot's output, and the
 **agentless DOS suite passing byte-for-byte** — the dialect seam
@@ -1004,9 +1031,10 @@ tested against its own spelling.
 dialect seam, DOS moved behind it with the suite unchanged; (b)
 the OpenBSD dialect and route (2)'s recipe change, proven against
 a machine installed by spike 0; (c) route (1) if and when a user's
-own OpenBSD asks for it. Spike 0 precedes the pledge, because a
-recipe that has never completed is not a foundation anything may
-be pledged on.
+own OpenBSD asks for it. The binary-selection fix precedes all
+three and is not one of them — a recipe that cannot complete is not
+a foundation anything may be pledged on, and spike 0 has now said
+exactly why it could not.
 
 ## Horizon — smaller and later
 
