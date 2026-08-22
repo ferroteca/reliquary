@@ -867,6 +867,148 @@ work item: it may be that the honest answer is no change at all,
 and the finding's value was in forcing the question while the
 answer is still free.
 
+## F64 — The OpenBSD platform workflow: readiness and `exec`, agentless
+
+> **Entered 2026-08-22** from a consuming project's proposal
+> (testaferro's F23, an OpenBSD guest binding — blocked on exactly
+> this). Demanded by **U12** (in force: an unattended install ending
+> in a *usable* machine — the codex's OpenBSD recipe ends in one no
+> verb can touch), **U14** (granular results reaching the caller,
+> which on a second platform needs `exec` at all), and **P11**
+> (today every guest verb refuses `openbsd` by rule id
+> `platform.verb-not-implemented`; that is honest, and it is also
+> the install's whole product being inert). Honours **P2**: nothing
+> below depends on guest cooperation.
+
+**What exists, and what is unknown.** The codex holds `openbsd`
+(7.9 amd64, 512M, a 4G blank), `openbsd-installer` (the pinned
+ISO) and `openbsd-install` (autoinstall over the run-scoped HTTP
+server, answering root's password, hostname `openbsd`, ssh allowed,
+sets from `cd0`). The machine layer materializes and boots it; the
+schema admits the platform; the memory floor is recorded. The unit
+tier pins the ISO hash and the seed closure — **nothing on record
+says the install has ever completed for real.** The script's own
+`wait "boot>"` and `wait "CONGRATULATIONS…"` presuppose the one fact
+everything below rests on, so it is the first thing to measure
+rather than argue (spike 0, below).
+
+**The transport is the one already built, and that is the whole
+bet.** OpenBSD amd64 booted by BIOS on QEMU's `-vga std` takes its
+console on `vga(4)` in text mode — wscons over an 80×25 VGA text
+screen — so the agentless plane applies unchanged: QMP `send-key`
+in, text memory at `0xb8000` out, `screendump` for pictures, the
+VNC plane with the fixed-font recognizer as the equally agentless
+fallback should the console ever leave text mode. P2 is honoured
+with no new carrier, and the dialect is the only thing that
+differs. If spike 0 finds the console in a framebuffer mode after
+boot, the VNC plane is the route and the bet still holds; if the
+recognizer cannot read OpenBSD's console font, that is the stop,
+and this entry shrinks to recording why.
+
+**What a platform owns is a dialect, not a transport.** Today
+`interaction_agentless.py` is DOS from its first constant
+(`_PROMPT_RE`, the `IF ERRORLEVEL` probe, the "DOS prompt"
+narration) while its loop — type, catch the echo, wait for the
+prompt to come back, settle before believing it (D111, D112,
+D115), slice the rows — is platform-neutral and is exactly what
+OpenBSD's `ksh` needs too. The seam is therefore a **platform
+dialect** behind the existing loop, not a second loop:
+
+- `platform_dos.py` and a new `platform_openbsd.py` each supply
+  the prompt shape, the outcome probe and its sentinel, the
+  readiness sequence, and the narration words; the loop in
+  `interaction_agentless.py` takes a dialect and says "prompt"
+  where it now says "DOS prompt".
+- `_running_guest()` selects the dialect from the machine's
+  recorded `platform` — blueprint-declared, never inferred (P10,
+  AGENTS.md "Platform selection") — through a registry of the
+  platforms with a delivered workflow; `win9x` and `winnt` keep
+  refusing by the same rule id, which is P11 doing its job.
+- The scripting language needs nothing new: a `platform openbsd`
+  script already parses, and whatever statement drives a command
+  routes through the same dispatch.
+
+**The OpenBSD dialect, clause by clause:**
+
+- **Prompt.** Root's default `ksh` prompt is `<hostname># `; the
+  shape is a row ending in `# ` or `$ ` after a non-blank head,
+  and D113's declared-prompt door carries over for a guest whose
+  `.profile` redrew it. The echo discipline is unchanged: the tty
+  echoes the typed line where the prompt was.
+- **Outcome probe.** `test $? -ne 0 && echo RLQ-EXEC-FAILED` as
+  its own line — text reliquary composed and reads back, so G2
+  and P18 are untouched exactly as on DOS. One honest difference,
+  stated rather than hidden (P11): the shell returns 127 for a
+  command it could not find, so the mistyped-command gap the DOS
+  probe has (`COMMAND.COM` leaves ERRORLEVEL alone) does **not**
+  exist here. The rule ids are the same two.
+- **Output.** The rows between the echo and the returned prompt,
+  one screen deep, with F14's limit in force unchanged; the value
+  channels are the same too — a guest program writes to a drive
+  and the caller reads it on the host (P16's carve-out), and
+  OpenBSD mounts a vvfat hard disk as `msdos` through
+  `mount_msdos(8)`, which is what makes a directory-source media
+  usable from this guest without reliquary reading a byte.
+- **Readiness.** The one clause DOS never had. DOS boots to a
+  prompt; OpenBSD boots to `login:`, and "ready for commands"
+  means a shell. Two routes, to be **decided first**:
+  1. *Readiness logs in.* `wait_ready` recognizes `login:` on the
+     bottom row, types the user, answers `Password:`, and waits
+     for the prompt. Credentials come through the property
+     sources (P13) and the `credentials` module's secret handling
+     — never typed into a blueprint field — with the recipe's
+     root password as the seeded default. General, and the
+     transport learns a two-step handshake.
+  2. *The recipe arranges a prompt.* `openbsd-install` ends by
+     putting a root shell on the console — `/etc/ttys`'
+     `ttyC0` line running `/bin/ksh` directly, the long-standing
+     console trick — so the machine boots to a prompt and
+     readiness is DOS-shaped: a settled prompt on the bottom row,
+     no credentials in the transport at all. Cheap, and it makes
+     the codex machine a test fixture rather than a system,
+     which P1's ephemeral-machine reading arguably prefers and a
+     user seeding the recipe for their own use may not.
+  The recommendation is **(2) for the codex machine and (1) as the
+  general mechanism**, in that order of delivery: (2) proves the
+  dialect against a real boot with the least new surface, and (1)
+  is what a user's own OpenBSD — installed by their own recipe,
+  logging in like a system — needs. Neither is decided here.
+
+**Surfaces touched** (SURFACES.md, by lookup): **S2** and **S1** —
+`exec`, `wait_ready` and `check=` gain a second platform with the
+same contract, and `wait_ready --prompt` reads as the shell prompt
+there; **S6** — the codex recipe changes under route (2), and an
+`openbsd-verify` sibling of `freedos-verify` is owed either way;
+**S4** only if route (1) adds a credential parameter to the machine
+document. **S3** and **S7** are unchanged: no statement and no
+event gains a meaning. The norms in `docs/spec/` for the verbs say
+"DOS is the delivered workflow" and are amended with the delivery.
+
+**Out of scope, by the cut:** ssh as a control plane — the recipe
+already allows root over ssh, and a native plane is **P3**'s arc
+and F4's territory, not this entry's; guest-file verbs over it for
+the same reason; `win9x` and `winnt` (no recipe, no text console
+to bet on); any in-guest component; and the GUI era (F5).
+
+**Proof.** Integration, asked for by name as the DOS boots are:
+spike 0 is the install completing for real (a 700 MB ISO and a
+45-minute deadline, paid once — the product is the disk, P20);
+then a boot, `wait_ready`, `exec "uname -a"` reading back the
+kernel line, `exec "false", check=True` raising
+`command.signalled-failure` and `exec "nosuch"` raising the same,
+a row slice that does not include the boot's output, and the
+**agentless DOS suite passing byte-for-byte** — the dialect seam
+may not move a DOS reading by one row. P24: every touched surface
+tested against its own spelling.
+
+**Sprint bound: too large as one, and the cut is visible.** (a) The
+dialect seam, DOS moved behind it with the suite unchanged; (b)
+the OpenBSD dialect and route (2)'s recipe change, proven against
+a machine installed by spike 0; (c) route (1) if and when a user's
+own OpenBSD asks for it. Spike 0 precedes the pledge, because a
+recipe that has never completed is not a foundation anything may
+be pledged on.
+
 ## Horizon — smaller and later
 
 > **Not a feature, and so unnumbered.** This is a holding list of
