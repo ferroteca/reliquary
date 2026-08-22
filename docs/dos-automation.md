@@ -15,8 +15,11 @@ Reliquary provides agentless automation for DOS guests through QEMU. No guest ag
   directory-source media serves a host directory to the guest as a
   virtual FAT drive, and `insert-media --file` swaps a whole image
   live — and never reaches inside a volume itself
-- **Command completion** is detected by watching for the DOS prompt,
-  and confirmed only once the screen under it has stopped changing —
+- **Command completion** is detected by watching for the DOS prompt
+  to come back — the standard `X:\path>` shape, or exactly the
+  prompt the guest was at, so a customized prompt needs nothing
+  declared — and confirmed only once the screen under it has stopped
+  changing —
   a prompt can arrive mid-scroll, and reading one that is still being
   drawn returns output cut at a boundary that never existed
 - **Screenshots** are captured through QEMU

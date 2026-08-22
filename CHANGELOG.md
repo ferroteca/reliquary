@@ -28,9 +28,43 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   nothing rather than guessing (P11). The
   `freedos-exec-wrapped-echo.rlqt` capture, which pinned the
   refusal, is re-recorded over the fixed layer and leaves the
-  transcript corpus README's known-gaps list (issue #8). The
-  echo-lookalike and custom-prompt gaps (#7, #9) stand: what counts
-  as an echo or a prompt is still theirs to decide.
+  transcript corpus README's known-gaps list (issue #8).
+
+- **`exec` identifies the echo by where it sits, not by what it
+  looks like** (D111; issue #7). A file whose last line is the echo
+  of the command that types it — `C:\>TYPE C:\ECHOLIKE.TXT`,
+  printed by that very `TYPE` — won the backward scan for "a row
+  ending with the command with a `>` in it", and `exec` returned an
+  **empty** result with no error: the spec violation P11 exists to
+  forbid. The command is typed at the prompt the guest was sitting
+  at, so the echo is that prompt row with the command appended and
+  it sits *where the prompt was* — the rows above it are the rows
+  that were above the prompt, less what scrolled off. A row that
+  merely spells the same text has the command's own output above
+  it and is never taken for the echo; the same command run twice
+  finds the second echo for the same reason. The lookalike capture
+  is re-recorded over the fixed layer and returns the file's three
+  lines.
+
+- **`exec` completes on the prompt the guest was at, beside the
+  standard shape** (D112; issue #9). Completion was one pattern,
+  `X:\path>`, so a guest whose `AUTOEXEC.BAT` sets `PROMPT [$P]$G`
+  waited out every command's full timeout and was unusable from the
+  first. The prompt the guest was sitting at when the command was
+  sent is now completion evidence in its own right, whatever its
+  shape — the guest's own statement of what its prompt looks like,
+  needing no pattern and nothing declared — and the standard shape
+  stays, being what lets `CD` complete after changing the prompt's
+  text. **One limit, stated**: a command that changes a customized
+  prompt (`PROMPT` itself, `CD` under one) returns to text `exec`
+  has no evidence for and the wait expires, now naming both shapes
+  it waited for so the reader stops looking at the guest. A
+  declared prompt pattern was weighed and is not provided: a
+  blueprint surface change with no demand on record. A new capture,
+  `freedos-exec-at-custom-prompt.rlqt`, pins `VER` at `[C:\]>`
+  succeeding; the `PROMPT [$P]$G` capture keeps pinning the expiry
+  as the stated limit. `wait_ready` keeps the standard shape alone,
+  having no earlier screen to read a customized prompt off.
 
 ## 0.1.0a3 - 2026-08-22
 

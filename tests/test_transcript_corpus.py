@@ -55,7 +55,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "fixtures", "conformance")
 
 #: Pinned where the fixtures are gathered, so a bucket that stops
 #: loading is a collection error rather than a green run over nothing.
-CAPTURES = corpus.fixtures(ROOT, "transcript", ".rlqt", 7)
+CAPTURES = corpus.fixtures(ROOT, "transcript", ".rlqt", 8)
 
 
 def _script_path(reader, fixture):

@@ -178,6 +178,94 @@ is waiting on an answer today.
 
 ## Decided
 
+- D112 — A PROMPT IS THE STANDARD SHAPE, OR THE ONE THE GUEST WAS
+  AT — DECIDED (owner, 2026-08-22) and delivered the same day.
+  Supports U14; P10, P11. Sharpens D75, which made completion need
+  evidence this command landed and left "a prompt" as one pattern.
+
+  `exec`'s completion detection recognized one shape, `X:\path>`,
+  so a guest whose `AUTOEXEC.BAT` customizes the prompt waited out
+  every command's full timeout (issue #9; the transcript corpus's
+  custom-prompt capture). Two sources may now say the prompt is
+  back, and no third: the **standard DOS shape**, what every
+  unconfigured DOS draws and what lets `CD` — which changes the
+  prompt's *text* — complete; and **exactly the prompt the guest
+  was sitting at** when the command was sent, whatever its shape.
+  The second is the guest's own statement of what its prompt looks
+  like, an observation rather than an inference from appearance
+  (D72), so it needs no pattern and nothing declared, and it is
+  what makes a customized guest usable from its first command.
+
+  THE RESIDUE, STATED (P11): a command that changes a customized
+  prompt — `PROMPT` itself, or `CD` under `[$P]$G` — returns to
+  text neither source has evidence for, and the wait expires
+  naming both shapes it waited for, so the reader does not go
+  looking at the guest, which ran the command perfectly well. The
+  corpus pins it: the `PROMPT [$P]$G` capture keeps recording the
+  expiry as a stated limit, and a new capture of `VER` at the
+  customized prompt pins the success. `wait_ready` keeps the
+  standard shape alone — it has no earlier screen to read a
+  customized prompt off — and nothing in `src/` calls it today;
+  it survives as the `GuestExec` protocol's first method.
+
+  WEIGHED AND DECLINED:
+
+  - **A declared prompt pattern in the blueprint**, which would
+    close the residue and is the P10-clean shape for configuration
+    — declined for now as a blueprint surface change (S4) with no
+    demand on record: no use case in force names a customized
+    prompt, and the only evidence is this corpus finding. It is
+    the move if a guest ever demands it, on that demand.
+  - **A declared pattern only, refusing every other prompt by
+    name** — the issue's "honest and cheap" option; declined
+    because it leaves every customized guest unusable without a
+    declaration when the guest's own screen already says what its
+    prompt is.
+  - **A wider pattern** — declined outright: any row ending in `>`
+    becomes a completion signal, the false positive P11 refuses.
+
+- D111 — THE ECHO IS WHERE THE PROMPT WAS — DECIDED (owner,
+  2026-08-22) and delivered the same day. Supports U14; P10 (as
+  D72 sharpened it), P11 (as D75 applied it).
+
+  `exec` located a command's echo by appearance — scanning upward
+  from the bottom for "a row ending with the command that carries
+  a `>`" — and a file whose last line is the echo of the command
+  that types it won that scan: the file's real content was
+  discarded and `exec` returned an **empty** result with no error
+  (issue #7; the corpus's echo-lookalike capture), the spec
+  violation P11 forbids. The run already holds better evidence
+  than looks. The command is typed at the prompt the screen ended
+  with before it was sent, so the echo is **that prompt row with
+  the command appended** (wrapped by the cell when longer than the
+  screen is wide, per issue #8), and it sits **where the prompt
+  was**: the rows above it are the rows that were above the
+  prompt, less whatever scrolled off the top. Everything the
+  command prints lands below its echo, so a row that merely spells
+  the same text has the command's own output above it and is never
+  taken for the echo — and the same command run twice, the first
+  echo still on screen, finds the second for the same reason. The
+  `>`-in-the-row heuristic goes with the scan direction: the prompt
+  is known text now, not a shape.
+
+  THE RESIDUE, STATED: output longer than a screenful whose first
+  visible row is such a lookalike is accepted as the echo, nothing
+  being left above it to contradict it; it was wrong before as
+  well, and it is named in the corpus README rather than hidden.
+
+  WEIGHED AND DECLINED:
+
+  - **Remembering the row the live wait first saw the echo on**
+    (issue #7's own hint) — declined because it depends on the
+    poll catching the echo before fast output scrolls it, where
+    the screen read before typing is always there and places the
+    echo exactly.
+  - **Scanning top-down by appearance** — declined: it finds the
+    first row that looks right, and the same command run twice
+    then returns the previous run's output with the new echo
+    inside it. The rows-above test is the rule; the scan order is
+    incidental.
+
 - D110 — GUI AUTOMATION'S DEMAND IS U5; F63 IS CUT OUT AND F5
   KEEPS ITS NUMBER — DECIDED (owner, 2026-08-21). Supports U5.
   The pledges of U5 and F63 are lifecycle acts and are not

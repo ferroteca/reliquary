@@ -716,6 +716,26 @@ limit and is returned; output that cannot be tied to the command
 at all is `screen.no-echo`, because a plausible tuple of somebody
 else's rows is worse than an error (**P11**).
 
+**What an echo is, and what a prompt is** (D111, D112). The command
+is typed at the prompt the guest was sitting at, so its echo is that
+prompt row with the command appended — wrapped at the screen's
+width when longer — and it sits *where the prompt was*: the rows
+above it are the rows that were above the prompt, less what scrolled
+off. A row that merely looks like an echo (a file whose last line
+reads `C:\>TYPE C:\ECHOLIKE.TXT`, printed by that very command) is
+never taken for one, because what sits above it is the command's own
+output. Completion is the prompt coming back, in either of two
+shapes and no third: the **standard DOS prompt**, `X:\path>`, which
+is what lets `CD` complete after changing the prompt's text; or
+**exactly the prompt the guest was at** when the command was sent,
+whatever its shape — so a guest whose `AUTOEXEC.BAT` sets
+`PROMPT [$P]$G` is usable from the first command with nothing
+declared. **One limit, stated**: a command that changes a customized
+prompt — `PROMPT` itself, or `CD` under one — returns to text `exec`
+has no evidence for, and the wait expires (`screen.no-match`) naming
+both shapes it waited for. A declared prompt pattern is not provided
+today.
+
 ```powershell
 rlq exec "ver" -b freedos
 # → FreeDOS kernel 2043 (Build 2043) [compiled Feb 26 2021]

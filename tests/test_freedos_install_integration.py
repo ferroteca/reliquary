@@ -74,9 +74,14 @@ _HAZARDS = (
     # More output than a screen holds: agentless capture's documented
     # limit, and the prompt arriving after a long scroll.
     ("scrolling-output", r"DIR /S C:\FREEDOS", 90),
-    # A guest whose prompt is not the shape the pattern expects. Taken
-    # last, because it leaves the guest that way for the session.
+    # A command that changes the prompt to a shape exec has no
+    # evidence for: the stated limit (D112), pinned. It leaves the
+    # guest at `[C:\]>` for the session, which is what the last
+    # capture needs.
     ("custom-prompt", "PROMPT [$P]$G", 20),
+    # An ordinary command at that customized prompt: the prompt the
+    # guest was at is completion evidence in its own right.
+    ("at-custom-prompt", "VER", 30),
 )
 
 

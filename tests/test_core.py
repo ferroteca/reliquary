@@ -1043,11 +1043,11 @@ def test_a_wrap_falling_on_a_space_is_restored_from_the_command():
     assert rows == ("A" * 70 + " BBBBB",)
 
 
-def test_a_full_row_is_not_taken_for_a_continuation_of_the_echo():
-    # a row above the echo that happens to be full is only part of
-    # it when what sits there is the command's own text
+def test_a_full_row_above_the_prompt_is_not_taken_for_part_of_the_echo():
+    # a full row above the echo is what was above the prompt, and
+    # the echo is matched as the line it is, not as "ends with"
     rows, _console = _run_against([
-        ["C:\\>"],
+        ["Z" * 80, "C:\\>"],
         ["Z" * 80, "C:\\>dir", "FILE1", "C:\\>"],
     ])
 
@@ -1059,7 +1059,87 @@ def test_without_a_screen_width_only_an_unwrapped_echo_is_found():
     # none cannot say where a line broke, and the scan says nothing
     # rather than guessing (P11)
     rows = ["C:\\>ECHO " + "X" * 71, "X" * 9, "X" * 80]
+    at_prompt = ["C:\\>"]
 
-    assert agentless_module._echo_at(rows, _WIDE, 80) == 1
-    assert agentless_module._echo_at(rows, _WIDE, 0) is None
-    assert agentless_module._echo_at(["C:\\>dir", "FILE1"], "dir", 0) == 0
+    assert agentless_module._echo_at(rows, at_prompt, _WIDE, 80) == 1
+    assert agentless_module._echo_at(rows, at_prompt, _WIDE, 0) is None
+    assert agentless_module._echo_at(
+        ["C:\\>dir", "FILE1"], at_prompt, "dir", 0) == 0
+
+
+# The echo is where the prompt was (D111): found by where it sits and
+# what was above it, never by what it looks like.
+
+def test_an_output_row_that_spells_the_echo_is_not_the_echo():
+    # a file whose last line is the echo of the command that types
+    # it: the real echo has the old screen above it, the lookalike
+    # has the file's own lines — and is the file's third line
+    rows, _console = _run_against([
+        ["X" * 80, "C:\\>"],
+        ["X" * 80, "C:\\>TYPE C:\\ECHOLIKE.TXT", "THE FIRST LINE",
+         "THE SECOND LINE", "C:\\>TYPE C:\\ECHOLIKE.TXT", "C:\\>"],
+    ], command="TYPE C:\\ECHOLIKE.TXT")
+
+    assert rows == ("THE FIRST LINE", "THE SECOND LINE",
+                    "C:\\>TYPE C:\\ECHOLIKE.TXT")
+
+
+def test_the_same_command_run_twice_finds_the_second_echo():
+    # the first run's echo is still on screen above the prompt; what
+    # sits above *it* is not what sat above the prompt
+    rows, _console = _run_against([
+        ["C:\\>dir", "OLD", "C:\\>"],
+        ["C:\\>dir", "OLD", "C:\\>dir", "NEW", "C:\\>"],
+    ])
+
+    assert rows == ("NEW",)
+
+
+def test_an_echo_that_scrolled_off_still_returns_the_visible_tail():
+    # the documented limit, unchanged: the echo was seen live, so
+    # the tail is the command's and is returned
+    rows, _console = _run_against([
+        ["C:\\>"],
+        ["C:\\>dir", "L1", "L2"],
+        ["L7", "L8", "C:\\>"],
+    ])
+
+    assert rows == ("L7", "L8")
+
+
+# A prompt is the standard shape, or the one the guest was at (D112).
+
+def test_a_customized_prompt_completes_when_it_comes_back():
+    # the guest drew it, the command was typed at it, and it is back:
+    # no pattern needed
+    rows, _console = _run_against([
+        ["[C:\\]>"],
+        ["[C:\\]>VER", "FreeDOS kernel 2043", "[C:\\]>"],
+    ], command="VER")
+
+    assert rows == ("FreeDOS kernel 2043",)
+
+
+def test_a_standard_prompt_changed_by_cd_still_completes():
+    # CD changes the prompt's text; the standard shape is what lets
+    # it complete
+    rows, _console = _run_against([
+        ["C:\\>"],
+        ["C:\\>CD FREEDOS", "C:\\FREEDOS>"],
+    ], command="CD FREEDOS")
+
+    assert rows == ()
+
+
+def test_a_command_that_changes_a_customized_prompt_expires_naming_why():
+    # the stated limit: neither shape comes back, and the expiry
+    # says what it waited for so the reader does not blame the guest
+    with pytest.raises(RunFailure) as expired:
+        _run_against([
+            ["[C:\\]>"],
+            ["[C:\\]>CD FREEDOS", "[C:\\FREEDOS]>"],
+        ], command="CD FREEDOS", timeout=5)
+
+    assert expired.value.rule_id == "screen.no-match"
+    assert repr("[C:\\]>") in str(expired.value)
+    assert "changes the prompt" in str(expired.value)

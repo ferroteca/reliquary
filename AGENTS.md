@@ -332,7 +332,10 @@ workflow:
   settled on sight, but nothing can know it is a clock until it has ticked repeatedly, so a baseline that stops
   at the first settled frame hands back an empty mask.
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
-  adapter (prompt-based readiness and command completion — **a prompt is a candidate, not an answer**, held
+  adapter (prompt-based readiness and command completion — **the echo and the prompt are identified by
+  provenance, never by shape alone**: the echo is the row the command was typed at with the rows that were above
+  the prompt still above it, and the prompt is back when it is the standard shape or exactly the one the guest
+  was at, D111 and D112; and **a prompt is a candidate, not an answer**, held
   until `screen_stability` says the screen under it settled, because one arriving mid-scroll would otherwise
   slice the output at a boundary that never existed, F45; the poll ramp gains a third rung for that rather
   than losing its second — `_ECHO_POLL` catches the echo, `_PROMPT_POLL` waits a prompt out cheaply, and

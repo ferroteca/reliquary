@@ -1406,19 +1406,20 @@ def test_the_command_output_is_returned(rig):
 def test_the_rows_between_echo_and_prompt_are_the_output():
     rows = _command_output(
         ["C:\\>DIR", "VOL SERIAL IS 1234", "2 FILE(S)", "C:\\>"],
-        "DIR", echoed=True)
+        ["C:\\>"], "DIR", echoed=True)
     assert rows == ("VOL SERIAL IS 1234", "2 FILE(S)")
 
 
 def test_a_command_with_no_output_returns_nothing():
-    assert _command_output(["C:\\>CLS", "C:\\>"], "CLS", echoed=True) == ()
+    assert _command_output(["C:\\>CLS", "C:\\>"], ["C:\\>"], "CLS",
+                           echoed=True) == ()
 
 
 def test_a_scrolled_echo_yields_what_is_still_visible():
     # The honest limit of screen scraping: the echo scrolled off,
     # so what remains on screen is what the caller gets. `echoed`
     # is what says it scrolled rather than never arrived.
-    rows = _command_output(["LINE 1", "LINE 2", "C:\\>"],
+    rows = _command_output(["LINE 1", "LINE 2", "C:\\>"], ["C:\\>"],
                            "TYPE BIG.TXT", echoed=True)
     assert rows == ("LINE 1", "LINE 2")
 
@@ -1429,7 +1430,7 @@ def test_an_echo_never_seen_is_a_failure_not_a_tuple():
     # and returning them would pass one command's text off as
     # another's (P11).
     with pytest.raises(RunFailure) as caught:
-        _command_output(["LINE 1", "LINE 2", "C:\\>"],
+        _command_output(["LINE 1", "LINE 2", "C:\\>"], ["C:\\>"],
                         "TYPE BIG.TXT", echoed=False)
     assert caught.value.rule_id == "screen.no-echo"
     assert "never echoed" in str(caught.value)

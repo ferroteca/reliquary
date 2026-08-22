@@ -50,7 +50,12 @@ class AgentlessGuestExec:
         self._machine = machine
 
     def wait_ready(self, timeout: float = 90) -> None:
-        """Wait for a DOS prompt."""
+        """Wait for a DOS prompt.
+
+        The standard shape alone (D112): there is no earlier screen
+        here to have read a customized prompt off, so a guest that
+        boots to one is not recognized as ready by this wait.
+        """
         print("rlq: waiting for a DOS prompt...", file=sys.stderr)
         with self._machine.console() as console:
             deadline = time.monotonic() + timeout
@@ -143,6 +148,9 @@ class AgentlessGuestExec:
         """
         with self._machine.console() as console:
             before = [row for row in console.screen_text() if row]
+            # The prompt the command is typed at: the echo sits where
+            # it was (D111), and its coming back is completion (D112).
+            prompt = before[-1] if before else ""
             console.send_text(command)
             sent = time.monotonic()
             deadline = sent + timeout
@@ -158,20 +166,20 @@ class AgentlessGuestExec:
                 # Sticky: once the echo has been seen, a later screen
                 # without it is a scrolled one, not a command that
                 # never ran. Nothing else can tell those apart.
-                echoed = (echoed
-                          or _echo_at(rows, command, width) is not None)
+                echoed = (echoed or
+                          _echo_at(rows, before, command, width) is not None)
                 landed = echoed or rows != before
                 complete = bool(landed and rows
-                                and _PROMPT_RE.match(rows[-1]))
+                                and _is_prompt(rows[-1], prompt))
                 if complete and reading.stable:
-                    return _command_output(rows, command, width,
+                    return _command_output(rows, before, command, width,
                                            echoed=echoed)
                 if complete:
                     unsettled = reading
                 time.sleep(_poll_interval(complete, now - sent))
         raise RunFailure(
             f"timed out after {timeout}s waiting for command to finish: "
-            f"{command}{_settling_note(unsettled)}",
+            f"{command}{_settling_note(unsettled)}{_prompt_note(prompt)}",
             rule_id="screen.no-match")
 
 
@@ -223,76 +231,107 @@ def _screen_width(frame):
     return max((len(row) for row in frame[1]), default=0)
 
 
-def _echo_at(rows, command, width=0):
-    """Where the command's echo ends in ``rows``, or ``None``.
+def _is_prompt(row, prompt):
+    """Whether ``row`` is a prompt the wait may complete on (D112).
 
-    The echo is the guest repeating back what was typed at it: the
-    prompt and the command on one line. **A line longer than the
-    screen is wide wraps**, and the guest wraps it by the cell — a
-    full row, then the rest — so an 85-column command leaves no row
-    that ends with it, and the echo is the *last* of the rows it
-    spans. The scan walks upward from each candidate row, matching
-    the command's tail on that row and then exactly the ``width``
-    characters the guest would have drawn on each row above, so a
-    row that merely happens to be full is never mistaken for a
-    continuation: what sits on it has to be the command's own text.
-    ``width`` is the screen's cell width; ``0`` means it is unknown,
-    and only an unwrapped echo can then be found.
+    Two shapes, and no third. The standard DOS prompt, ``X:\\path>``,
+    is what every unconfigured DOS draws, and it is what lets a
+    command that changes the prompt's *text* — ``CD`` — complete. And
+    exactly the prompt the guest was sitting at when the command was
+    sent, whatever its shape: the guest's own statement of what its
+    prompt looks like (D72), which needs no pattern and is what makes
+    a customized guest usable from its first command. A wider pattern
+    is the false positive P11 refuses — any row ending in ``>`` would
+    become a completion signal.
+    """
+    return bool(_PROMPT_RE.match(row) or (prompt and row == prompt))
+
+
+def _prompt_note(prompt):
+    """What the expired wait was waiting for, so the reader looks here.
+
+    A command that changes a customized prompt — ``PROMPT`` itself,
+    or ``CD`` under one — returns to text the wait has no evidence
+    for, and the expiry has to say so: "the guest never returned to
+    the prompt" sends the reader to the guest, which ran the command
+    perfectly well.
+    """
+    if not prompt:
+        return ""
+    return (f"; waited for a standard DOS prompt or for {prompt!r}, which "
+            "the guest was at — a command that changes the prompt to "
+            "another shape returns to text exec has no evidence for")
+
+
+def _echo_rows(prompt, command, width):
+    """The rows the guest draws when ``command`` is typed at ``prompt``.
+
+    One line, ``prompt + command``, broken by the cell at ``width``
+    and right-stripped row by row, as the screen reads back; a chunk
+    that strips to nothing is dropped, as the blank-row filter drops
+    it from the screen. ``width`` ``0`` means unknown, and the line
+    then stands as one row.
+    """
+    line = (prompt + command).rstrip()
+    if not line:
+        return []
+    if not width:
+        return [line]
+    chunks = [line[start:start + width].rstrip()
+              for start in range(0, len(line), width)]
+    return [chunk for chunk in chunks if chunk]
+
+
+def _echo_at(rows, before, command, width=0):
+    """Where the command's echo ends in ``rows``, or ``None`` (D111).
+
+    The echo is not found by its looks. The command was typed at the
+    prompt ``before`` ends with, so the echo is that row with the
+    command appended — wrapped by the cell when longer than the
+    screen is wide — and it sits *where the prompt was*: the rows
+    above it are the rows that were above the prompt, less whatever
+    scrolled off the top. Everything the command prints lands below
+    it, so a row that merely spells the same text (a file whose last
+    line is the echo of the command that types it) is never taken
+    for the echo — what sits above it is the command's own output
+    rather than the screen the command was typed into. The scan
+    starts where the prompt was and moves up, since scrolling is the
+    only way the echo moves, and the candidate needing the least of
+    it wins — the same command run twice finds the second echo, not
+    the first. The one screen this cannot tell apart is output
+    longer than a screenful whose first visible row is such a
+    lookalike: nothing is left above it to contradict it.
 
     The last row of the echo is the index returned, since the
-    command's output starts on the row after it.
+    command's output starts on the row after it. ``width`` is the
+    screen's cell width; ``0`` means it is unknown, and only an
+    unwrapped echo can then be found.
     """
-    needle = command.strip()
-    if not needle:
+    prompt = before[-1] if before else ""
+    echo = _echo_rows(prompt, command, width)
+    if not echo:
         return None
-    for index in range(len(rows) - 1, -1, -1):
-        if _echo_ends_at(rows, index, needle, width):
-            return index
+    above = before[:-1]
+    # From where the prompt was, upward: the echo can only have moved
+    # up, by scrolling, and the candidate that needs the least of it
+    # is the one every row above is accounted for.
+    for start in range(min(len(above), len(rows) - len(echo)), -1, -1):
+        if rows[start:start + len(echo)] != echo:
+            continue
+        if rows[:start] != above[len(above) - start:]:
+            continue
+        return start + len(echo) - 1
     return None
 
 
-def _echo_ends_at(rows, index, needle, width):
-    """Whether ``needle``'s echo ends on ``rows[index]``, wrapped or not.
-
-    Rows arrive right-stripped, so the chunk of the line a row held
-    is compared stripped as well — a wrap falling on a space inside
-    the command leaves a row shorter than the screen, and the match
-    restores that space from the command rather than asking the row
-    for what the stripping took.
-    """
-    text = rows[index].rstrip()
-    if text.endswith(needle):
-        return ">" in text
-    if not width or not text or not needle.endswith(text):
-        return False
-    remaining = needle[:-len(text)]
-    for row in range(index - 1, -1, -1):
-        text = rows[row].rstrip()
-        if len(remaining) >= width:
-            if text != remaining[-width:].rstrip():
-                return False
-            remaining = remaining[:-width]
-            if not remaining:
-                # The command began at column zero: the prompt filled
-                # the row above by itself.
-                return row > 0 and ">" in rows[row - 1]
-            continue
-        # The first row: the prompt, then the head of the command,
-        # filling the row exactly — that is what made it wrap.
-        head = remaining.rstrip()
-        stripped_away = len(remaining) - len(head)
-        return (text.endswith(head)
-                and len(text) + stripped_away == width
-                and ">" in text[:len(text) - len(head)])
-    return False
-
-
-def _command_output(rows, command, width=0, *, echoed):
+def _command_output(rows, before, command, width=0, *, echoed):
     """The rows a command produced, between its echo and the prompt.
 
     ``rows`` are the non-blank screen rows, the last being the prompt
-    that came back, and ``width`` the screen's cell width, which is
-    what lets an echo that wrapped be found at all.
+    that came back; ``before`` the non-blank rows of the screen the
+    command was typed into, which is what places the echo; and
+    ``width`` the screen's cell width, which is what lets an echo
+    that wrapped be found at all.
 
     ``echoed`` says whether the echo was seen at any point during the
     wait, and it is what separates the two ways the echo can be
@@ -305,7 +344,7 @@ def _command_output(rows, command, width=0, *, echoed):
     is a failure to report, not a value to return (P11).
     """
     end = len(rows) - 1
-    index = _echo_at(rows[:end], command, width)
+    index = _echo_at(rows[:end], before, command, width)
     if index is not None:
         return tuple(rows[index + 1:end])
     if echoed:

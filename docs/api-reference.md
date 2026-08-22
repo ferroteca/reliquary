@@ -178,7 +178,14 @@ no meaning to what travels through them.
   Completion means *this* command finished rather than that a prompt
   is visible, so output that cannot be tied to the command raises
   `RunFailure` (`screen.no-echo`) instead of returning rows that
-  belong to something else. `check=True` opts into the outcome: a
+  belong to something else. The echo is the row the command was
+  typed at, with the rows that were above the prompt still above it
+  — never a row that merely looks like one — and the prompt is back
+  when it is the standard `X:\path>` shape or exactly the prompt
+  the guest was at, so a customized prompt needs nothing declared; a
+  command that changes a customized prompt is the one stated limit,
+  expiring with `screen.no-match` and naming what it waited for
+  (D111, D112). `check=True` opts into the outcome: a
   command that signalled failure raises `RunFailure`
   (`command.signalled-failure`) naming it, with the row return
   unchanged — the channel a setup command needs, whose output is

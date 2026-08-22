@@ -40,16 +40,20 @@ carrying a `script` or a `command` in its header.
 
 Each is a screen a real FreeDOS draws for an ordinary command —
 nothing here is malformed or staged. What the layer *makes* of each
-is what the fixture pins, and two of the four are wrong today.
+is what the fixture pins. None is wrong today: three were when
+they were first taken, and each closed against its own capture
+(#7, #8, #9; D111, D112) — two of the five now pin a stated limit
+rather than a defect.
 
 | fixture | the screen | what the layer does |
 |---|---|---|
 | `freedos-exec-wrapped-echo.rlqt` | an 85-column command, whose echo wraps across two rows | correct — the echo is found across the rows it spans, and the command's output below it comes back |
-| `freedos-exec-echo-lookalike.rlqt` | a file whose last line reads `C:\>TYPE C:\ECHOLIKE.TXT`, printed by that very command | **returns nothing** — no error, three lines on screen, an empty result |
+| `freedos-exec-echo-lookalike.rlqt` | a file whose last line reads `C:\>TYPE C:\ECHOLIKE.TXT`, printed by that very command | correct — the echo is the row the command was typed at, and the lookalike below it is the file's own last line, returned with the other two |
 | `freedos-exec-scrolling-output.rlqt` | `DIR /S` over a thousand files: pages of scroll, then a prompt | correct — the visible tail, which is the documented limit |
-| `freedos-exec-custom-prompt.rlqt` | a guest whose prompt is `[C:\]>` after `PROMPT [$P]$G` | **never completes** — `screen.no-match` at the timeout |
+| `freedos-exec-custom-prompt.rlqt` | `PROMPT [$P]$G` itself, changing the prompt from `C:\>` to `[C:\]>` | **expires** — `screen.no-match`, the stated limit: neither the standard shape nor the prompt the guest was at comes back, and the expiry says so |
+| `freedos-exec-at-custom-prompt.rlqt` | `VER` at that `[C:\]>` prompt | correct — the prompt the guest was at is completion evidence in its own right |
 
-All seven are taken against real QEMU on the opt-in integration tier and
+All eight are taken against real QEMU on the opt-in integration tier and
 **reconstruct with no hypervisor present**, so they run in the default
 suite, in about a second between them: the layer's waiting is real
 time and a replay has none of it. A failing capture is a defect to
@@ -83,11 +87,13 @@ than it looks:
   held to it: the rows a command returned, the phase a script
   finished in, or the rule id either refused with.
 
-**Which is what lets a capture of a failing run be a fixture.** Two
-of the four pathological captures record a refusal or a wrong answer,
-and they assert it — so the day one of those gaps closes, its fixture
-fails saying so and asks to be re-recorded. A green test over
-behaviour nobody believes in is the thing this avoids.
+**Which is what lets a capture of a failing run be a fixture.**
+Three of the pathological captures recorded a refusal or a wrong
+answer and asserted it, and each did its job: the day its gap
+closed, the fixture failed saying so and was re-recorded. The
+custom-prompt capture still records a refusal — a stated limit now
+rather than a gap — and asserts that. A green test over behaviour
+nobody believes in is the thing this avoids.
 
 A codex label resolves to the shipped script rather than to a copy —
 the codex is the live, tested one — and any other name resolves to a
@@ -217,25 +223,36 @@ recorder — they are what `exec` does with three ordinary screens.
   scan runs backwards from the bottom for a row ending with the
   command and carrying a `>`, and a file whose last line is
   `C:\>TYPE C:\ECHOLIKE.TXT` is exactly that row. Everything above it
-  — the file's real content — is discarded and `exec` returns an
-  **empty** result with no error. This one is a **spec violation**,
+  — the file's real content — was discarded and `exec` returned an
+  **empty** result with no error. This one was a **spec violation**,
   not an unstated limit: `docs/spec/cli.md` promises "the command's
   own output or a failure — never text it cannot attribute", and an
   empty tuple attributed to a command that printed three lines is
-  neither.
+  neither. **Closed** (issue #7; D111): the echo is identified by
+  where it sits — the row the command was typed at, with the rows
+  that were above the prompt still above it — and a row that merely
+  spells the same text is the command's own output. The one screen
+  that rule cannot tell apart, stated rather than hidden: output
+  longer than a screenful whose *first visible row* is such a
+  lookalike, nothing being left above it to contradict it.
 - **A customized prompt is never recognized.** `_PROMPT_RE` is
   `^[A-Z]:(\\[^>]*)?>$`, so a guest whose `AUTOEXEC.BAT` sets
   `PROMPT [$P]$G` — or `$T$G`, or anything with a suffix — makes
-  every `exec` wait out its full timeout. Nothing in the spec says
-  which prompts are supported.
+  every `exec` wait out its full timeout. Nothing in the spec said
+  which prompts were supported. **Closed** (issue #9; D112): the
+  prompt the guest was at is completion evidence beside the standard
+  shape, so a customized guest is usable from its first command with
+  nothing declared. What remains is stated rather than open: a
+  command that changes a customized prompt returns to text `exec`
+  has no evidence for, the expiry names both shapes it waited for,
+  and the capture of `PROMPT [$P]$G` now pins that limit.
 
-The other two are not fixed here, and that is deliberate: a corpus
-records what the layer does, and what counts as a DOS prompt (or as
-an echo) is a design question with a decision to make, not a test
-fixture's to settle. A wrapped echo needed no such decision — the
-line is the guest's own, broken where the screen ends — which is why
-that one could close without one. The fixtures pin today's
-behaviour so that whoever settles it cannot do so silently.
+None of the three is a gap any more, and the corpus is why they
+closed honestly: what counts as a DOS prompt, or as an echo, was a
+design question with a decision to make (D111, D112) rather than a
+test fixture's to settle, and the fixtures pinned the old behaviour
+so that settling it could not happen silently. Each re-recording is
+the record that it did not.
 
 ## What this corpus deliberately does not cover
 
