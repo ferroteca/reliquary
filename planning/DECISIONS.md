@@ -205,8 +205,14 @@ is waiting on an answer today.
   expiry as a stated limit, and a new capture of `VER` at the
   customized prompt pins the success. `wait_ready` keeps the
   standard shape alone — it has no earlier screen to read a
-  customized prompt off — and nothing in `src/` calls it today;
-  it survives as the `GuestExec` protocol's first method.
+  customized prompt off. That is a residue on the **public**
+  surface, not a dead method: nothing inside `src/` calls it, but
+  it is exported from the package root and is the readiness idiom
+  the README and `docs/dos-automation.md` teach before `execute`,
+  so a guest that boots to a customized prompt fails the
+  documented idiom at its first line. Filed as **T28** rather than
+  left here (this sentence first called the method uncalled, which
+  was true of `src/` and misleading about the surface).
 
   WEIGHED AND DECLINED:
 

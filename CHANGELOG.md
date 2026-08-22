@@ -63,8 +63,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   blueprint surface change with no demand on record. A new capture,
   `freedos-exec-at-custom-prompt.rlqt`, pins `VER` at `[C:\]>`
   succeeding; the `PROMPT [$P]$G` capture keeps pinning the expiry
-  as the stated limit. `wait_ready` keeps the standard shape alone,
-  having no earlier screen to read a customized prompt off.
+  as the stated limit. `wait_ready` — the embedding API's readiness
+  wait, and the idiom the guides teach before `execute` — keeps the
+  standard shape alone, having no earlier screen to read a
+  customized prompt off; that residue on the public surface is
+  **T28**.
 
 ## 0.1.0a3 - 2026-08-22
 
