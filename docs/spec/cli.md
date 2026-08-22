@@ -23,7 +23,14 @@ SPDX-License-Identifier: GPL-3.0-only
 > exception — and the suite holds both surfaces to it on every
 > commit (`tests/test_command_manifest.py`). This document is
 > normative for behavior: what each command does, its flags, its
-> output and its exit codes.
+> output and its exit codes. **And no more than that** (D119): a
+> twin's return contract — which is also the command's `--json`
+> contract — is [api.md](api.md)'s, and a family's semantics live
+> in the contract home api.md's index names for it (the script
+> spec, the media spec, the blueprint and instance models, …);
+> this document cites those rather than restating them, and where
+> a passage here disagrees with the home, the home governs and the
+> passage is the bug.
 >
 > Concepts introduced here are documented durably in
 > [codex.md](codex.md) (the codex,

@@ -201,8 +201,9 @@ and parse what it prints cleanly (P7). Specification:
 The embedding API is the first-class surface for consuming
 projects: test harnesses, CI drivers, and any orchestration that
 needs decisions, expressions, or loops. It expects native bindings
-in multiple languages: the public Python surface — `Runner` /
-`MachineConfig` and the module-level functions — is the first
+in multiple languages: the public Python surface — the one
+exported `Session` (P26), the vocabulary beside it, and the
+guest-console functions at the carrier stratum — is the first
 binding, not the definition of the surface. A language without a
 native binding automates via the CLI instead. The API must never
 make working in a common binding language (C, Java) difficult: a

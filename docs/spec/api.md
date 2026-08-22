@@ -13,6 +13,17 @@ SPDX-License-Identifier: GPL-3.0-only
 > index into each family's normative contract. Engineering
 > invariants for the current binding remain in AGENTS.md "The
 > runner surface".
+>
+> **What this document norms, and what it only cites** (D119).
+> P6's one semantic surface has three norms with disjoint claims:
+> the command manifest for the **inventory** (what exists),
+> [cli.md](cli.md) for **command behaviour** (flags, output, exit
+> codes), and this document for the **conventions** below — the
+> identity rule, selectors, returns, error classes — and each
+> twin's **return contract**. A family's *semantics* live in the
+> contract home its row names, and the row cites them; where a
+> row and its home disagree, the home governs and the row is the
+> bug.
 
 ## Principles
 
@@ -216,17 +227,17 @@ appears in none of them.
 
 | CLI | API twin | contract home |
 |---|---|---|
-| `create-machine` / `start-machine` / `stop-machine` / `apply-blueprint` / `destroy-machine` / `recreate-machine` / `clone-machine` / `delete-blueprint` | the same names with underscores; `create_machine(name, *, dry_run=False, backend=None)` returns `str \| DryRun` — a distinct type so a dry return can never pass for the real one, and `backend=` (legal only under `dry_run`) asks what a *named* backend would do | [blueprint guide](../blueprint-guide.md), [cli.md](cli.md#the-dry-run) |
-| `export-drive` / `export-machine` | `export_drive(key, destination)` / `export_machine(to=, destination=None)` — stream-bearing; `to=` names an exporter (a vocabulary decoupled from backends) and is required | blueprint guide |
-| `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | blueprint guide |
-| `new-blueprint` | `new_blueprint()` | blueprint guide |
+| `create-machine` / `start-machine` / `stop-machine` / `apply-blueprint` / `destroy-machine` / `recreate-machine` / `clone-machine` / `delete-blueprint` | the same names with underscores; `create_machine(name, *, dry_run=False, backend=None)` returns `str \| DryRun` — a distinct type so a dry return can never pass for the real one, and `backend=` (legal only under `dry_run`) asks what a *named* backend would do | [instance model](instance-model.md), [cli.md](cli.md#the-dry-run) |
+| `export-drive` / `export-machine` | `export_drive(key, destination)` / `export_machine(to=, destination=None)` — stream-bearing; `to=` names an exporter (a vocabulary decoupled from backends) and is required | [instance model](instance-model.md) (design: proposed/FEATURES.md "Machine mobility") |
+| `import-vm` | `import_vm(source, name, platform, hdd_images, snapshot)` | [instance model](instance-model.md) (design: proposed/FEATURES.md "Machine mobility") |
+| `new-blueprint` | `new_blueprint()` | [blueprint model](blueprint-model.md), [cli.md](cli.md#scaffolding-a-blueprint) |
 | codex family (`seed-blueprint`, `seed-script`, `list-codex`) | **none — CLI-only** (D87). `seed-blueprint <name> [--only]` copies a library blueprint and the scripts it names into your `blueprints`/`scripts` directories; `seed-script <stem> [--only]` copies one script; `list-codex` names what the library holds (`--json` adds each entry's description). Reaching the shipped library is a human act: nothing programmatic may bind a name the next point release may move (P18) | [codex](codex.md) |
 | `list-backends` | **none — CLI-only.** It reports the discovered backends on this host and their installation homes; adapters themselves remain an internal provider seam. `--json` provides the same report to non-Python callers without making that seam public | [cli.md](cli.md#discovering-backends) |
 | `run-script <label>` | `run_script()` returns the run's output, raises by error class (D36 — no stored record; the `exec` twin lands with it); `run_script(label, *, dry_run=False)` returns `ScriptRun \| DryRun`, and under `dry_run` the selector is optional because its presence chooses the checkable tier. `expect={key: value}` (`--expect key=value`, repeatable) contracts the run on the machine variables it leaves — a postcondition rather than a wait, since a blocking run's variables are final when it returns — and is refused under `dry_run`, which runs nothing. `record=<path>` (`--record <path>`) writes a screen transcript for debugging and corpus capture, stopping for the rest of the run once a bound secret reaches the guest, and is refused under `dry_run`, which reads no screen; the `.rlqt` format is deliberately not a surface and the invocation alone is (D98) | [script spec](script-spec.md), [cli.md](cli.md#the-dry-run), [cli.md](cli.md#recording-a-screen-transcript) |
 | the `run` family; `begin-run` / `end-run`; `list-runs` — all backlog (D35/D36) | the record model — persisted runs, `run status` / `run delete`, the async followers `run tail` / `run wait` / `run cancel` with the run handle (`start_script()` / `attach_run()` / `delete_run()`), and interaction runs (`begin_run` / `end_run`) — is async-backlog work; milestone 9 stores nothing | script spec |
 | `fetch-media` | `fetch_media()` blocking; `start_fetch()` → fetch handle (backlog — D35) | [media spec](media-spec.md#fetch-progress) |
 | `clean-media` / `prune-media` / `add-media` | `clean_media(name=None)` / `prune_media(dry_run=)` / `add_media(name, path)` | media spec |
-| `insert-media` / `eject-media` / `set-boot-order` | `insert_media(slot, media=None, file=None)` (`--file` mounts an anonymous `local`+`use` image, U20) / `eject_media()` / `set_boot_order()` | blueprint guide, script spec |
+| `insert-media` / `eject-media` / `set-boot-order` | `insert_media(slot, media=None, file=None)` (`--file` mounts an anonymous `local`+`use` image, U20) / `eject_media()` / `set_boot_order()` | [blueprint model](blueprint-model.md), [media spec](media-spec.md), [script spec](script-spec.md) |
 | `get-machine-dir` | `get_machine_dir()` — the machine's cache directory as an absolute path; the out-of-band door | [instance model](instance-model.md) |
 | `get-machine-var` | `get_machine_var(key)` — reads a machine variable a script `set` (a `machine.json` field cleared on start; the script→host scalar channel, U14/U20) | script spec |
 | `wait-machine-var` | `wait_machine_var(key, value=None, *, timeout=120, interval=1)` — the same read on a loop, for a variable **another actor** sets (a run on another thread, or one being followed): a blocking `run_script` leaves its variables final, so contract those with its `expect=` instead. `value=None` waits for any value. Expiry raises `WaitExpired`, both a `RunFailure` (exit `4`) and a Python `TimeoutError`, so a caller holding the loop asks again | [cli.md](cli.md) |

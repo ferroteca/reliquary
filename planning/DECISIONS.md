@@ -83,9 +83,6 @@ sits in that feature's own "Decide first" block, in
 to run before that feature's deliverables start. What follows is
 what gates nothing in particular.
 
-### Still needed
-
-
 ### Deferred to 1.0
 
 - **Format versioning**: pre-1.0, user documents carry no
@@ -118,20 +115,38 @@ is waiting on an answer today.
   owner 2026-07-21 — a real third-party adapter story elevates
   it into the INTERFACES inventory through the interface-change
   rule, never by drift)
-- **two norms for one semantic surface** (raised 2026-07-26).
-  `docs/spec/cli.md` and `docs/spec/api.md` are both normative for
-  what ARCHITECTURE.md calls one semantic surface. P6 states the
-  parity symmetrically and the twin-name rule derives only
-  *names*, so nothing says which wins if the two disagree on
-  **semantics**. **Both stay normative for now** (owner): they
-  align very closely, so the risk is dormant rather than absent.
-  Re-ask when they first diverge, or when a second binding lands —
-  the resolutions available are naming one of them normative and
-  the other derived (the API is the natural pick, and this needs
-  no move to code-as-norm), adding a tie-break clause, or placing
-  the semantics in one document both specs present.
 
 ## Decided
+
+- D119 — ONE SEMANTIC SURFACE, THREE NORMS WITH DISJOINT CLAIMS,
+  AND THE CONTRACT HOME GOVERNS — DECIDED (owner, 2026-08-22),
+  closing the "two norms for one semantic surface" watch.
+  Supports P6, P23. Settles what stands *between* api.md, cli.md
+  and the command manifest.
+
+  The watch asked which of cli.md and api.md wins when the two
+  disagree on semantics, both being normative for P6's one
+  surface. By the time it was re-asked the labour had divided:
+  the manifest norms the **inventory** (F60), cli.md's status
+  claims **command behaviour** — flags, output, exit codes — and
+  api.md's claims the **conventions and return contracts** and
+  calls itself the *index* into each family's contract home. So
+  the resolution is the third the watch listed — the semantics
+  live in one home each — **plus the tie-break it lacked: a
+  citing passage that disagrees with its home is the bug, and
+  the home governs.** Both status blocks now say so. Naming
+  api.md the single norm — the watch's natural pick — was
+  declined: api.md carries end-goal design that does not ship,
+  and cli.md documents only what exists, so the pick would norm
+  unbuilt capability.
+
+  WHERE IT HAD BITTEN: four index rows named the blueprint
+  *guide* as a contract home, a document whose own header
+  disclaims the role ("descriptive … this guide has the bug");
+  they now point at instance-model.md and blueprint-model.md.
+  REOPENS if a second binding's reference and the Python one
+  diverge on a return contract, which is the one conflict no
+  contract home yet arbitrates.
 
 - D118 — NO DRIVE-SCOPED SETTINGS SECTION; A DRIVE IS ADDRESSED
   THROUGH THE BACKEND'S OWN HATCH — DECIDED (owner, 2026-08-22)
