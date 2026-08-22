@@ -223,6 +223,27 @@ materialization.
   a Vagrantfile / box handoff around a provider VM — but it does
   not own the native virtualization capabilities Reliquary needs to
   verify. The real backend remains the provider underneath.
+- **Emulators without a management interface are not backends —
+  DOSBox-X in particular** (investigated 2026-08-22; the
+  evidence and the reopen condition are
+  [dosbox-x.md](dosbox-x.md), watched by **R12**). The machine
+  half fits — it boots real DOS from floppy, hard-disk and ISO
+  images over emulated IDE, and reads raw, VHD and qcow2 with a
+  native differencing image of its own. **The control half does
+  not exist**: every carrier this seam requires is a host-side
+  command against a *running* machine, and DOSBox-X's whole
+  external surface is the command line at launch and the SDL
+  window after it — no monitor, socket or pipe, so no key
+  injection, no screen readback, no medium swap, and no
+  identity to verify or fail closed on. The tools that could
+  drive it (`AUTOTYPE`, `DX-CAPTURE`, `IMGSWAP`) belong to the
+  DOS it supplies, which is the DOS an install replaces.
+  Driving the host window instead would be the brittle
+  UI-automation plane
+  [guest-communication.md](guest-communication.md) refuses, and
+  an `agentless-display` *emulated* rather than reported (P11).
+  It is a handoff target at the image boundary, like the two
+  entries above, rather than a provider.
 
 ## Backend assignment
 

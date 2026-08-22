@@ -46,7 +46,7 @@ nothing is ever reissued.
 - **The next P-number to issue is P28** — architectural
   principles, one namespace across proposed, pledged, and the root
   list.
-- **The next R-number to issue is R12** — recurring obligations,
+- **The next R-number to issue is R13** — recurring obligations,
   standing in [RECURRING.md](RECURRING.md), the number
   evaporating when an obligation is retired.
 - **The next S-number to issue is S9** — application surfaces

@@ -159,3 +159,15 @@ discharge is judgment work, never a script's verdict alone.
   its weight better than the stdlib?
 - **Stale after**: one month.
 - **Last performed**: 2026-08-01.
+
+### R12 — Watch DOSBox-X for a host control channel
+
+- **Check**: whether DOSBox-X has grown a **host-side control
+  channel** — the four capabilities listed in
+  [design/dosbox-x.md](design/dosbox-x.md), "What would reopen
+  this", against an already-booted guest. That document is the
+  standing refusal; this is the condition that would reopen it,
+  and nothing weaker counts.
+- **Stale after**: six months — a control channel is an
+  architectural addition, not a point release.
+- **Last performed**: 2026-08-22.
