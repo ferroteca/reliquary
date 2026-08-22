@@ -9,8 +9,15 @@ from typing import Protocol, runtime_checkable
 class GuestExec(Protocol):
     """Readiness and command-completion capability for a running guest."""
 
-    def wait_ready(self, timeout: float = 90) -> None:
-        """Wait until the adapter can execute guest commands."""
+    def wait_ready(self, timeout: float = 90, *,
+                   prompt: str | None = None) -> None:
+        """Wait until the adapter can execute guest commands.
+
+        ``prompt`` is what ready looks like when the platform's
+        default evidence cannot say — on agentless DOS, the exact
+        text of a customized prompt (D113). An adapter whose
+        readiness is reported rather than observed may ignore it.
+        """
         ...
 
     def execute(self, command: str, timeout: float = 120, *,

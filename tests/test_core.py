@@ -843,6 +843,36 @@ def test_times_out_without_a_prompt():
                 machine_module.Machine()).wait_ready(timeout=0)
 
 
+def test_a_customized_prompt_is_ready_only_when_the_caller_declares_it():
+    # no earlier screen to read it off (D112), so the caller says
+    # what the guest draws (D113) — exactly, as the bottom row
+    console = mock.Mock()
+    console.screen_text.return_value = ["[C:\\]>"] + [""] * 24
+    with _over(console), \
+            mock.patch.object(agentless_module.time, "sleep"):
+        guest = agentless_module.AgentlessGuestExec(machine_module.Machine())
+        with pytest.raises(RunFailure) as undeclared:
+            guest.wait_ready(timeout=0)
+        guest.wait_ready(prompt="[C:\\]>")
+        with pytest.raises(RunFailure) as wrong:
+            guest.wait_ready(timeout=0, prompt="[C:\\FREEDOS]>")
+
+    assert repr("[C:\\]>") not in str(undeclared.value)
+    assert repr("[C:\\FREEDOS]>") in str(wrong.value)
+    console.send_text.assert_not_called()
+
+
+def test_a_declared_prompt_does_not_unseat_the_standard_shape():
+    # declaring one adds evidence; a guest at the standard prompt
+    # is still ready
+    console = mock.Mock()
+    console.screen_text.return_value = ["C:\\>"] + [""] * 24
+    with _over(console), \
+            mock.patch.object(agentless_module.time, "sleep"):
+        agentless_module.AgentlessGuestExec(
+            machine_module.Machine()).wait_ready(prompt="[C:\\]>")
+
+
 # The interaction adapters, and what the package exposes.
 
 def test_a_machine_session_comes_from_its_recorded_backend():

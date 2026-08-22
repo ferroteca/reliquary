@@ -49,26 +49,33 @@ class AgentlessGuestExec:
     def __init__(self, machine: Machine):
         self._machine = machine
 
-    def wait_ready(self, timeout: float = 90) -> None:
+    def wait_ready(self, timeout: float = 90, *,
+                   prompt: str | None = None) -> None:
         """Wait for a DOS prompt.
 
-        The standard shape alone (D112): there is no earlier screen
-        here to have read a customized prompt off, so a guest that
-        boots to one is not recognized as ready by this wait.
+        The standard shape, or exactly ``prompt`` when the caller
+        declares one (D113): there is no earlier screen here to read
+        a customized prompt off, the way :meth:`execute` does (D112),
+        so a guest that boots to one is recognized only when the
+        caller says what it draws — the script language's own
+        ``wait "C:\\>"`` stance, at the API. The text is the bottom
+        row as the guest draws it, compared exactly; a pattern is
+        the wider door D112 refused.
         """
         print("rlq: waiting for a DOS prompt...", file=sys.stderr)
         with self._machine.console() as console:
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
                 rows = [row for row in console.screen_text() if row]
-                if rows and _PROMPT_RE.match(rows[-1]):
+                if rows and _is_prompt(rows[-1], prompt):
                     print(f"rlq: at DOS prompt: {rows[-1]}",
                           file=sys.stderr)
                     return
                 time.sleep(2)
+        declared = f" or for {prompt!r}" if prompt else ""
         raise RunFailure(
-            f"timed out after {timeout}s waiting for a DOS prompt",
-            rule_id="screen.no-match")
+            f"timed out after {timeout}s waiting for a DOS prompt"
+            f"{declared}", rule_id="screen.no-match")
 
     def execute(self, command: str, timeout: float = 120, *,
                 check: bool = False):

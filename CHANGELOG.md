@@ -11,6 +11,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **`wait_ready(prompt=)` — readiness at a customized prompt**
+  (D113; T28). `AgentlessGuestExec.wait_ready` recognized the
+  standard DOS prompt alone, and with D112 making a customized
+  guest usable through `execute`, the documented readiness idiom
+  failed at its first line for the same guest. The caller now
+  declares what ready looks like at the call — the exact bottom-row
+  text the guest draws, `wait_ready(prompt="[C:\\]>")` — the script
+  language's own `wait "C:\>"` stance at the API; `None` keeps the
+  standard shape, and the expiry names what it waited for. A
+  blueprint field, readiness-as-stability, a regex, and retiring
+  the method for `wait_text` were weighed and declined. The README
+  and `docs/dos-automation.md` show the keyword and name
+  `wait_text` as the general authored wait.
+
 ### Fixed
 
 - **`exec` finds an echo that wrapped.** A command longer than the

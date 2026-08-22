@@ -733,6 +733,10 @@ finally:
     session.stop_machine(machine_id)
 ```
 
+A guest whose `AUTOEXEC.BAT` customizes the prompt says so at the call — `guest.wait_ready(prompt="[C:\\]>")`,
+the exact text the guest draws — because readiness has no earlier screen to read it off; `execute` needs nothing,
+reading the prompt off the screen it types into.
+
 `Machine` also exposes the VGA text screen directly: `machine.screen_text()`
 returns the 80x25 rows, and `machine.wait_text(pattern, timeout=60)` polls until the screen matches a regular
 expression (returning the matching screen)

@@ -178,6 +178,58 @@ is waiting on an answer today.
 
 ## Decided
 
+- D113 — READINESS LEARNS A CUSTOMIZED PROMPT FROM THE CALLER —
+  DECIDED (owner, 2026-08-22) and delivered the same day, striking
+  T28. Supports U14; P10, P11. Completes D112 at the public
+  surface.
+
+  `execute` learns a customized prompt from the screen it types
+  into (D112); `wait_ready` has no such screen, and it is the
+  readiness idiom the README and `docs/dos-automation.md` teach
+  before `execute`, so a guest whose `AUTOEXEC.BAT` sets
+  `PROMPT [$P]$G` failed the documented idiom at its first line
+  (T28). **The caller declares it at the call**:
+  `wait_ready(timeout=90, *, prompt=None)`, `prompt` being the
+  exact bottom-row text the guest draws, `None` keeping the
+  standard shape. That is the script language's own stance — the
+  codex `ready` script states its evidence as `wait "C:\>"`, and
+  "what ready means is the workflow's own business, never
+  reliquary's" — moved to the API: the actor who customized the
+  guest says what ready looks like, at the one call that needs
+  it. Declared rather than guessed (P10), an exact row rather than
+  a pattern (D112's refusal of the wider door), a plain string
+  every binding language can carry (api.md's second principle),
+  and S2 alone. The expiry names what it waited for.
+
+  THE RESIDUE, STATED: a prompt carrying `$T` or `$D` changes
+  every second and equals no text, for `wait_ready` and `execute`
+  alike. OBSERVED, NOT TAKEN: `wait_ready` has no CLI twin, which
+  api.md's first principle says every public capability has —
+  pre-existing, and `exec` never needs it (its precondition is
+  "running"); and `wait_ready` confirms no stability under a
+  prompt where `execute` does (F45) — each a small item of its
+  own if wanted.
+
+  WEIGHED AND DECLINED:
+
+  - **A blueprint field** (`platform-settings.prompt`, S4) —
+    heavier, would have the blueprint describe the installed
+    system's runtime configuration rather than the machine, and
+    D112's no-demand finding for `execute` still stands; the move
+    if a second site ever needs the same declaration.
+  - **Readiness as stability** — any bottom row once the screen
+    stops changing; declined because a boot menu, a "Press any
+    key", and a stalled driver are all stable screens, the false
+    positive P11 refuses at the moment it is likeliest.
+  - **Retiring `wait_ready` for `machine.wait_text`** — declined:
+    the protocol seam is right (an agent adapter answers readiness
+    by the agent reporting in, not by a screen), and `wait_text`
+    matches anywhere on screen with no prompt semantics. It stays
+    the general authored wait and the guides now say so.
+  - **A regex, fullmatch on the bottom row** — would serve `$T`
+    prompts at the cost of the wider door and a Python-flavoured
+    value, and would diverge from `execute`'s exact-row rule.
+
 - D112 — A PROMPT IS THE STANDARD SHAPE, OR THE ONE THE GUEST WAS
   AT — DECIDED (owner, 2026-08-22) and delivered the same day.
   Supports U14; P10, P11. Sharpens D75, which made completion need

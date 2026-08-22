@@ -123,6 +123,13 @@ finally:
     reliquary.stop_machine(machine_id)
 ```
 
+A guest whose `AUTOEXEC.BAT` customizes the prompt says so at the
+call — `guest.wait_ready(prompt="[C:\\]>")`, the exact text the guest
+draws — because readiness has no earlier screen to read it off;
+`execute` needs nothing, reading the prompt off the screen it types
+into. For any other boot-time evidence, `machine.wait_text(pattern)`
+is the general authored wait over the whole screen.
+
 To run a whole `.rlqs` script instead of driving the guest step by step,
 use `run_script` (see the [API reference](api-reference.md)). For
 complete usage, see [README.md](../README.md).

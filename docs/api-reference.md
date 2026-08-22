@@ -404,10 +404,17 @@ Module-level equivalents take `home=` directly: `send_keys`,
 `screenshot(name="screen", home=None, directory=None)`.
 
 `GuestExec` is the capability protocol —
-`wait_ready(timeout=90)`, `execute(command, timeout=120, *,
-check=False)` — and
+`wait_ready(timeout=90, *, prompt=None)`, `execute(command,
+timeout=120, *, check=False)` — and
 `AgentlessGuestExec` is the concrete agentless DOS adapter over a
-`Machine`. How a platform answers `check` is its own business: DOS
+`Machine`. `wait_ready` is ready at the standard DOS prompt, or at
+exactly the bottom-row text `prompt` declares — the way a guest
+whose `AUTOEXEC.BAT` sets `PROMPT [$P]$G` is reported ready,
+`wait_ready(prompt="[C:\\]>")`, since no earlier screen exists to
+read a customized prompt off the way `execute` does (D112, D113).
+A time-bearing prompt (`$T`) matches no exact text and is the one
+stated residue, for `execute` as well. How a platform answers
+`check` is its own business: DOS
 probes ERRORLEVEL, an agent would read an exit status, and what
 every adapter owes is the same answer.
 
