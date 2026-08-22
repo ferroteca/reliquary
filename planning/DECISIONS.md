@@ -207,8 +207,8 @@ is waiting on an answer today.
   api.md's first principle says every public capability has —
   pre-existing, and `exec` never needs it (its precondition is
   "running"); and `wait_ready` confirms no stability under a
-  prompt where `execute` does (F45) — each a small item of its
-  own if wanted.
+  prompt where `execute` does (F45). Filed as **T29** and **T30**
+  (owner, 2026-08-22).
 
   WEIGHED AND DECLINED:
 

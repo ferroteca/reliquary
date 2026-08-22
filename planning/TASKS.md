@@ -124,3 +124,55 @@ is mechanical, a defect needs no pledge because the norm it
 violates already is one. A group with nothing in it is not listed:
 an empty heading is a record of retired work, which this file does
 not keep.
+
+### Surface decisions
+
+#### T29 — `wait_ready` has no CLI twin
+
+`AgentlessGuestExec.wait_ready()` is reachable from Python alone.
+[docs/spec/api.md](../docs/spec/api.md)'s first principle is that
+nothing is API-only — every public capability has a CLI twin and a
+change lands on both presentations at once — and this one has
+none: `rlq exec` never calls it, its precondition being that the
+machine is *running* and completion being its own evidence, and
+no `wait-ready` command exists. Observed in **D113**, which gave
+the method its `prompt=` keyword without adding a twin, and filed
+here rather than left in the decision's text.
+
+**The question is whether the twin is owed or the method is the
+odd one out.** The handle stratum (`Machine.screen_text`,
+`wait_text`, `send_keys`) already has module-level and CLI twins,
+so the pattern argues for `rlq wait-ready [--prompt <text>]` — a
+script-free readiness check a harness can run between
+`start-machine` and `exec`, which is exactly the gap the codex
+`ready` script fills with `wait "C:\>"` today. The other answer
+is that readiness belongs to scripts and the API's method is the
+embedding-only convenience the principle tolerates, in which case
+the principle needs the carve-out stated. Either is a surface
+decision (S1, S2) under [SURFACES.md](SURFACES.md), recorded as a
+D-number; the spec and the command manifest follow it.
+
+### Defects
+
+#### T30 — `wait_ready` answers a prompt on sight where `execute` waits for it to settle
+
+`execute` holds a prompt as a candidate until `screen_stability`
+says the screen under it settled (F45; D75): one arriving
+mid-scroll, or a bottom row that transiently resembles one while
+output is still drawing, would otherwise end the wait at a
+boundary that never existed. `wait_ready` applies none of that —
+it returns the instant the bottom non-blank row matches — though
+the boot it waits out is the screen likeliest to still be moving:
+`AUTOEXEC.BAT` prints, a driver loads, a prompt-shaped row scrolls
+past. Observed in **D113** and filed here.
+
+**The rule is the adapter's own, and the first thing to settle is
+whether it binds readiness.** The hazard is weaker than
+`execute`'s — nothing is sliced, a caller simply proceeds a moment
+early and its first `execute` then reads a screen still settling
+— so the fix may be the same gate reused, a lighter
+"prompt held for one quiescence window", or a finding that the
+boot case does not need it, stated. The transcript corpus cannot
+pin `wait_ready` (captures are of a command or a script), so the
+evidence is a hands-on boot against a real guest, and the
+unit tests in `test_core.py` under "Booting to a DOS prompt".
