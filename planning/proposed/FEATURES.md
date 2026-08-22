@@ -905,7 +905,10 @@ boot, the VNC plane is the route and the bet still holds; if the
 recognizer cannot read OpenBSD's console font, that is the stop,
 and this entry shrinks to recording why.
 
-**What a platform owns is a dialect, not a transport.** Today
+**What a platform owns is a dialect, not a transport** — the
+design is [design/platform-dialect.md](design/platform-dialect.md),
+which carries the dialect's shape, the selection rule, the OpenBSD
+clauses, the proof and the cut; what follows is the argument. Today
 `interaction_agentless.py` is DOS from its first constant
 (`_PROMPT_RE`, the `IF ERRORLEVEL` probe, the "DOS prompt"
 narration) while its loop — type, catch the echo, wait for the
@@ -951,28 +954,24 @@ dialect** behind the existing loop, not a second loop:
   usable from this guest without reliquary reading a byte.
 - **Readiness.** The one clause DOS never had. DOS boots to a
   prompt; OpenBSD boots to `login:`, and "ready for commands"
-  means a shell. Two routes, to be **decided first**:
-  1. *Readiness logs in.* `wait_ready` recognizes `login:` on the
-     bottom row, types the user, answers `Password:`, and waits
-     for the prompt. Credentials come through the property
-     sources (P13) and the `credentials` module's secret handling
-     — never typed into a blueprint field — with the recipe's
-     root password as the seeded default. General, and the
-     transport learns a two-step handshake.
-  2. *The recipe arranges a prompt.* `openbsd-install` ends by
-     putting a root shell on the console — `/etc/ttys`'
-     `ttyC0` line running `/bin/ksh` directly, the long-standing
-     console trick — so the machine boots to a prompt and
-     readiness is DOS-shaped: a settled prompt on the bottom row,
-     no credentials in the transport at all. Cheap, and it makes
-     the codex machine a test fixture rather than a system,
-     which P1's ephemeral-machine reading arguably prefers and a
-     user seeding the recipe for their own use may not.
-  The recommendation is **(2) for the codex machine and (1) as the
-  general mechanism**, in that order of delivery: (2) proves the
-  dialect against a real boot with the least new surface, and (1)
-  is what a user's own OpenBSD — installed by their own recipe,
-  logging in like a system — needs. Neither is decided here.
+  means a shell. Two routes were weighed — *readiness logs in*
+  (`wait_ready` recognizes `login:`, types the user, answers
+  `Password:` from the property sources and the `credentials`
+  module, P13) and *the recipe arranges a prompt* (`/etc/ttys`'
+  `ttyC0` line running `/bin/ksh`, so the machine boots to one).
+  **Settled for the design (owner round, 2026-08-22): the recipe
+  arranges the prompt, by the installer's own exit to a shell** —
+  the response file answers `Exit to (S)hell, (H)alt or (R)eboot`
+  with `shell`, and at the installer's `#` the recipe edits
+  `/mnt/etc/ttys` and reboots: no login, no credential anywhere
+  in the transport, no new verb, four statements the language
+  already has (the design, "Readiness"). The codex machine is
+  then a fixture with a root shell on its console, said so in the
+  recipe's comments. *Readiness logs in* stays the general
+  mechanism for a user's own OpenBSD and is the last piece of the
+  cut, delivered when one asks. Spike 0 measures the two facts the
+  route rests on — autoinstall honouring the exit-to-shell answer,
+  and the edited `ttys` line yielding a shell on `ttyC0`.
 
 **Surfaces touched** (SURFACES.md, by lookup): **S2** and **S1** —
 `exec`, `wait_ready` and `check=` gain a second platform with the
