@@ -928,6 +928,18 @@ measured rather than argued (above): it has not, and the reason is
 the backend's hardcoded i386 binary rather than anything in the
 recipe or the platform.
 
+**Spike 0, second pass (2026-08-22, after the architecture fix): the
+install completes.** With the right system binary launching and the
+loader step corrected, the codex recipe's own answers carried a real
+autoinstall through to `CONGRATULATIONS! Your OpenBSD install has
+been successfully completed!` in about eleven minutes — served from
+the run-scoped HTTP server, read from first screen to last over
+`control-planes: ["vnc"]`. **The install is no longer the unknown.**
+What the same run overturned is the readiness route this entry had
+settled (below): the installed machine is kept as the spike's
+product (P20), so the next round starts against a real OpenBSD guest
+rather than a 700 MB download.
+
 **The transport is the one already built, and that is the whole
 bet.** OpenBSD amd64 booted by BIOS on QEMU's `-vga std` takes its
 console on `vga(4)` in text mode — wscons over an 80×25 VGA text
@@ -973,11 +985,18 @@ dialect** behind the existing loop, not a second loop:
 
 **The OpenBSD dialect, clause by clause:**
 
-- **Prompt.** Root's default `ksh` prompt is `<hostname># `; the
-  shape is a row ending in `# ` or `$ ` after a non-blank head,
+- **Prompt.** Root's default `ksh` prompt is `<hostname># `,
+  confirmed by spike 0 against the installed guest (`openbsd#`);
+  the shape is a row ending in `# ` or `$ ` after a non-blank head,
   and D113's declared-prompt door carries over for a guest whose
   `.profile` redrew it. The echo discipline is unchanged: the tty
-  echoes the typed line where the prompt was.
+  echoes the typed line where the prompt was. **One wrinkle the VNC
+  plane adds**: the guest draws its own cursor, so the recognizer
+  reads it as a cell and the bottom row comes back `openbsd# _`. A
+  shape anchored at the end of the row misses by that one
+  character — a property of the plane rather than of this platform,
+  so it is the seam's to settle (the design, "the cursor is a
+  glyph").
 - **Outcome probe.** `test $? -ne 0 && echo RLQ-EXEC-FAILED` as
   its own line — text reliquary composed and reads back, so G2
   and P18 are untouched exactly as on DOS. One honest difference,
@@ -999,26 +1018,34 @@ dialect** behind the existing loop, not a second loop:
   `Password:` from the property sources and the `credentials`
   module, P13) and *the recipe arranges a prompt* (`/etc/ttys`'
   `ttyC0` line running `/bin/ksh`, so the machine boots to one).
-  **Settled for the design (owner round, 2026-08-22): the recipe
-  arranges the prompt, by the installer's own exit to a shell** —
-  the response file answers `Exit to (S)hell, (H)alt or (R)eboot`
-  with `shell`, and at the installer's `#` the recipe edits
-  `/mnt/etc/ttys` and reboots: no login, no credential anywhere
-  in the transport, no new verb, four statements the language
-  already has (the design, "Readiness"). The codex machine is
-  then a fixture with a root shell on its console, said so in the
-  recipe's comments. *Readiness logs in* stays the general
-  mechanism for a user's own OpenBSD and is the last piece of the
-  cut, delivered when one asks. Spike 0 measures the two facts the
-  route rests on — autoinstall honouring the exit-to-shell answer,
-  and the edited `ttys` line yielding a shell on `ttyC0`.
+  The design round chose the second, by the installer's own exit to
+  a shell — and **spike 0's second pass refuted it: under
+  autoinstall the installer never asks.** `Exit to (S)hell, (H)alt
+  or (R)eboot` is an *interactive* install's question, so the
+  response-file line answering it is inert; the install ends, the
+  machine reboots on its own, and the console comes up
+  `OpenBSD/amd64 (openbsd.my.domain) (ttyC0)` at `login:`. No
+  script ever holds the installer's shell, so nothing is left for
+  the `sed` to ride. **Readiness therefore logs in, and it is not
+  the later general mechanism but the only one** — measured by hand
+  against the installed guest: `login:` → the user → `Password:` →
+  the secret → `openbsd#`, which confirms this entry's guess at the
+  prompt shape exactly. Two things follow. The **credential is
+  load-bearing from the first delivery** rather than deferred with
+  a later piece, through P13's sources and never a blueprint field.
+  And **what the API carries it as is a surface question this entry
+  leaves open** (S2, and S4 if the machine document ever names the
+  account): `wait_ready(user=, password=)` is the obvious shape and
+  is not settled here — D113's `prompt=`, where the caller declares
+  what the guest draws, is where that round starts.
 
 **Surfaces touched** (SURFACES.md, by lookup): **S2** and **S1** —
 `exec`, `wait_ready` and `check=` gain a second platform with the
 same contract, and `wait_ready --prompt` reads as the shell prompt
-there; **S6** — the codex recipe changes under route (2), and an
-`openbsd-verify` sibling of `freedos-verify` is owed either way;
-**S4** only if route (1) adds a credential parameter to the machine
+there; **S6** — the codex recipe takes the loader-step fix and the
+`openbsd` machine gains its `vnc` plane, with an `openbsd-verify`
+sibling of `freedos-verify` owed beside them; **S4** if the
+credential the login handshake needs takes a name in the machine
 document. **S3** and **S7** are unchanged: no statement and no
 event gains a meaning. The norms in `docs/spec/` for the verbs say
 "DOS is the delivered workflow" and are amended with the delivery.
@@ -1029,12 +1056,11 @@ and F4's territory, not this entry's; guest-file verbs over it for
 the same reason; `win9x` and `winnt` (no recipe, no text console
 to bet on); any in-guest component; and the GUI era (F5).
 
-**Proof.** Integration, asked for by name as the DOS boots are:
-first the install completing for real behind the fixed binary
-selection (a 762 MiB ISO and a 45-minute deadline, paid once — the
-product is the disk, P20), which spike 0 has taken as far as the
-installer prompt; then a boot, `wait_ready`, `exec "uname -a"`
-reading back the kernel line, `exec "false", check=True` raising
+**Proof.** Integration, asked for by name as the DOS boots are.
+**Spike 0 is done** — the install completes for real, and what it
+measured is folded above and into the design. What remains: a boot,
+`wait_ready` through the login handshake, `exec "uname -a"` reading
+back the kernel line, `exec "false", check=True` raising
 `command.signalled-failure` and `exec "nosuch"` raising the same,
 a row slice that does not include the boot's output, and the
 **agentless DOS suite passing byte-for-byte** — the dialect seam
@@ -1042,13 +1068,15 @@ may not move a DOS reading by one row. P24: every touched surface
 tested against its own spelling.
 
 **Sprint bound: too large as one, and the cut is visible.** (a) The
-dialect seam, DOS moved behind it with the suite unchanged; (b)
-the OpenBSD dialect and route (2)'s recipe change, proven against
-a machine installed by spike 0; (c) route (1) if and when a user's
-own OpenBSD asks for it. The binary-selection fix precedes all
-three and is not one of them — a recipe that cannot complete is not
-a foundation anything may be pledged on, and spike 0 has now said
-exactly why it could not.
+dialect seam, DOS moved behind it with the suite unchanged; (b) the
+OpenBSD dialect **with readiness in it**, the platform's `vnc`
+default and the recipe's loader fix, proven against the machine
+spike 0 installed. The third piece this entry used to carry — route
+(1), "if and when a user's own OpenBSD asks for it" — **is gone,
+folded into (b)**: the measurement killed the route that would have
+avoided a login, and a handshake a dialect cannot reach a prompt
+without is not separable from it. Spike 0 no longer precedes the
+pledge; it has run.
 
 ## Horizon — smaller and later
 

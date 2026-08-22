@@ -9,9 +9,15 @@ SPDX-License-Identifier: GPL-3.0-only
 > the OpenBSD platform workflow) — owner round, 2026-08-22.
 > **Nothing here is pledged.** F64 carries the demand and the cut;
 > this document holds the shape the cut delivers, so the pledge
-> round starts from it rather than from the entry's prose. Spike 0
-> — the OpenBSD recipe completing for real — precedes the pledge,
-> and two clauses below are marked as what it measures.
+> round starts from it rather than from the entry's prose.
+>
+> **Spike 0 has run** (2026-08-22; F64 carries its first pass, and
+> its second is folded in here). The OpenBSD recipe completed a
+> real install for the first time — and **two of this document's
+> calls did not survive it.** The transport and the readiness route
+> are rewritten below against what was measured, and each says what
+> it used to claim, because a design whose refuted half is quietly
+> deleted teaches the next reader nothing.
 
 ## The claim
 
@@ -39,10 +45,11 @@ cannot read off a screen:
 | field | DOS (today's constants) | OpenBSD |
 |---|---|---|
 | `name` | `dos` | `openbsd` |
+| `plane` | `agentless-display` — the QMP text-memory scrape | **`vnc`** — the scrape is blind to this guest (measured; below), so the platform's *default* control plane differs. That is the extension the blueprint model already anticipates: "omitted, it resolves to the platform's default … defaults that differ by platform arrive with the planes that justify them" |
 | `prompt_shape` | `^[A-Z]:(\\[^>]*)?>$` — needed so `CD` can change the prompt's *text* and still complete | a row ending in `# ` or `$ ` after a non-blank head; `ksh`'s prompt does not change on `cd`, so the shape is only the standard-readiness door, and D113's `prompt=` carries over for a redrawn one |
 | `probe` | `IF ERRORLEVEL 1 ECHO RLQ-EXEC-FAILED` | `test $? -ne 0 && echo RLQ-EXEC-FAILED` — its own line, read through the same echo discipline; `$?` is the previous line's status in `ksh`, and is `127` for a command the shell could not find, so the DOS probe's stated gap (`COMMAND.COM` leaves ERRORLEVEL alone) does not exist here (P11, stated either way) |
 | `sentinel` | `RLQ-EXEC-FAILED` | the same word: it is text Reliquary composed and reads back (G2, P18), and one spelling keeps the rule ids the two probes share |
-| `ready` | a settled prompt on the bottom row | a settled prompt on the bottom row — **because the codex machine boots to one** (below); a guest that boots to `login:` is route (1)'s, delivered when asked |
+| `ready` | a settled prompt on the bottom row | **a login handshake, then a settled prompt** (measured; below): `login:` → the user → `Password:` → the secret → `openbsd#`. DOS has no handshake, so this is the one dialect field with a *sequence* in it rather than a value |
 | narration | "waiting for a DOS prompt…" / "at DOS prompt:" | the dialect's word for its prompt, in the same two lines |
 
 The rule ids do not change: `screen.no-echo`, `screen.no-match`,
@@ -66,72 +73,128 @@ platform is a file and a registry line.
 parses today; `exec` is a CLI/API composite above the language, and
 a script drives the guest with `enter` and `wait` as it always did.
 
-## The transport is the one already built
+## The transport: the framebuffer plane, and why text mode did not decide it
 
-OpenBSD amd64 booted by BIOS on QEMU's `-vga std` takes its console
-on `vga(4)` in text mode — `wscons` over an 80×25 VGA text screen —
-so the agentless plane applies unchanged: QMP `send-key` in, text
-memory at `0xb8000` out, `screendump` for pictures; the VNC plane
-with the fixed-font recognizer is the equally agentless fallback
-should the console ever leave text mode (F63). **Spike 0 measures
-this**: the console's mode after first boot, and whether the
-recognizer reads the console font if the VNC plane is needed. If
-the console is a framebuffer the VNC plane is the route and the bet
-holds; if the recognizer cannot read it, that is the stop, and F64
-shrinks to recording why.
+**This section used to say the agentless plane applied unchanged** —
+the console is in text mode, so QMP text memory out, with the VNC
+plane as the fallback should the console ever leave text mode. Spike
+0 kept the premise and broke the conclusion.
 
-## Readiness: the codex machine boots to a prompt
+The premise held: OpenBSD amd64 booted by BIOS on QEMU's `-vga std`
+does take its console on `vga(4)` in text mode, and says so —
+`wsdisplay0 at vga1 mux 1: console (80x25, vt100 emulation)`. **And
+the text scrape still cannot read it.** A 32 KB dump of physical
+`0xb8000`, taken while the installer's menu was on screen, holds no
+installer text at all: it still carries what SeaBIOS wrote.
+`vga_screen` (`backend_qemu.py`) reads a fixed `0xb8000` and takes
+the visible screen to begin there — true of DOS, which scrolls by
+moving bytes inside that window; false of a guest whose wscons
+attaches the adapter and paints through its own aperture. The
+symptom is a screen frozen at the boot banner while the guest runs
+on, which is worse than a blank one: it is a stale reading that
+looks live.
 
-DOS boots to a prompt; OpenBSD boots to `login:`. F64 weighed two
-routes — readiness logging in, or the recipe arranging a root shell
-on the console — and recommended the second for the codex machine.
-**The design takes the second by its cheapest mechanism, which
-neither route as written named**: the installer's own exit to a
-shell, with the installed filesystem still mounted.
+So **"is the console text?" was the wrong question, and being right
+about it bought nothing.** What decides the plane is whether the
+guest paints through the legacy aperture, and only the framebuffer
+can answer for a guest that does not. It answers well: over
+`control-planes: ["vnc"]` the shared fixed-font recognizer read
+every screen this platform shows — the loader, the kernel's dmesg,
+the installer's menu, the installed system's boot, its `login:` and
+its shell — with no font declared and nothing tuned. The
+font-recognition stop this design feared is not in play.
 
-After `CONGRATULATIONS! Your OpenBSD install has been successfully
-completed!` the installer asks `Exit to (S)hell, (H)alt or
-(R)eboot?` Under autoinstall the answer comes from the response
-file like every other, so the recipe's `install.conf` gains one
-line —
+**The plane is therefore a dialect field** (the table above), not a
+deployment choice left to whoever writes the blueprint. It needs no
+new mechanism: the blueprint model already has `control-planes`
+resolving to *the platform's default* when omitted, and says that
+defaults differing by platform arrive with the planes that justify
+them. This is that arrival. A machine of this platform left on the
+inherited default is not slower — it is blind, and P11 wants that
+said where an author meets it.
+
+### One plane difference, not a platform one: the cursor is a glyph
+
+On the text scrape the cursor is hardware state and never a
+character. On the framebuffer the guest has *drawn* it, so the
+recognizer reads it as a cell like any other and the bottom row
+comes back `openbsd# _`, not `openbsd# `. Every rule that matches a
+prompt as an **exact row** — D112's second shape, D113's declared
+`prompt=` — meets that trailing cell, and a shape anchored at the
+end of the row misses by one character.
+
+This belongs to the plane and not to OpenBSD, so it reaches the DOS
+guest the moment DOS is driven over VNC (F63). It is recorded here
+because here is where it was first measured, and it is **the seam's
+question rather than this dialect's**: whichever way it is settled —
+the recognizer accounting for the cursor cell, or every prompt shape
+tolerating it — one answer serves both platforms, and two would be
+the second spelling G6 refuses.
+## Readiness: the guest boots to `login:`, so readiness logs in
+
+**This section used to arrange a prompt instead of logging in.** It
+had the recipe answer the installer's `Exit to (S)hell, (H)alt or
+(R)eboot` with `shell`, then edit `/mnt/etc/ttys` at the installer's
+own prompt so `init` would run `/bin/ksh` on `ttyC0` — readiness
+DOS-shaped, no credential in the transport, four statements the
+language already had. It was the cheaper route and it does not
+exist.
+
+**Spike 0 refuted it: under autoinstall the installer never asks.**
+`Exit to (S)hell, (H)alt or (R)eboot` is an *interactive* install's
+question, so a response-file line answering it is inert — the
+install ends, the machine reboots on its own, and the next thing on
+the console is
 
 ```
-Exit to (S)hell, (H)alt or (R)eboot = shell
+OpenBSD/amd64 (openbsd.my.domain) (ttyC0)
+
+login:
 ```
 
-— and the recipe, at the installer's `#` prompt with the target at
-`/mnt`, runs one edit and reboots:
+There is no moment at which a script holds the installer's shell, so
+there is nothing for a `sed` to ride. (OpenBSD's own hook for
+running commands at the end of an install is an `install.site` set;
+it is a different mechanism, wants the sets served rather than read
+from `cd0`, and is not what this design weighed. It stays available
+and unargued.)
 
-```rlqs
-wait "CONGRATULATIONS! Your OpenBSD install has been successfully completed!"
-wait /^# $/
-enter "sed -i 's|/usr/libexec/getty Pc|/bin/ksh|' /mnt/etc/ttys"
-wait /^# $/
-enter "reboot"
-```
+**So readiness logs in — and that is not the later general
+mechanism, it is the only one.** Measured by hand against the
+installed guest:
 
-`ttyC0 "/bin/ksh" vt220 on secure` is the long-standing console
-trick: `init` runs the shell as root on the console, the machine
-boots to `openbsd# `, and readiness is DOS-shaped — a settled
-prompt on the bottom row, no credential anywhere in the transport,
-no new verb, four statements the language already has. **Spike 0
-measures the two facts this rests on**: that autoinstall honours
-the exit-to-shell answer rather than rebooting on its own, and that
-the edited `ttys` line yields an interactive shell on `ttyC0` at
-boot.
+| the guest shows | readiness does |
+|---|---|
+| `login:` | types the user |
+| `Password:` | types the secret; the guest echoes nothing, so there is no echo to catch |
+| `openbsd#` | ready |
 
-What this makes of the codex machine is stated rather than hidden:
-a test fixture with a root shell on its console, not a system that
-logs in. That is what P1's ephemeral reading prefers for a rig, and
-it is the codex's business to say so in the recipe's comments,
-because a user seeding the recipe for a system of their own wants
-the line gone. **Route (1) — `wait_ready` recognizing `login:`,
-typing a user, answering `Password:` from the property sources and
-the credentials module (P13), and waiting for the prompt — stays
-the general mechanism** for exactly that user's OpenBSD, delivered
-when one asks: it is the only piece that touches a transport, and
-it is the last of the cut.
+The prompt shape this design guessed is confirmed exactly: root's
+`ksh` prompt is `<hostname>#`.
 
+Three consequences, none of them cosmetic:
+
+- **The credential is load-bearing from the first delivery**, not
+  deferred with a later piece. It comes through the property
+  sources and the credentials module (P13) — never a blueprint
+  field — with the codex recipe's own root password as the codex
+  machine's seeded default.
+- **The dialect's `ready` field carries a sequence**, not a value:
+  two screens answered in order before a prompt is waited for. The
+  loop is unchanged — this sits in front of it — but it is the one
+  place the OpenBSD dialect is structurally larger than DOS's.
+- **What the API surface carries the credential as is a surface
+  question this design leaves open** (S2, and S4 if the machine
+  document ever names the account). `wait_ready(user=, password=)`
+  is the obvious shape and is *not* settled here: it is the kind of
+  call that earns its own round, and D113's `prompt=` precedent —
+  the caller declares what the guest draws — is where that round
+  starts.
+
+**A guest that already boots to a shell needs none of this**, and
+nothing above forbids one: a user whose own OpenBSD runs a console
+shell meets the DOS-shaped path, because `ready` is a dialect field
+and an installed system is free to differ from the codex machine.
 ## Output and values
 
 The rows between the echo and the returned prompt, one screen
@@ -147,9 +210,15 @@ channel is a script's and is platform-neutral already.
 
 Integration, asked for by name as the DOS boots are:
 
-0. the install completing for real — a 700 MB ISO and a 45-minute
-   deadline, paid once, the product being the disk (P20) — and the
-   console mode and the two readiness facts above measured on it;
+0. **done** (2026-08-22, both passes). The install completes for
+   real: the codex recipe's own answers carried a real autoinstall
+   to `CONGRATULATIONS! Your OpenBSD install has been successfully
+   completed!` in about eleven minutes, served from the run-scoped
+   HTTP server and read throughout over the VNC plane. What it
+   returned is folded above — the plane, the cursor cell, the dead
+   exit-to-shell route, the login handshake, and the loader step the
+   codex recipe gets wrong. The product is the disk (P20), so what
+   is kept from the run is the installed machine;
 1. a boot, `wait_ready`, `exec "uname -a"` reading back the kernel
    line, `exec "false", check=True` raising
    `command.signalled-failure`, `exec "nosuch"` raising the same
@@ -161,29 +230,32 @@ Integration, asked for by name as the DOS boots are:
    verbs' "DOS is the delivered workflow" clauses in `docs/spec/`
    amended with the delivery, and `docs/dos-automation.md` gaining
    an OpenBSD sibling or a platform section.
-
 ## The cut
 
 Too large as one feature, and the cut is visible. At pledge F64
-retires and each piece takes a fresh number; (b) references (a),
-(c) references (b):
+retires and each piece takes a fresh number; (b) references (a):
 
 - **(a) the dialect seam** — DOS moved behind it, the registry in
   `_running_guest()`, the suite unchanged. No new behaviour on any
   surface; proof 2 alone.
-- **(b) the OpenBSD dialect and the recipe's exit-to-shell
-  change**, proven against a machine installed by spike 0; an
-  `openbsd-verify` sibling of `freedos-verify`; the norms amended.
-  Surfaces S1, S2 (`exec`, `wait_ready`, `check=` gain a platform
-  with the same contract) and S6 (the recipe).
-- **(c) readiness that logs in** — route (1), if and when a user's
-  own OpenBSD asks for it. The one piece that adds to S4 (a
-  credential parameter, if the machine document needs one) and to
-  the transport.
+- **(b) the OpenBSD dialect, readiness included**, proven against a
+  machine installed by spike 0; the platform's `vnc` default; the
+  recipe's loader-step fix; an `openbsd-verify` sibling of
+  `freedos-verify`; the norms amended. Surfaces S1, S2 (`exec`,
+  `wait_ready`, `check=` gain a platform with the same contract),
+  S6 (the recipe), and S4 if the credential needs a name in the
+  machine document.
 
-Spike 0 precedes the pledge of any of them: a recipe that has never
-completed is not a foundation anything may be pledged on.
+**(c) is gone**, and its disappearance is the spike's doing: it held
+"readiness that logs in," which the measurement moved into (b) by
+killing the route that would have avoided it. A login handshake is
+not separable from a dialect that cannot reach a prompt without one.
+What (b) grew it must also carry — the credential surface question
+above is the first thing its pledge round settles.
 
+Spike 0 no longer precedes the pledge: it has run, and what it
+returned is written into the sections above rather than left as a
+condition on them.
 ## Out of scope, by the cut
 
 ssh as a control plane (the recipe already allows root over ssh; a
