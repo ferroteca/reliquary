@@ -11,6 +11,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Fixed
+
+- **`exec` finds an echo that wrapped.** A command longer than the
+  screen is wide — 85 columns, which a path plus arguments reaches
+  easily — ran on the guest and was refused with `screen.no-echo`:
+  its echo wraps at column 80, so no row *ends* with the command and
+  the scan found nothing. The scan now reconstructs the line the
+  guest broke, matching the command's tail on the candidate row and
+  exactly the screen's width of its text on each row above — a full
+  row is a continuation only when what sits on it is the command's
+  own text, and a wrap that fell on a space is restored from the
+  command rather than read off the right-stripped row. The width is
+  taken off the frame's attribute rows, one token per cell on every
+  backend; a frame offering none finds only an unwrapped echo, saying
+  nothing rather than guessing (P11). The
+  `freedos-exec-wrapped-echo.rlqt` capture, which pinned the
+  refusal, is re-recorded over the fixed layer and leaves the
+  transcript corpus README's known-gaps list (issue #8). The
+  echo-lookalike and custom-prompt gaps (#7, #9) stand: what counts
+  as an echo or a prompt is still theirs to decide.
+
 ## 0.1.0a3 - 2026-08-22
 
 ### Added

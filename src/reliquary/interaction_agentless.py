@@ -154,15 +154,18 @@ class AgentlessGuestExec:
                 frame = console.screen()
                 reading = settling.observe(frame, now=now)
                 rows = [row for row in frame[0] if row]
+                width = _screen_width(frame)
                 # Sticky: once the echo has been seen, a later screen
                 # without it is a scrolled one, not a command that
                 # never ran. Nothing else can tell those apart.
-                echoed = echoed or _echo_at(rows, command) is not None
+                echoed = (echoed
+                          or _echo_at(rows, command, width) is not None)
                 landed = echoed or rows != before
                 complete = bool(landed and rows
                                 and _PROMPT_RE.match(rows[-1]))
                 if complete and reading.stable:
-                    return _command_output(rows, command, echoed=echoed)
+                    return _command_output(rows, command, width,
+                                           echoed=echoed)
                 if complete:
                     unsettled = reading
                 time.sleep(_poll_interval(complete, now - sent))
@@ -207,28 +210,89 @@ def _settling_note(reading):
     return f"{note})"
 
 
-def _echo_at(rows, command):
-    """Where the command's echo sits in ``rows``, or ``None``.
+def _screen_width(frame):
+    """How many cells wide the screen is, read off the attribute rows.
 
-    The echo is the last row that both ends with the command and
-    carries a prompt before it — the guest repeating back what was
-    typed at it.
+    The text rows cannot say: they come back right-stripped, so a
+    full row and a short one are told apart only by the attribute
+    half of the seam's contract, which carries one token per cell
+    whatever the backend. A frame with no attribute rows has no
+    width to offer, and ``0`` says so — wrapping is then undetectable
+    and only a one-row echo can be found.
+    """
+    return max((len(row) for row in frame[1]), default=0)
+
+
+def _echo_at(rows, command, width=0):
+    """Where the command's echo ends in ``rows``, or ``None``.
+
+    The echo is the guest repeating back what was typed at it: the
+    prompt and the command on one line. **A line longer than the
+    screen is wide wraps**, and the guest wraps it by the cell — a
+    full row, then the rest — so an 85-column command leaves no row
+    that ends with it, and the echo is the *last* of the rows it
+    spans. The scan walks upward from each candidate row, matching
+    the command's tail on that row and then exactly the ``width``
+    characters the guest would have drawn on each row above, so a
+    row that merely happens to be full is never mistaken for a
+    continuation: what sits on it has to be the command's own text.
+    ``width`` is the screen's cell width; ``0`` means it is unknown,
+    and only an unwrapped echo can then be found.
+
+    The last row of the echo is the index returned, since the
+    command's output starts on the row after it.
     """
     needle = command.strip()
     if not needle:
         return None
     for index in range(len(rows) - 1, -1, -1):
-        text = rows[index].rstrip()
-        if text.endswith(needle) and ">" in text:
+        if _echo_ends_at(rows, index, needle, width):
             return index
     return None
 
 
-def _command_output(rows, command, *, echoed):
+def _echo_ends_at(rows, index, needle, width):
+    """Whether ``needle``'s echo ends on ``rows[index]``, wrapped or not.
+
+    Rows arrive right-stripped, so the chunk of the line a row held
+    is compared stripped as well — a wrap falling on a space inside
+    the command leaves a row shorter than the screen, and the match
+    restores that space from the command rather than asking the row
+    for what the stripping took.
+    """
+    text = rows[index].rstrip()
+    if text.endswith(needle):
+        return ">" in text
+    if not width or not text or not needle.endswith(text):
+        return False
+    remaining = needle[:-len(text)]
+    for row in range(index - 1, -1, -1):
+        text = rows[row].rstrip()
+        if len(remaining) >= width:
+            if text != remaining[-width:].rstrip():
+                return False
+            remaining = remaining[:-width]
+            if not remaining:
+                # The command began at column zero: the prompt filled
+                # the row above by itself.
+                return row > 0 and ">" in rows[row - 1]
+            continue
+        # The first row: the prompt, then the head of the command,
+        # filling the row exactly — that is what made it wrap.
+        head = remaining.rstrip()
+        stripped_away = len(remaining) - len(head)
+        return (text.endswith(head)
+                and len(text) + stripped_away == width
+                and ">" in text[:len(text) - len(head)])
+    return False
+
+
+def _command_output(rows, command, width=0, *, echoed):
     """The rows a command produced, between its echo and the prompt.
 
     ``rows`` are the non-blank screen rows, the last being the prompt
-    that came back.
+    that came back, and ``width`` the screen's cell width, which is
+    what lets an echo that wrapped be found at all.
 
     ``echoed`` says whether the echo was seen at any point during the
     wait, and it is what separates the two ways the echo can be
@@ -241,7 +305,7 @@ def _command_output(rows, command, *, echoed):
     is a failure to report, not a value to return (P11).
     """
     end = len(rows) - 1
-    index = _echo_at(rows[:end], command)
+    index = _echo_at(rows[:end], command, width)
     if index is not None:
         return tuple(rows[index + 1:end])
     if echoed:

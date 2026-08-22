@@ -40,11 +40,11 @@ carrying a `script` or a `command` in its header.
 
 Each is a screen a real FreeDOS draws for an ordinary command —
 nothing here is malformed or staged. What the layer *makes* of each
-is what the fixture pins, and three of the four are wrong today.
+is what the fixture pins, and two of the four are wrong today.
 
 | fixture | the screen | what the layer does |
 |---|---|---|
-| `freedos-exec-wrapped-echo.rlqt` | an 85-column command, whose echo wraps across two rows | **refuses** it — `screen.no-echo` on a command that ran fine |
+| `freedos-exec-wrapped-echo.rlqt` | an 85-column command, whose echo wraps across two rows | correct — the echo is found across the rows it spans, and the command's output below it comes back |
 | `freedos-exec-echo-lookalike.rlqt` | a file whose last line reads `C:\>TYPE C:\ECHOLIKE.TXT`, printed by that very command | **returns nothing** — no error, three lines on screen, an empty result |
 | `freedos-exec-scrolling-output.rlqt` | `DIR /S` over a thousand files: pages of scroll, then a prompt | correct — the visible tail, which is the documented limit |
 | `freedos-exec-custom-prompt.rlqt` | a guest whose prompt is `[C:\]>` after `PROMPT [$P]$G` | **never completes** — `screen.no-match` at the timeout |
@@ -83,7 +83,7 @@ than it looks:
   held to it: the rows a command returned, the phase a script
   finished in, or the rule id either refused with.
 
-**Which is what lets a capture of a failing run be a fixture.** Three
+**Which is what lets a capture of a failing run be a fixture.** Two
 of the four pathological captures record a refusal or a wrong answer,
 and they assert it — so the day one of those gaps closes, its fixture
 fails saying so and asks to be re-recorded. A green test over
@@ -206,10 +206,13 @@ The first five findings were about capturing faithfully. These are
 what the faithful captures then showed, and they are **not** in the
 recorder — they are what `exec` does with three ordinary screens.
 
-- **A command over 80 columns cannot be run.** Its echo wraps, no row
-  *ends* with the command, and `_echo_at` finds nothing; the command
-  runs fine on the guest and `exec` refuses to tell you what it said
-  (`screen.no-echo`).
+- **A command over 80 columns could not be run.** Its echo wrapped, no
+  row *ended* with the command, and `_echo_at` found nothing; the
+  command ran fine on the guest and `exec` refused to tell you what it
+  said (`screen.no-echo`). **Closed** (issue #8): the scan now
+  reconstructs the line the guest broke, the width taken off the
+  attribute rows, and the fixture was re-recorded over the fixed layer
+  — the capture of the refusal did exactly what it was kept for.
 - **A line of output that looks like the echo silently wins.** The
   scan runs backwards from the bottom for a row ending with the
   command and carrying a `>`, and a file whose last line is
@@ -226,11 +229,13 @@ recorder — they are what `exec` does with three ordinary screens.
   every `exec` wait out its full timeout. Nothing in the spec says
   which prompts are supported.
 
-None of the three is fixed here, and that is deliberate: a corpus
+The other two are not fixed here, and that is deliberate: a corpus
 records what the layer does, and what counts as a DOS prompt (or as
 an echo) is a design question with a decision to make, not a test
-fixture's to settle. The fixtures pin today's behaviour so that
-whoever settles it cannot do so silently.
+fixture's to settle. A wrapped echo needed no such decision — the
+line is the guest's own, broken where the screen ends — which is why
+that one could close without one. The fixtures pin today's
+behaviour so that whoever settles it cannot do so silently.
 
 ## What this corpus deliberately does not cover
 

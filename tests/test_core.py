@@ -1011,3 +1011,55 @@ def test_a_prompt_on_a_still_painting_screen_is_not_completion():
     ])
 
     assert rows == ("FILE1", "FILE2", "FILE3")
+
+
+# An echo that wraps: the guest draws prompt and command as one line
+# and breaks it by the cell, so no row *ends* with the command.
+
+_WIDE = "ECHO " + "X" * 80
+
+
+def test_a_command_wider_than_the_screen_is_found_across_its_rows():
+    # 85 columns: the row fills at 80 and the tail lands on the next;
+    # the command ran fine and what it said comes back — including
+    # an output row that is itself 80 columns of the same character
+    rows, _console = _run_against([
+        ["C:\\>"],
+        ["C:\\>ECHO " + "X" * 71, "X" * 9, "X" * 80, "C:\\>"],
+    ], command=_WIDE)
+
+    assert rows == ("X" * 80,)
+
+
+def test_a_wrap_falling_on_a_space_is_restored_from_the_command():
+    # rows come back right-stripped, so the space the line broke on
+    # is gone from the screen; the command still knows it was there
+    command = "ECHO " + "A" * 70 + " " + "B" * 5
+    rows, _console = _run_against([
+        ["C:\\>"],
+        ["C:\\>ECHO " + "A" * 70, "BBBBB", "A" * 70 + " BBBBB", "C:\\>"],
+    ], command=command)
+
+    assert rows == ("A" * 70 + " BBBBB",)
+
+
+def test_a_full_row_is_not_taken_for_a_continuation_of_the_echo():
+    # a row above the echo that happens to be full is only part of
+    # it when what sits there is the command's own text
+    rows, _console = _run_against([
+        ["C:\\>"],
+        ["Z" * 80, "C:\\>dir", "FILE1", "C:\\>"],
+    ])
+
+    assert rows == ("FILE1",)
+
+
+def test_without_a_screen_width_only_an_unwrapped_echo_is_found():
+    # the width comes off the attribute rows; a frame that offers
+    # none cannot say where a line broke, and the scan says nothing
+    # rather than guessing (P11)
+    rows = ["C:\\>ECHO " + "X" * 71, "X" * 9, "X" * 80]
+
+    assert agentless_module._echo_at(rows, _WIDE, 80) == 1
+    assert agentless_module._echo_at(rows, _WIDE, 0) is None
+    assert agentless_module._echo_at(["C:\\>dir", "FILE1"], "dir", 0) == 0
