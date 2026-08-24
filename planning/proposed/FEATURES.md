@@ -194,23 +194,19 @@ Decide first:
   metric, and landmark-block placement within a script (the
   asset shape itself is settled —
   [design/landmarks.md](design/landmarks.md)).
-- Pointer input end to end: the machine-blueprint
-  pointing-device field, the control-plane input capability, and
-  the script verbs — match-and-click with the click point in the
-  asset; click owns its search as an observation-bearing action
-  and needs its timing-matrix row. The input seam follows the
-  two-layer event model: three portable primitives — pointer
-  move (x, y), button press/release, key press/release — with
-  clicks, drags, chords, and paced typing composed above them,
-  and event pacing owned by the control plane. The primitives
-  are exactly RFB's PointerEvent/KeyEvent, so the VNC control
-  plane implements them with no translation, and
-  QMP/VBoxManage/WMI input paths reduce to the same three.
-  Synchronization concepts to adopt with them: act-then-confirm
-  (an input step optionally asserting the screen changed) and
-  screen-stillness waits. Also open: a host-side
-  landmark-cropping convenience (a CLI subcommand, never a
-  service). Era note: DOS/9x-era setup GUIs are fixed-mode,
+- Pointer input end to end: **designed** (owner round,
+  2026-08-24 — [design/pointer-input.md](design/pointer-input.md)):
+  the seam is one carrier method in RFB's `PointerEvent` shape
+  (the entry's three primitives collapse into it, key events
+  already delivered), composition and pacing control-plane-owned
+  above it; `pointing-device` (`tablet` / `mouse`) as a
+  first-class machine field under P25's cleared gate, pointer
+  verbs refusing a relative-only machine at preflight; and
+  `click` as the fifth guest-input verb — observation-bearing
+  like `select`, `spot=` with a lone-spot default,
+  left-single-click as the whole first cut. Still open here: a
+  host-side landmark-cropping convenience (a CLI subcommand,
+  never a service). Era note: DOS/9x-era setup GUIs are fixed-mode,
   fixed-font, animation-free — asset churn should be far below
   os-autoinst needle churn — and NT-era setup is largely keyboard-drivable, so
   keyboard-first remains the preferred path where it works.
@@ -263,8 +259,11 @@ Deliverables:
    adapter's VNC carriers; the adjudicated calls are D110),
    and the capability error naming Hyper-V where the plane cannot
    exist.
-2. The three portable input primitives exposed at the
-   control-plane seam, with pacing control-plane-owned.
+2. Pointer input per
+   [design/pointer-input.md](design/pointer-input.md): the
+   `pointer_event` carrier method, the `pointing-device` machine
+   field, and the `click` verb, with pacing and composition
+   control-plane-owned.
 3. Landmarks implemented per
    [design/landmarks.md](design/landmarks.md): the `.rlql`
    catalog form, `@landmark`
