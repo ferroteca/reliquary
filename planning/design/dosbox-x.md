@@ -6,23 +6,29 @@ SPDX-License-Identifier: GPL-3.0-only
 # DOSBox-X as a backend
 
 > **Status:** investigated 2026-08-22 against **DOSBox-X 2026.08.02**
-> (the install at `C:\DOSBox-X`), and **not a goal today** — the
-> ruling is the non-goal bullet in
+> (the install at `C:\DOSBox-X`), ruled **not a goal against that
+> build** — the ruling is the non-goal bullet in
 > [backend-adapter.md](backend-adapter.md), and this document is the
-> evidence behind it. It sits in `design/` because it serves no
-> single feature ([README.md](../README.md)): it is a refusal with a
-> stated reopen condition, and **R12**
-> ([RECURRING.md](../RECURRING.md)) is the standing watch that tests
-> that condition rather than leaving it to be remembered. Shaped by
-> **P11** (capability honesty — reported, never emulated), **P2**
-> (agentless operation is permanent) and **P21** (a dependency must
-> pull its weight); the demand a fifth backend would serve is
-> **U12**'s unattended install and **U1**'s single command, which
-> the DOS workflow already reaches on QEMU today. **It authorizes no
-> implementation.** DOSBox-X arriving as a backend would be its own
-> proposal under the surface-change rule
-> ([SURFACES.md](../SURFACES.md)), taking a place in **D66**'s
-> priority order as part of that act.
+> evidence behind it. **R12's reopen condition has since been met**,
+> independently verified 2026-08-24 against a control channel added
+> on a personal fork (below), which is a different fact from the
+> ruling changing: the control half the non-goal names is no longer
+> missing, but it exists nowhere Reliquary could depend on today
+> without adopting that fork. It sits in `design/` because it serves
+> no single feature ([README.md](../README.md)); **R12**
+> ([RECURRING.md](../RECURRING.md)) is the standing watch, now
+> retargeted to the adoption question the technical one resolved
+> into. Shaped by **P11** (capability honesty — reported, never
+> emulated), **P2** (agentless operation is permanent) and **P21** (a
+> dependency must pull its weight); the demand a fifth backend would
+> serve is **U12**'s unattended install and **U1**'s single command,
+> which the DOS workflow already reaches on QEMU today. **It
+> authorizes no implementation.** DOSBox-X arriving as a backend, on
+> whatever binary, would be its own proposal under the surface-change
+> rule ([SURFACES.md](../SURFACES.md)), taking a place in **D66**'s
+> priority order as part of that act — and adopting a personal fork
+> as a build dependency is a separate, prior question this document
+> does not answer.
 
 ## Why the question is worth asking
 
@@ -173,25 +179,101 @@ of which would be enough:
 
 ## What would reopen this
 
-**R12** checks for exactly this, and nothing weaker counts.
-DOSBox-X would need a **host-side control channel** — a socket,
-named pipe, or stdio protocol — that against an **already-booted**
-guest can:
+The bar, as originally set: DOSBox-X would need a **host-side
+control channel** — a socket, named pipe, or stdio protocol — that
+against an **already-booted** guest can inject key events, read the
+screen, change a removable medium, and name/verify the running
+instance so a stop can be fail-closed. More mapper hotkeys, more
+`Z:` programs, or a richer guest-facing integration device would
+**not** have reopened it.
 
-1. inject key events,
-2. read the screen (text memory or framebuffer),
-3. change a removable medium, and
-4. name and report the running instance, so an identity can be
-   recorded and verified before any command, and a stop can be
-   fail-closed.
+## The bar was met, on a personal fork (2026-08-24)
 
-(1)–(3) are the carriers; (4) is the ownership doctrine, and a
-channel offering the first three without it still could not be
-driven safely. More mapper hotkeys, more `Z:` programs, or a richer
-guest-facing integration device do **not** reopen the question.
-Where to look: `changelog.txt` in the installation, the
-configuration reference for a new section, and the option list
-(`--help`, `-helpdebug`).
+`pgalbraith/dosbox-x`, branch `control-channel` (built from DOSBox-X
+2026.08.02 plus four commits, `a108b48c` → `7879a182` → `1d6406c1` →
+`d21d1581`), adds `src/hardware/hostcontrol.cpp`: a loopback TCP
+listener (`[control]` section, off by default) speaking a
+line-oriented protocol — `PING`/`VERSION`/`IDENTIFY`, `AUTH <token>`,
+`KEY`/`KEYDOWN`/`KEYUP`, `SCREEN`, `SCREENSHOT`, `MOUNT`/`SWAP`,
+`EJECT`, `STOP`. Every guest-touching command refuses until `AUTH`
+succeeds against a launcher-minted token (`-set control.token=...`),
+a wrong guess drops the connection rather than allowing retries, and
+`IDENTIFY` reports a free-form `backend-id` — the ownership
+doctrine's shape, not just its name.
+
+**Independently verified against a built binary**, not taken on the
+branch's own word: the CI artifact for `d21d1581` (`64-bit Visual
+Studio builds` → `dosbox-x-vs2026build-*`) was downloaded and run
+standalone, driven over the socket by a throwaway Python client,
+against the FreeDOS LiveCD ISO already cached at
+`cache/media/freedos-livecd.iso` and a hand-assembled minimal
+bootable floppy (a boot sector that prints a marker and halts, built
+to force a real BIOS→guest handoff without depending on any DOS
+distribution). Confirmed directly:
+
+- **`PING`/`VERSION`/`IDENTIFY`** answer before auth; every
+  guest-touching command refuses with `ERR not authenticated` before
+  it; `AUTH` with the wrong token gets `ERR auth failed` and the
+  connection closes (no retry); the right token authenticates and
+  `IDENTIFY` then reports `authenticated=yes`.
+- **`KEY`** injection works pre-boot: a multi-character DOS command
+  string, sent one `KEY` per character, landed correctly on
+  DOSBox-X's own `Z:\>` prompt.
+- **`SCREEN`** readback is exact: it echoed the typed command and
+  DOSBox-X's own response verbatim, then — after `BOOT`ing the
+  hand-built floppy — showed the guest's own `GUEST-BOOTED-OK`
+  banner, confirming the readback survives the boot handoff rather
+  than freezing on DOSBox-X's own last-drawn screen (the failure
+  mode F64 hit on OpenBSD's `wscons`,
+  [FEATURES.md:922](../proposed/FEATURES.md)).
+- **`MOUNT` + `SWAP`** (floppy): appending a second, never-mounted
+  image to the booted floppy drive and switching to it both
+  returned `OK`, matching the "append then select" contract.
+- **`EJECT`** (the gap this document originally flagged, closed in
+  `1d6406c1`/`d21d1581`): called against the CD-ROM mounted *before*
+  `BOOT`, once the guest was live (confirmed via the log line
+  `Alright: DOS kernel shutdown, booting a guest OS`) — returned
+  `OK`, and independently confirmed in the log by
+  `IDE ATAPI acknowledge media change for drive D`, not just the
+  socket's own say-so. A second `EJECT` on the same drive was
+  idempotent (`OK`); `EJECT` against an unmounted/invalid drive was
+  correctly refused (`ERR drive not a mounted CD-ROM`); the
+  connection stayed healthy immediately after (`PING` still
+  answered).
+
+Not personally re-verified: `SCREENSHOT` (graphics-mode framebuffer
+capture) rests on the branch author's own testing, not mine — lower
+risk, since it reads the same persistent buffer `SCREEN`'s sibling
+capture feature already reads, and the mechanism class (`KEY`,
+`SCREEN`) it shares was independently confirmed.
+
+**A separate, unrelated limitation surfaced along the way**: this
+build's `IMGMOUNT -bootcd` cannot boot the actual FreeDOS LiveCD ISO
+— `El Torito boot entry: media types other than floppy emulation not
+supported yet`. The LiveCD uses a no-emulation El Torito boot
+record; DOSBox-X's El Torito handling only supports floppy
+emulation. This is core boot-handling, not `hostcontrol.cpp`, so it
+predates and is unrelated to the control channel — but it means the
+control channel alone would not carry Reliquary's exact
+`freedos-install` recipe (which boots that ISO directly) without a
+second fix or a different installer-delivery shape (a hard-disk
+image instead of a CD, for instance). Named here rather than
+silently worked around, per **P11**.
+
+**What the branch still doesn't close.** No floppy/hdd eject-to-empty,
+no attaching an unseen image to a drive that started empty (`MOUNT`
+still requires an already-mounted `fatDrive`), no SMP, no `vvfat`.
+None of Reliquary's codex recipes currently need the first two; the
+last two were already named as honest gaps in "The machine half
+fits" above and are unaffected by this branch.
+
+**What no amount of testing changes.** The channel lives on an
+**unmerged personal fork**, not upstream DOSBox-X and not the stock
+`C:\DOSBox-X` install this document was first written against. An
+adapter built against it would depend on that fork specifically —
+maintain it, upstream it, or track someone else's release of it —
+which is a commitment distinct from "the capability now exists
+somewhere," and not one this document decides.
 
 ## Where DOSBox-X does have a place
 

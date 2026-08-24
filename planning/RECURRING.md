@@ -160,14 +160,18 @@ discharge is judgment work, never a script's verdict alone.
 - **Stale after**: one month.
 - **Last performed**: 2026-08-01.
 
-### R12 — Watch DOSBox-X for a host control channel
+### R12 — Watch DOSBox-X's control channel for a path to adoption
 
-- **Check**: whether DOSBox-X has grown a **host-side control
-  channel** — the four capabilities listed in
-  [design/dosbox-x.md](design/dosbox-x.md), "What would reopen
-  this", against an already-booted guest. That document is the
-  standing refusal; this is the condition that would reopen it,
-  and nothing weaker counts.
-- **Stale after**: six months — a control channel is an
-  architectural addition, not a point release.
-- **Last performed**: 2026-08-22.
+- **Check**: originally, whether DOSBox-X had grown a host-side
+  control channel meeting the four capabilities in
+  [design/dosbox-x.md](design/dosbox-x.md) — met 2026-08-24,
+  independently verified against `pgalbraith/dosbox-x`'s
+  `control-channel` branch ("The bar was met, on a personal fork").
+  **Retargeted to what that resolved into**: whether the channel (or
+  an equivalent) has reached somewhere Reliquary could depend on
+  without maintaining a fork itself — merged upstream, or released
+  in an official build. A fork staying a fork, however capable,
+  does not discharge this.
+- **Stale after**: six months — an upstream merge is an
+  infrequent event, not a point release.
+- **Last performed**: 2026-08-24.
