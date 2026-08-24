@@ -288,7 +288,10 @@ Deliverables:
    catalog form, `@landmark`
    matching with fuzzy/ignore modifier regions, the cursor
    normalization contract, and the match-and-click verbs
-   composed on the primitives.
+   composed on the primitives. **Its watch-only half is cut and
+   pledge-ready** (the design's "The cut" section, 2026-08-24):
+   the first piece F5 spends, taking its number at the pledge
+   itself.
 4. Win9x/WinNT platform workflows: GUI installer scripting for
    the setup GUIs text scraping cannot reach, keyboard-first
    where NT-era setup allows it.

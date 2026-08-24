@@ -11,8 +11,10 @@ SPDX-License-Identifier: GPL-3.0-only
 > The demand is **U5** (pledged; D110 adjudicated it as the GUI
 > half's), and F5's cut rule applies: at pledge the piece this
 > design serves takes a fresh number, referencing the delivered
-> VNC plane (F63) and the landmarks design
-> ([landmarks.md](landmarks.md)) it composes with. The four calls
+> VNC plane (F63) and **the watch-only landmarks piece**
+> ([landmarks.md](landmarks.md), "The cut") it composes with —
+> which pledges first, so this piece's references point
+> downward. The four calls
 > below were adjudicated in the round that produced this
 > document; their rejected alternatives are recorded here, the
 > way [platform-dialect.md](platform-dialect.md) records its own.

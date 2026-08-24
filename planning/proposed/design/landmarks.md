@@ -239,3 +239,76 @@ the proportion of pixels changed over the same window, the same
 default — so a landmark, like text, is only ever judged on a
 settled frame.
 
+## The cut: F5's first piece is watch-only landmarks
+
+Prepared in the 2026-08-24 owner round so the pledge is
+mechanical; the piece takes the ledger's next F-number **in the
+pledge commit, not here**, citing U5 and referencing F63, and F5
+keeps its number and the remainder — D110's own shape.
+
+**The order is forced, not chosen.** A pledged item may not
+depend on a proposal, and `click` composes on landmarks — its
+search matches one, its target is a landmark's spot — so the
+pointer piece cannot pledge first. The pointer carrier alone,
+with no verb to send through it, is the surface `rfb.py`'s own
+doctrine refuses. Watch-only landmarks are the one piece whose
+references all point at delivered work — F63's framebuffer
+capture, the JSON5 reader (D102), asset resolution, the
+stability gate, the condition seam — and the piece carries
+standalone value: NT-era setup is largely keyboard-drivable
+(F5's era note), so `wait @name` plus the delivered keyboard
+verbs is the whole loop for keyboard-first GUI flows the moment
+a platform workflow arrives.
+
+- **WEIGHED AND DECLINED — landmarks and pointer as one
+  piece**: two designs' worth of surface in one pledge, the
+  seven-work-items shape the sprint bound exists to refuse.
+- **WEIGHED AND DECLINED — the pointer seam first**: `click`
+  cannot come with it (an upward reference), and a carrier
+  without a sender is refused above.
+
+**In the piece:** `.rlql` parsing and validation per the schema
+above — stem identity, the static refusals, variants by
+adjacency; the `landmarks` fixed leaf and `@` pool integration,
+asset-resolution.md un-reserving `.rlql` in the same act; the
+pixel-equal matcher — three regimes, per-region judgment,
+nearest-miss reporting, and the plane-stated-format
+normalization hook ([hyperv-screen.md](hyperv-screen.md)), the
+identity on VNC so it lands as one seam point costing nothing
+today; `@name` as a screen condition in `wait` / `on` /
+`always`, kind-checked at binding, capability preflight at the
+condition's granularity, the dry-run timing plan naming it; the
+norms amended (script-spec's value spelling, asset-resolution)
+and a packaged `.rlql` schema beside the blueprint's.
+
+**Out, staying where it stands:** `click` and every pointer
+surface ([pointer-input.md](pointer-input.md) whole — the
+natural second piece, its references then pointing at this one,
+downward); the cursor-parking contract and the park-zone
+built-in mask; the recorder (F1); other backends' endpoints,
+platform workflows, and the cropping convenience.
+
+**The cursor interim, stated rather than mechanized.** Parking
+exists because pointer verbs move the cursor unpredictably.
+Before any pointer verb exists nothing moves the guest's
+cursor — a keyboard-only run leaves it where the guest drew it,
+which is where the author's capture shows it, so capture and run
+agree by construction. The norm states that the parking contract
+arrives with the pointer piece (P11), and no mechanism lands
+now.
+
+- **WEIGHED AND DECLINED — minimal internal parking in this
+  piece**: it drags the `pointing-device` field and the carrier
+  in — half the pointer design — past the sprint bound, for a
+  hazard keyboard-only runs cannot produce.
+
+**Proof, on delivered machinery only:** integration asked for by
+name — a real `.rlql` landmark of a FreeDOS screen matched over
+the VNC plane on QEMU; a variant miss reported with its
+nearest-miss geography; the capability refusal on a plane
+without framebuffer capture; and the agentless DOS suite byte
+for byte untouched. Proving against a real GUI guest would
+couple the piece to unpledged platform workflows — the flaw the
+reference rule names — so that proof belongs to the workflow
+piece that boots one.
+
