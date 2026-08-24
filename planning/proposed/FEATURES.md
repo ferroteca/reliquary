@@ -190,10 +190,15 @@ capability has to be reachable by more than one.
 
 Decide first:
 
-- The GUI asset spec: the `.rlql` JSON schema, the similarity
-  metric, and landmark-block placement within a script (the
-  asset shape itself is settled —
-  [design/landmarks.md](design/landmarks.md)).
+- The GUI asset spec: **designed in full** (owner rounds,
+  2026-07-21 and 2026-08-24 —
+  [design/landmarks.md](design/landmarks.md)): the `.rlql` JSON5
+  schema (stem-identified, dimensions-only pinning — the mode
+  half dropped as unverifiable), the similarity metric
+  (pixel-equal fraction, per-region judgment), and reference
+  placement — `@name` in every screen-condition position; this
+  bullet used to say "landmark-block placement within a script",
+  a phrase from before D12 deleted the embedded block.
 - Pointer input end to end: **designed** (owner round,
   2026-08-24 — [design/pointer-input.md](design/pointer-input.md)):
   the seam is one carrier method in RFB's `PointerEvent` shape
