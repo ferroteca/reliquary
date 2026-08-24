@@ -253,10 +253,20 @@ Decide first:
   and P10 forbids guessing at one. Boot order is the exception
   that already works, being stated to the firmware rather than
   read back from it.
-- The Hyper-V agentless screen strategy: whether WMI
-  thumbnail/keyboard automation is good enough for installer
-  scripting, or Hyper-V machines require the serial/agent
-  control planes from day one.
+- The Hyper-V agentless screen strategy: **designed as a bet
+  with its refutation stated** (owner round, 2026-08-24 —
+  [design/hyperv-screen.md](design/hyperv-screen.md)). Input is
+  proven prior art (Packer drives `Msvm_Keyboard` host-side —
+  blind, which is the half Reliquary cannot accept); the screen
+  is the open half, and the strategy is the WMI thumbnail
+  composition **if its spike proves native-res unscaled
+  capture** — RGB565 is survivable, the recognizer binarizes and
+  the landmark matcher normalizes the reference through the
+  plane's stated pixel format — else a reported capability
+  absence (P11), the RDP carrier weighed then as its own
+  proposal and the serial/agent planes declined as this
+  question's answer (P3's arc). The spike precedes the pledge,
+  F64's precedent.
 
 Deliverables:
 
@@ -283,7 +293,10 @@ Deliverables:
    the setup GUIs text scraping cannot reach, keyboard-first
    where NT-era setup allows it.
 5. The VMware Workstation adapter.
-6. The Hyper-V adapter, last, on its decided screen strategy.
+6. The Hyper-V adapter, last, on the screen strategy
+   [design/hyperv-screen.md](design/hyperv-screen.md) decides —
+   its spike's outcome, not this entry, says whether that is the
+   WMI composition or a reported capability absence.
 
 Done when: a GUI-era install script drives a setup end to end
 through landmarks on QEMU over VNC and on Hyper-V through its

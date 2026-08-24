@@ -170,7 +170,11 @@ about, and the PNG itself carries the rendering.
 ## The similarity metric: pixel-equal fraction
 
 Every pixel after decode normalization is judged by **exact
-equality**, and every pixel is in exactly one regime: an `ignore`
+equality** — with the reference side first normalized through the
+capture plane's stated pixel format, a seam rule settled at
+[hyperv-screen.md](hyperv-screen.md) ("one rule for every
+plane"; on VNC's forced 32bpp it is the identity) — and every
+pixel is in exactly one regime: an `ignore`
 region excludes it — ignore wins where regions overlap — a
 `fuzzy` region judges its own pixels against its own threshold
 (matched fraction ≥ the declared literal), and the residual
