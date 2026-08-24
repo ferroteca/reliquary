@@ -223,22 +223,26 @@ Decide first:
   designs are studied and reimplemented, never its code (see
   AGENTS.md prior art for the boundary, which is doctrine rather
   than merely licensing).
-- Blueprint device growth: firmware/boot semantics (BIOS vs
-  UEFI) for post-DOS platforms, and when network, display
-  adapter, audio, and USB become first-class blueprint fields
-  (each following the drives pattern: agnostic vocabulary,
-  capability-checked per backend); per-platform controller
-  defaults beyond `ide`; whether slot ranges widen for
-  multi-device controllers (additive change); and how Hyper-V
-  generations surface (a backend setting vs. inferred from
-  declared capabilities).
-  **Admission is gated by P25** (D93, 2026-07-30, which removed
-  D91's single-backend `devices` axis): a device or adapter name
-  becomes a first-class field only with general applicability
-  across multiple backends — what one backend alone provides
-  stays behind that backend's pin in `backend-settings`. So this
-  bullet's entries each carry two questions now: the design
-  itself, and whether the capability clears the bar at all.
+- Blueprint device growth: **designed** (owner round,
+  2026-08-24 —
+  [design/device-growth.md](design/device-growth.md)), and the
+  round's product is dispositions, not fields — P25's two gates
+  (demand necessary, multi-backend applicability) applied per
+  item, each refusal its own argument. Network: host-reachability
+  stays derived from the script's `http` block, generalized per
+  backend, the NIC model a per-platform default — a first-class
+  field waits for machine-shaped demand, and then carries
+  attachment vocabulary, never card names. Firmware:
+  `bios`/`uefi` designed in full (platform defaults, NVRAM
+  varstore residency), admission deferred to the first platform
+  needing `uefi`. Display adapter: refused on applicability,
+  permanently behind `backend-settings`. Audio: refused on
+  demand. USB: a controller is always implied by the device that
+  needs it, never a field. Controller defaults go
+  per-(platform, medium) by the arrival rule; slot ranges widen
+  per controller type at that type's admission (additive, as
+  this entry already held); Hyper-V generation is derived —
+  `bios` → Gen1, `uefi` → Gen2 — never a pin.
   **A second controller type leaves no declared first disk.**
   Slot order is authoritative only within a type; across types the
   guest's firmware decides how the controllers themselves
