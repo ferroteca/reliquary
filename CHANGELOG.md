@@ -2628,7 +2628,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is gone from the code and reserved in the banner beside the
   `ObjectSource` third source, the same treatment `screen.read`
   received. Landmarks remain settled design in
-  planning/proposed/design/landmarks.md.
+  planning/pledged/design/landmarks.md.
 
   Two tests hold it there: the kind table against the kinds any
   module actually requests, and the home-layout diagram against the

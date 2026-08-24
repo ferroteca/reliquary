@@ -16,7 +16,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > today's behaviour: the `ObjectSource` fileless third source, and
 > landmark declarations (`.rlql`, the home `landmarks/` folder) —
 > settled design in
-> [landmarks.md](../../planning/proposed/design/landmarks.md) and
+> [landmarks.md](../../planning/pledged/design/landmarks.md) and
 > entirely unbuilt, so no asset kind is declared for them. Details
 > may change before first release.
 >
@@ -31,7 +31,7 @@ artifact-residency split ([ARCHITECTURE.md](../../ARCHITECTURE.md) P4);
 the individual asset formats are specified in
 [blueprint-model.md](blueprint-model.md),
 [media-spec.md](media-spec.md), [script-spec.md](script-spec.md),
-and [landmarks.md](../../planning/proposed/design/landmarks.md).
+and [landmarks.md](../../planning/pledged/design/landmarks.md).
 
 ## Assets are identified by extension
 
@@ -44,7 +44,7 @@ the composed model, and a media is a spec inside a `.rlqb` (D30),
 resolved through the component namespace rather than by this rule.
 Reserved: `.rlql` a landmark declaration (its `<name>.<n>.png`
 variant renderings attaching by stem adjacency the same way —
-[landmarks.md](../../planning/proposed/design/landmarks.md)), which
+[landmarks.md](../../planning/pledged/design/landmarks.md)), which
 no source resolves today.
 
 An asset's **identity** is its

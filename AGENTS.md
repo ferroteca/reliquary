@@ -1448,7 +1448,7 @@ scope).
 Keysight's eggPlant Functional is the closer analogue for the display seam specifically: a commercial GUI test tool
 that drives its system under test over VNC **or** RDP, matches screens by image, and carries the click point inside
 the matched image. Its vocabulary lands almost one-to-one on the settled landmark design
-(`planning/proposed/design/landmarks.md`) — hot spot to spot, image collection to variant, search rectangle to the
+(`planning/pledged/design/landmarks.md`) — hot spot to spot, image collection to variant, search rectangle to the
 deferred selecting region, tolerance to the similarity percent — and that convergence is the useful part: it says the
 asset model is well-trodden rather than novel. Proprietary, so the concept-reference rule applies by default; the
 public documentation is the whole of what is readable, and it is the *only* thing to be read — no trial binaries
@@ -1457,7 +1457,7 @@ decompiled, no EULA-gated material, no support-portal content.
 eggPlant is the one reference here where the relicensing reservation *raises* rather than lowers the stakes. A GPL
 hobby project converging on a commercial tool's vocabulary is unremarkable; a project that has publicly reserved the
 right to relicense is a more attractive target for a patent holder in the same space, and the convergence documented
-against `planning/proposed/design/landmarks.md` is a discoverable record. The convergence is genuine and independently
+against `planning/pledged/design/landmarks.md` is a discoverable record. The convergence is genuine and independently
 arrived at, which is exactly why it should stay documented as such — evidence of parallel design, not of borrowing.
 Should the reservation ever be exercised, this is the reference to review first, with advice.
 

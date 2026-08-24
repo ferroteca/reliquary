@@ -54,10 +54,11 @@ under that number, and what remains is the journey none of which is
 built: the localized-installer seam is compositional, the half no
 value can reach. Its carrier divides now as the demand does: the
 first cut — the VNC control plane on QEMU, screen and keyboard —
-was pledged in the same act as F63 and is **delivered**, and the
-rest of the GUI era
-— pointer input, landmarks, the platform workflows — stands in
-[proposed/FEATURES.md](../proposed/FEATURES.md) (F5) on this
+was pledged in the same act as F63 and is **delivered**; the
+second — watch-only landmarks — is pledged as **F65** (owner,
+2026-08-24; [FEATURES.md](FEATURES.md)); and the rest of the GUI
+era — pointer input and `click`, the platform workflows — stands
+in [proposed/FEATURES.md](../proposed/FEATURES.md) (F5) on this
 pledge, each piece still moving by its own decision (D65). Text
 verbatim as reshaped by D64:
 

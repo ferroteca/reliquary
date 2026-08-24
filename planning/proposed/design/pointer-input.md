@@ -12,7 +12,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > half's), and F5's cut rule applies: at pledge the piece this
 > design serves takes a fresh number, referencing the delivered
 > VNC plane (F63) and **the watch-only landmarks piece**
-> ([landmarks.md](landmarks.md), "The cut") it composes with —
+> ([landmarks.md](../../pledged/design/landmarks.md), "The cut") it composes with —
 > which pledges first, so this piece's references point
 > downward. The four calls
 > below were adjudicated in the round that produced this
@@ -52,7 +52,7 @@ adapter: the seam stays one method however the surface grows.
 RFB speaks framebuffer coordinates natively; QMP's `abs` axes run
 0–32767 and the adapter scales. Click points come from a
 landmark's named spot set, whose declaration pins screen
-dimensions ([landmarks.md](landmarks.md)) — and since a landmark
+dimensions ([landmarks.md](../../pledged/design/landmarks.md)) — and since a landmark
 match is whole-screen, a dimension mismatch is already a non-match
 by construction. No scaling, no second coordinate space, and
 nothing for a verb to check that matching has not already checked.
@@ -99,7 +99,7 @@ machine is a named capability failure before the first input
 
 ## Parking rides the same primitive
 
-[landmarks.md](landmarks.md) settled cursor normalization: every
+[landmarks.md](../../pledged/design/landmarks.md) settled cursor normalization: every
 pointer verb ends by parking the cursor at the fixed per-platform
 park position, and the park zone is permanently masked from
 matching. The park move is simply the last `pointer_event` of the

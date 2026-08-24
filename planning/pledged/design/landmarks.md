@@ -13,9 +13,14 @@ SPDX-License-Identifier: GPL-3.0-only
 > reference placement — the F5 "Decide first" bullet used to call
 > the third item "landmark-block placement within a script", a
 > phrase surviving from before D12 deleted the embedded block;
-> what it names is where `@name` may stand. Implementation lands
-> with F5; pointer input and `click` are designed at
-> [pointer-input.md](pointer-input.md).
+> what it names is where `@name` may stand.
+>
+> **The watch-only piece is pledged as F65** (owner, 2026-08-24;
+> [../FEATURES.md](../FEATURES.md)), which is why this document
+> sits in `pledged/design/` — "The cut" below is that piece's
+> boundary. The pointer half — `click`, parking, the park-zone
+> mask — remains proposed with **F5**, designed at
+> [pointer-input.md](../../proposed/design/pointer-input.md).
 
 Landmarks are the image-match assets for GUI guests — the
 `@landmark` matcher the script language's growth rule already
@@ -135,7 +140,7 @@ document through the shared reader (D102), kebab-case keys, the
 `regions` and `spots` are optional: a bare landmark is the
 whole-screen exact match, and a spotless one is watchable but not
 clickable — a `click` against it is the static error
-[pointer-input.md](pointer-input.md) names. The static refusals,
+[pointer-input.md](../../proposed/design/pointer-input.md) names. The static refusals,
 all before a machine starts (G3): a region or spot outside the
 pinned dimensions; `similarity` on an `ignore` region or missing
 from a `fuzzy` one; a percent outside the **exclusive** (0%,
@@ -172,7 +177,7 @@ about, and the PNG itself carries the rendering.
 Every pixel after decode normalization is judged by **exact
 equality** — with the reference side first normalized through the
 capture plane's stated pixel format, a seam rule settled at
-[hyperv-screen.md](hyperv-screen.md) ("one rule for every
+[hyperv-screen.md](../../proposed/design/hyperv-screen.md) ("one rule for every
 plane"; on VNC's forced 32bpp it is the identity) — and every
 pixel is in exactly one regime: an `ignore`
 region excludes it — ignore wins where regions overlap — a
@@ -273,7 +278,7 @@ adjacency; the `landmarks` fixed leaf and `@` pool integration,
 asset-resolution.md un-reserving `.rlql` in the same act; the
 pixel-equal matcher — three regimes, per-region judgment,
 nearest-miss reporting, and the plane-stated-format
-normalization hook ([hyperv-screen.md](hyperv-screen.md)), the
+normalization hook ([hyperv-screen.md](../../proposed/design/hyperv-screen.md)), the
 identity on VNC so it lands as one seam point costing nothing
 today; `@name` as a screen condition in `wait` / `on` /
 `always`, kind-checked at binding, capability preflight at the
@@ -282,7 +287,7 @@ norms amended (script-spec's value spelling, asset-resolution)
 and a packaged `.rlql` schema beside the blueprint's.
 
 **Out, staying where it stands:** `click` and every pointer
-surface ([pointer-input.md](pointer-input.md) whole — the
+surface ([pointer-input.md](../../proposed/design/pointer-input.md) whole — the
 natural second piece, its references then pointing at this one,
 downward); the cursor-parking contract and the park-zone
 built-in mask; the recorder (F1); other backends' endpoints,

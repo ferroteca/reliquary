@@ -8,7 +8,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > **Status:** the storage shape for binary data an author supplies
 > to a script, stated once because it now has more than one
 > instance. It was settled for landmark renderings in the 2026-07-21
-> owner rounds ([proposed/design/landmarks.md](../proposed/design/landmarks.md);
+> owner rounds ([pledged/design/landmarks.md](../pledged/design/landmarks.md);
 > the adjudication trail is in [DECISIONS.md](../DECISIONS.md)) and
 > this document generalizes that settlement rather than deciding
 > anything new. It sits in `design/` because it serves no single
