@@ -46,7 +46,7 @@ whether it checked all of them or half, which is how the blueprint
 corpus came to run against the parser and not the schema
 ([D106](../../../../planning/DECISIONS.md)). Both corpora gather
 their fixtures through one helper, `tests/corpus.py`, which is also
-where the bucket counts are pinned — 21, 52 and 6 — so a bucket that
+where the bucket counts are pinned — 22, 53 and 6 — so a bucket that
 stops loading is a collection error rather than a green run over
 nothing. Adding or retiring a fixture updates the pin and the tallies
 here together.
@@ -91,7 +91,7 @@ defect left open, answered by trying the coarse version first.
 ## What the corpus measured on the way
 
 It opened with four fixtures that could not name their rule and
-now has none: all 52 name the diagnostic that rejects them. The
+now has none: all 53 name the diagnostic that rejects them. The
 corpus was written first and the ids followed, which is the order
 that made them right — see below.
 

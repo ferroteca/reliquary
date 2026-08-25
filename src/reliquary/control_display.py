@@ -341,6 +341,23 @@ class DisplayConsole:
         """
         return self._session.framebuffer()
 
+    def click(self, x, y, park, buttons=1):
+        """Click at one framebuffer pixel, then park the cursor (F66).
+
+        Composed here, never in an adapter (D103's reasoning applied
+        to the pointer): a move-and-press, a release at the same
+        point, and a park move to ``park`` — three ``pointer_event``
+        calls over the one carrier method, so growth (a drag, a
+        chord) stays composition above the seam. The park position is
+        the caller's to resolve (``landmarks.park_position``), since
+        it is a property of the screen a landmark pinned, not of this
+        console.
+        """
+        self._session.pointer_event(x, y, buttons)
+        self._session.pointer_event(x, y, 0)
+        park_x, park_y = park
+        self._session.pointer_event(park_x, park_y, 0)
+
     def cursor_menu_select(self, item, timeout=30, exclude=()):
         """Steer a cursor-key menu onto a matching item and press ENTER.
 

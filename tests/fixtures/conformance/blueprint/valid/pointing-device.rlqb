@@ -1,0 +1,7 @@
+// valid: pointing-device is a closed enum, capability-checked at
+//       assignment like control-planes (F66)
+// spec: Machine topology
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "pointing-device": "tablet", "drives": { "cdrom0": null } }
+]

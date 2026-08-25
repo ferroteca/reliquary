@@ -1153,6 +1153,8 @@ class _ScriptEngine:
                 self._press(statement)
             elif verb == "select":
                 self._select(statement)
+            elif verb == "click":
+                self._click(statement)
             elif verb == "screenshot":
                 self._screenshot(statement)
             elif verb == "insert":
@@ -1864,6 +1866,58 @@ class _ScriptEngine:
                 exclude=exclude)
         self._completed(statement, "select")
 
+    def _resolve_spot(self, statement, landmark):
+        """The spot a `click` targets: named, or the lone one (F66).
+
+        Preflight already proved this succeeds for a literal `spot=`
+        (or no `spot=` at all — the lone-spot default, only legal
+        where exactly one exists). An interpolated `spot=` is checked
+        here instead, for the same reason a `$property` media
+        reference resolves at runtime rather than preflight: its
+        value is unknowable before binding.
+        """
+        if statement.spot is not None:
+            name = _render_literal(statement.spot, self._bindings)
+            try:
+                return landmark.spots[name]
+            except KeyError:
+                raise self._error(
+                    f"@{landmark.name} has no spot named {name!r} "
+                    f"(has: {', '.join(sorted(landmark.spots)) or 'none'})",
+                    statement, rule_id="landmark.spot-unknown") from None
+        return next(iter(landmark.spots.values()))
+
+    def _click(self, statement):
+        """Find a landmark, then deliver a click at one of its spots.
+
+        Two halves, like `select`: the *search* reuses `wait`'s exact
+        machinery (`_observation`/`_arm`/`_observe`) since a `click`'s
+        target is a real landmark pixel-match, not a text scan — a
+        timeout here names the statement's clock with no pointer
+        event ever delivered. The *delivery* — pace, then the
+        composed click-and-park — follows only once the search has
+        matched.
+        """
+        name = statement.arguments[0]
+        condition = statement.conditions[0]
+        description = _describe(condition)
+        observations = [self._observation(condition, None)]
+        bound = self._arm(statement, observations, description)
+        self._observe(observations, bound, description, statement)
+        landmark = self._landmarks[name]
+        spot = self._resolve_spot(statement, landmark)
+        detail = f"@{name}"
+        if statement.spot is not None:
+            detail += (f" spot="
+                       f"{_render_literal(statement.spot, self._bindings)!r}")
+        self._action(statement, "click", detail)
+        self._pace(statement)
+        with self._console() as console:
+            console.click(spot.x, spot.y,
+                          _landmarks.park_position(landmark.width,
+                                                   landmark.height))
+        self._completed(statement, "click")
+
     # -- supporting operations -----------------------------------
 
     def _screenshot(self, statement):
@@ -2074,7 +2128,10 @@ def _observed(script):
     ``_walk`` above is the plain statement traversal and drops the
     handlers it descends through; a condition sits on the handler
     itself as often as on a `wait`, so the two walks are separate
-    rather than one generalized to yield both kinds.
+    rather than one generalized to yield both kinds. `click` (F66)
+    carries one too — its search is a landmark match like `wait`'s —
+    so it joins `wait` here rather than growing a second walk for the
+    same three landmark refusals.
     """
 
     def walk(items, handlers=()):
@@ -2088,7 +2145,7 @@ def _observed(script):
                 continue
             if not hasattr(item, "verb"):
                 continue              # a phase, reached below
-            if item.verb == "wait":
+            if item.verb in ("wait", "click"):
                 yield item
             yield from walk((), item.handlers)
 
@@ -2173,21 +2230,57 @@ def _capture_format(machine_state):
     return plane, _backends.adapter(backend).capture_format(plane)
 
 
+def _preflight_spot(node, landmark, script_path):
+    """Refuse a `click`'s `spot=` before the machine starts (F66).
+
+    A landmark declaring exactly one spot needs no modifier; more (or
+    none at all) makes one required, and a name the declaration does
+    not carry is refused by name. An interpolated `spot=` cannot be
+    checked here — its value is unknowable before binding, the same
+    reason a `$property` media reference resolves later rather than
+    here — so it is left to runtime (`_ScriptEngine._resolve_spot`).
+    """
+    spot = node.spot
+    if spot is not None and spot.interpolated:
+        return
+    if spot is None:
+        if len(landmark.spots) != 1:
+            raise ScriptPreflightError(
+                f"click @{landmark.name} needs spot=: the landmark "
+                f"declares {len(landmark.spots)} spots and the lone-spot "
+                "default only applies where exactly one exists",
+                statement=node, path=script_path,
+                rule_id="landmark.spot-required")
+        return
+    name = spot.text
+    if name not in landmark.spots:
+        raise ScriptPreflightError(
+            f"@{landmark.name} has no spot named {name!r} (has: "
+            f"{', '.join(sorted(landmark.spots)) or 'none'})",
+            statement=node, path=script_path,
+            rule_id="landmark.spot-unknown")
+
+
 def _preflight_landmarks(script, machine_state, script_path, context):
     """Bind every `@name` a condition watches, or refuse by name (F65).
 
-    Three refusals, all of them before the machine is touched (G3):
-    the name resolves to nothing; it resolves to another kind of the
-    one `@` pool, which is the kind check at binding — a media or a
-    font in condition position names the use and the kind; and the
-    machine's driving plane captures no framebuffer, which is
-    capability preflight at the *condition's* granularity rather than
-    the script's, since a script watching no landmark asks nothing of
-    the plane.
+    Three refusals apply to every landmark condition, all of them
+    before the machine is touched (G3): the name resolves to nothing;
+    it resolves to another kind of the one `@` pool, which is the
+    kind check at binding — a media or a font in condition position
+    names the use and the kind; and the machine's driving plane
+    captures no framebuffer, which is capability preflight at the
+    *condition's* granularity rather than the script's, since a
+    script watching no landmark asks nothing of the plane. `click`
+    (F66) adds three more, checked only for it: the machine's
+    `pointing-device` is not `tablet`; the driving plane cannot
+    deliver a pointer event even though it captures one (a plane can
+    hold one capability without the other); and `spot=`, above.
     """
     namespace = None
     resolved = {}
     plane, capture = None, None
+    pointing_device, pointer_capable = None, None
     for node in _observed(script):
         for condition in node.conditions:
             if condition.kind != "landmark":
@@ -2210,6 +2303,28 @@ def _preflight_landmarks(script, machine_state, script_path, context):
                     statement=node, path=script_path,
                     rule_id="machine.plane-no-framebuffer")
             resolved[name] = namespace[name]
+            if node.verb != "click":
+                continue
+            if pointer_capable is None:
+                pointing_device = machine_state.get(
+                    "pointing-device", "mouse")
+                pointer_capable = _backends.adapter(
+                    machine_state["backend"]).pointer_capable(plane)
+            if pointing_device != "tablet":
+                raise ScriptPreflightError(
+                    "click needs an absolute pointing device and this "
+                    f"machine's is {pointing_device!r}; declare "
+                    "\"pointing-device\": \"tablet\" in the blueprint",
+                    statement=node, path=script_path,
+                    rule_id="machine.pointing-device-not-tablet")
+            if not pointer_capable:
+                raise ScriptPreflightError(
+                    f"the {plane!r} control plane cannot deliver a "
+                    f"pointer event, so the click @{name} cannot be "
+                    "delivered on this machine",
+                    statement=node, path=script_path,
+                    rule_id="machine.plane-no-pointer-input")
+            _preflight_spot(node, resolved[name], script_path)
     return _Resolved(resolved, capture)
 
 

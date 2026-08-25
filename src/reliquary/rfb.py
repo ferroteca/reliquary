@@ -7,9 +7,7 @@ Reliquary launches the server it connects to (D110) and so controls
 both ends of the wire: the RFB 3.8 version handshake, security type
 None, a forced 32-bit true-colour pixel format so the framebuffer
 has exactly one in-memory shape, Raw-encoding framebuffer updates
-(full and incremental), and ``KeyEvent``. ``PointerEvent`` is
-deliberately absent — it arrives with the pointer-input feature, and
-a message nothing sends is surface pretending to exist.
+(full and incremental), ``KeyEvent`` and ``PointerEvent`` (F66).
 
 Nothing here knows QEMU or a machine: the client speaks the wire and
 :mod:`backend_qemu` owns which VM is behind it. Identity is never
@@ -234,6 +232,16 @@ class RfbClient:
         """Press (``down=True``) or release one X11 keysym."""
         self._sock.sendall(struct.pack(
             ">BBHI", 4, 1 if down else 0, 0, keysym))
+
+    def pointer_event(self, x, y, button_mask):
+        """Move the pointer to ``(x, y)`` with ``button_mask`` held.
+
+        Framebuffer pixel coordinates throughout (F66) — RFB carries
+        no other kind, so a caller needing to move, press or release
+        composes this primitive rather than the wire growing a
+        second message.
+        """
+        self._sock.sendall(struct.pack(">BBHH", 5, button_mask, x, y))
 
     def close(self):
         try:

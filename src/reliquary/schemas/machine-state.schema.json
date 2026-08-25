@@ -80,6 +80,10 @@
       "type": "array",
       "items": {"enum": ["agentless-display", "vnc", "serial-console", "guest-agent"]}
     },
+    "pointing-device": {
+      "description": "The resolved pointer input device (F66).",
+      "enum": ["tablet", "mouse"]
+    },
     "backend-settings": {
       "description": "The blueprint's per-backend settings sections, carried through verbatim.",
       "type": "object"

@@ -21,13 +21,12 @@ landmark matches when any variant does. That is the safe failure
 asymmetry (G4): anti-aliasing and palette drift fail toward a visible
 timeout, never toward the wrong screen.
 
-**Watch-only** (F65). ``spots`` are parsed and validated because they
-are part of the settled schema and a recorder writes them, but
-nothing here reads one: the pointer verbs that would, and the
-cursor-parking contract that makes a capture reproducible under them,
-arrive with the pointer piece (planning/proposed/design/pointer-input.md).
-Before any pointer verb exists nothing moves the guest's cursor, so a
-capture and a keyboard-only run agree by construction.
+``spots`` are read by the `click` verb (F66), which locates one by
+name and delivers a pointer event there. Every pointer verb ends by
+parking the cursor at :func:`park_position`, and this module excludes
+that zone from every match unconditionally (:func:`_park_region`),
+which is what keeps a capture cursor-free by construction the way it
+was before any pointer verb existed.
 """
 
 import functools
@@ -44,6 +43,23 @@ from .errors import InternalError, PreflightError, StaticError
 
 #: The region kinds, and what each does to the pixels under it.
 REGION_KINDS = ("fuzzy", "ignore")
+
+#: The size of the built-in park-zone ignore region (F66): big enough
+#: to hold a rendered cursor glyph on any screen a landmark pins.
+_PARK_SIZE = 16
+
+
+def park_position(width, height):
+    """The cursor's park position after a pointer verb, for one screen.
+
+    Bottom-right, scaled to the screen's own pinned dimensions rather
+    than a bare constant -- one per-platform rule today because DOS is
+    the only shipped platform (docs/spec/landmarks.md, "The cursor"),
+    but resolved per landmark since screens pin different sizes.
+    Authored content commonly anchors top-left (a title, a menu bar),
+    so the opposite corner is the one least likely to overlap it.
+    """
+    return (max(0, width - 1), max(0, height - 1))
 
 #: The fields a declaration may carry. Unknown keys are refused, as
 #: they are in a blueprint: a mistyped ``similarty`` that softened
@@ -504,12 +520,31 @@ def normalize(image, capture_format):
             f"{capture_format!r}") from None
 
 
+def _park_region(width, height):
+    """The built-in ignore region around :func:`park_position`.
+
+    Never authored and never in a ``.rlql`` file: every match excludes
+    it, exactly as a declared ``ignore`` region would, because the
+    parked cursor is furniture no landmark author asked to describe
+    (F66). Clamped to a **quarter** of the declaration's own pinned
+    size, not merely its full extent: a screen small enough that the
+    plain size clamp still covers all of it would have its residual
+    swallowed whole, and a "match" that compares nothing is not one.
+    """
+    size_x = min(_PARK_SIZE, max(1, width // 4))
+    size_y = min(_PARK_SIZE, max(1, height // 4))
+    return Region("ignore", width - size_x, height - size_y, size_x, size_y)
+
+
 def _masks(declaration):
     """The three regimes as Pillow masks over one screen.
 
     ``ignore`` wins where regions overlap, so it is drawn first and
     subtracted from everything else; each fuzzy region judges only
     its own surviving pixels; the residual is what no region claims.
+    The built-in park-zone region (above) joins the declared ones
+    unconditionally, on every landmark, whether or not a script in
+    this run ever clicks.
 
     **Built once per geometry, not once per sample.** A wait reads
     every ~0.2s and the regimes depend on the declaration alone, so
@@ -519,8 +554,10 @@ def _masks(declaration):
     declarations never share a cache entry and an edited one gets
     fresh masks on its next parse.
     """
-    return _regime_masks(declaration.path, declaration.size,
-                         declaration.regions)
+    return _regime_masks(
+        declaration.path, declaration.size,
+        declaration.regions + (_park_region(declaration.width,
+                                            declaration.height),))
 
 
 @functools.lru_cache(maxsize=16)

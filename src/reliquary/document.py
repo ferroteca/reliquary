@@ -31,6 +31,7 @@ _PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
 _BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
 _CONTROLLERS = {"ide", "sata", "scsi", "nvme", "virtio"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
+_POINTING_DEVICES = {"tablet", "mouse"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
 _SPEC_TYPES = {"machine", "media"}
 # Retired with the first-round four-component model; named so a stale
@@ -298,6 +299,7 @@ class Machine:
     description: Optional[Union[str, Deferred]] = None
     scripts: Mapping[str, str] = field(default_factory=dict)
     control_planes: Tuple[str, ...] = ()
+    pointing_device: Optional[str] = None
     backend_settings: Mapping[str, Mapping] = field(default_factory=dict)
     parameters: Mapping[str, object] = field(default_factory=dict)
 
@@ -787,7 +789,7 @@ _MEDIA_FIELDS = {"type", "name", "materialize", "size", "location", "sha256",
 _CHILD_FIELDS = (_MEDIA_FIELDS - {"location"}) | {"path"}
 _MACHINE_VOCABULARY = {"platform", "backend", "memory", "cpus", "drives",
                        "boot", "scripts", "control-planes",
-                       "backend-settings", "parameters"}
+                       "pointing-device", "backend-settings", "parameters"}
 
 
 def _unknown_media_field(unknown, where, container):
@@ -947,8 +949,8 @@ def _check_type_echo(value, expected, where):
 
 _MACHINE_FIELDS = {
     "type", "name", "platform", "backend", "memory", "cpus", "drives", "boot",
-    "description", "scripts", "control-planes", "backend-settings",
-    "parameters",
+    "description", "scripts", "control-planes", "pointing-device",
+    "backend-settings", "parameters",
 }
 _STATE_ONLY = {"id", "backend-id", "blueprint-digest", "blueprint-source"}
 _DRIVE_FIELDS = {"media", "controller", "enabled"}
@@ -1209,6 +1211,10 @@ def _machine(value, register, *, where=_MACHINE):
         control_planes=_control_planes(value["control-planes"],
                                        at("control-planes"))
         if "control-planes" in value else (),
+        pointing_device=_text(value["pointing-device"],
+                              at("pointing-device"), closed=True,
+                              allowed=_POINTING_DEVICES)
+        if "pointing-device" in value else None,
         backend_settings=_backend_settings(value["backend-settings"],
                                            at("backend-settings"))
         if "backend-settings" in value else empty,

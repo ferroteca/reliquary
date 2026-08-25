@@ -1,0 +1,8 @@
+// invalid: closed vocabulary: pointing-device
+// spec: Reach
+// schema: rejects
+// id: ref.not-allowed-here
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "pointing-device": "${device}", "drives": { "cdrom0": null } }
+]

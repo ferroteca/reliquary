@@ -57,6 +57,11 @@ class _QemuDriver:
     #: scrapes resolved characters out of VGA text memory, so it
     #: states no format and a landmark condition is refused on it.
     capture_formats = {"agentless-display": None, "vnc": "rgb"}
+    #: Whether each plane can deliver a pointer event (F66). QMP's
+    #: `input-send-event` reaches the emulated tablet on either plane
+    #: — a property of the management interface, not of the screen.
+    pointer_planes = {"agentless-display": True, "vnc": True}
+    pointing_devices = ("tablet", "mouse")
     #: The command that would reach a VM the identity check must stop
     #: short of.
     destructive = "quit"
@@ -138,6 +143,11 @@ class _VirtualBoxDriver:
     #: VirtualBox has no text-memory readback: its display plane's
     #: screen *is* a framebuffer, so it states one.
     capture_formats = {"agentless-display": "rgb"}
+    #: Not wired yet (F66's own scope): the requirement is portable
+    #: on paper (P25), but only QEMU's carrier delivers a pointer
+    #: event today.
+    pointer_planes = {"agentless-display": False}
+    pointing_devices = ()
     destructive = "controlvm"
 
     def executable(self, root):
@@ -236,6 +246,22 @@ def test_each_plane_states_the_capture_format_it_reads(driver, adapter):
                 == driver.capture_formats[plane])
     # A plane this backend does not serve states nothing either.
     assert adapter.capture_format("serial-console") is None
+
+
+def test_each_plane_states_whether_it_delivers_pointer_events(driver,
+                                                               adapter):
+    """The same per-plane honesty as `capture_format`, for pointer
+    delivery (F66) — a separate capability from framebuffer capture,
+    since a plane can hold one without the other (VirtualBox today).
+    """
+    for plane in driver.control_planes:
+        assert (adapter.pointer_capable(plane)
+                is driver.pointer_planes[plane])
+    assert adapter.pointer_capable("serial-console") is False
+
+
+def test_the_capability_report_states_its_pointing_devices(driver, adapter):
+    assert adapter.capabilities().pointing_devices == driver.pointing_devices
 
 
 def test_an_image_is_named_in_the_backends_own_format(driver, adapter,

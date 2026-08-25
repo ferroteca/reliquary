@@ -10,7 +10,8 @@ surface and lands on S1/S2 in the same change.
 
 The capture wraps the **carrier seam** (the adapter session's
 ``text_screen()`` / ``send_keys()`` / ``screenshot()`` /
-``change_medium()``), so it is backend-neutral by construction.
+``change_medium()`` / ``pointer_event()``), so it is backend-neutral
+by construction.
 Reconstruction stands a fake session at that same seam, and the
 whole interpretation layer runs unmodified above it.
 """
@@ -440,6 +441,16 @@ class RecordingSession:
         """
         return self._inner.framebuffer()
 
+    def pointer_event(self, x, y, buttons):
+        """Pass the event through; the transcript holds no pixels.
+
+        The same reasoning as :meth:`framebuffer`: a `click`'s search
+        already made this landmark's capture unreplayable, so
+        recording the delivery that followed would promise a
+        reconstruction it cannot give (F66).
+        """
+        self._inner.pointer_event(x, y, buttons)
+
     def screenshot(self, path):
         result = self._inner.screenshot(path)
         self._writer.write_call("screenshot",
@@ -726,6 +737,19 @@ class ReplaySession:
         raise TranscriptError(
             "a transcript records text screens and holds no "
             "framebuffer; a landmark condition cannot be replayed",
+            rule_id="transcript.no-framebuffer")
+
+    def pointer_event(self, x, y, buttons):
+        """Refused: replaying `click`'s search already failed first.
+
+        A `click`'s landmark search reads :meth:`framebuffer`, which a
+        transcript refuses by name before delivery is ever reached —
+        this exists so a caller reaching past that gate is told what
+        it asked of, rather than meeting an ``AttributeError`` (F66).
+        """
+        raise TranscriptError(
+            "a transcript records text screens and holds no "
+            "framebuffer; a pointer event cannot be replayed",
             rule_id="transcript.no-framebuffer")
 
     def screenshot(self, path):

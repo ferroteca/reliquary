@@ -138,6 +138,7 @@ def test_state_records_bookkeeping_and_defaults(rig):
     assert state["memory"] == 16
     assert state["cpus"] == 1
     assert state["control-planes"] == ["agentless-display"]
+    assert state["pointing-device"] == "mouse"
     # The blueprint declares a scripts map and the state does not
     # record it (D101): a label names which instructions to run,
     # not what the machine is, so it stays outside the shape
@@ -146,6 +147,12 @@ def test_state_records_bookkeeping_and_defaults(rig):
     assert state["boot"] == ["hdd0"]
     assert state["backend-id"] == f"reliquary-{machine_id}"
     assert state["blueprint-digest"].startswith("sha256:")
+
+
+def test_a_declared_pointing_device_is_resolved_into_state(rig):
+    machine_id = rig.create(
+        "tablet-rig", {"platform": "dos", "pointing-device": "tablet"})
+    assert rig.state(machine_id)["pointing-device"] == "tablet"
 
 
 def test_optional_fields_absent(rig):
@@ -903,6 +910,14 @@ def test_apply_adds_and_removes_drives(rig):
     assert "hdd1" not in state["drives"]
     assert "cdrom0" in state["drives"]
     assert not os.path.exists(os.path.join(disks_root, "big.qcow2"))
+
+
+def test_apply_resolves_a_newly_declared_pointing_device(rig):
+    machine_id = rig.create("pda", {"platform": "dos"})
+    assert rig.state(machine_id)["pointing-device"] == "mouse"
+    rig.write("pda", {"platform": "dos", "pointing-device": "tablet"})
+    apply_blueprint(machine=machine_id, context=rig.home)
+    assert rig.state(machine_id)["pointing-device"] == "tablet"
 
 
 def test_apply_refuses_an_unimplemented_control_plane(rig):

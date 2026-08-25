@@ -249,6 +249,23 @@ def test_a_bare_landmark_is_a_whole_screen_exact_match(home):
     assert result.nearest.changed == 1
 
 
+def test_the_built_in_park_zone_is_excluded_from_every_match(home):
+    # F66: unconditional and unauthored -- a captured cursor sitting in
+    # the bottom-right corner (the park position for this landmark's
+    # own 64x32 pinned size) never breaks an otherwise-clean match.
+    declaration = _declaration(home)
+    parked = _paint(_plain(), (48, 24, 64, 32), (255, 255, 255))
+    assert match(declaration, parked).matched
+
+
+def test_a_pixel_just_outside_the_park_zone_still_fails_a_match(home):
+    # The boundary is precise: one pixel to the left of the built-in
+    # region is ordinary screen content and is judged like any other.
+    declaration = _declaration(home)
+    almost_parked = _paint(_plain(), (47, 24, 48, 32), (255, 255, 255))
+    assert not match(declaration, almost_parked).matched
+
+
 def test_an_ignore_region_excludes_its_pixels_outright(home):
     declaration = _declaration(
         home, regions=[{"kind": "ignore", "x": 0, "y": 24,

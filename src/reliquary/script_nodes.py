@@ -59,8 +59,9 @@ KEYWORDS = (
     "description", "platform", "machine", "entry", "timeout", "deadline",
     "pacing", "stability",
     "property", "http", "content", "phase", "with", "wait", "on", "always",
-    "goto", "finish", "enter", "type", "press", "select", "screenshot",
-    "insert", "eject", "set-boot", "set", "start", "stop", "font",
+    "goto", "finish", "enter", "type", "press", "select", "click",
+    "screenshot", "insert", "eject", "set-boot", "set", "start", "stop",
+    "font",
 )
 
 

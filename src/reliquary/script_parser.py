@@ -51,6 +51,7 @@ _SIGNATURES = {
     # the gap before the first key event, so a verb that delivers no
     # keys has nothing to pace.
     "select": ("exclude", "pacing"),
+    "click": ("spot", "pacing"),
     "enter": ("pacing",), "type_text": ("pacing",),
     "press": ("pacing",), "screenshot": (),
     "insert": (), "eject": (), "set_boot": (), "set_var": (),
@@ -158,9 +159,9 @@ _PLACEMENT.update({
         "stability guards the frame a compare runs on, and this verb "
         "compares nothing: write it on the observation whose result "
         "you are waiting for, or on the phase"
-    for node in ("enter", "type_text", "press", "select", "screenshot",
-                 "insert", "eject", "set_boot", "set_var", "start",
-                 "stop", "http_control")
+    for node in ("enter", "type_text", "press", "select", "click",
+                 "screenshot", "insert", "eject", "set_boot", "set_var",
+                 "start", "stop", "http_control")
 })
 # A modifier value's terminal, as the condition kind it spells.
 _CONDITION_KINDS = {
@@ -227,6 +228,7 @@ class Statement(_Observed):
     stability: Optional[str] = None
     pacing: Optional[str] = None
     exclude: Optional[StringLiteral] = None
+    spot: Optional[StringLiteral] = None
     contents: Tuple["HttpContent", ...] = ()
     line: int = 0
     column: int = 1
@@ -922,6 +924,28 @@ class _Builder(Transformer):
             "select", (children[1].reliquary.value,),
             pacing=_duration(modifiers.get("pacing")),
             exclude=exclude.reliquary.value if exclude else None, line=line,
+            column=_column(children[0]))
+
+    def click(self, children):
+        modifiers = _modifiers(
+            "click", [c for c in children if isinstance(c, tuple)])
+        spot = modifiers.get("spot")
+        line = _line(children[0])
+        if spot is not None and spot.type != "STRING":
+            raise ScriptParseError(line, "spot must be a string",
+                                   children[0].column,
+                                   rule_id="node.modifier-not-a-string")
+        name = str(children[1])
+        # A `conditions` tuple, like `wait`'s, is what lets preflight's
+        # landmark walk (`_observed`/`_preflight_landmarks`) bind and
+        # refuse a `click`'s reference exactly as it already does a
+        # `wait`'s — no second walk for the same three checks.
+        condition = Condition("screen", "landmark", name, line,
+                              _column(children[0]))
+        return Statement(
+            "click", (name,), conditions=(condition,),
+            pacing=_duration(modifiers.get("pacing")),
+            spot=spot.reliquary.value if spot else None, line=line,
             column=_column(children[0]))
 
     def screenshot(self, children):

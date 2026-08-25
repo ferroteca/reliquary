@@ -74,6 +74,10 @@
             "enum": ["agentless-display", "vnc", "serial-console", "guest-agent"]
           }
         },
+        "pointing-device": {
+          "description": "The pointer input device (F66). Omitted, it resolves to the platform's default (mouse, today). Never supplied by a reference.",
+          "enum": ["tablet", "mouse"]
+        },
         "backend-settings": {
           "type": "object",
           "propertyNames": {"enum": ["qemu", "virtualbox", "vmware", "hyperv"]},

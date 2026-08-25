@@ -10,5 +10,6 @@ phase begin pacing=250ms {
     type "immediately" pacing=0s
     enter "inherits the phase"
     select "Yes"
+    click @setup-page pacing=2s
     finish
 }

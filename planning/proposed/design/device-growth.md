@@ -125,7 +125,8 @@ kept: the use case arriving is the watch.
 ## USB: implied by the device that needs it, never a field
 
 `pointing-device: tablet`
-([pointer-input.md](pointer-input.md)) is the demand, and an
+([blueprint-model.md](../../../docs/spec/blueprint-model.md), F66,
+delivered) is the demand, and an
 adapter that renders the tablet renders its USB controller
 unasked. A bare `usb: true` would declare a controller with
 nothing on it — machine shape with no consumer. **The rule,

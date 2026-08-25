@@ -27,8 +27,9 @@ open:
   production. The adapter translates the qcode seam onto its own
   scancode vocabulary, which is D103's rule doing what it was
   written for. `Msvm_SyntheticMouse` answers absolutely, which is
-  also what keeps [pointer-input.md](pointer-input.md)'s P25
-  claim true on this backend.
+  also what keeps
+  [blueprint-model.md](../../../docs/spec/blueprint-model.md)'s
+  (F66, delivered) P25 claim true on this backend.
 - **The screen is the half prior art avoids.** Packer types
   **blind**, on timing alone — and blind typing is the guess P10
   forbids and the language cannot express: every pause must be

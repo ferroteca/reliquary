@@ -605,6 +605,34 @@ def test_start_renders_this_backends_section_last():
 
 # The session's carriers, over a scripted monitor.
 
+def test_pointing_device_tablet_renders_the_usb_device():
+    adapter = qemu_module.QemuAdapter()
+    state = {
+        "id": "tab-0", "backend-id": "reliquary-tab-0", "memory": 32,
+        "boot": [], "drives": {}, "pointing-device": "tablet",
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=".", backend_dir="qemu")
+    args = launch.call_args.args[0]
+    assert args[-3:] == ["-usb", "-device", "usb-tablet,id=pointer0"]
+
+
+def test_pointing_device_mouse_renders_nothing_extra():
+    adapter = qemu_module.QemuAdapter()
+    state = {
+        "id": "mouse-0", "backend-id": "reliquary-mouse-0", "memory": 32,
+        "boot": [], "drives": {}, "pointing-device": "mouse",
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=".", backend_dir="qemu")
+    args = launch.call_args.args[0]
+    assert "usb-tablet" not in " ".join(args)
+
+
 def test_the_text_screen_reads_characters_and_attribute_tokens():
     cells = []
     for index, char in enumerate("A:\\>" + " " * (80 * 25 - 4)):
@@ -634,6 +662,28 @@ def test_key_names_reach_qmp_as_qcode_events():
         "send-key",
         keys=[{"type": "qcode", "data": "shift"},
               {"type": "qcode", "data": "a"}])
+
+
+def test_pointer_events_are_refused_off_the_vnc_plane():
+    # No coordinate space without a framebuffer (F66) — unreachable in
+    # an ordinary run, since `capture_format` already refuses a
+    # landmark condition (and so a `click`) on this plane.
+    qmp = mock.Mock()
+    with pytest.raises(PreflightError) as caught:
+        qemu_module.QemuSession(qmp).pointer_event(1, 2, 1)
+    assert caught.value.rule_id == "machine.plane-no-pointer-input"
+
+
+def test_the_qemu_adapter_reports_the_pointing_devices_it_renders():
+    report = qemu_module.QemuAdapter().capabilities()
+    assert report.pointing_devices == ("tablet", "mouse")
+
+
+def test_the_qemu_adapter_can_deliver_a_pointer_event_on_either_plane():
+    adapter = qemu_module.QemuAdapter()
+    assert adapter.pointer_capable("agentless-display")
+    assert adapter.pointer_capable("vnc")
+    assert not adapter.pointer_capable("serial-console")
 
 
 def test_a_medium_change_targets_the_drive_by_key():
@@ -712,12 +762,16 @@ class _FakeRfb:
 
     def __init__(self, image=None):
         self.events = []
+        self.pointer_events = []
         self.refreshed = 0
         self.closed = False
         self._image = image
 
     def key_event(self, keysym, down):
         self.events.append((keysym, down))
+
+    def pointer_event(self, x, y, button_mask):
+        self.pointer_events.append((x, y, button_mask))
 
     def refresh(self, incremental=False):
         self.refreshed += 1
@@ -962,6 +1016,13 @@ def test_vnc_keys_go_down_in_order_and_up_in_reverse():
     shift, a = 0xffe1, ord("a")
     assert client.events == [(shift, True), (a, True),
                              (a, False), (shift, False)]
+
+
+def test_vnc_pointer_events_reach_rfb_with_no_translation():
+    client = _FakeRfb()
+    session = qemu_module.QemuVncSession(mock.Mock(), client)
+    session.pointer_event(50, 40, 1)
+    assert client.pointer_events == [(50, 40, 1)]
 
 
 def test_the_keysym_table_covers_the_seam_vocabulary():

@@ -22,7 +22,7 @@
       "items": {"$ref": "#/$defs/region"}
     },
     "spots": {
-      "description": "Named points in screen coordinates. Declared and validated today, and unread until the pointer verbs land: a spotless landmark is watchable and not clickable.",
+      "description": "Named points in screen coordinates, read by the click verb (F66): a spotless landmark is watchable and not clickable.",
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/spot"}
     }

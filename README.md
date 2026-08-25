@@ -276,6 +276,23 @@ and a machine driving one that does not says so before the run
 touches the guest. The format is specified in
 [docs/spec/landmarks.md](docs/spec/landmarks.md).
 
+**GUI screens are clicked, not guessed at.** A landmark's `spots`
+name points on it a script can click:
+
+```rlqs
+click @setup-page spot="next"
+```
+
+`click` finds the landmark the same way `wait` does — matched on a
+settled frame, timing out visibly if it never appears — then
+delivers a left click at the named spot (or the lone one, on a
+landmark declaring exactly one) and parks the cursor out of frame.
+It needs an absolute pointing device: declare `"pointing-device":
+"tablet"` on the machine, since a relative mouse cannot be aimed
+without guessing (a PS/2 mouse's guest driver applies acceleration
+the host cannot observe), and a `mouse` machine is refused by name
+before the run starts.
+
 ## The machine layer
 
 Beneath the scripts, Reliquary is a general automation harness for running remote tasks in QEMU guests, usable on its

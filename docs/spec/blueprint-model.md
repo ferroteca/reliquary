@@ -97,8 +97,8 @@ required type is an error.
 
 Topology only — no content lives here. `platform` (required,
 never inferred — P10), `backend`, `memory`, `cpus`, `boot`,
-`control-planes`, `backend-settings`, `description`, `scripts`,
-`parameters`, and `name`.
+`control-planes`, `pointing-device`, `backend-settings`,
+`description`, `scripts`, `parameters`, and `name`.
 
 `drives` maps a slot key (`hdd0`, `cdrom0`, `floppy0`, …) to one
 of:
@@ -174,6 +174,18 @@ cannot carry.
   `["agentless-display"]` for every platform today — the
   universal, cooperation-free plane. Defaults that differ by
   platform arrive with the planes that justify them.
+- **`pointing-device`** (F66) is `tablet` or `mouse`, judged the
+  same way as `control-planes`: capability-checked against the
+  assigned backend at materialization, failing closed naming both
+  the backend and the device. An absolute event needs an absolute
+  device — a PS/2 mouse is relative and the guest's own driver
+  applies acceleration the host cannot observe (P10) — so `click`
+  preflight-refuses a `mouse` machine by name rather than
+  attempting a calibration guess. Omitted, it resolves to `mouse`
+  — the stock relative device every platform's machine carries
+  anyway, so the default records reality rather than aspiring to
+  one; a GUI-era platform earns a richer default the way
+  `control-planes` will earn one of its own.
 - **`backend-settings`** is the **only** place backend-specific
   configuration may appear, which is what makes a blueprint
   without it portable by construction. One section per backend
@@ -531,8 +543,9 @@ Two exclusions, and they have different grounds:
    reference. The catalog and the authored graph stay static
    (G3) — the same ground that killed the `children` glob.
 2. **Closed vocabularies.** `platform`, `backend`,
-   `materialize`, `controller`, and `control-planes` items never
-   take a reference. These are where a published schema's
+   `materialize`, `controller`, `control-planes` items, and
+   `pointing-device` never take a reference. These are where a
+   published schema's
    completion is most valuable and where a reference destroys
    it (U4, U5), and they have no named case asking for one.
    `platform` is the sharpest instance: P10 has it never

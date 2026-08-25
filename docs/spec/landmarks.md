@@ -6,18 +6,11 @@ SPDX-License-Identifier: GPL-3.0-only
 # Landmarks: the `.rlql` authored kind and the image match
 
 > **Status:** normative for the delivered surface — the `.rlql`
-> declaration, the pixel-equal matcher, and the `@name` screen
-> condition (F65). It arrived here from
+> declaration, the pixel-equal matcher, the `@name` screen
+> condition (F65), and the `click` verb with the spot lookup and
+> cursor-parking contract it delivers (F66). It arrived here from
 > `planning/pledged/design/` on delivery, which is the one-way move
 > every shipped surface makes ([planning/README.md](../../planning/README.md)).
->
-> **One thing below is stated and not built**: the cursor-parking
-> contract, which arrives with the pointer verbs and is designed at
-> [pointer-input.md](../../planning/pledged/design/pointer-input.md).
-> It is named here because a landmark author needs to know why
-> today's rule is enough and what will change — see
-> [the cursor](#the-cursor) — and it binds nothing until that piece
-> is pledged. Everything else on this page is in force.
 >
 > The authored `.rlql` document's norm is **split**, like the
 > blueprint's: the published schema
@@ -290,24 +283,27 @@ written and read exactly as it is for a text condition.
 
 ## The cursor
 
-Captures and matching are cursor-free by construction today, and the
-mechanism that will keep them so is **not yet built**.
+Captures and matching are cursor-free by construction, and every
+pointer verb keeps them so (F66).
 
-**Today**: nothing moves the guest's cursor. There are no pointer
-verbs, so a keyboard-only run leaves the cursor where the guest drew
-it — which is where the author's capture shows it — and capture and
-run agree without any mechanism at all. An author who wants a screen
-whose cursor may sit anywhere declares an `ignore` region, like any
-other furniture.
+**Before `click`, and still true for a keyboard-only run**: nothing
+moves the guest's cursor, so it stays where the guest drew it —
+which is where the author's capture shows it — and capture and run
+agree without any mechanism at all. An author who wants a screen
+whose cursor may sit anywhere still declares an `ignore` region, like
+any other furniture.
 
-**With the pointer verbs**
-([pointer-input.md](../../planning/pledged/design/pointer-input.md)):
-every pointer verb will end by parking the cursor at a fixed
-per-platform park position — never script surface — the park zone
-becomes a built-in ignore region, and a cursor-free capture is used
-automatically where the control plane can provide one (RFB cursor
-pseudo-encodings). None of that lands until that piece is pledged,
-and this document is where it will be stated when it does.
+**Every pointer verb ends by parking the cursor** at a fixed
+position for the screen it just acted on — scaled to that landmark's
+own pinned dimensions rather than a single global pixel, since
+different landmarks pin different screen sizes — and the park zone
+is a **built-in `ignore` region**, unioned with a landmark's declared
+ones at every match, never written into the `.rlql` file itself.
+This is host-side masking, not a cursor-free capture: nothing here
+negotiates an RFB pseudo-encoding to suppress the cursor from the
+framebuffer, so an author composing a capture by hand still sees
+whatever the guest actually drew, including a cursor a prior `click`
+parked into frame.
 
 Diagnostics capture reality either way: an explicit `screenshot` and
 an automatic failure capture never inject a park move, because it
@@ -319,10 +315,11 @@ could dismiss the hover state or menu that explains a failure.
   confine matching to declared rectangles are deferred as additive
   growth; today a region softens or voids, and the rest of the screen
   is always judged.
-- **There is no `click`, and no spot is read.** `spots` are declared
-  and validated because a recorder writes them and the schema is
-  settled, but the verbs that consume them arrive with the pointer
-  piece.
+- **There is no drag, chord, or paced-pointer surface.** `click` is
+  left-single-click only (F66); `button=`, `count=`, and a drag verb
+  are additive sibling growth with no named demand yet — the carrier
+  seam already carries any mask and any sequence, so growth here
+  never touches an adapter.
 - **A landmark is not recordable.** A screen transcript holds
   character rows and attribute tokens, so a run watching a landmark
   can be recorded but its landmark waits cannot be replayed: the

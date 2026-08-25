@@ -11,6 +11,7 @@ wait "C:\>"
 type "dir"
 press enter
 select "Yes"
+click @setup-page spot="next"
 screenshot after-install
 set result "ok"
 eject cdrom0

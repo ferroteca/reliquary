@@ -93,6 +93,7 @@ action: KW_ENTER STRING modifier* _NL                   -> enter
       | KW_HTTP NAME NAME* modifier* _open content_def+ _close -> http_control
       | KW_PRESS NAME+ modifier* _NL                    -> press
       | KW_SELECT STRING modifier* _NL                  -> select
+      | KW_CLICK MEDIA_REF modifier* _NL                -> click
       | KW_SCREENSHOT NAME? modifier* _NL               -> screenshot
       | KW_INSERT NAME media_arg modifier* _NL          -> insert
       | KW_EJECT NAME modifier* _NL                     -> eject
@@ -114,7 +115,7 @@ _close: _BLOCK_CLOSE _NL
 %declare KW_STABILITY
 %declare KW_DEADLINE KW_PROPERTY KW_HTTP KW_CONTENT KW_PHASE KW_WITH
 %declare KW_WAIT KW_ON KW_ALWAYS
-%declare KW_GOTO KW_FINISH KW_ENTER KW_TYPE KW_PRESS KW_SELECT
+%declare KW_GOTO KW_FINISH KW_ENTER KW_TYPE KW_PRESS KW_SELECT KW_CLICK
 %declare KW_SCREENSHOT KW_INSERT KW_EJECT KW_SET_BOOT KW_SET KW_START KW_STOP
 %declare KW_FONT
 %declare NAME STRING REGEX DURATION MEDIA_REF PROP_REF MOD_NAME TRIPLE CONTENT_TEXT

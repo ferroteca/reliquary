@@ -832,6 +832,20 @@ class QemuSession:
             "plane that does (control-planes: [\"vnc\"])",
             rule_id="machine.plane-no-framebuffer")
 
+    def pointer_event(self, x, y, buttons):
+        """Refused: an absolute event needs a framebuffer to aim at.
+
+        A `click` locates its target by matching a landmark, which
+        this plane already refuses in :meth:`framebuffer` — so this
+        method answers the same way for the same reason, unreachable
+        in an ordinary run behind that earlier refusal (F66).
+        """
+        raise PreflightError(
+            "the agentless-display plane reads QEMU's VGA text memory "
+            "and captures no framebuffer, so it has no pixel space a "
+            "pointer event could aim at (control-planes: [\"vnc\"])",
+            rule_id="machine.plane-no-pointer-input")
+
     def screenshot(self, path):
         """Capture the framebuffer to ``path`` as a PNG.
 
@@ -964,6 +978,15 @@ class QemuVncSession(QemuSession):
                 self._rfb.key_event(keysym, False)
             time.sleep(delay)
 
+    def pointer_event(self, x, y, buttons):
+        """Move/press/release as one RFB ``PointerEvent`` (F66).
+
+        No translation: the wire's own coordinates are framebuffer
+        pixels, which is exactly what a caller composing a click
+        already has in hand from a landmark's spot.
+        """
+        self._rfb.pointer_event(x, y, buttons)
+
     def text_screen(self, font_banks=()):
         """Framebuffer + shared fixed-font recognizer.
 
@@ -1052,6 +1075,7 @@ class QemuAdapter(BackendAdapter):
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
+            pointing_devices=("tablet", "mouse"),
         )
 
     def capture_format(self, plane):
@@ -1066,6 +1090,20 @@ class QemuAdapter(BackendAdapter):
         and makes the reference-side normalization the identity.
         """
         return "rgb" if plane == "vnc" else None
+
+    def pointer_capable(self, plane):
+        """QMP delivers pointer events on either plane (F66).
+
+        Unlike the framebuffer, this is a property of the management
+        interface, not of the screen carrier: ``input-send-event``
+        and RFB ``PointerEvent`` both reach the same emulated tablet
+        regardless of which plane is driving the display. Whether a
+        `click` can actually *aim* one is the separate, plane-specific
+        question :meth:`capture_format` already answers — an
+        agentless-display machine still refuses `click` there, just
+        for lack of anywhere to point rather than for lack of a wire.
+        """
+        return plane in ("agentless-display", "vnc")
 
     def validate_settings(self, settings):
         """Judge this machine's ``qemu`` section, rendering nothing.
@@ -1121,6 +1159,12 @@ class QemuAdapter(BackendAdapter):
         boot = _boot_order(state.get("boot", []), state.get("drives", {}))
         if boot is not None:
             args += ["-boot", f"order={boot}"]
+        if state.get("pointing-device") == "tablet":
+            # An absolute pointing device (F66): a PS/2 mouse is
+            # relative and its guest driver applies acceleration the
+            # host cannot observe, so `click` needs this rather than
+            # the stock relative default (P10).
+            args += ["-usb", "-device", "usb-tablet,id=pointer0"]
         args += settings_args(
             (state.get("backend-settings") or {}).get(self.name))
         planes = state.get("control-planes") or ["agentless-display"]

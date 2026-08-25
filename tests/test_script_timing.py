@@ -240,6 +240,16 @@ def test_select_appears_in_both_lists():
         "select", "2s")
 
 
+def test_click_appears_in_both_lists():
+    """Like `select`, it observes *and* delivers (F66)."""
+    plan = _plan(_HEAD + 'timeout 20s\npacing 2s\nclick @welcome\n')
+    assert (plan.observations[0].kind,
+            plan.observations[0].timeout.spelling,
+            plan.observations[0].landmark) == ("click", "20s", "welcome")
+    assert (plan.inputs[0].verb, plan.inputs[0].pacing.spelling) == (
+        "click", "2s")
+
+
 def test_a_host_side_verb_is_absent_from_the_plan():
     plan = _plan(_HEAD + 'screenshot\nstart\nset answer "42"\n')
     assert plan.inputs == ()

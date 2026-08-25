@@ -86,6 +86,10 @@ class Capabilities:
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
     vvfat: bool = False
+    #: The pointing devices this backend can attach (F66) —
+    #: ``tablet``/``mouse``, the blueprint's own vocabulary. Empty is
+    #: the honest default: nothing built claims nothing.
+    pointing_devices: Tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -120,6 +124,10 @@ class Requirements:
     media: Tuple[str, ...] = ()
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
+    #: The declared ``pointing-device``, or ``None`` where the
+    #: blueprint left it to its default (F66) — a single value, unlike
+    #: the tuple axes above, since a machine declares at most one.
+    pointing_device: Optional[str] = None
 
 
 class BackendAdapter:
@@ -195,6 +203,21 @@ class BackendAdapter:
         """
         return None
 
+    def pointer_capable(self, plane):
+        """Whether this plane's management interface can deliver a
+        pointer event (F66).
+
+        ``False`` — the honest default, as ``capture_format``'s is
+        ``None`` — means **this plane cannot deliver one**, and a
+        `click` against a machine driving it is refused by name at
+        preflight. This is a separate question from
+        :meth:`capture_format`: whether the wire can carry a pointer
+        event and whether a `click` can *aim* one (which needs a
+        framebuffer to search) are two different capabilities, and a
+        plane can hold one without the other.
+        """
+        return False
+
     def unmet(self, requirements):
         """Requirements this backend cannot honor, named one by one.
 
@@ -216,6 +239,9 @@ class BackendAdapter:
         for mode in requirements.materialize:
             if mode not in report.materialize:
                 missing.append(f"media materialize {mode!r}")
+        if (requirements.pointing_device and
+                requirements.pointing_device not in report.pointing_devices):
+            missing.append(f"pointing device {requirements.pointing_device!r}")
         return tuple(missing)
 
     def validate_settings(self, settings):

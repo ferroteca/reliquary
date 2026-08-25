@@ -1,0 +1,10 @@
+# valid: click, the fifth guest-input verb -- a landmark reference,
+#        the lone-spot default, and a named spot=
+# spec: Input verbs / click
+
+platform dos
+machine stopped
+
+wait @welcome-screen
+click @welcome-screen
+click @component-list spot="continue"

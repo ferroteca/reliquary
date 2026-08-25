@@ -57,7 +57,7 @@ class _FakeVncServer:
         self.before_update = before_update
         self.name = name
         self.received = {"pixel_format": None, "encodings": None,
-                         "keys": [], "updates": []}
+                         "keys": [], "updates": [], "pointers": []}
         self._listener = socket.create_server(("127.0.0.1", 0))
         self.port = self._listener.getsockname()[1]
         self._thread = threading.Thread(target=self._serve, daemon=True)
@@ -126,6 +126,10 @@ class _FakeVncServer:
                 body = self._read(sock, 7)
                 (keysym,) = struct.unpack(">I", body[3:7])
                 self.received["keys"].append((body[0], keysym))
+            elif kind == 5:  # PointerEvent
+                body = self._read(sock, 5)
+                buttons, x, y = struct.unpack(">BHH", body)
+                self.received["pointers"].append((x, y, buttons))
             else:
                 return
 
@@ -293,6 +297,20 @@ def test_key_events_carry_the_keysym_and_the_direction():
         client.refresh()  # a round trip so the server has read them
     server.join()
     assert server.received["keys"] == [(1, 0xff0d), (0, 0xff0d)]
+
+
+# -- pointer events (F66) --------------------------------------------
+
+def test_pointer_events_carry_the_position_and_the_button_mask():
+    server = _FakeVncServer()
+    with _connect(server) as client:
+        client.pointer_event(50, 40, 1)   # move and press
+        client.pointer_event(50, 40, 0)   # release at the same point
+        client.pointer_event(0, 0, 0)     # park
+        client.refresh()  # a round trip so the server has read them
+    server.join()
+    assert server.received["pointers"] == [
+        (50, 40, 1), (50, 40, 0), (0, 0, 0)]
 
 
 # -- the readiness probe -------------------------------------------

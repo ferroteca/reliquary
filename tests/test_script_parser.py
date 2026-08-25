@@ -385,6 +385,27 @@ def test_select_accepts_only_exclude():
         parse_script(_HEAD + 'select "a" stable=2s\n')
 
 
+def test_click_accepts_only_spot_and_pacing():
+    script = parse_script(_HEAD + 'click @welcome spot="next"\n')
+    statement = script.statements[0]
+    assert statement.arguments == ("welcome",)
+    assert statement.spot.text == "next"
+    assert statement.conditions[0].kind == "landmark"
+    assert statement.conditions[0].value == "welcome"
+    with pytest.raises(ScriptParseError):
+        parse_script(_HEAD + 'click @welcome stability=0.9\n')
+
+
+def test_click_spot_must_be_a_string():
+    with pytest.raises(ScriptParseError):
+        parse_script(_HEAD + "click @welcome spot=2s\n")
+
+
+def test_click_takes_a_landmark_reference_not_a_string():
+    with pytest.raises(ScriptParseError):
+        parse_script(_HEAD + 'click "welcome"\n')
+
+
 def test_a_repeated_header_is_rejected():
     with pytest.raises(ScriptParseError) as caught:
         parse_script("platform dos\nplatform win9x\nstart\n")

@@ -58,7 +58,8 @@ workflow:
   full field reference (`platform`, `backend`, `memory`, `cpus`,
   `drives` — a media name, `null`, `{media, controller, enabled}`, or an inline media (the anonymous blank included) —
   `boot`, `name` (the id-safe identity, not a
-  display label), `description`, `scripts`, `control-planes`, `backend-settings`, `parameters`),
+  display label), `description`, `scripts`, `control-planes`, `pointing-device` (F66), `backend-settings`,
+  `parameters`),
   `authoring.py` is **the counterpart of `assets.py`** — `assets` resolves and reads what a user owns, `authoring`
   writes and removes it — and is authoring-only: it scaffolds (`new_blueprint`), writes a media declaration for a
   file already
@@ -114,7 +115,8 @@ workflow:
   names what the library holds and reports nothing of yours, `codex_blueprint_available` is the question a
   refusal asks so it can name the seed command), `machines.py` owns machine materialization under
   `cache/machines/<blueprint>-<n>/` — where **backend assignment** happens, before any image work: the
-  blueprint's whole demand (control planes, media kinds, controllers, materialization modes) becomes a
+  blueprint's whole demand (control planes, media kinds, controllers, materialization modes, the
+  `pointing-device` — F66, resolved by `_resolve_pointing_device`, defaulting to `mouse`) becomes a
   `backends.Requirements`, and a declared `backend` pins the choice — as does `backend-settings` for exactly
   one backend, which **narrows** the walk to it (`_backend_choice`: declared, else a lone section, else the
   walk; presence narrows, not content) — while an absent one walks the priority
@@ -210,7 +212,10 @@ workflow:
   (design: `planning/design/backend-adapter.md`), deliberately *not* one of the application surfaces:
   the `BackendAdapter` contract (discovery, capability report, image materialization, start/stop, and the
   carrier session), the `Availability` / `Capabilities` / `Requirements` vocabulary the report and the demand
-  share, the `backend-settings` contract (`settings_keys` — the keys an adapter's section may carry, empty
+  share (`pointing_devices` / `pointing_device` the newest axis, F66, judged in `unmet()` exactly as `drives`
+  is), `capture_format(plane)` and its sibling `pointer_capable(plane)` — two separate per-plane
+  capabilities (F66: a plane can capture a framebuffer without being wired to deliver a pointer event on it,
+  VirtualBox today), each defaulting to the honest "nothing" (`None` / `False`), the `backend-settings` contract (`settings_keys` — the keys an adapter's section may carry, empty
   being the honest default — and `validate_settings`, the shared unknown-key refusal an argv-shaped adapter
   extends with its own overlap rule; only the *assigned* backend's section is ever judged, no adapter being
   able to speak for another's vocabulary), `identity()` (the recorded-VM-identity record every adapter writes: backend, `backend-id`,
@@ -220,7 +225,8 @@ workflow:
   whether that backend could build this machine are two questions and a dry run asks only the second.
   `_set_adapter` is the test seam, as `credentials._set_provider` is for the keyring.
   `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the drive
-  and boot rendering a machine's state lowers into, the `backend-settings.qemu` hatch (`SETTINGS_KEYS` = `machine` /
+  and boot rendering a machine's state lowers into (the `pointing-device: tablet` field renders alongside
+  them, `-usb -device usb-tablet,id=pointer0`, F66), the `backend-settings.qemu` hatch (`SETTINGS_KEYS` = `machine` /
   `args`, `RESERVED_ARGUMENTS` = what a blueprint field or the VM identity owns — case-sensitively, `-m`
   being memory and `-M` the machine type, and deliberately *not* `-device` or `-cpu`, with
   `RESERVED_DRIVE_PROPERTIES` the `-drive` properties `drives` renders and so refuses through
@@ -228,7 +234,9 @@ workflow:
   route to one drive's options and the reason no drive-scoped section exists, D118; `settings_args` both
   validates and renders, which is what makes a section a create accepted one a start applies, and it renders
   last so a caller's own arguments are the tail of the logged command line), the owned launch with its identity verification, `Qmp`,
-  the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`) plus the named native escape
+  the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`, `pointer_event` — F66, refused on
+  the base session for lacking a coordinate space to aim into, real on the VNC session via RFB's own
+  `PointerEvent`, no scaling) plus the named native escape
   hatch `QemuSession.native()`. **It serves two display planes over
   the one carrier seam** (F63): the agentless default scrapes VGA
   text memory over QMP, and the VNC plane (`control-planes:
@@ -244,10 +252,10 @@ workflow:
   opens the RFB socket, and `change_medium` rides QMP whatever
   plane drives the screen. `rfb.py` is the wire — an in-tree
   minimal RFB 3.8 client (security None, forced 32bpp true colour,
-  Raw-only updates full and incremental, `KeyEvent`; no
-  `PointerEvent` until the pointer feature lands, D110's
-  no-new-dependency ruling) that knows no machine and verifies no
-  identity, which is why it stays a separate module below the
+  Raw-only updates full and incremental, `KeyEvent` and
+  `PointerEvent`, D110's no-new-dependency ruling) that knows no
+  machine and verifies no identity, which is why it stays a
+  separate module below the
   adapter. **No adapter opens a disk's
   contents**: an adapter creates the images a machine runs on and
   exposes nothing that reads inside one (D108).
@@ -361,6 +369,14 @@ workflow:
   failing regions and their achieved percentages. The reference side is normalized through the
   capture plane's stated pixel format first — the seam point `hyperv-screen.md` settled, an
   identity on every plane built today and costing nothing until one quantizes.
+  **`spots` are read by `click`** (F66): a named point, or the lone spot a spotless-of-ambiguity
+  declaration carries, is where a pointer event lands. `park_position(width, height)` resolves
+  every pointer verb's post-delivery park move per landmark — bottom-right, scaled to that
+  landmark's own pinned size rather than a bare global pixel, since content commonly anchors
+  top-left — and `_park_region` folds the matching built-in `ignore` region into every match
+  unconditionally, clamped to a quarter of the pinned size so a small landmark's residual is
+  never swallowed whole. This is host-side masking, not a cursor-free capture: nothing
+  negotiates an RFB pseudo-encoding to keep the cursor out of the framebuffer in the first place.
   **What decides whether a machine can watch a landmark is the plane's screen carrier, not the
   backend**: `BackendAdapter.capture_format(plane)` reports the pixel format a plane captures
   in, or `None` where it captures none (the honest default, as `settings_keys` is empty by
@@ -394,9 +410,12 @@ workflow:
   and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
   effective timeout and quiescence gate, and every guest-input verb's effective `pacing` — the settling gap
   before its first
-  key event, D60 — each with the scope that supplied it. **`stability=` is `pacing`'s opposite number** (F48):
+  key event, D60 — each with the scope that supplied it (`INPUT_VERBS` gained `click` at F66, and
+  `click` joins `select` as the only two verbs appearing twice in the resolved plan — an
+  `Observation` for the search, carrying the landmark name, and an `Input` for the delivery).
+  **`stability=` is `pacing`'s opposite number** (F48):
   a proportion rather than a duration, resolved over the ladder statement > branching wait > phase > header >
-  built-in 0.99, sitting on observations where pacing sits on the four input verbs — each guard on exactly the
+  built-in 0.99, sitting on observations where pacing sits on the five input verbs — each guard on exactly the
   statement kind whose hazard it addresses, so neither needs position-sensitive semantics. It sits where
   `stable` cannot, and the divergence is principled: `stable` qualifies a match, so one must exist, while
   `stability` qualifies the frame a compare runs on, and a frame exists at every sample — which is also what
@@ -465,7 +484,15 @@ workflow:
   cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
   the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
   create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys
-  (a `ScriptPreflightError`, exit 3 — it is caught before the first guest input),
+  (a `ScriptPreflightError`, exit 3 — it is caught before the first guest input; `click`'s own
+  three join it under the same class — `machine.pointing-device-not-tablet`,
+  `machine.plane-no-pointer-input`, `landmark.spot-required`/`landmark.spot-unknown` — F66, checked
+  in `_preflight_landmarks`'s existing walk since `click` carries a `conditions` tuple like `wait`
+  does, needing no second walk for the three landmark refusals both share).
+  **`_click` reuses `wait`'s search machinery verbatim** — `_observation`/`_arm`/`_observe` — rather
+  than `select`'s opaque `cursor_menu_select`, because a `click`'s target is a real landmark
+  pixel-match and not a text scan; only once that search matches does delivery pay `pacing` and
+  compose the click through `DisplayConsole.click`, which parks the cursor as its last event.
   property binding before the machine starts, secret redaction, and
   the run **returning its output** to the caller — no run-record
   persistence, milestone 9's return model; the `runs/` archive is
@@ -489,7 +516,10 @@ workflow:
   surface and lands on S1/S2 in the same change (`--record <path>`
   on `run-script`, `run_script(record=)` on the session). The
   capture wraps the **carrier seam** — the adapter session's
-  `text_screen` / `send_keys` / `screenshot` / `change_medium` —
+  `text_screen` / `send_keys` / `screenshot` / `change_medium` / `pointer_event` (F66, passed
+  through on record and refused on replay for the same reason `framebuffer` already is: a
+  transcript holds no pixels, so a `click`'s search is already unreplayable before its delivery
+  would be reached) —
   so it is backend-neutral by construction: `RecordingSession` is
   that wrapper, and `ReplaySession` stands a fake session at the
   same seam, which is what lets the whole interpretation layer

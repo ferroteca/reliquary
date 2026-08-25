@@ -48,8 +48,8 @@ _CORPUS = os.path.join(_HERE, "fixtures", "conformance", "blueprint")
 
 _ID = re.compile(r"^// id: (\S+)", re.M)
 
-VALID = corpus.fixtures(_CORPUS, "valid", ".rlqb", count=23)
-INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqb", count=47)
+VALID = corpus.fixtures(_CORPUS, "valid", ".rlqb", count=24)
+INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqb", count=48)
 AT_RESOLUTION = corpus.fixtures(
     _CORPUS, "invalid-at-resolution", ".rlqb", count=2)
 
@@ -200,7 +200,8 @@ def test_the_schema_rejects_exactly_what_the_fixture_declares(fixture):
 
 
 @pytest.mark.parametrize("vocabulary", [
-    "platform", "backend", "materialize", "controller", "control-planes"])
+    "platform", "backend", "materialize", "controller", "control-planes",
+    "pointing-device"])
 def test_a_closed_vocabulary_is_schema_enforced(vocabulary):
     """What the reach trim buys, asserted rather than assumed.
 

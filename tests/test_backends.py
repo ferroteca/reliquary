@@ -64,6 +64,30 @@ def test_a_media_kind_the_backend_lacks_is_named():
         "floppy drives",)
 
 
+def test_a_pointing_device_the_backend_lacks_is_named():
+    report = Capabilities(backend="hyperv", pointing_devices=("mouse",))
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(
+        _requirements(pointing_device="tablet")) == (
+        "pointing device 'tablet'",)
+
+
+def test_no_declared_pointing_device_asks_nothing():
+    # `pointing_device=None` is "the blueprint left it to its
+    # default", never "the backend must supply nothing" — an empty
+    # report still leaves this unmet.
+    report = Capabilities(backend="hyperv")
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(_requirements()) == ()
+
+
+def test_pointer_capable_defaults_to_false():
+    # The honest default, as `capture_format`'s is `None`: nothing
+    # built claims nothing (P11).
+    adapter = backends.BackendAdapter()
+    assert adapter.pointer_capable("vnc") is False
+
+
 # A section is honored or refused — never carried and ignored.
 #
 # The seam's own half: the key set. What an adapter does with the keys

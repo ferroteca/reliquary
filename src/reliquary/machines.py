@@ -108,6 +108,17 @@ def _resolve_control_planes(machine):
             or _default_control_planes(machine.platform))
 
 
+def _resolve_pointing_device(machine):
+    """The machine's pointer input device, defaulted.
+
+    ``mouse`` is the stock relative device every platform's default
+    machine carries anyway, so the default records reality rather
+    than aspiring to one (F66); a GUI-era platform earns a richer
+    default the way `control-planes` will earn one of its own.
+    """
+    return machine.pointing_device or "mouse"
+
+
 def _backend_choice(machine):
     """Where the blueprint says this machine belongs, and how it said it.
 
@@ -157,7 +168,8 @@ def _requirements(machine, namespace):
             modes.append(item.materialize)
     return backends.Requirements(
         control_planes=tuple(planes), media=tuple(media),
-        controllers=tuple(controllers), materialize=tuple(modes))
+        controllers=tuple(controllers), materialize=tuple(modes),
+        pointing_device=_resolve_pointing_device(machine))
 
 
 def _blueprint_digest(resolved, drives):
@@ -344,6 +356,7 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         "name": machine.name,
         "description": machine.description,
         "control-planes": control_planes,
+        "pointing-device": _resolve_pointing_device(machine),
         "backend-settings": {
             name: dict(section)
             for name, section in machine.backend_settings.items()},
@@ -645,6 +658,7 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         "cpus": machine.cpus if machine.cpus is not None else 1,
         "boot": list(machine.boot),
         "control-planes": _resolve_control_planes(machine),
+        "pointing-device": _resolve_pointing_device(machine),
         "drives": drives,
         "media": entries,
         "properties": dict(bound.sources),
@@ -701,6 +715,7 @@ def _dry_report(plan):
     if plan["boot"]:
         lines.append("boot: " + ", ".join(plan["boot"]))
     lines.append("control planes: " + ", ".join(plan["control-planes"]))
+    lines.append(f"pointing device: {plan['pointing-device']}")
     if plan["drives"]:
         lines.append("drives:")
         lines.extend(_drive_line(drive) for drive in plan["drives"])
@@ -949,6 +964,7 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             "name": parsed.name,
             "description": parsed.description,
             "control-planes": control_planes,
+            "pointing-device": _resolve_pointing_device(parsed),
             "backend-settings": {
                 name: dict(section)
                 for name, section in parsed.backend_settings.items()},

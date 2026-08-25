@@ -67,7 +67,7 @@ _UNITS = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0}
 #: Host-side verbs (``insert``, ``eject``, ``set-boot``,
 #: ``screenshot``, ``start``, ``stop``, ``set``, ``http``) are not
 #: guest input and do not.
-INPUT_VERBS = frozenset({"enter", "type", "press", "select"})
+INPUT_VERBS = frozenset({"enter", "type", "press", "select", "click"})
 
 
 def parse_duration(spelling):
@@ -363,6 +363,14 @@ def _statements(statements, default, pacing, stability, phase,
             observations.append(Observation(
                 "select", statement.line, statement.column, phase, default,
                 None, stability))
+            continue
+        if statement.verb == "click":
+            # Like `select`, twice in the plan: its search is a real
+            # landmark match (F65's own machinery), not select's text
+            # scan, so it carries the landmark the way a `wait` does.
+            observations.append(Observation(
+                "click", statement.line, statement.column, phase, default,
+                None, stability, statement.arguments[0]))
             continue
         if statement.verb != "wait":
             continue

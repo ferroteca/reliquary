@@ -211,14 +211,14 @@ select "English (United States)"
   a known state: `wait`, in its single-condition and branching
   forms, and reactive `always` handlers.
 - **Actions** deliver intent-level input or perform supporting host
-  operations: `enter`, `type`, `press`, `select`, `insert`,
+  operations: `enter`, `type`, `press`, `select`, `click`, `insert`,
   `eject`, `set-boot`, `set`, `screenshot`, `start`, and `stop`.
 
 Intent-level verbs remain above portable input events. `select`
 means choosing a visible menu entry, not sending a guessed number
-of Down keys. The selected control plane composes the necessary
-key press and release events and owns their pacing (G5). Pointer actions
-will follow the same model when GUI automation arrives.
+of Down keys; `click` means a spot on a matched landmark, not a
+guessed pixel. The selected control plane composes the necessary
+key or pointer events and owns their pacing (G5).
 
 Three design rules govern the whole surface:
 
@@ -600,6 +600,9 @@ action          = "enter" , string , [ pacing-mod ] , eol
                 | "press" , key , { key } , [ pacing-mod ] , eol
                 | "select" , string ,
                   [ "exclude" , "=" , string ] ,
+                  [ pacing-mod ] , eol
+                | "click" , media-ref ,
+                  [ "spot" , "=" , string ] ,
                   [ pacing-mod ] , eol
                 | "screenshot" , [ name ] , eol
                 | "insert" , slot , ( media-ref | property-ref ) ,
@@ -1715,7 +1718,7 @@ The four families scope differently, and placement is the law:
   budgeted per visit; the header `deadline` is the backstop that
   bounds the whole run, cycles included.
 - **Input pacing (`pacing`) is lexically scoped** like the first
-  family, and applies to the four guest-input verbs:
+  family, and applies to the five guest-input verbs:
 
   ```text
   statement > phase > header > built-in 0.1s
@@ -1807,13 +1810,13 @@ placement is a parse error:
 | single-condition `wait` | bound on this observation | error | hold requirement on this match | gate on this observation's samples | error — it delivers no input |
 | branching `wait` | bound on reaching the first match | error | error — put it on the `on` | gate on this wait's samples | error — it delivers no input |
 | `on` / `always` | error — the container owns the waiting | error | hold requirement on this condition | gate on this handler's samples | error — put it on the input verb |
-| `enter` / `type` / `press` / `select` | error | error | error | error — it compares nothing | gap before this delivery |
+| `enter` / `type` / `press` / `select` / `click` | error | error | error | error — it compares nothing | gap before this delivery |
 | every other statement | error | error | error | error — it compares nothing | error — it delivers no input |
 
 **`stability` and `pacing` are opposite numbers**, and the table is
 the clearest place to see it: each sits on exactly the statement
 kind whose hazard it addresses — pacing guards the actor and lives
-on the four verbs that deliver input, stability guards the compare
+on the five verbs that deliver input, stability guards the compare
 and lives on the observations — so neither overlaps the other and
 no word needs position-sensitive semantics.
 
@@ -1920,12 +1923,14 @@ unmappable character is the named input error the
 substitution.
 
 Every verb in this section pays the pacing gap before its first
-key event, and each accepts `pacing=` to tune it
-([Timing](#timing)). The four are `enter`, `type`, `press` and
-`select`; the supporting operations below are not guest input and
-pay nothing. `select` is both — it delivers keys *and* observes
-between them — so it carries a `timeout` for its feedback and a
-`pacing` for its delivery, and appears twice in the resolved plan.
+key or pointer event, and each accepts `pacing=` to tune it
+([Timing](#timing)). The five are `enter`, `type`, `press`,
+`select` and `click`; the supporting operations below are not
+guest input and pay nothing. `select` and `click` are both
+observation-bearing — each delivers *and* observes, `select` a
+cursor-key menu, `click` a landmark — so each carries a `timeout`
+for its search and a `pacing` for its delivery, and each appears
+twice in the resolved plan.
 
 ### `enter`
 
@@ -2000,6 +2005,42 @@ verb never guesses. `select` is an observation-bearing action: its
 feedback watches run under the statement's effective `timeout`,
 resolved by the same lexical rules as any observation, and a
 failure names that clock and its source scope.
+
+### `click`
+
+```rlqs
+click @welcome-screen
+click @component-list spot="continue"
+```
+
+Finds a landmark and delivers a left click at one of its declared
+spots, then parks the cursor (F66). Its *search* — matching the
+landmark on stability-gated frames — runs under the statement's
+effective `timeout`, resolved by the same lexical rules as any
+observation; a search that matches nothing times out visibly, the
+same safe-failure asymmetry landmarks chose, with no pointer event
+ever delivered. Its *delivery* — the click, then the park move —
+pays `pacing`, exactly as the other input verbs do.
+
+**Spot naming.** A landmark declaring exactly one spot needs no
+`spot=`; more than one makes it required, and `spot=` naming
+nothing in the declaration is a static error — the referenced
+`.rlql` is loaded and checked at preflight, before the machine
+starts (G3).
+
+**Capability.** `click` requires everything a landmark condition
+does (framebuffer capture on the driving control plane) plus two
+more: pointer input on that plane, and `pointing-device: tablet`
+on the machine (see [blueprint-model.md](blueprint-model.md)) — an
+absolute event needs an absolute device, so a relative `mouse`
+machine is refused by name rather than attempted with a
+calibration guess. Every refusal lands before the first guest
+input (G3).
+
+**First cut: left-single-click only.** `button=`, `count=`, and a
+drag verb are additive sibling growth (G7) with no named demand
+yet — the seam itself already carries any mask and any sequence,
+so growth here never touches an adapter.
 
 ## Phase transitions
 
@@ -2366,6 +2407,17 @@ scope, preflight further rejects, naming what it needed:
   captures no framebuffer (`machine.plane-no-framebuffer`, a
   machine) — capability at the condition's granularity, so a script
   watching no landmark is unaffected;
+- `click` on a machine whose `pointing-device` is not `tablet`
+  (`machine.pointing-device-not-tablet`), or whose driving control
+  plane cannot deliver a pointer event
+  (`machine.plane-no-pointer-input` — a separate question from
+  framebuffer capture, since a plane can hold one without the
+  other) (F66, a machine);
+- `click spot=` naming nothing the landmark declares
+  (`landmark.spot-unknown`), and a `click` with no `spot=` where
+  the landmark declares zero or more than one
+  (`landmark.spot-required`, the lone-spot default applying only
+  where exactly one exists) (F66, a landmark);
 - `insert`/`eject` slots and `set-boot` drives the target
   machine does not declare — a `with` head answering to the rule
   of the action it spells, and a scoped `boot` prefix to
@@ -2683,7 +2735,7 @@ The intended post-beta growth discipline is (G7):
   the same screen. Neither is a new construct or a positional
   keyword;
 - new action kinds use explicit sibling forms following the same
-  node shape, as future pointer verbs will;
+  node shape, as `click` does (F66) beside `select`;
 - **a new construct is argued as one.** `with` is the only block
   form added since the vocabulary was set, and it earned that
   standing by expressing a unit — a *stage*, a group of phases —

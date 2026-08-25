@@ -74,7 +74,7 @@ into a description.
 | [script-spec.md](script-spec.md) | The `.rlqs` scripting language, and the G1–G7 language goals |
 | [blueprint-model.md](blueprint-model.md) | The composed blueprint model — structure, identity, the location grammar, the reference closure |
 | [media-spec.md](media-spec.md) | Media: acquisition, verification, and the cache |
-| [landmarks.md](landmarks.md) | Landmarks: the `.rlql` image-match asset and the `@name` screen condition |
+| [landmarks.md](landmarks.md) | Landmarks: the `.rlql` image-match asset, the `@name` screen condition, and the cursor-parking contract `click` mechanizes |
 | [script-properties.md](script-properties.md) | Properties, secret storage, and the binding pipeline |
 | [asset-resolution.md](asset-resolution.md) | Where authored assets resolve from, and the six placeable working directories |
 | [instance-model.md](instance-model.md) | Machines: the state document, ownership, locking, recovery |

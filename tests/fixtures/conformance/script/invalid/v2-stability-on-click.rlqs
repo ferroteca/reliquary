@@ -1,0 +1,10 @@
+# invalid: the placement matrix: click joins the other three input
+# verbs in refusing stability, the same reason select does -- the
+# lexically inherited default governs the search, and the verb takes
+# no override
+# rule: V2
+# id: node.timing-placement
+# spec: Timing
+
+platform dos
+click @welcome-screen stability=0.99

@@ -59,8 +59,11 @@ second — watch-only landmarks — was pledged as **F65** (owner,
 2026-08-24) and is **delivered**, its number retired and its
 surface normative at
 [docs/spec/landmarks.md](../../docs/spec/landmarks.md); the third
-— pointer input, `pointing-device`, and `click` — is pledged as
-**F66** (owner, 2026-08-25; [FEATURES.md](FEATURES.md)); and the
+— pointer input, `pointing-device`, and `click` — was pledged as
+**F66** (owner, 2026-08-25) and is **delivered**, its number
+retired and its surface normative at
+[../../docs/spec/script-spec.md](../../docs/spec/script-spec.md#click);
+and the
 platform workflows stand alone in
 [proposed/FEATURES.md](../proposed/FEATURES.md) (F5) on this
 pledge, still moving by their own decision (D65). Text

@@ -29,6 +29,7 @@ class FakeSession:
         self.attributes = (attributes if attributes is not None
                            else [[0x07] * 80 for _ in range(25)])
         self.keys = []
+        self.pointer_events = []
         self.screenshots = []
         self.media_changes = []
         #: What this session's framebuffer carrier hands back, where
@@ -41,6 +42,9 @@ class FakeSession:
 
     def send_keys(self, combos, delay=0.06):
         self.keys.extend(list(combo) for combo in combos)
+
+    def pointer_event(self, x, y, buttons):
+        self.pointer_events.append((x, y, buttons))
 
     def text_screen(self, font_banks=()):
         return list(self.rows), [list(row) for row in self.attributes]
@@ -68,7 +72,7 @@ class FakeAdapter(BackendAdapter):
     def __init__(self, name="qemu", *, available=True,
                  capabilities=None, extension=".qcow2",
                  image_payload=None, settings_keys=(),
-                 capture_planes=None):
+                 capture_planes=None, pointer_planes=None):
         self.name = name
         self.available = available
         self.extension = extension
@@ -93,6 +97,7 @@ class FakeAdapter(BackendAdapter):
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
+            pointing_devices=("tablet", "mouse"),
         )
         self.images = []
         self.starts = []
@@ -109,6 +114,10 @@ class FakeAdapter(BackendAdapter):
         #: is the seam's own honest default: a plane that states no
         #: format is one a landmark condition is refused on.
         self.capture_planes = dict(capture_planes or {})
+        #: ``{plane: bool}`` for the planes this double can deliver a
+        #: pointer event on (F66). Empty by default, the seam's own
+        #: honest default (`backends.BackendAdapter.pointer_capable`).
+        self.pointer_planes = dict(pointer_planes or {})
         #: What a session's framebuffer carrier answers with.
         self.session_image = None
         self.native = object()
@@ -137,6 +146,9 @@ class FakeAdapter(BackendAdapter):
 
     def capture_format(self, plane):
         return self.capture_planes.get(plane)
+
+    def pointer_capable(self, plane):
+        return self.pointer_planes.get(plane, False)
 
     def validate_settings(self, settings):
         self.validated.append(settings)

@@ -148,6 +148,57 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A transcript holds character rows and attribute tokens, so a
   recorded run's landmark waits cannot be replayed and the replay
   says so by name rather than improvising a screen.
+- **Pointer input: `pointer_event`, the `tablet` pointing device,
+  and `click`** (F66, cut out of F5, serving U5). The seam gained
+  exactly one new carrier method — `pointer_event(x, y, buttons)`,
+  RFB's own `PointerEvent` shape, joining `KeyEvent` on the VNC
+  plane's wire with no translation — and everything above it
+  composes: `click @landmark` / `click @landmark spot="name"`
+  finds a landmark (F65's own matcher), delivers a left click at
+  one of its declared spots, and parks the cursor. Coordinates are
+  framebuffer pixels throughout, a landmark's own space, so a click
+  needs no second scale.
+- **`pointing-device` is a first-class machine field**
+  (`tablet` / `mouse`), capability-checked at assignment exactly as
+  `drives` is — a declared `tablet` a backend cannot supply fails
+  closed naming both. Today's platforms default to `mouse`, the
+  stock relative device every machine carries anyway; QEMU renders
+  `tablet` as `-usb -device usb-tablet,id=pointer0` and reports both
+  devices in its capability report. `click` preflight-refuses a
+  `mouse` machine by name (P10: an absolute event needs an absolute
+  device, never a calibration guess against a relative one).
+- **Capability preflight, at the condition's granularity, again.**
+  `click` needs everything a landmark condition does (framebuffer
+  capture) plus pointer input on the driving control plane — a
+  separate question from framebuffer capture, since a plane can
+  hold one without the other (VirtualBox's display plane captures a
+  framebuffer today but has no pointer delivery wired) — reported by
+  the seam's new `pointer_capable(plane)`, honestly `False` by
+  default. `click`'s own `spot=` is checked too: a landmark
+  declaring exactly one spot needs no modifier, more than one makes
+  it required, and a name the declaration lacks is refused by name
+  — all three before the machine starts.
+- **`click`'s search reuses `wait`'s exact machinery, not
+  `select`'s.** `select`'s search is a text scan hidden inside one
+  console call; `click`'s is a real landmark pixel-match, the same
+  stability-gated sampling `wait @landmark` already runs, so a
+  `click` on a landmark that never appears times out naming the
+  statement's clock with no pointer event ever delivered. Like
+  `select`, it is timing-dual — an `Observation` for the search, an
+  `Input` for the delivery — and appears twice in the resolved plan.
+- **Every pointer verb parks the cursor**, and the park zone is a
+  built-in `ignore` region excluded from every match unconditionally
+  — bottom-right, scaled to each landmark's own pinned size rather
+  than one global pixel, since content commonly anchors top-left.
+  This is host-side masking, not a cursor-free capture: nothing
+  negotiates an RFB pseudo-encoding to keep the cursor out of the
+  framebuffer itself.
+- **First cut: left-single-click only.** `button=`, `count=`, and a
+  drag verb are additive sibling growth with no named demand yet;
+  the seam itself already carries any mask and any sequence, so
+  growth here never touches an adapter. The recorder, the other
+  backends' VNC endpoints, and any relative-mouse delivery stay out
+  of scope.
 - **Per-drive QEMU options through the machine-scoped hatch**
   (D118). A drive-scoped `backend-settings` section was declined:
   QEMU's own `-set drive.<slot>.<option>=<value>` addresses one

@@ -417,7 +417,8 @@ def test_backend_overrides_the_blueprint_field(dry):
                     control_planes=("agentless-display",),
                     media=("floppy", "hdd", "cdrom"),
                     controllers=("ide",),
-                    materialize=("new", "use")))
+                    materialize=("new", "use"),
+                    pointing_devices=("tablet", "mouse")))
     plan = dry.run(backend="vmware").plan
     assert plan["backend"] == "vmware"
     assert plan["backend-source"] == "--backend"

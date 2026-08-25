@@ -30,6 +30,7 @@ from reliquary.script_runner import (_preflight_machine_rules,
                                      _HttpService, _ScriptEngine,
                                      execute_script)
 from reliquary.script_validation import PORTABLE_KEY_NAMES
+from tests import fake_backend
 
 _HEAD = "platform dos\n"
 
@@ -124,6 +125,9 @@ class _FakeConsole:
 
     def cursor_menu_select(self, item, timeout=30, exclude=()):
         self.commands.append(("select", item, timeout, exclude))
+
+    def click(self, x, y, park, buttons=1):
+        self.commands.append(("click", x, y, park, buttons))
 
 
 class _FakeHttpService:
@@ -437,13 +441,15 @@ def test_a_screen_observation_needs_a_running_machine(runtime):
 
 
 def _landmark(tmp_path, name="welcome", regions=None, variants=(1,),
-              colour=(10, 20, 30)):
+              colour=(10, 20, 30), spots=None):
     """One declaration with its renderings, parsed as a run would."""
     root = tmp_path / "landmarks"
     root.mkdir(parents=True, exist_ok=True)
     document = {"screen": {"width": 16, "height": 8}}
     if regions is not None:
         document["regions"] = regions
+    if spots is not None:
+        document["spots"] = spots
     (root / f"{name}.rlql").write_text(json.dumps(document),
                                        encoding="utf-8")
     for number in variants:
@@ -506,6 +512,60 @@ def test_a_matched_landmark_names_the_variant_that_matched(runtime,
                if event["kind"] == _events.OBSERVATION_MATCH][-1]
     assert matched["variant"] == "welcome.2.png"
     assert matched["description"] == "@welcome"
+
+
+def test_a_click_delivers_at_its_named_spot_then_parks(runtime, tmp_path):
+    declaration = _landmark(
+        tmp_path, spots={"next": {"x": 12, "y": 3}, "cancel": {"x": 2,
+                                                                "y": 5}})
+    capture = Image.new("RGB", (16, 8), (10, 20, 30))
+    engine = runtime.engine(
+        'timeout 5s\nclick @welcome spot="next"\n', captures=[capture],
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    runtime.run_linear(engine)
+    # The park position is the bottom-right corner of *this* landmark's
+    # own pinned screen (16x8), not a bare global constant.
+    assert runtime.console.commands == [("click", 12, 3, (15, 7), 1)]
+
+
+def test_a_click_uses_the_lone_spot_by_default(runtime, tmp_path):
+    declaration = _landmark(tmp_path, spots={"only": {"x": 4, "y": 4}})
+    capture = Image.new("RGB", (16, 8), (10, 20, 30))
+    engine = runtime.engine(
+        "timeout 5s\nclick @welcome\n", captures=[capture],
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    runtime.run_linear(engine)
+    assert runtime.console.commands == [("click", 4, 4, (15, 7), 1)]
+
+
+def test_a_click_on_a_landmark_that_never_appears_delivers_nothing(
+        runtime, tmp_path):
+    declaration = _landmark(tmp_path, spots={"only": {"x": 4, "y": 4}})
+    wrong = Image.new("RGB", (16, 8), (200, 0, 0))
+    engine = runtime.engine(
+        "timeout 1s\nclick @welcome\n", captures=[wrong],
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    with pytest.raises(ScriptRuntimeError) as caught:
+        runtime.run_linear(engine)
+    assert "the observation timeout of 1s expired" in str(caught.value)
+    assert "@welcome" in str(caught.value)
+    # No pointer event was ever composed: the search failed before
+    # delivery was reached.
+    assert runtime.console.commands == []
+
+
+def test_a_click_pays_the_pacing_gap_before_delivery(runtime, tmp_path):
+    # The fake clock only advances on a sleep, and the search itself
+    # burns a little polling the screen to quiescence before the
+    # (much larger) explicit pacing gap is paid — so this proves the
+    # gap was honored without pinning the search's own overhead.
+    declaration = _landmark(tmp_path, spots={"only": {"x": 4, "y": 4}})
+    capture = Image.new("RGB", (16, 8), (10, 20, 30))
+    engine = runtime.engine(
+        'pacing 2s\ntimeout 5s\nclick @welcome\n', captures=[capture],
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    runtime.run_linear(engine)
+    assert runtime.clock.now >= 2.0
 
 
 def test_a_branching_wait_reads_both_the_screen_and_the_capture(runtime,
@@ -1599,13 +1659,16 @@ class _Preflight:
         with open(os.path.join(fonts_dir, f"{name}.bin"), "wb") as handle:
             handle.write(bytes(4096))
 
-    def write_landmark(self, name, width=16, height=8, regions=None):
+    def write_landmark(self, name, width=16, height=8, regions=None,
+                      spots=None):
         """Declare a landmark in the home so `@name` preflights."""
         root = os.path.join(self.home, "landmarks")
         os.makedirs(root, exist_ok=True)
         document = {"screen": {"width": width, "height": height}}
         if regions is not None:
             document["regions"] = regions
+        if spots is not None:
+            document["spots"] = spots
         with open(os.path.join(root, f"{name}.rlql"), "w",
                   encoding="utf-8") as handle:
             json.dump(document, handle)
@@ -1613,9 +1676,9 @@ class _Preflight:
             os.path.join(root, f"{name}.1.png"))
 
     def state(self, phase="ready", drives=None, backend="qemu",
-              planes=("vnc",)):
+              planes=("vnc",), pointing_device=None):
         """The machine.json a preflight is run against."""
-        return {
+        state = {
             "id": self.machine_id,
             "phase": phase,
             "backend": backend,
@@ -1625,13 +1688,16 @@ class _Preflight:
                          "path": "blank.qcow2"},
             },
         }
+        if pointing_device is not None:
+            state["pointing-device"] = pointing_device
+        return state
 
     def write_state(self, phase="ready", drives=None, backend="qemu",
-                    planes=("vnc",)):
+                    planes=("vnc",), pointing_device=None):
         root = os.path.join(self.home, "cache", "machines",
                             self.machine_id)
         os.makedirs(root)
-        state = self.state(phase, drives, backend, planes)
+        state = self.state(phase, drives, backend, planes, pointing_device)
         with open(os.path.join(root, "machine.json"), "w",
                   encoding="utf-8") as handle:
             json.dump(state, handle)
@@ -1791,7 +1857,98 @@ def test_a_script_watching_no_landmark_asks_the_plane_nothing(preflight):
         script, preflight.state(planes=("agentless-display",)),
         "<script>", preflight.home)
     assert resolved.landmarks == {}
-    assert resolved.capture_format is None
+
+
+# `click` preflight (F66): the three refusals its own entry names,
+# beside the three landmark ones above it shares with `wait`.
+
+def test_a_click_needs_the_tablet_pointing_device(preflight):
+    # The default is `mouse` (the stock relative device every
+    # platform's machine carries anyway), and `click` refuses it by
+    # name rather than attempting a calibration guess (P10, P11).
+    preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
+    preflight.write_state(planes=("vnc",))
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(
+            _HEAD + "machine stopped\nclick @welcome\n")
+    assert caught.value.rule_id == "machine.pointing-device-not-tablet"
+    assert "'mouse'" in str(caught.value)
+
+
+def test_a_click_needs_a_plane_that_delivers_pointer_events(preflight):
+    # A plane can capture a framebuffer without being wired to
+    # deliver a pointer event on it (VirtualBox today) — two separate
+    # capabilities, so this is refused even though the landmark
+    # itself would be watchable here.
+    preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
+    preflight.write_state(backend="qemu", planes=("agentless-display",),
+                          pointing_device="tablet")
+    with fake_backend.installed(
+            name="qemu",
+            capabilities=fake_backend.Capabilities(
+                backend="qemu", pointing_devices=("tablet", "mouse")),
+            capture_planes={"agentless-display": "rgb"},
+            pointer_planes={"agentless-display": False}):
+        with pytest.raises(ScriptPreflightError) as caught:
+            preflight.execute(
+                _HEAD + "machine stopped\nclick @welcome\n")
+    assert caught.value.rule_id == "machine.plane-no-pointer-input"
+    assert "'agentless-display'" in str(caught.value)
+
+
+def test_a_click_with_no_declared_spots_needs_one(preflight):
+    preflight.write_landmark("welcome")
+    preflight.write_state(planes=("vnc",), pointing_device="tablet")
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(
+            _HEAD + "machine stopped\nclick @welcome\n")
+    assert caught.value.rule_id == "landmark.spot-required"
+    assert "declares 0 spots" in str(caught.value)
+
+
+def test_a_click_with_more_than_one_spot_needs_one_named(preflight):
+    preflight.write_landmark(
+        "welcome",
+        spots={"next": {"x": 1, "y": 1}, "cancel": {"x": 2, "y": 2}})
+    preflight.write_state(planes=("vnc",), pointing_device="tablet")
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(
+            _HEAD + "machine stopped\nclick @welcome\n")
+    assert caught.value.rule_id == "landmark.spot-required"
+    assert "declares 2 spots" in str(caught.value)
+
+
+def test_a_click_spot_naming_nothing_is_refused(preflight):
+    preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
+    preflight.write_state(planes=("vnc",), pointing_device="tablet")
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(
+            _HEAD + 'machine stopped\nclick @welcome spot="cancel"\n')
+    assert caught.value.rule_id == "landmark.spot-unknown"
+    assert "no spot named 'cancel'" in str(caught.value)
+
+
+def test_a_click_binds_its_landmark_with_one_spot_and_no_modifier(
+        preflight):
+    preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
+    script = parse_script(_HEAD + "machine stopped\nclick @welcome\n")
+    resolved = _preflight_machine_rules(
+        script, preflight.state(planes=("vnc",), pointing_device="tablet"),
+        "<script>", preflight.home)
+    assert resolved.capture_format == "rgb"
+    assert "next" in resolved.landmarks["welcome"].spots
+
+
+def test_a_click_naming_its_spot_binds_cleanly(preflight):
+    preflight.write_landmark(
+        "welcome",
+        spots={"next": {"x": 1, "y": 1}, "cancel": {"x": 2, "y": 2}})
+    script = parse_script(
+        _HEAD + 'machine stopped\nclick @welcome spot="cancel"\n')
+    resolved = _preflight_machine_rules(
+        script, preflight.state(planes=("vnc",), pointing_device="tablet"),
+        "<script>", preflight.home)
+    assert "cancel" in resolved.landmarks["welcome"].spots
 
 
 def test_a_landmark_in_a_handler_is_preflighted_too(preflight):
