@@ -13,7 +13,7 @@ SPDX-License-Identifier: GPL-3.0-only
 >
 > **One thing below is stated and not built**: the cursor-parking
 > contract, which arrives with the pointer verbs and is designed at
-> [pointer-input.md](../../planning/proposed/design/pointer-input.md).
+> [pointer-input.md](../../planning/pledged/design/pointer-input.md).
 > It is named here because a landmark author needs to know why
 > today's rule is enough and what will change — see
 > [the cursor](#the-cursor) — and it binds nothing until that piece
@@ -301,7 +301,7 @@ whose cursor may sit anywhere declares an `ignore` region, like any
 other furniture.
 
 **With the pointer verbs**
-([pointer-input.md](../../planning/proposed/design/pointer-input.md)):
+([pointer-input.md](../../planning/pledged/design/pointer-input.md)):
 every pointer verb will end by parking the cursor at a fixed
 per-platform park position — never script surface — the park zone
 becomes a built-in ignore region, and a cursor-free capture is used

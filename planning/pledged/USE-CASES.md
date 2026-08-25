@@ -58,10 +58,12 @@ was pledged in the same act as F63 and is **delivered**; the
 second — watch-only landmarks — was pledged as **F65** (owner,
 2026-08-24) and is **delivered**, its number retired and its
 surface normative at
-[docs/spec/landmarks.md](../../docs/spec/landmarks.md); and the rest of the GUI
-era — pointer input and `click`, the platform workflows — stands
-in [proposed/FEATURES.md](../proposed/FEATURES.md) (F5) on this
-pledge, each piece still moving by its own decision (D65). Text
+[docs/spec/landmarks.md](../../docs/spec/landmarks.md); the third
+— pointer input, `pointing-device`, and `click` — is pledged as
+**F66** (owner, 2026-08-25; [FEATURES.md](FEATURES.md)); and the
+platform workflows stand alone in
+[proposed/FEATURES.md](../proposed/FEATURES.md) (F5) on this
+pledge, still moving by their own decision (D65). Text
 verbatim as reshaped by D64:
 
 > - **U5 — Custom installation.** A user wants the German

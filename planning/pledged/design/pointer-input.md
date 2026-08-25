@@ -7,17 +7,22 @@ SPDX-License-Identifier: GPL-3.0-only
 
 > **Status:** the design for **F5**'s pointer-input piece
 > (planning/proposed/FEATURES.md, the GUI era's "Decide first"
-> bullet) — owner round, 2026-08-24. **Nothing here is pledged.**
-> The demand is **U5** (pledged; D110 adjudicated it as the GUI
-> half's), and F5's cut rule applies: at pledge the piece this
-> design serves takes a fresh number, referencing the delivered
-> VNC plane (F63) and **the watch-only landmarks piece**
+> bullet) — owner round, 2026-08-24. The demand is **U5** (pledged;
+> D110 adjudicated it as the GUI half's), and it references the
+> delivered VNC plane (F63) and **the watch-only landmarks piece**
 > ([docs/spec/landmarks.md](../../../docs/spec/landmarks.md)), which is
 > **delivered** — so this piece's references point downward at
 > shipped surface rather than at a pledge. The four calls
 > below were adjudicated in the round that produced this
-> document; their rejected alternatives are recorded here, the
-> way [platform-dialect.md](platform-dialect.md) records its own.
+> document; their rejected alternatives are recorded here, the way
+> [platform-dialect.md](../../proposed/design/platform-dialect.md)
+> records its own.
+>
+> **This piece is pledged as F66** (owner, 2026-08-25;
+> [../FEATURES.md](../FEATURES.md)), which is why this document
+> sits in `pledged/design/` — "Out of scope" below is that piece's
+> boundary, and the host-side landmark-cropping convenience it
+> names stays open in F5's own entry.
 
 ## The claim
 

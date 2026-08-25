@@ -47,8 +47,8 @@ viewer over the `vnc` control plane is the recording prerequisite
 on **every** backend, QEMU included
 ([design/recorder.md](design/recorder.md)). That plane's screen-and-keyboard
 half is delivered on QEMU (F63) — and the viewer additionally needs
-the pointer input and interactive display still with the GUI era
-(**F5**). This entry's former sequencing note claimed a
+pointer input — pledged as **F66** — and interactive display
+still with the GUI era (**F5**). This entry's former sequencing note claimed a
 text-mode half depending on nothing unpledged, and **that was wrong
 against its own design** — what text mode avoids is the landmark
 and click work, which is F5's GUI asset spec and pointer input,
@@ -159,7 +159,11 @@ passes byte-for-byte.
 > left it 2026-08-24**: **F65**, watch-only landmarks — pledged
 > and **delivered** the same day, its number retired and its
 > surface normative at
-> [docs/spec/landmarks.md](../../docs/spec/landmarks.md). Every deliverable below now stands on pledged
+> [docs/spec/landmarks.md](../../docs/spec/landmarks.md). **The
+> third cut left it 2026-08-25**: **F66**, pointer input —
+> `pointer_event`, `pointing-device`, and `click`
+> ([../pledged/FEATURES.md](../pledged/FEATURES.md)), the design
+> travelling to `pledged/design/` with it. Every deliverable below now stands on pledged
 > demand and stays here until pledged — a pledged use case makes
 > a feature pledgeable and pledges nothing itself (D65).
 >
@@ -205,19 +209,20 @@ Decide first:
   a phrase from before D12 deleted the embedded block. It is kept
   here only to say the question is closed, and goes with the
   entry.
-- Pointer input end to end: **designed** (owner round,
-  2026-08-24 — [design/pointer-input.md](design/pointer-input.md)):
-  the seam is one carrier method in RFB's `PointerEvent` shape
-  (the entry's three primitives collapse into it, key events
-  already delivered), composition and pacing control-plane-owned
-  above it; `pointing-device` (`tablet` / `mouse`) as a
-  first-class machine field under P25's cleared gate, pointer
-  verbs refusing a relative-only machine at preflight; and
-  `click` as the fifth guest-input verb — observation-bearing
-  like `select`, `spot=` with a lone-spot default,
-  left-single-click as the whole first cut. Still open here: a
-  host-side landmark-cropping convenience (a CLI subcommand,
-  never a service). Era note: DOS/9x-era setup GUIs are fixed-mode,
+- Pointer input end to end: **pledged** (F66, 2026-08-25 —
+  [pointer-input.md](../pledged/design/pointer-input.md)): the
+  seam is one carrier method in RFB's `PointerEvent` shape (the
+  entry's three primitives collapse into it, key events already
+  delivered), composition and pacing control-plane-owned above
+  it; `pointing-device` (`tablet` / `mouse`) as a first-class
+  machine field under P25's cleared gate, pointer verbs refusing a
+  relative-only machine at preflight; and `click` as the fifth
+  guest-input verb — observation-bearing like `select`, `spot=`
+  with a lone-spot default, left-single-click as the whole first
+  cut. It is kept here only to say the question is closed, and
+  goes with the entry. **Left open**: a host-side
+  landmark-cropping convenience (a CLI subcommand, never a
+  service). Era note: DOS/9x-era setup GUIs are fixed-mode,
   fixed-font, animation-free — asset churn should be far below
   os-autoinst needle churn — and NT-era setup is largely keyboard-drivable, so
   keyboard-first remains the preferred path where it works.
@@ -284,18 +289,21 @@ Deliverables:
    adapter's VNC carriers; the adjudicated calls are D110),
    and the capability error naming Hyper-V where the plane cannot
    exist.
-2. Pointer input per
-   [design/pointer-input.md](design/pointer-input.md): the
-   `pointer_event` carrier method, the `pointing-device` machine
-   field, and the `click` verb, with pacing and composition
-   control-plane-owned.
+2. Pointer input: **pledged as F66** (owner, 2026-08-25;
+   [../pledged/FEATURES.md](../pledged/FEATURES.md), the design
+   travelling to
+   [../pledged/design/pointer-input.md](../pledged/design/pointer-input.md)
+   with it) — the `pointer_event` carrier, the `pointing-device`
+   field, and `click`. What stays here: the host-side
+   landmark-cropping convenience, and every deliverable below that
+   composes on this one.
 3. Landmarks: **the watch-only half is delivered** (F65, owner,
    2026-08-24;
    [docs/spec/landmarks.md](../../docs/spec/landmarks.md)) — the
    `.rlql` kind, the matcher, the `@name` condition. What stays
    here: the cursor-parking contract, the park-zone mask, and the
    match-and-click verbs composed on the primitives, which ride
-   deliverable 2's pledge.
+   **F66**'s pledge.
 4. Win9x/WinNT platform workflows: GUI installer scripting for
    the setup GUIs text scraping cannot reach, keyboard-first
    where NT-era setup allows it.
