@@ -1,0 +1,7 @@
+# invalid at preflight: a @name in condition position the landmark source does not
+#          define; parse cannot know the source, so this is preflight's
+# spec: Validation and preflight
+# id: landmark.unknown
+
+platform dos
+wait @no-such-landmark

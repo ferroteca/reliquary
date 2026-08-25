@@ -52,6 +52,11 @@ class _QemuDriver:
     extension = ".qcow2"
     vvfat = True
     control_planes = ("agentless-display", "vnc")
+    #: The pixel format each plane's screen carrier captures in, or
+    #: ``None`` where it captures none (F65). QEMU's default plane
+    #: scrapes resolved characters out of VGA text memory, so it
+    #: states no format and a landmark condition is refused on it.
+    capture_formats = {"agentless-display": None, "vnc": "rgb"}
     #: The command that would reach a VM the identity check must stop
     #: short of.
     destructive = "quit"
@@ -130,6 +135,9 @@ class _VirtualBoxDriver:
     extension = ".vdi"
     vvfat = False
     control_planes = ("agentless-display",)
+    #: VirtualBox has no text-memory readback: its display plane's
+    #: screen *is* a framebuffer, so it states one.
+    capture_formats = {"agentless-display": "rgb"}
     destructive = "controlvm"
 
     def executable(self, root):
@@ -211,6 +219,23 @@ def test_the_capability_report_claims_only_what_is_built(driver, adapter):
     assert report.controllers == ("ide",)
     assert report.materialize == ("new", "difference", "copy", "use")
     assert report.vvfat is driver.vvfat
+
+
+def test_each_plane_states_the_capture_format_it_reads(driver, adapter):
+    """A landmark's gate, and it is per plane rather than per backend.
+
+    The matcher compares the pixels a plane's *screen carrier* hands
+    over, so what decides is what that carrier is — resolved
+    characters or a framebuffer — and the two backends disagree about
+    their same-named plane. A backend that quietly widened the claim
+    would be one whose landmark conditions preflight passes and whose
+    runtime cannot honor (P11, P25).
+    """
+    for plane in driver.control_planes:
+        assert (adapter.capture_format(plane)
+                == driver.capture_formats[plane])
+    # A plane this backend does not serve states nothing either.
+    assert adapter.capture_format("serial-console") is None
 
 
 def test_an_image_is_named_in_the_backends_own_format(driver, adapter,

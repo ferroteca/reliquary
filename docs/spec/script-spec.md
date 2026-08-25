@@ -1442,12 +1442,13 @@ default, and is always named as a prefix:
 ```rlqs
 wait "C:\>"              # the screen: the default, unprefixed
 wait /[0-9]+ files/      # the screen, matched by regex
+wait @setup-page         # the screen, matched as an image
 wait machine=stopped     # the machine: non-default, always named
 ```
 
 | channel | observes | condition spelling |
 |---|---|---|
-| the screen (default) | the guest's visible display | string or regex, unprefixed |
+| the screen (default) | the guest's visible display | string, regex, or `@landmark`, unprefixed |
 | `machine=` | machine state reported by the backend | `stopped` |
 
 Machine state has exactly one spelling, `machine=stopped`; there
@@ -1504,6 +1505,52 @@ satisfies the condition.
 When several handlers could match the same screen snapshot,
 the first declaration wins. Validation warns about obvious literal
 shadowing; regex overlap cannot generally be proven.
+
+### Landmark matching
+
+A `@name` in condition position watches the screen as an **image**:
+
+```rlqs
+wait @setup-page stable=500ms timeout=2m
+```
+
+The name resolves to a `.rlql` landmark — one declaration owning the
+geometry, with its variant renderings beside it — and the condition
+holds when the guest's screen matches it. It stands wherever a screen
+condition stands: a single-form `wait`, an `on` arm, an `always`
+handler; it carries `stable=` and `timeout` like any screen
+condition; and it is one condition per observation like any other.
+
+This is the third **value spelling** of the one screen channel, not a
+new channel and not new syntax — the growth rule's own shape (see
+[how the vocabulary grows](#how-the-vocabulary-grows)). There is no
+negation form, as there is none anywhere in the language.
+
+The declaration, the match, the region regimes and the nearest-miss
+report are specified in **[landmarks.md](landmarks.md)**, which is
+normative for them. Three rules belong here, because they are the
+language's:
+
+- **Kind is checked at binding.** The `@` pool is one namespace
+  across media, fonts and landmarks, so the *use* decides which kind
+  a name must be. A `@name` in condition position resolving to a
+  media or a font is refused naming the use and the kind
+  (`landmark.wrong-kind`), exactly as a landmark name in `insert`
+  position is (`media.wrong-kind`) and in `font` position
+  (`font.wrong-kind`). A name nothing in the pool holds is
+  `landmark.unknown`.
+- **Capability is preflighted at the condition's granularity.** A
+  landmark condition requires framebuffer capture from the control
+  plane driving the machine; a plane that captures none refuses the
+  condition by name, before any guest input
+  (`machine.plane-no-framebuffer`). A script that watches no landmark
+  asks the plane for nothing.
+- **The cursor needs no rule yet.** No verb moves the guest's cursor,
+  so a run leaves it where the guest drew it — which is where the
+  author's capture shows it — and capture and run agree by
+  construction. The parking contract that will keep that true once
+  pointer verbs exist is stated in
+  [landmarks.md](landmarks.md#the-cursor) and lands with them.
 
 ### Machine state
 
@@ -2309,6 +2356,16 @@ scope, preflight further rejects, naming what it needed:
   defines (the media namespace);
 - `font` references (`@name`) naming no font the source defines
   (`font.unknown`, the font namespace — F61);
+- landmark references (`@name` in condition position) naming no
+  landmark the source defines (`landmark.unknown`, the landmark
+  namespace — F65) — and, in any of the three positions, a `@name`
+  that resolves to *another* kind of the one pool, refused naming
+  the use and the kind (`landmark.wrong-kind`, `media.wrong-kind`,
+  `font.wrong-kind`);
+- a landmark condition on a machine whose driving control plane
+  captures no framebuffer (`machine.plane-no-framebuffer`, a
+  machine) — capability at the condition's granularity, so a script
+  watching no landmark is unaffected;
 - `insert`/`eject` slots and `set-boot` drives the target
   machine does not declare — a `with` head answering to the rule
   of the action it spells, and a scoped `boot` prefix to
@@ -2621,7 +2678,7 @@ The intended post-beta growth discipline is (G7):
   new value spelling names a new matcher over the default
   surface.** A serial stream becomes `wait console="login:"` — a
   new prefixed channel, because it is a different observable.
-  Image matching becomes a landmark reference, `wait @setup-page`
+  Image matching became a landmark reference, `wait @setup-page`
   — a new value spelling, because it is a different matcher over
   the same screen. Neither is a new construct or a positional
   keyword;

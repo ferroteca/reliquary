@@ -252,6 +252,30 @@ run fails, the report names what it was waiting for, which clock expired, the ro
 nearest, a screenshot, and the command to try next. Pass `--display` to show the QEMU window instead of running
 headless — helpful when debugging a script.
 
+**Screens that text cannot describe are watched as images.** A
+*landmark* is a `<name>.rlql` declaration in your `landmarks/`
+directory with one or more PNG renderings beside it
+(`<name>.1.png`, `<name>.2.png` — alternative paintings of the same
+screen), and a script watches one exactly where it would watch for a
+string:
+
+```rlqs
+wait @setup-page timeout=2m
+```
+
+The whole screen has to match pixel for pixel, which is the safe
+direction: a screen that has drifted times out visibly instead of
+firing input at the wrong page. Rectangles in the declaration soften
+that where a screen has furniture on it — an `ignore` region is
+excluded outright, and a `fuzzy` region carries its own tolerance
+(`"similarity": "97%"`). When nothing matches, the failure report
+names the closest rendering, the regions it failed on, and the
+percentage each reached. Landmark watching needs a control plane
+that captures a framebuffer — `control-planes: ["vnc"]` on QEMU —
+and a machine driving one that does not says so before the run
+touches the guest. The format is specified in
+[docs/spec/landmarks.md](docs/spec/landmarks.md).
+
 ## The machine layer
 
 Beneath the scripts, Reliquary is a general automation harness for running remote tasks in QEMU guests, usable on its
@@ -387,6 +411,11 @@ Documents/reliquary/
 ├── blueprints/           composed blueprints you author (<name>.rlqb) —
 │                         a machine plus its media/source/archive components
 ├── scripts/              automation scripts (<name>.rlqs)
+├── fonts/                authored glyph fonts (<name>.rlqf beside its
+│                         <name>.bin bank) — read from the home only
+├── landmarks/            authored landmarks (<name>.rlql beside its
+│                         <name>.1.png, <name>.2.png renderings) —
+│                         read from the home only
 └── cache/                regenerable; resolves independently
     │                     (--cache-dir) and can live elsewhere
     ├── media/            cached, hash-verified media payloads
@@ -407,7 +436,10 @@ standard error.
 
 Blueprints (with their media/source/archive components) and scripts are
 read from the `blueprints` and `scripts` directories above, each walked
-recursively by file extension. A name those directories do not hold is
+recursively by file extension. Fonts and landmarks are read the same
+way, from `fonts` and `landmarks` — those two are fixed leaves under
+the home rather than separately placeable, so a project tree holding
+its own blueprints and scripts still finds them under the home. A name those directories do not hold is
 **not** taken from anywhere else — the built-in codex is not a
 fallback tier, so a name they do not hold is refused rather than
 supplied (the refusal names `rlq seed-blueprint <name>` when the

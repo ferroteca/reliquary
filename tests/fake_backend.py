@@ -20,7 +20,8 @@ from reliquary.backends import Availability, BackendAdapter, Capabilities
 class FakeSession:
     """A session whose carriers record what they were asked for."""
 
-    def __init__(self, adapter, vm, rows=None, attributes=None):
+    def __init__(self, adapter, vm, rows=None, attributes=None,
+                 image=None):
         self.adapter = adapter
         self.vm = vm
         self.backend = adapter.name
@@ -30,6 +31,10 @@ class FakeSession:
         self.keys = []
         self.screenshots = []
         self.media_changes = []
+        #: What this session's framebuffer carrier hands back, where
+        #: its plane states a capture format at all (F65).
+        self.image = image
+        self.grabs = 0
 
     def native(self):
         return self.adapter.native
@@ -39,6 +44,13 @@ class FakeSession:
 
     def text_screen(self, font_banks=()):
         return list(self.rows), [list(row) for row in self.attributes]
+
+    def framebuffer(self):
+        self.grabs += 1
+        if self.image is None:
+            raise AssertionError(
+                "this double's plane captures no framebuffer")
+        return self.image
 
     def screenshot(self, path):
         self.screenshots.append(path)
@@ -55,7 +67,8 @@ class FakeAdapter(BackendAdapter):
 
     def __init__(self, name="qemu", *, available=True,
                  capabilities=None, extension=".qcow2",
-                 image_payload=None, settings_keys=()):
+                 image_payload=None, settings_keys=(),
+                 capture_planes=None):
         self.name = name
         self.available = available
         self.extension = extension
@@ -91,6 +104,13 @@ class FakeAdapter(BackendAdapter):
         #: support files.
         self.session_caches = []
         self.session_rows = None
+        #: ``{plane: pixel format}`` for the planes this double
+        #: captures a framebuffer on (F65). Empty by default, which
+        #: is the seam's own honest default: a plane that states no
+        #: format is one a landmark condition is refused on.
+        self.capture_planes = dict(capture_planes or {})
+        #: What a session's framebuffer carrier answers with.
+        self.session_image = None
         self.native = object()
         self.start_error = None
         self.stop_error = None
@@ -114,6 +134,9 @@ class FakeAdapter(BackendAdapter):
 
     def capabilities(self):
         return self.report
+
+    def capture_format(self, plane):
+        return self.capture_planes.get(plane)
 
     def validate_settings(self, settings):
         self.validated.append(settings)
@@ -160,7 +183,8 @@ class FakeAdapter(BackendAdapter):
         if self.session_error is not None:
             raise self.session_error
         self.session_caches.append(cache)
-        open_session = FakeSession(self, vm, rows=self.session_rows)
+        open_session = FakeSession(self, vm, rows=self.session_rows,
+                                   image=self.session_image)
         self.sessions.append(open_session)
         yield open_session
 

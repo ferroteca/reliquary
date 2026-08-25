@@ -13,11 +13,14 @@ from unittest import mock
 
 import pytest
 
+from PIL import Image
+
 from reliquary import events as _events
 from reliquary import text_recognize
 from reliquary.binding import BoundProperties
 from reliquary.errors import (PreflightError, RunCancelled, StaticError,
                               UnreadableScreen)
+from reliquary.landmarks import load_landmark_declaration
 from reliquary.script_parser import parse_script
 from reliquary.script_runner import (_preflight_machine_rules,
                                      ScriptPreflightError,
@@ -55,7 +58,7 @@ class _FakeConsole:
     #: mid-redraw, which is the one thing a wait must not act on.
     HOLD = 3
 
-    def __init__(self, screens=(), fail=False, hold=HOLD):
+    def __init__(self, screens=(), fail=False, hold=HOLD, captures=()):
         self.screens = list(screens)
         self.fail = fail
         self.hold = hold
@@ -63,6 +66,12 @@ class _FakeConsole:
         self.keys = []
         self.reads = 0
         self._held = 0
+        #: Framebuffer captures a landmark condition is matched
+        #: against (F65), held for `hold` reads apiece exactly as the
+        #: text screens above are and for the same reason.
+        self.captures = list(captures)
+        self.grabs = 0
+        self._grabs_held = 0
 
     def screen_text(self):
         self.reads += 1
@@ -93,6 +102,19 @@ class _FakeConsole:
         """
         rows = self.screen_text()
         return rows, [[0x07] * 80 for _ in range(len(rows))]
+
+    def framebuffer(self):
+        """The scripted captures, one Pillow image per read (F65)."""
+        self.grabs += 1
+        if not self.captures:
+            raise AssertionError("no capture was scripted for this read")
+        current = self.captures[0]
+        if len(self.captures) > 1:
+            self._grabs_held += 1
+            if self._grabs_held >= self.hold:
+                self._grabs_held = 0
+                self.captures.pop(0)
+        return current
 
     def send_text(self, text, enter=True):
         self.commands.append(("send_text", text, enter))
@@ -142,7 +164,8 @@ class _Runtime:
         self.clock = None
 
     def engine(self, source, screens=(), running=True, fail=False,
-               bindings=None, events=None, hold=_FakeConsole.HOLD):
+               bindings=None, events=None, hold=_FakeConsole.HOLD,
+               captures=(), landmarks=None, capture_format=None):
         _FakeHttpService.instances = []
         script = parse_script(_HEAD + source)
         clock = _Clock()
@@ -150,9 +173,11 @@ class _Runtime:
             script, "plain-0", "/tmp/home",
             "/tmp/home/cache/machines/plain-0", events=events,
             script_path="demo.rlqs", clock=clock, sleep=clock.sleep,
-            http_service_factory=_FakeHttpService, bindings=bindings)
+            http_service_factory=_FakeHttpService, bindings=bindings,
+            landmarks=landmarks, capture_format=capture_format)
         engine._running = running
-        self.console = _FakeConsole(screens, fail, hold=hold)
+        self.console = _FakeConsole(screens, fail, hold=hold,
+                                    captures=captures)
         self.clock = clock
 
         @contextlib.contextmanager
@@ -406,6 +431,140 @@ def test_a_screen_observation_needs_a_running_machine(runtime):
     with pytest.raises(ScriptRuntimeError) as caught:
         runtime.run_linear(engine)
     assert "machine is not running" in str(caught.value)
+
+
+# A landmark condition watches pixels rather than rows (F65).
+
+
+def _landmark(tmp_path, name="welcome", regions=None, variants=(1,),
+              colour=(10, 20, 30)):
+    """One declaration with its renderings, parsed as a run would."""
+    root = tmp_path / "landmarks"
+    root.mkdir(parents=True, exist_ok=True)
+    document = {"screen": {"width": 16, "height": 8}}
+    if regions is not None:
+        document["regions"] = regions
+    (root / f"{name}.rlql").write_text(json.dumps(document),
+                                       encoding="utf-8")
+    for number in variants:
+        Image.new("RGB", (16, 8), colour).save(root / f"{name}.{number}.png")
+    return load_landmark_declaration(str(root / f"{name}.rlql"))
+
+
+def test_a_landmark_condition_matches_the_captured_framebuffer(runtime,
+                                                               tmp_path):
+    declaration = _landmark(tmp_path)
+    wrong = Image.new("RGB", (16, 8), (200, 0, 0))
+    right = Image.new("RGB", (16, 8), (10, 20, 30))
+    engine = runtime.engine(
+        "timeout 10s\nwait @welcome\n",
+        captures=[wrong, right],
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    runtime.run_linear(engine)
+    assert runtime.console.grabs > 1
+    # A landmark-only wait never asks for the recognized screen: on a
+    # GUI screen matching glyphs would be work thrown away.
+    assert runtime.console.reads == 0
+
+
+def test_a_landmark_expiry_reports_its_nearest_miss_geography(runtime,
+                                                              tmp_path):
+    declaration = _landmark(
+        tmp_path, regions=[{"kind": "fuzzy", "x": 0, "y": 0, "width": 8,
+                            "height": 8, "similarity": "99%"}])
+    capture = Image.new("RGB", (16, 8), (10, 20, 30))
+    capture.paste(Image.new("RGB", (2, 1), (9, 9, 9)), (0, 0))
+    stream = _events.EventStream()
+    engine = runtime.engine(
+        "timeout 1s\nwait @welcome\n", captures=[capture], events=stream,
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    with pytest.raises(ScriptRuntimeError):
+        runtime.run_linear(engine)
+    with contextlib.redirect_stdout(io.StringIO()):
+        engine._fail(ScriptRuntimeError("expired"))
+    report = [event for event in stream.events
+              if event["kind"] == _events.FAILURE][-1]
+    misses = report["landmark-miss"]
+    assert len(misses) == 1
+    assert "welcome.1.png" in misses[0]
+    assert "fuzzy 8x8+0+0 at 99%" in misses[0]
+
+
+def test_a_matched_landmark_names_the_variant_that_matched(runtime,
+                                                           tmp_path):
+    declaration = _landmark(tmp_path, variants=(1,))
+    other = Image.new("RGB", (16, 8), (80, 80, 80))
+    other.save(tmp_path / "landmarks" / "welcome.2.png")
+    declaration = load_landmark_declaration(
+        str(tmp_path / "landmarks" / "welcome.rlql"))
+    stream = _events.EventStream()
+    engine = runtime.engine(
+        "timeout 10s\nwait @welcome\n", captures=[other], events=stream,
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    runtime.run_linear(engine)
+    matched = [event for event in stream.events
+               if event["kind"] == _events.OBSERVATION_MATCH][-1]
+    assert matched["variant"] == "welcome.2.png"
+    assert matched["description"] == "@welcome"
+
+
+def test_a_branching_wait_reads_both_the_screen_and_the_capture(runtime,
+                                                                tmp_path):
+    declaration = _landmark(tmp_path)
+    engine = runtime.engine(
+        "timeout 10s\n"
+        "wait {\n"
+        '    on "ready" {\n        press esc\n    }\n'
+        "    on @welcome {\n        press esc\n    }\n"
+        "}\n",
+        screens=[["ready"]],
+        captures=[Image.new("RGB", (16, 8), (200, 0, 0))],
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    runtime.run_linear(engine)
+    assert runtime.console.reads > 0
+    assert runtime.console.grabs > 0
+
+
+def test_an_unreadable_text_screen_does_not_lose_the_capture(runtime,
+                                                             tmp_path):
+    # The ordinary case on a landmark's own screen: a GUI page is not
+    # an 80x25 text grid, so the recognizer refuses it while the
+    # pixels arrived perfectly. A branching wait mixing a text arm
+    # with a landmark arm must still be able to fire the landmark one.
+    declaration = _landmark(tmp_path)
+    right = Image.new("RGB", (16, 8), (10, 20, 30))
+    engine = runtime.engine(
+        "timeout 10s\n"
+        "wait {\n"
+        '    on "never here" {\n        press esc\n    }\n'
+        "    on @welcome {\n        press esc\n    }\n"
+        "}\n",
+        captures=[right],
+        landmarks={"welcome": declaration}, capture_format="rgb")
+
+    def unreadable(_font_banks=()):
+        raise UnreadableScreen(
+            "framebuffer 800x600 is not an even 80x25 text grid",
+            rule_id="recognize.geometry")
+
+    runtime.console.screen = unreadable
+    runtime.run_linear(engine)
+    assert runtime.console.keys == [["esc"]]
+    assert engine._last_sample.image is right
+    assert "80x25" in engine._last_sample.unreadable
+
+
+def test_a_landmark_wait_judges_only_settled_captures(runtime, tmp_path):
+    # The gate's contract one grain finer: a capture still changing is
+    # not one a condition is judged on, so the wait keeps looking.
+    declaration = _landmark(tmp_path)
+    right = Image.new("RGB", (16, 8), (10, 20, 30))
+    engine = runtime.engine(
+        "timeout 10s\nwait @welcome\n", captures=[right],
+        landmarks={"welcome": declaration}, capture_format="rgb")
+    runtime.run_linear(engine)
+    # Two reads at least: one to establish the window, one inside it.
+    assert runtime.console.grabs >= 2
 
 
 # The first condition that holds fires its handler.
@@ -1440,18 +1599,39 @@ class _Preflight:
         with open(os.path.join(fonts_dir, f"{name}.bin"), "wb") as handle:
             handle.write(bytes(4096))
 
-    def write_state(self, phase="ready", drives=None):
-        root = os.path.join(self.home, "cache", "machines",
-                            self.machine_id)
-        os.makedirs(root)
-        state = {
+    def write_landmark(self, name, width=16, height=8, regions=None):
+        """Declare a landmark in the home so `@name` preflights."""
+        root = os.path.join(self.home, "landmarks")
+        os.makedirs(root, exist_ok=True)
+        document = {"screen": {"width": width, "height": height}}
+        if regions is not None:
+            document["regions"] = regions
+        with open(os.path.join(root, f"{name}.rlql"), "w",
+                  encoding="utf-8") as handle:
+            json.dump(document, handle)
+        Image.new("RGB", (width, height), (10, 20, 30)).save(
+            os.path.join(root, f"{name}.1.png"))
+
+    def state(self, phase="ready", drives=None, backend="qemu",
+              planes=("vnc",)):
+        """The machine.json a preflight is run against."""
+        return {
             "id": self.machine_id,
             "phase": phase,
+            "backend": backend,
+            "control-planes": list(planes),
             "drives": drives if drives is not None else {
                 "hdd0": {"medium": "hdd", "slot": 0, "size": "20M",
                          "path": "blank.qcow2"},
             },
         }
+
+    def write_state(self, phase="ready", drives=None, backend="qemu",
+                    planes=("vnc",)):
+        root = os.path.join(self.home, "cache", "machines",
+                            self.machine_id)
+        os.makedirs(root)
+        state = self.state(phase, drives, backend, planes)
         with open(os.path.join(root, "machine.json"), "w",
                   encoding="utf-8") as handle:
             json.dump(state, handle)
@@ -1516,6 +1696,115 @@ def test_an_unknown_font_reference_fails_before_execution(preflight):
     message = str(caught.value)
     assert "no font named 'guestt'" in message
     assert "did you mean 'guest'" in message
+
+
+def test_an_unknown_landmark_reference_fails_before_execution(preflight):
+    preflight.write_landmark("welcome")
+    preflight.write_state()
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(_HEAD + "machine stopped\nwait @welcom\n")
+    message = str(caught.value)
+    assert "no landmark named 'welcom'" in message
+    assert "did you mean 'welcome'" in message
+
+
+def test_a_media_in_condition_position_names_the_use_and_the_kind(
+        preflight):
+    # The one @ pool holds three kinds, so a reference that misses its
+    # own is told which one it hit rather than that nothing was found.
+    preflight.write_media("freedos-livecd")
+    preflight.write_state(drives={"cdrom0": {"medium": "cdrom",
+                                             "slot": 0}})
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(_HEAD + "machine stopped\n"
+                          "wait @freedos-livecd\n")
+    assert caught.value.rule_id == "landmark.wrong-kind"
+    assert "@freedos-livecd is a media" in str(caught.value)
+
+
+def test_a_font_in_condition_position_names_the_use_and_the_kind(
+        preflight):
+    preflight.write_font("guest")
+    preflight.write_state()
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(_HEAD + "machine stopped\nwait @guest\n")
+    assert caught.value.rule_id == "landmark.wrong-kind"
+    assert "@guest is a font" in str(caught.value)
+
+
+def test_a_landmark_in_insert_position_names_the_use_and_the_kind(
+        preflight):
+    # The same rule read the other way: `insert` mounts a media, so a
+    # landmark there is refused naming what it hit, not reported as a
+    # media nobody declared.
+    preflight.write_landmark("welcome")
+    preflight.write_state(drives={"cdrom0": {"medium": "cdrom",
+                                             "slot": 0}})
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(_HEAD + "machine stopped\n"
+                          "insert cdrom0 @welcome\n")
+    assert caught.value.rule_id == "media.wrong-kind"
+    assert "@welcome is a landmark" in str(caught.value)
+
+
+def test_a_landmark_in_font_position_names_the_use_and_the_kind(
+        preflight):
+    preflight.write_landmark("welcome")
+    preflight.write_state()
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(_HEAD + "machine stopped\nfont @welcome\n")
+    assert caught.value.rule_id == "font.wrong-kind"
+    assert "@welcome is a landmark" in str(caught.value)
+
+
+def test_a_plane_without_framebuffer_capture_refuses_the_condition(
+        preflight):
+    # QEMU's agentless-display plane reads VGA text memory, so there
+    # are no pixels for a landmark to be matched against — and the
+    # refusal lands before any guest input, naming the plane.
+    preflight.write_landmark("welcome")
+    preflight.write_state(planes=("agentless-display",))
+    with pytest.raises(ScriptPreflightError) as caught:
+        preflight.execute(_HEAD + "machine stopped\nwait @welcome\n")
+    assert caught.value.rule_id == "machine.plane-no-framebuffer"
+    assert "'agentless-display' control plane captures no framebuffer" \
+        in str(caught.value)
+    assert "@welcome" in str(caught.value)
+
+
+def test_a_landmark_binds_its_declaration_and_the_capture_format(
+        preflight):
+    preflight.write_landmark("welcome")
+    script = parse_script(_HEAD + "machine stopped\nwait @welcome\n")
+    resolved = _preflight_machine_rules(
+        script, preflight.state(), "<script>", preflight.home)
+    assert resolved.capture_format == "rgb"
+    assert resolved.landmarks["welcome"].size == (16, 8)
+
+
+def test_a_script_watching_no_landmark_asks_the_plane_nothing(preflight):
+    # Capability preflight is at the *condition's* granularity: a
+    # script with no landmark condition runs on a plane that captures
+    # nothing, exactly as it always did.
+    script = parse_script(_HEAD + 'machine stopped\nwait "ready"\n')
+    resolved = _preflight_machine_rules(
+        script, preflight.state(planes=("agentless-display",)),
+        "<script>", preflight.home)
+    assert resolved.landmarks == {}
+    assert resolved.capture_format is None
+
+
+def test_a_landmark_in_a_handler_is_preflighted_too(preflight):
+    # A GUI installer's error dialogs are the `always` case, so the
+    # binding has to reach handlers and not only bare waits.
+    preflight.write_landmark("welcome")
+    source = (_HEAD + "machine stopped\nentry a\ndeadline 1h\n"
+              "phase a {\n    always @nonesuch {\n        press esc\n"
+              "    }\n}\n")
+    with pytest.raises(ScriptPreflightError) as caught:
+        _preflight_machine_rules(parse_script(source), preflight.state(),
+                                 "<script>", preflight.home)
+    assert caught.value.rule_id == "landmark.unknown"
 
 
 def test_a_property_font_reference_is_not_preflighted(preflight):

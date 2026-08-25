@@ -139,6 +139,9 @@ def load_font_namespace(context=None):
     pool") -- a font and a media claiming the same name is an error
     naming both files, folded case-insensitively like every other
     name in this pool (:func:`resolve.build_namespace`'s own rule).
+    Landmarks are the pool's third kind and check themselves against
+    this one (``landmarks.py``); checking back from here would put
+    the two modules in a cycle for a refusal either side can raise.
     """
     source = assets.source_for(context)
     index = assets.index_by_name(
@@ -146,17 +149,12 @@ def load_font_namespace(context=None):
     declarations = {name: load_font_declaration(path)
                     for name, path in index.items()}
     media = resolve.load_namespace(context).media
-    folded_media = {existing.lower(): existing for existing in media}
-    for name, declaration in declarations.items():
-        other = folded_media.get(name.lower())
-        if other is not None:
-            raise PreflightError(
-                f"font {name!r} and media {other!r} share the @ pool "
-                f"({'the same name' if other == name else 'names that '
-                    'differ only by case'}):\n"
-                f"  {declaration.path}\n"
-                f"  a media spec named {other!r}",
-                rule_id="name.pool-collision")
+    assets.guard_pool(
+        "font",
+        {name: declaration.path
+         for name, declaration in declarations.items()},
+        "media",
+        {name: f"a media spec named {name!r}" for name in media})
     return types.MappingProxyType(declarations)
 
 

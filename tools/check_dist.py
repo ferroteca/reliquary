@@ -35,6 +35,7 @@ import zipfile
 WHEEL_REQUIRED = (
     "reliquary/script_grammar.lark",
     "reliquary/schemas/blueprint-schema-v1.json",
+    "reliquary/schemas/landmark-schema-v1.json",
     "reliquary/schemas/machine-state.schema.json",
     "reliquary/fonts/cp437_8x16.bin",
     "reliquary/codex/codex.json",

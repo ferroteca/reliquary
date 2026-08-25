@@ -129,8 +129,12 @@ def describe(event):
     if kind == _events.OBSERVATION_ARM:
         return prefix + f"wait {fields.get('description')}"
     if kind == _events.OBSERVATION_MATCH:
+        # A text condition is satisfied by a row and names it; a
+        # landmark by a *variant*, which is the fact an author acts on
+        # when several renderings are in play (F65).
         row = fields.get("row")
-        seen = f": {row!r}" if row else ""
+        variant = fields.get("variant")
+        seen = f": {row!r}" if row else f": {variant}" if variant else ""
         return (f"matched {fields.get('description')} after "
                 f"{_seconds(fields.get('elapsed', 0.0))}{seen}")
     if kind == _events.OBSERVATION_TIMEOUT:
@@ -213,6 +217,12 @@ def _failure_report(fields):
         value = fields.get(key)
         if value:
             lines.append(f"  {label}: {value}")
+    for miss in fields.get("landmark-miss") or ():
+        # The landmark half of the nearest miss (F65): the variant
+        # that came closest, and the regions it failed on with the
+        # percentage each achieved. One line each, because a
+        # branching wait may have been watching several.
+        lines.append(f"  landmark miss: {miss}")
     unclear = fields.get("unreadable-cells")
     if unclear:
         # Beside the nearest miss rather than instead of it: the miss

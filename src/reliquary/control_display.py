@@ -328,6 +328,19 @@ class DisplayConsole:
         """
         return self._session.text_screen(font_banks)
 
+    def framebuffer(self):
+        """Return the plane's captured framebuffer as a Pillow image.
+
+        The landmark matcher's reading path (F65), beside the text
+        one above and never through it: a landmark compares pixels,
+        so recognizing glyphs first would be work thrown away. A
+        plane whose screen carrier resolves characters rather than
+        capturing pixels refuses this by name — preflight has already
+        turned that machine's landmark conditions away
+        (`backends.BackendAdapter.capture_format`).
+        """
+        return self._session.framebuffer()
+
     def cursor_menu_select(self, item, timeout=30, exclude=()):
         """Steer a cursor-key menu onto a matching item and press ENTER.
 

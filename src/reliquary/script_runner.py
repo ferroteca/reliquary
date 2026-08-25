@@ -32,6 +32,7 @@ from . import text_recognize
 from .binding import bind_properties, console_asker, describe_sources
 from .document import load_document
 from . import fonts as _fonts
+from . import landmarks as _landmarks
 from .errors import (PreflightError, ReliquaryError, RunCancelled,
                      RunFailure, StaticError, UnreadableScreen,
                      exit_code, outcome)
@@ -45,6 +46,7 @@ from .script_parser import load_script
 from .script_timing import (format_plan, parse_duration,
                             resolve as resolve_timing)
 from .script_validation import PORTABLE_KEY_NAMES, reach
+from . import backends as _backends
 from . import events as _events
 from . import screen_stability as _stability
 from . import machines as _machines
@@ -144,6 +146,8 @@ def _describe(condition):
         return f"machine={condition.value}"
     if condition.kind == "regex":
         return f"/{condition.value}/"
+    if condition.kind == "landmark":
+        return f"@{condition.value}"
     return repr(_literal(condition.value))
 
 
@@ -366,6 +370,10 @@ class _Sample:
     stopped: bool = False
     frame: tuple = ()
     unreadable: str = None
+    #: The plane's captured framebuffer, read only when a landmark
+    #: condition is armed (F65) — the pixels a landmark is matched
+    #: against, and what the quiescence gate judges on such a sample.
+    image: object = None
     #: How many cells of this screen matched no glyph well enough to
     #: be believed and were read as spaces. A screen can be perfectly
     #: readable *as a shape* and still be mostly unrecognized, which
@@ -388,24 +396,39 @@ class _Observation:
     sample at which its condition does not hold.
     """
 
-    def __init__(self, condition, stable=None):
+    def __init__(self, condition, stable=None, landmark=None,
+                 capture_format=None):
         self.condition = condition
         self.stable = stable
         self.consumed = False
         self._episode = None
+        #: The resolved declaration a landmark condition watches for,
+        #: bound at preflight so no sample resolves an asset (F65).
+        self.landmark = landmark
+        self.capture_format = capture_format
+        #: The last verdict this observation reached, which is what
+        #: the failure report's nearest miss quotes.
+        self.result = None
 
     @property
     def channel(self):
         return self.condition.channel
+
+    @property
+    def watches_pixels(self):
+        """Whether this condition is judged on a captured framebuffer."""
+        return self.condition.kind == "landmark"
 
     def matches_row(self, row):
         """Whether one screen row satisfies this condition.
 
         The per-row form the whole-sample test is built from, so a
         match event can name the row that satisfied it rather than
-        merely asserting that one did.
+        merely asserting that one did. A landmark matches a screen
+        and never a row, so it answers no here and the match event
+        names the variant instead.
         """
-        if self.condition.channel == "machine":
+        if self.condition.channel == "machine" or self.watches_pixels:
             return False
         if self.condition.kind == "regex":
             return re.search(self.condition.value, row) is not None
@@ -415,6 +438,15 @@ class _Observation:
         """Whether the condition holds at this sample."""
         if self.condition.channel == "machine":
             return sample.stopped
+        if self.watches_pixels:
+            if sample.image is None:
+                # A stopped machine, or an unreadable capture: no
+                # pixels arrived, so nothing was matched and nothing
+                # is claimed. The wait keeps looking.
+                return False
+            self.result = _landmarks.match(self.landmark, sample.image,
+                                           self.capture_format)
+            return self.result.matched
         return any(self.matches_row(row) for row in sample.rows)
 
     def update(self, sample, now):
@@ -452,7 +484,8 @@ class _ScriptEngine:
                  events=None, script_path=None, plan=None,
                  clock=time.monotonic, sleep=time.sleep,
                  http_service_factory=_HttpService, bindings=None,
-                 record_pace=None, recording_writer=None):
+                 record_pace=None, recording_writer=None,
+                 landmarks=None, capture_format=None):
         self._script = script
         self._plan = plan if plan is not None else resolve_timing(script)
         self._phases = {phase.name: phase for phase in script.phases}
@@ -465,6 +498,12 @@ class _ScriptEngine:
         #: The banks a `font` statement's names resolved to, tried
         #: before the host's own — empty until a script names one.
         self._font_prefix = ()
+        #: ``{name: LandmarkDeclaration}`` for every `@name` this
+        #: script watches, and the capture format the machine's
+        #: driving plane states — both resolved at preflight (F65),
+        #: so no sample reads an asset or asks the seam anything.
+        self._landmarks = dict(landmarks or {})
+        self._capture_format = capture_format
         self._now = clock
         self._sleep = sleep
         self._step = 0
@@ -492,6 +531,9 @@ class _ScriptEngine:
         # was revisited, and the last screen read.
         self._pending = None
         self._pending_literal = None
+        #: The armed landmark observations, kept for the failure
+        #: report: their verdicts are the nearest-miss geography.
+        self._pending_landmarks = ()
         self._route = []
         self._revisits = collections.Counter()
         self._last_sample = None
@@ -680,6 +722,7 @@ class _ScriptEngine:
             revisits={name: count for name, count
                       in self._revisits.items() if count > 1} or None,
             **{"nearest-miss": self._nearest_miss(),
+               "landmark-miss": self._landmark_miss(),
                "unreadable-screen": self._unreadable_screen(),
                "unreadable-cells": self._unreadable_cells(),
                "fonts-tried": self._fonts_tried(),
@@ -703,6 +746,27 @@ class _ScriptEngine:
         best = max(rows, key=lambda row: difflib.SequenceMatcher(
             None, target, row).ratio())
         return self._redact(best)
+
+    def _landmark_miss(self):
+        """The nearest miss of every landmark this expiry was watching.
+
+        A landmark's own answer to `nearest-miss` above, and it has to
+        be its own field because the two measure different things: a
+        text miss is the row closest to a literal, and this is the
+        *variant* closest to the capture, with the regions it failed
+        on and the percentage each achieved. Per-region and never one
+        pooled score — a small failing region drowns in a large
+        matching screen's average, and the report loses the geography
+        that makes it actionable.
+
+        Silent where no landmark was armed, which is every run of
+        every script that watches text alone.
+        """
+        misses = [observation.result.describe()
+                  for observation in self._pending_landmarks
+                  if observation.result is not None
+                  and not observation.result.matched]
+        return tuple(misses) or None
 
     def _unreadable_screen(self):
         """Why the last read produced no screen, where it produced none.
@@ -1161,6 +1225,20 @@ class _ScriptEngine:
 
     # -- observation ---------------------------------------------
 
+    def _observation(self, condition, stable):
+        """Arm one condition, binding what preflight already resolved.
+
+        A landmark carries its declaration and the plane's capture
+        format from here rather than resolving either mid-run: both
+        are preflight's answers (G3), and a sample that had to read a
+        file to decide would be a refusal arriving after the first
+        guest input.
+        """
+        landmark = (self._landmarks.get(condition.value)
+                    if condition.kind == "landmark" else None)
+        return _Observation(condition, _seconds(stable), landmark,
+                            self._capture_format)
+
     def _arm(self, statement, observations, description):
         """Announce an observation and remember it as pending."""
         bound = self._bound(statement)
@@ -1171,6 +1249,9 @@ class _ScriptEngine:
             if condition.channel == "screen" and condition.kind == "text":
                 literal = _normalize_row(_literal(condition.value))
         self._pending_literal = literal
+        self._pending_landmarks = tuple(
+            observation for observation in observations
+            if observation.watches_pixels)
         self._emit(_events.OBSERVATION_ARM, description=description,
                    timeout=bound.seconds, line=getattr(statement, "line", 0),
                    **{"timeout-source": bound.source})
@@ -1181,15 +1262,14 @@ class _ScriptEngine:
             return self._wait_branching(statement)
         condition = statement.condition
         description = _describe(condition)
-        observations = [_Observation(condition, _seconds(statement.stable))]
+        observations = [self._observation(condition, statement.stable)]
         bound = self._arm(statement, observations, description)
         self._observe(observations, bound, description, statement)
         return None
 
     def _wait_branching(self, statement):
         handlers = statement.handlers
-        observations = [_Observation(handler.condition,
-                                     _seconds(handler.stable))
+        observations = [self._observation(handler.condition, handler.stable)
                         for handler in handlers]
         description = " or ".join(
             _describe(handler.condition) for handler in handlers)
@@ -1205,8 +1285,7 @@ class _ScriptEngine:
 
     def _run_reactive(self, phase):
         """Dispatch a reactive phase's standing handlers."""
-        observations = [_Observation(handler.condition,
-                                     _seconds(handler.stable))
+        observations = [self._observation(handler.condition, handler.stable)
                         for handler in phase.handlers]
         description = " or ".join(
             _describe(handler.condition) for handler in phase.handlers)
@@ -1219,9 +1298,10 @@ class _ScriptEngine:
             _stability.ScreenStability(threshold=gate.value))
         self._gated = None
         self._measured = False
+        text, pixels = self._reads(observations)
         while True:
             self._check_clocks()
-            sample = self._read()
+            sample = self._read(text, pixels)
             now = self._now()
             # An unstable frame evaluates *none* of the handlers,
             # which is why the gate belongs to the container rather
@@ -1273,9 +1353,10 @@ class _ScriptEngine:
             _stability.ScreenStability(threshold=gate.value))
         self._gated = None
         self._measured = False
+        text, pixels = self._reads(observations)
         while True:
             self._check_clocks(statement)
-            sample = self._read()
+            sample = self._read(text, pixels)
             now = self._now()
             # An unsettled sample is not one the condition is judged
             # on, and sampling tightens while the screen moves: a
@@ -1300,6 +1381,7 @@ class _ScriptEngine:
                         getattr(statement, "line", 0))
                     self._pending = None
                     self._pending_literal = None
+                    self._pending_landmarks = ()
                     return index
             # Checked after a sample: a timeout always means samples
             # were taken and none satisfied the condition.
@@ -1333,14 +1415,24 @@ class _ScriptEngine:
             rule_id="time.observation-expired")
 
     def _matched(self, description, sample, observation, elapsed, line):
-        """Report a match, naming the row that satisfied it."""
+        """Report a match, naming the evidence that satisfied it.
+
+        A text condition is satisfied by a row and names it; a
+        landmark is satisfied by a *variant* and names that instead,
+        since which rendering matched is the fact an author acts on
+        when several are in play.
+        """
         row = None
         for candidate in sample.rows:
             if observation.matches_row(candidate):
                 row = candidate
                 break
+        variant = None
+        if observation.result is not None and observation.result.matched:
+            variant = observation.result.nearest.filename
         self._emit(_events.OBSERVATION_MATCH, description=description,
-                   row=row, elapsed=round(elapsed, 3), line=line)
+                   row=row, elapsed=round(elapsed, 3), line=line,
+                   variant=variant)
 
     def _bound(self, node):
         """The effective timeout the timing plan resolved for a node."""
@@ -1371,16 +1463,23 @@ class _ScriptEngine:
         wait keeps looking. A stopped machine has no screen to judge,
         and the machine channel still has to be answerable there.
         """
-        if gate is None or sample.stopped or not sample.frame:
+        # A landmark sample is judged on the pixels it was matched
+        # on, which is the same contract one grain finer (F65): a
+        # capture that arrived is what the gate reads, and the text
+        # frame only where none did.
+        reading_of = sample.image if sample.image is not None else (
+            sample.frame)
+        if gate is None or sample.stopped or not reading_of:
             return True
         # Quantize to the grid this reading path's noise justifies:
         # a text scrape varies by milliseconds, an interpreted
         # framebuffer by hundreds of them, and a window resized on
         # that noise would judge two identical runs differently.
         monitor.cadence_step = (
-            _stability.GUI_CADENCE_STEP if self._recognized_screens
-            else _stability.TEXT_CADENCE_STEP)
-        reading = monitor.observe(sample.frame, now=now)
+            _stability.TEXT_CADENCE_STEP
+            if sample.image is None and not self._recognized_screens
+            else _stability.GUI_CADENCE_STEP)
+        reading = monitor.observe(reading_of, now=now)
         self._report_guard(monitor, reading)
         if reading.stability is not None:
             # The window was observed, so there is a verdict here
@@ -1444,8 +1543,8 @@ class _ScriptEngine:
             return f"{note} (never sampled densely enough to tell)"
         note += f" (stability {reading.stability:.3f}"
         if reading.animated:
-            note += (f", outside a {len(reading.animated)}-cell "
-                     "animated region")
+            note += (f", outside a {len(reading.animated)}-"
+                     f"{reading.unit} animated region")
         return f"{note})"
 
     def _pace(self, statement):
@@ -1509,15 +1608,55 @@ class _ScriptEngine:
                 "the machine is not running; the script must start it "
                 "first", node, rule_id="machine.not-running")
 
-    def _read(self):
+    @staticmethod
+    def _reads(observations):
+        """What one sample of this observation set has to capture.
+
+        Two reading paths, and a set spanning both pays for both: a
+        landmark needs the plane's pixels and a text condition needs
+        the recognized screen, and the two are separate carrier calls
+        (`control_display.DisplayConsole`). A landmark-only wait skips
+        the recognizer entirely, which is the whole point on a GUI
+        screen — matching glyphs there is work thrown away.
+
+        A set with no screen condition at all still reads the text
+        screen, exactly as it did before landmarks existed: the read
+        is what notices a machine that stopped underneath a
+        `machine=stopped` wait.
+        """
+        pixels = any(one.watches_pixels for one in observations)
+        text = not pixels or any(
+            one.channel == "screen" and not one.watches_pixels
+            for one in observations)
+        return text, pixels
+
+    def _read(self, text=True, pixels=False):
         """Take one sample of every channel."""
         if not self._running:
             return self._sampled(_Sample((), True))
+        unreadable = None
         try:
             with self._console() as console:
                 self._recognized_screens = getattr(
                     console, "recognizes_text", False)
-                frame = console.screen(self._font_prefix)
+                capture = console.framebuffer() if pixels else None
+                frame = ((), ())
+                if text:
+                    try:
+                        frame = console.screen(self._font_prefix)
+                    except UnreadableScreen as error:
+                        # **A capture already in hand outlives a text
+                        # read that failed**, and on a landmark's own
+                        # screen that is the ordinary case: a GUI page
+                        # is not an 80x25 text grid, so the recognizer
+                        # refuses it while the pixels a landmark is
+                        # matched on arrived perfectly. Losing the
+                        # sample here would mean a branching wait
+                        # mixing a text arm with a landmark arm could
+                        # never fire the landmark one.
+                        if capture is None:
+                            raise
+                        unreadable = str(error)
             rows = frame[0]
         except (OSError, ConnectionError):
             # The QEMU process is gone: the guest powered itself off,
@@ -1543,9 +1682,10 @@ class _ScriptEngine:
             return self._sampled(_Sample((), False, (), str(error)))
         return self._sampled(
             _Sample(tuple(_normalize_row(row) for row in rows), False,
-                    frame,
+                    frame, unreadable,
                     unclear=len(text_recognize.unreadable_cells(frame)),
-                    fonts=getattr(frame, "fonts_tried", ())))
+                    fonts=getattr(frame, "fonts_tried", ()),
+                    image=capture))
 
     def _sampled(self, sample):
         """Keep the latest reading, which the failure report needs."""
@@ -1920,10 +2060,168 @@ def _no_such_font(name, namespace):
     return f"no font named {name!r} in the active source{hint}"
 
 
+def _no_such_landmark(name, namespace):
+    """The diagnostic for a landmark reference the namespace lacks."""
+    close = difflib.get_close_matches(name, namespace, n=3, cutoff=0.6)
+    hint = ("; did you mean " + ", ".join(repr(other) for other in close)
+            if close else "")
+    return f"no landmark named {name!r} in the active source{hint}"
+
+
+def _observed(script):
+    """Yield every node that carries an observation condition.
+
+    ``_walk`` above is the plain statement traversal and drops the
+    handlers it descends through; a condition sits on the handler
+    itself as often as on a `wait`, so the two walks are separate
+    rather than one generalized to yield both kinds.
+    """
+
+    def walk(items, handlers=()):
+        for handler in handlers:
+            yield handler
+            yield from walk(handler.statements)
+        for item in items:
+            units = getattr(item, "units", None)
+            if units is not None:
+                yield from walk(units)
+                continue
+            if not hasattr(item, "verb"):
+                continue              # a phase, reached below
+            if item.verb == "wait":
+                yield item
+            yield from walk((), item.handlers)
+
+    yield from walk(script.statements)
+    for phase in script.phases:
+        yield from walk(phase.statements, phase.handlers)
+
+
+def _pool_kind(name, context, want):
+    """Which *other* kind of the one ``@`` pool holds ``name``.
+
+    The pool is one namespace across media, fonts and landmarks, so a
+    reference that misses its own kind has usually hit another one —
+    and saying *which* is the difference between "no landmark named
+    'freedos'" and "'freedos' is a media". Consulted only on a miss,
+    so an ordinary run never resolves a namespace it had no use for,
+    and never re-resolves the kind that just missed.
+    """
+    lookups = {
+        "media": lambda: load_namespace(context).media,
+        "font": lambda: _fonts.load_font_namespace(context),
+        "landmark": lambda: _landmarks.load_landmark_namespace(context),
+    }
+    try:
+        for kind, holds in lookups.items():
+            if kind != want and name in holds():
+                return kind
+    except ReliquaryError:
+        # The pool is being consulted to *improve* a refusal that is
+        # already certain. A second failure while looking must not
+        # replace the first one.
+        return None
+    return None
+
+
+def _wrong_kind(name, want, used_for, context, statement, script_path):
+    """The kind-at-binding refusal, or ``None`` if nothing else holds it.
+
+    One rule in three directions: the use decides which kind a
+    ``@name`` must be, so a reference landing on another kind of the
+    same pool is told what it hit and where it was used, rather than
+    being reported as a name nobody declared.
+    """
+    other = _pool_kind(name, context, want)
+    if other is None:
+        return None
+    return ScriptPreflightError(
+        f"@{name} is a {other}, and a {want} is what {used_for}; the "
+        "one @ pool holds all three kinds, so the use decides which "
+        "is meant", statement=statement, path=script_path,
+        rule_id=f"{want}.wrong-kind")
+
+
+@dataclasses.dataclass(frozen=True)
+class _Resolved:
+    """What preflight settled that a run then needs in hand.
+
+    Both halves are answers a sample must never go looking for: a
+    landmark declaration is read off disk, and the capture format is
+    the seam's, and either arriving mid-run would be a refusal after
+    the first guest input (G3).
+    """
+
+    landmarks: dict = dataclasses.field(default_factory=dict)
+    capture_format: str = None
+
+
+def _capture_format(machine_state):
+    """The pixel format the machine's driving plane captures in.
+
+    The first declared control plane drives the session (F63), so it
+    is the one asked. ``None`` — the plane reads no framebuffer — is
+    what makes a landmark condition a named refusal below.
+    """
+    plane = (machine_state.get("control-planes")
+             or ["agentless-display"])[0]
+    backend = machine_state.get("backend")
+    if not backend:
+        # A state with no backend recorded cannot be asked, and the
+        # plane is still the honest half of the answer.
+        return plane, None
+    return plane, _backends.adapter(backend).capture_format(plane)
+
+
+def _preflight_landmarks(script, machine_state, script_path, context):
+    """Bind every `@name` a condition watches, or refuse by name (F65).
+
+    Three refusals, all of them before the machine is touched (G3):
+    the name resolves to nothing; it resolves to another kind of the
+    one `@` pool, which is the kind check at binding — a media or a
+    font in condition position names the use and the kind; and the
+    machine's driving plane captures no framebuffer, which is
+    capability preflight at the *condition's* granularity rather than
+    the script's, since a script watching no landmark asks nothing of
+    the plane.
+    """
+    namespace = None
+    resolved = {}
+    plane, capture = None, None
+    for node in _observed(script):
+        for condition in node.conditions:
+            if condition.kind != "landmark":
+                continue
+            name = condition.value
+            if namespace is None:
+                namespace = _landmarks.load_landmark_namespace(context)
+                plane, capture = _capture_format(machine_state)
+            if name not in namespace:
+                raise _wrong_kind(
+                    name, "landmark", "a screen condition watches",
+                    context, node, script_path) or ScriptPreflightError(
+                    _no_such_landmark(name, namespace), statement=node,
+                    path=script_path, rule_id="landmark.unknown")
+            if capture is None:
+                raise ScriptPreflightError(
+                    f"the {plane!r} control plane captures no "
+                    f"framebuffer, so the landmark condition @{name} "
+                    "cannot be watched on this machine",
+                    statement=node, path=script_path,
+                    rule_id="machine.plane-no-framebuffer")
+            resolved[name] = namespace[name]
+    return _Resolved(resolved, capture)
+
+
 def _preflight_machine_rules(script, machine_state, script_path,
                              context=None):
     """Fail before any guest input when a script names something the
     machine or the namespace does not define.
+
+    Returns the :class:`_Resolved` bundle the run then holds: the
+    landmark declarations it will match against and the capture
+    format of the plane driving it, both settled here so no sample
+    resolves an asset.
 
     Two of the machine rules preflight owes (script-spec.md,
     "Validation and preflight"): a media reference naming no media
@@ -1958,7 +2256,10 @@ def _preflight_machine_rules(script, machine_state, script_path,
                 if font_namespace is None:
                     font_namespace = _fonts.load_font_namespace(context)
                 if name not in font_namespace:
-                    raise ScriptPreflightError(
+                    raise _wrong_kind(
+                        name, "font", "the font statement names",
+                        context, statement,
+                        script_path) or ScriptPreflightError(
                         _no_such_font(name, font_namespace),
                         statement=statement, path=script_path,
                         rule_id="font.unknown")
@@ -1993,10 +2294,14 @@ def _preflight_machine_rules(script, machine_state, script_path,
         if namespace is None:
             namespace = load_namespace(context)
         if name not in namespace.media:
-            raise ScriptPreflightError(
+            raise _wrong_kind(
+                name, "media", "insert mounts", context, statement,
+                script_path) or ScriptPreflightError(
                 _no_such_media(name, namespace),
                 statement=statement, path=script_path,
                 rule_id="media.unknown")
+    return _preflight_landmarks(script, machine_state, script_path,
+                                context)
 
 
 def execute_script(script, *, machine_id, context=None, display=False,
@@ -2024,7 +2329,7 @@ def execute_script(script, *, machine_id, context=None, display=False,
             phase = "-"
         return "-", phase
 
-    _preflight_machine_rules(
+    resolved = _preflight_machine_rules(
         script, _machines.load_machine_state(machine_id, context),
         script_path, context)
     record_pace = None
@@ -2039,7 +2344,9 @@ def execute_script(script, *, machine_id, context=None, display=False,
         script, machine_id, context,
         _machines.machine_dir_path(machine_id, context),
         events=events, script_path=script_path, bindings=bindings,
-        record_pace=record_pace, recording_writer=recording_writer)
+        record_pace=record_pace, recording_writer=recording_writer,
+        landmarks=resolved.landmarks,
+        capture_format=resolved.capture_format)
     try:
         with _cancel_on_interrupt(engine):
             engine.run(display=display)

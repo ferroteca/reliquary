@@ -8,8 +8,9 @@ SPDX-License-Identifier: GPL-3.0-only
 > **Status:** the storage shape for binary data an author supplies
 > to a script, stated once because it now has more than one
 > instance. It was settled for landmark renderings in the 2026-07-21
-> owner rounds ([pledged/design/landmarks.md](../pledged/design/landmarks.md);
-> the adjudication trail is in [DECISIONS.md](../DECISIONS.md)) and
+> owner rounds ([docs/spec/landmarks.md](../../docs/spec/landmarks.md), where the
+> delivered surface now lives; the adjudication trail is in
+> [DECISIONS.md](../DECISIONS.md)) and
 > this document generalizes that settlement rather than deciding
 > anything new. It sits in `design/` because it serves no single
 > feature: landmarks are one instance, the fonts **U25** needs are
@@ -22,7 +23,9 @@ SPDX-License-Identifier: GPL-3.0-only
 > ([pledged/FEATURES.md](../pledged/FEATURES.md)) is the entry that
 > adopts this shape — `.rlqf` beside its bank, one `@` pool, the
 > declaration owning the cell size and the codepage the bytes cannot
-> state (D109).
+> state (D109). **The landmark kind has since shipped too**
+> (F65, 2026-08-24): `.rlql` beside its numbered PNG renderings,
+> the same one `@` pool, the same fixed leaf under the home.
 
 ## The question
 

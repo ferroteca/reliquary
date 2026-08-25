@@ -809,6 +809,29 @@ class QemuSession:
         """
         return vga_screen(self._qmp)
 
+    def framebuffer(self):
+        """Refused: this plane's screen is text memory, not pixels.
+
+        The landmark matcher compares the pixels a plane's *screen
+        carrier* hands over, and this one hands over characters the
+        guest already resolved — there is no framebuffer in the
+        reading path to compare. `screendump` still captures a
+        diagnostic image (:meth:`screenshot` above, the `screenshot`
+        verb and the automatic failure capture), which is a different
+        carrier on a different clock and is not a sampling path.
+
+        Unreachable in an ordinary run: `capture_format` reports
+        ``None`` for this plane, so preflight refuses a landmark
+        condition before any guest input (F65). It answers here so
+        that a caller reaching past that gate is told what it asked
+        of, rather than meeting an ``AttributeError``.
+        """
+        raise PreflightError(
+            "the agentless-display plane reads QEMU's VGA text memory "
+            "and captures no framebuffer; a landmark condition needs a "
+            "plane that does (control-planes: [\"vnc\"])",
+            rule_id="machine.plane-no-framebuffer")
+
     def screenshot(self, path):
         """Capture the framebuffer to ``path`` as a PNG.
 
@@ -959,6 +982,22 @@ class QemuVncSession(QemuSession):
         return text_recognize.recognize(
             self._rfb.image(), bank=tuple(font_banks) + host_banks)
 
+    def framebuffer(self):
+        """The RFB framebuffer as a Pillow image (F65).
+
+        The landmark matcher's own carrier: the same refresh-and-read
+        :meth:`text_screen` runs, stopping before the recognizer. A
+        landmark-only sample therefore costs one framebuffer read and
+        no glyph matching at all, which is the point on a GUI screen
+        where recognizing anything would be wasted work.
+
+        The wire forces 32bpp true colour, so what comes back is
+        already this plane's stated ``rgb`` capture format
+        (:meth:`QemuAdapter.capture_format`).
+        """
+        self._rfb.refresh()
+        return self._rfb.image()
+
     def screenshot(self, path):
         """Capture the framebuffer to ``path`` as a PNG."""
         png = os.path.abspath(os.fspath(path))
@@ -1014,6 +1053,19 @@ class QemuAdapter(BackendAdapter):
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
         )
+
+    def capture_format(self, plane):
+        """Only the VNC plane reads a framebuffer here (F65).
+
+        The two planes differ in what their screen carrier *is*: the
+        agentless-display plane scrapes resolved characters out of
+        VGA text memory over QMP, and the VNC plane interprets the
+        RFB framebuffer. So a landmark condition — which compares
+        pixels — is served by the second and refused by name on the
+        first. The wire forces 32bpp true colour, which is ``rgb``
+        and makes the reference-side normalization the identity.
+        """
+        return "rgb" if plane == "vnc" else None
 
     def validate_settings(self, settings):
         """Judge this machine's ``qemu`` section, rendering nothing.

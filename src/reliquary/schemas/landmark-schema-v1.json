@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reliquary Landmark",
+  "description": "Synchronized companion to the landmark declaration (docs/spec/landmarks.md), which remains normative. One authored JSON5 kind, .rlql: one declaration owning the geometry — pinned screen dimensions, a region list and a named spot set — with its renderings attached as plain PNGs beside it by stem-and-number adjacency (<name>.1.png, <name>.2.png), never listed here. Schema validity never implies document validity: the bounds checks (a region or spot outside the pinned screen), the requirement that at least one variant rendering exist, the refusal of a variant whose decoded dimensions differ from the pinned ones, and the exclusive (0%, 100%) similarity range all live in the specification and the parser only. It validates the parsed document; the JSON5 grammar (comments, trailing commas, unquoted keys) is invisible at this level. Documents carry no $schema field pre-1.0; editors bind this schema to *.rlql by file association.",
+  "type": "object",
+  "required": ["screen"],
+  "additionalProperties": false,
+  "properties": {
+    "screen": {
+      "description": "The screen dimensions every variant rendering shares. Pinned, and mode is deliberately absent: the guest's video mode is observable over no control plane, and a field nothing can check is a declaration Reliquary would have to take on faith.",
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1}
+      }
+    },
+    "regions": {
+      "description": "Modifiers over the whole-screen exact match. Optional: a bare landmark matches the entire screen pixel for pixel.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/region"}
+    },
+    "spots": {
+      "description": "Named points in screen coordinates. Declared and validated today, and unread until the pointer verbs land: a spotless landmark is watchable and not clickable.",
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/spot"}
+    }
+  },
+
+  "$defs": {
+    "region": {
+      "description": "One rectangle and what it does to its own pixels. An ignore region excludes them outright and wins where regions overlap; a fuzzy region judges them against its own declared percentage. Everything no region covers requires 100%.",
+      "type": "object",
+      "required": ["kind", "x", "y", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["fuzzy", "ignore"]},
+        "x": {"type": "integer", "minimum": 0},
+        "y": {"type": "integer", "minimum": 0},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "similarity": {"$ref": "#/$defs/percent"}
+      },
+      "allOf": [
+        {
+          "description": "A fuzzy region states its own similarity; there is no default.",
+          "if": {"properties": {"kind": {"const": "fuzzy"}},
+                 "required": ["kind"]},
+          "then": {"required": ["similarity"]}
+        },
+        {
+          "description": "An ignore region judges none of its pixels, so a similarity on one is a contradiction rather than a redundancy.",
+          "if": {"properties": {"kind": {"const": "ignore"}},
+                 "required": ["kind"]},
+          "then": {"not": {"required": ["similarity"]}}
+        }
+      ]
+    },
+
+    "percent": {
+      "description": "A percent literal with its unit spelled, as durations spell theirs. The spelling is all this checks: the exclusive (0%, 100%) range — 0% being an ignore region in a second spelling and 100% the region's absence — is a numeric comparison a pattern cannot make honestly, so it is the parser's, like the bounds checks above.",
+      "type": "string",
+      "pattern": "^(?:[0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)%$"
+    },
+
+    "spot": {
+      "description": "One point on the pinned screen.",
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": {"type": "integer", "minimum": 0},
+        "y": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

@@ -81,6 +81,7 @@ always_handler: KW_ALWAYS condition? modifier* _open statement+ _close
 // validates.
 condition: STRING                       -> screen_text
          | REGEX                        -> screen_regex
+         | MEDIA_REF                    -> screen_landmark
          | NAME                         -> bare_condition
 
 transfer: KW_GOTO NAME _NL              -> goto

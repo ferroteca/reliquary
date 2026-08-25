@@ -16,6 +16,14 @@ selected by name (F60).
 Machine-state documents (`machine.json`) appear in the same prose and
 are a different document type with their own schema; they are
 identified by their state-only fields and skipped here.
+
+**Landmark declarations get the same treatment** (F65), from their
+own document and against their own schema and parser: `.rlql` is a
+second authored JSON5 kind and its spec teaches it by example, so an
+example that rots there rots in exactly the way this module exists to
+catch. Its parser needs a rendering beside the declaration, so one is
+synthesized at the declared size — the example is being checked for
+what it *says*, and a PNG in prose would say nothing.
 """
 
 import glob
@@ -27,8 +35,9 @@ from importlib import resources
 
 import jsonschema
 import pytest
+from PIL import Image
 
-from reliquary import document, json5reader, script_parser
+from reliquary import document, json5reader, landmarks, script_parser
 from reliquary.errors import StaticError
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
@@ -87,10 +96,31 @@ def _blocks(path):
         yield f"{path}#{index}", value
 
 
-def _schema():
+def _schema(name):
     text = (resources.files("reliquary") / "schemas"
-            / "blueprint-schema-v1.json").read_text(encoding="utf-8")
+            / name).read_text(encoding="utf-8")
     return json.loads(text)
+
+
+#: The document that teaches the `.rlql` landmark declaration.
+_LANDMARK_DOCUMENT = "docs/spec/landmarks.md"
+
+
+def _landmark_blocks(path):
+    """Every fenced JSON5 block in the landmark spec, in order."""
+    full = os.path.join(_REPO_ROOT, path)
+    if not os.path.isfile(full):
+        return
+    with open(full, encoding="utf-8") as handle:
+        text = handle.read()
+    for index, block in enumerate(_FENCE.findall(text)):
+        try:
+            value = json5reader.loads(block)
+        except StaticError:
+            continue
+        if not (isinstance(value, dict) and "screen" in value):
+            continue
+        yield f"{path}#{index}", block, value
 
 
 #: Every example the documents carry, gathered at collection.
@@ -100,7 +130,9 @@ EXAMPLES = [(label, value)
 SCRIPT_EXAMPLES = sorted(glob.glob(
     os.path.join(_REPO_ROOT, "planning", "design", "script-examples",
                  "*.rlqs")))
-SCHEMA = _schema()
+SCHEMA = _schema("blueprint-schema-v1.json")
+LANDMARK_SCHEMA = _schema("landmark-schema-v1.json")
+LANDMARK_EXAMPLES = list(_landmark_blocks(_LANDMARK_DOCUMENT))
 
 
 # No guard anywhere below: this module ships nowhere
@@ -131,6 +163,32 @@ def test_an_example_parses(value):
                          ids=[label for label, _value in EXAMPLES])
 def test_an_example_validates_against_the_schema(value):
     jsonschema.validate(value, SCHEMA)
+
+
+def test_the_landmark_spec_carries_a_real_example():
+    """The pin behind the parametrisations below."""
+    assert LANDMARK_EXAMPLES, (
+        f"{_LANDMARK_DOCUMENT} teaches the .rlql format and carries no "
+        "declaration to check")
+
+
+@pytest.mark.parametrize(
+    "value", [value for _label, _block, value in LANDMARK_EXAMPLES],
+    ids=[label for label, _block, _value in LANDMARK_EXAMPLES])
+def test_a_landmark_example_validates_against_its_schema(value):
+    jsonschema.validate(value, LANDMARK_SCHEMA)
+
+
+@pytest.mark.parametrize(
+    "block,value",
+    [(block, value) for _label, block, value in LANDMARK_EXAMPLES],
+    ids=[label for label, _block, _value in LANDMARK_EXAMPLES])
+def test_a_landmark_example_parses(block, value, tmp_path):
+    path = tmp_path / "example.rlql"
+    path.write_text(block, encoding="utf-8")
+    size = (value["screen"]["width"], value["screen"]["height"])
+    Image.new("RGB", size, (0, 0, 0)).save(tmp_path / "example.1.png")
+    landmarks.load_landmark_declaration(str(path))
 
 
 # Every open script example parses.

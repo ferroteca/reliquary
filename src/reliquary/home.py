@@ -302,13 +302,26 @@ def fonts_dir(context=None):
     assigned. `authored-binary-assets.md` is explicit that a binary
     asset kind (a font, a landmark) adds no seventh placeable root
     (P12); it resolves out of a directory that already exists,
-    exactly as the reserved `landmarks/` folder joins this same
-    layout. A project whose ``scripts``/``blueprints`` live outside
-    the home therefore still finds its fonts under the home alone —
-    an accepted cost of not widening the six-slot model for one more
+    exactly as `landmarks_dir` below joins this same layout. A
+    project whose ``scripts``/``blueprints`` live outside the home
+    therefore still finds its fonts under the home alone — an
+    accepted cost of not widening the six-slot model for one more
     read-only kind.
     """
     return os.path.join(home_dir(context), "fonts")
+
+
+def landmarks_dir(context=None):
+    """Return the authored-landmark directory.
+
+    ``<home>/landmarks`` — the fixed leaf `fonts_dir` above already
+    settled the shape of (F65). A landmark is the second authored
+    binary kind and answers to the same rule: it adds no seventh
+    placeable root, it is read-only, and its variant renderings sit
+    beside the declaration by stem adjacency rather than in a
+    directory of their own.
+    """
+    return os.path.join(home_dir(context), "landmarks")
 
 
 def effective_home(explicit):

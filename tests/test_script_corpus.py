@@ -79,10 +79,10 @@ _RULE = re.compile(r"^# rule: (V\d+)", re.M)
 _ID = re.compile(r"^# id: (\S+)", re.M)
 _CAUGHT_BY = re.compile(r"^# caught-by: (V\d+)", re.M)
 
-VALID = corpus.fixtures(_CORPUS, "valid", ".rlqs", count=20)
+VALID = corpus.fixtures(_CORPUS, "valid", ".rlqs", count=21)
 INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqs", count=52)
 AT_PREFLIGHT = corpus.fixtures(
-    _CORPUS, "invalid-at-preflight", ".rlqs", count=5)
+    _CORPUS, "invalid-at-preflight", ".rlqs", count=6)
 
 #: A machine declaring one slot of each kind, each carrying the
 #: `medium` its removability is read from. The fixtures name

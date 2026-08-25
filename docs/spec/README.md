@@ -74,6 +74,7 @@ into a description.
 | [script-spec.md](script-spec.md) | The `.rlqs` scripting language, and the G1–G7 language goals |
 | [blueprint-model.md](blueprint-model.md) | The composed blueprint model — structure, identity, the location grammar, the reference closure |
 | [media-spec.md](media-spec.md) | Media: acquisition, verification, and the cache |
+| [landmarks.md](landmarks.md) | Landmarks: the `.rlql` image-match asset and the `@name` screen condition |
 | [script-properties.md](script-properties.md) | Properties, secret storage, and the binding pipeline |
 | [asset-resolution.md](asset-resolution.md) | Where authored assets resolve from, and the six placeable working directories |
 | [instance-model.md](instance-model.md) | Machines: the state document, ownership, locking, recovery |
@@ -102,14 +103,17 @@ association:
 
 - `src/reliquary/schemas/blueprint-schema-v1.json` — the composed
   blueprint, versioned so editors can bind it today.
+- `src/reliquary/schemas/landmark-schema-v1.json` — the `.rlql`
+  landmark declaration, on the same terms.
 - `src/reliquary/schemas/machine-state.schema.json` — the machine state
   document.
 
-**For the blueprint, the schema is the structural norm** — and only
-the structural one: a schema captures the part JSON Schema can
-express, so schema validity never implies document validity, and
-[blueprint-model.md](blueprint-model.md) is normative for the
-semantics beyond it. Reliquary's own parser is the validator of
+**For the blueprint and the landmark alike, the schema is the
+structural norm** — and only the structural one: a schema captures
+the part JSON Schema can express, so schema validity never implies
+document validity, and [blueprint-model.md](blueprint-model.md) and
+[landmarks.md](landmarks.md) are normative for the semantics beyond
+it. Reliquary's own parser is the validator of
 both halves. Prose and schema are kept honest by the shared
 conformance corpus (`tests/fixtures/conformance/`), which
 runs every fixture against both, so neither can drift from the

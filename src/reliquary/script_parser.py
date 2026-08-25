@@ -799,6 +799,17 @@ class _Builder(Transformer):
     def screen_regex(self, children):
         return self._screen("regex", children[0])
 
+    def screen_landmark(self, children):
+        # A landmark reference is a screen condition in a new *value
+        # spelling*, which is exactly how the growth rule says a new
+        # matcher over an existing channel arrives (F65). The value is
+        # the referenced name; whether it names a landmark rather than
+        # a media or a font is checked at binding, where the one `@`
+        # pool is actually read.
+        token = children[0]
+        return Condition("screen", "landmark", str(token), _line(token),
+                         _column(token))
+
     def _screen(self, kind, token):
         return Condition("screen", kind, token.reliquary.value,
                          _line(token), _column(token))

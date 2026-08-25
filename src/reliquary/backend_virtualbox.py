@@ -19,6 +19,8 @@ import tempfile
 import time
 import uuid
 
+from PIL import Image
+
 from . import backends
 from . import text_recognize
 from .backends import Availability, BackendAdapter, Capabilities
@@ -645,6 +647,29 @@ class VirtualBoxSession:
             action="screenshot")
         return png
 
+    def framebuffer(self):
+        """The guest display as a Pillow image (F65).
+
+        The landmark matcher's carrier, and the first half of
+        :meth:`text_screen` below: this adapter's screen is a
+        screenshot either way, so a landmark condition costs exactly
+        what a text one costs minus the glyph matching. The image is
+        loaded off the temporary file and detached from it, so the
+        file can be removed while the caller still holds the pixels.
+        """
+        with tempfile.NamedTemporaryFile(
+                suffix=".png", delete=False) as handle:
+            path = handle.name
+        try:
+            self.screenshot(path)
+            with Image.open(path) as opened:
+                return opened.convert("RGB")
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
     def text_screen(self, font_banks=()):
         """Screenshot + shared fixed-font recognizer (F51).
 
@@ -724,6 +749,18 @@ class VirtualBoxAdapter(BackendAdapter):
             materialize=("new", "difference", "copy", "use"),
             vvfat=False,
         )
+
+    def capture_format(self, plane):
+        """This plane's screen *is* a framebuffer, so it states one.
+
+        VirtualBox has no text-memory readback: the display plane
+        screenshots the guest and hands the pixels to the shared
+        recognizer (F51/F52). The same pixels serve a landmark
+        condition unchanged (F65), and ``screenshotpng`` writes
+        ordinary 8-bit-per-channel colour, which is ``rgb`` and makes
+        the reference-side normalization the identity.
+        """
+        return "rgb" if plane == "agentless-display" else None
 
     def image_path(self, root, stem):
         return os.path.join(root, f"{stem}.vdi")

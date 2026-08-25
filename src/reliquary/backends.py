@@ -167,6 +167,34 @@ class BackendAdapter:
         """The named-vocabulary report this backend can honor."""
         raise NotImplementedError
 
+    def capture_format(self, plane):
+        """The pixel format this plane's screen carrier captures in.
+
+        ``None`` — the honest default, as ``settings_keys`` is empty
+        by default — means **this plane reads no framebuffer**, and a
+        landmark condition against a machine driving it is refused by
+        name at preflight (F65). The two answers separate the planes
+        the way they actually differ: QEMU's agentless-display plane
+        scrapes characters the guest already resolved out of VGA text
+        memory and there are no pixels to compare, while the VNC
+        plane and VirtualBox's display plane both interpret a
+        captured framebuffer and can hand the same pixels to a
+        matcher.
+
+        Naming the *format* rather than answering yes/no is the seam
+        point ``docs/spec/landmarks.md`` states: the reference
+        rendering is normalized through this format before the
+        pixel-equal comparison, so an asset captured on one plane
+        keeps its meaning on another whose capture quantizes
+        (a 16-bit thumbnail, say). Every built plane states ``"rgb"``
+        today, so the normalization is the identity and nothing
+        delivered pays for the hook.
+
+        A session whose plane states a format offers ``framebuffer()``
+        — the carrier returning that capture as a Pillow image.
+        """
+        return None
+
     def unmet(self, requirements):
         """Requirements this backend cannot honor, named one by one.
 

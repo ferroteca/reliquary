@@ -11,6 +11,17 @@ tokens. **Identity is the whole pair**, because a cursor menu moves
 its selection by attribute alone, and a text-only comparison would
 score exactly those frames as perfectly stable.
 
+**The contract generalizes from cells to pixels** (F65). A landmark
+is compared against a captured framebuffer, where there are no cells
+to compare, so `observe` also takes a Pillow image and measures the
+proportion of *pixels* that held still — the same window, the same
+default, the same recurrence mask. A `Reading` says which unit it
+counted, so a diagnostic can too. The default needs no restating at
+the finer grain: a landmark's residual demands every pixel, so a
+half-painted screen fails the match on its own, and what the gate
+buys there is an honest nearest-miss report rather than one measured
+mid-repaint.
+
 Stability is measured over a **window of wall-clock time**, never
 between consecutive samples. Sample adjacency would make the answer a
 property of the poll rate rather than of the guest: the same screen
@@ -34,6 +45,10 @@ rather than handing back the number an empty mask produced.
 import dataclasses
 import math
 import time
+
+from PIL import ImageChops
+
+from .errors import InternalError
 
 
 #: A quarter of an 80-column row. A text screen is 80 x 25 = 2000
@@ -122,8 +137,8 @@ def unsettled_note(reading):
         return f"{note} (never read often enough to tell)"
     note += f" (stability {reading.stability:.3f}"
     if reading.animated:
-        note += (f", outside a {len(reading.animated)}-cell animated "
-                 "region")
+        note += (f", outside a {len(reading.animated)}-"
+                 f"{reading.unit} animated region")
     return f"{note})"
 
 
@@ -155,6 +170,11 @@ def viable_window(interval, repeats=DEFAULT_ANIMATION_REPEATS,
     return interval * repeats * margin
 
 
+def _is_image(frame):
+    """Whether this reading is a framebuffer rather than a text screen."""
+    return hasattr(frame, "mode") and hasattr(frame, "size")
+
+
 def _grid(frame):
     """Flatten a frame into rows of (character, attribute) pairs."""
     rows, attributes = frame
@@ -166,6 +186,27 @@ def _grid(frame):
     return grid
 
 
+def _snapshot(frame):
+    """The comparable form of one reading, and what it counts in."""
+    if _is_image(frame):
+        return frame.convert("RGB"), "pixel"
+    return _grid(frame), "cell"
+
+
+def _extent(snapshot, unit):
+    """How many units this reading holds."""
+    if unit == "pixel":
+        return snapshot.size[0] * snapshot.size[1]
+    return sum(len(row) for row in snapshot)
+
+
+def _changed(before, after, unit):
+    """The units whose identity differs between two readings."""
+    if unit == "pixel":
+        return _changed_pixels(before, after)
+    return _changed_cells(before, after)
+
+
 def _changed_cells(before, after):
     """The (row, column) cells whose identity pair differs."""
     changed = set()
@@ -174,6 +215,30 @@ def _changed_cells(before, after):
             if was != is_now:
                 changed.add((row, column))
     return changed
+
+
+def _changed_pixels(before, after):
+    """The flat indices of pixels that differ between two captures.
+
+    Differenced band by band in Pillow rather than pixel by pixel in
+    Python: a 640x480 screen is 307,200 units where a text screen is
+    2,000, and the mask this feeds is rebuilt at every sample. A
+    difference in *any* channel counts, which is the same
+    identity-is-the-whole-thing rule the cell path applies to the
+    character and attribute pair.
+    """
+    if before.size != after.size:
+        return set(range(after.size[0] * after.size[1]))
+    difference = ImageChops.difference(before, after)
+    bands = difference.split()
+    combined = bands[0]
+    for band in bands[1:]:
+        combined = ImageChops.lighter(combined, band)
+    # ``tobytes`` on an ``L`` image is one byte per pixel with no
+    # padding, so the index *is* the pixel — and unlike ``getdata`` it
+    # is not on its way out of Pillow.
+    return {index for index, value in enumerate(combined.tobytes())
+            if value}
 
 
 @dataclasses.dataclass(frozen=True, repr=False)
@@ -212,11 +277,15 @@ class Reading:
     stability: float | None
     animated: frozenset = frozenset()
     blind: bool = False
+    #: What the verdict counted — ``"cell"`` on a text screen,
+    #: ``"pixel"`` on a captured framebuffer (F65). A diagnostic that
+    #: names a region says which, rather than calling pixels cells.
+    unit: str = "cell"
 
     def __repr__(self):
         return (f"Reading(stable={self.stable!r}, "
                 f"stability={self.stability!r}, "
-                f"animated={len(self.animated)} cells"
+                f"animated={len(self.animated)} {self.unit}s"
                 + (", blind" if self.blind else "") + ")")
 
 
@@ -252,19 +321,32 @@ class ScreenStability:
         self._changes = []
         self._samples = []
         self._size = 0
+        self._unit = "cell"
 
     def observe(self, frame, now=None):
-        """Record one sample and return the `Reading` it produces."""
+        """Record one sample and return the `Reading` it produces.
+
+        ``frame`` is the seam's text screen — ``(rows, attributes)``
+        — or a Pillow image where the plane captured pixels (F65). A
+        monitor stays on the kind it was first handed: mixing the two
+        would compare a screen against a different thing entirely and
+        read every sample as a total repaint.
+        """
         if now is None:
             now = time.monotonic()
-        grid = _grid(frame)
-        self._size = sum(len(row) for row in grid)
+        snapshot, unit = _snapshot(frame)
+        if self._previous is not None and unit != self._unit:
+            raise InternalError(
+                f"a stability monitor reading {self._unit}s was handed "
+                f"a {unit} frame")
+        self._unit = unit
+        self._size = _extent(snapshot, unit)
         if self._first is None:
             self._first = now
         if self._previous is not None:
             self._changes.append(
-                (now, _changed_cells(self._previous, grid)))
-        self._previous = grid
+                (now, _changed(self._previous, snapshot, unit)))
+        self._previous = snapshot
         self._samples.append(now)
         self._prune(now)
         return self._read(now)
@@ -379,7 +461,8 @@ class ScreenStability:
     def _read(self, now):
         animated = self._animated(now)
         if now - self._first < self._window:
-            return Reading(False, None, animated)
+            return Reading(False, None, animated,
+                           unit=self._unit)
         horizon = now - self._window + _EDGE
         changed = set()
         for when, cells in self._changes:
@@ -388,11 +471,14 @@ class ScreenStability:
         changed -= animated
         stability = 1.0 - len(changed) / self._size
         if stability >= self._threshold:
-            return Reading(True, stability, animated)
+            return Reading(True, stability, animated,
+                           unit=self._unit)
         # Only doubt a verdict the missing mask could have changed. A
         # screen that reads settled without one is settled whatever
         # the cadence, and saying otherwise would stand the guard down
         # on the quiet screens it costs nothing to judge.
         if self._blind():
-            return Reading(False, None, animated, blind=True)
-        return Reading(False, stability, animated)
+            return Reading(False, None, animated, blind=True,
+                           unit=self._unit)
+        return Reading(False, stability, animated,
+                       unit=self._unit)

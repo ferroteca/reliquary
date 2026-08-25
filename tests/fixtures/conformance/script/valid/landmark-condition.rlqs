@@ -1,0 +1,29 @@
+# valid: a landmark reference stands wherever a screen condition
+#        stands -- a single-form wait, an on arm, an always handler
+# spec: Observations / Channels
+
+platform dos
+entry setup
+deadline 1h
+
+phase setup {
+    wait @setup-page stable=500ms timeout=2m
+    press enter
+    wait {
+        on @finished-page {
+            goto done
+        }
+        on "Setup failed" {
+            finish
+        }
+    }
+}
+
+phase done {
+    always @error-dialog {
+        press esc
+    }
+    always @summary-page {
+        finish
+    }
+}

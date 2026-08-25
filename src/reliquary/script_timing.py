@@ -145,6 +145,12 @@ class Observation:
     timeout: Bound
     stable: Optional[Bound] = None
     stability: Optional[Level] = None
+    #: The landmark this observation watches for, where it watches
+    #: one (F65). A dry run names it: what a landmark wait costs is
+    #: the same clock as any other, and what it *needs* — an asset on
+    #: disk and a plane that captures pixels — is exactly what a
+    #: reader is checking the plan for.
+    landmark: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -266,6 +272,8 @@ def format_plan(plan, name=None):
                     and observation.stability is not
                     plan.default_stability):
                 entry += f"; stability {observation.stability}"
+            if observation.landmark is not None:
+                entry += f"; landmark @{observation.landmark}"
             lines.append(entry)
     if plan.inputs:
         lines.append("guest input:")
@@ -297,6 +305,19 @@ def _header_stability(script):
     return _level(script.stability, "header", None,
                   script.headers.get("stability", 0)) or Level(
         DEFAULT_STABILITY, float(DEFAULT_STABILITY), "built-in")
+
+
+def _landmark(node):
+    """The landmark an observation watches, or ``None``.
+
+    Read off the node's own conditions rather than passed down: a
+    branching wait carries none itself and each of its handlers
+    carries its own, which is exactly what the plan should show.
+    """
+    for condition in getattr(node, "conditions", ()):
+        if condition.kind == "landmark":
+            return condition.value
+    return None
 
 
 def _level(spelling, scope, scope_name, line):
@@ -353,7 +374,7 @@ def _statements(statements, default, pacing, stability, phase,
             observations.append(Observation(
                 "wait", statement.line, statement.column, phase, inner,
                 _bound(statement.stable, "statement", None, statement.line),
-                own))
+                own, _landmark(statement)))
             continue
         # A branching wait bounds reaching the first match, and is
         # the innermost scope for the observations its handlers
@@ -387,6 +408,7 @@ def _handler(handler, default, pacing, stability, phase, observations,
                  handler.line) or stability
     observations.append(Observation(
         handler.keyword, handler.line, handler.column, phase, default,
-        _bound(handler.stable, "statement", None, handler.line), own))
+        _bound(handler.stable, "statement", None, handler.line), own,
+        _landmark(handler)))
     _statements(handler.statements, default, pacing, own, phase,
                 observations, inputs)

@@ -39,7 +39,7 @@ draft. Text-mode capture comes first and needs no new language
 surface; GUI capture rides the landmark/click work, and a click's
 position seeds its landmark's spot. The draft is ordinary script
 text, self-contained by default — landmarks travel as embedded
-resolve-in-place blocks (planning/pledged/design/landmarks.md) — with
+resolve-in-place blocks (docs/spec/landmarks.md) — with
 factored
 catalog files on request; written once and user-owned from then
 on, like `import-vm` output.
@@ -63,7 +63,7 @@ concepts only, per AGENTS.md.)
 unchanged step is an *asset refresh*: a new landmark variant,
 never touching the script — the numbered-adjacency variant shape
 (`<name>.<n>.png` beside the declaration, or beside the script
-for an embedded landmark; planning/pledged/design/landmarks.md) makes
+for an embedded landmark; docs/spec/landmarks.md) makes
 refresh
 file-creation, never file-rewrite. New or changed steps
 are *step capture*: the fragment is emitted beside the script for

@@ -77,8 +77,9 @@ Deliverables:
    with opt-in surgical apply at the anchor — never regenerating,
    never text-merging.
 5. The landmark catalog shape, already decided (DECISIONS.md, the
-   wrinkle round; [landmarks.md](../pledged/design/landmarks.md)) —
-   implementation rides the asset spec work.
+   wrinkle round) and now **delivered**
+   ([docs/spec/landmarks.md](../../docs/spec/landmarks.md)) — what
+   the recorder owes is emitting into it.
 6. Run-events handover kinds (script/human control passing), so a
    capture session is one run record with mixed drivers. Milestone
    9 reserved these in the spec and no constant exists in the
@@ -155,9 +156,10 @@ passes byte-for-byte.
 > entry: **F63**, the VNC control plane on QEMU, screen and
 > keyboard — since **delivered** — this entry keeping its number
 > and the remainder under D110's cut ruling. **The second cut
-> left it 2026-08-24**: **F65**, watch-only landmarks
-> ([../pledged/FEATURES.md](../pledged/FEATURES.md)), the design
-> travelling to `pledged/design/` with it. Every deliverable below now stands on pledged
+> left it 2026-08-24**: **F65**, watch-only landmarks — pledged
+> and **delivered** the same day, its number retired and its
+> surface normative at
+> [docs/spec/landmarks.md](../../docs/spec/landmarks.md). Every deliverable below now stands on pledged
 > demand and stays here until pledged — a pledged use case makes
 > a feature pledgeable and pledges nothing itself (D65).
 >
@@ -193,15 +195,16 @@ capability has to be reachable by more than one.
 
 Decide first:
 
-- The GUI asset spec: **designed in full** (owner rounds,
-  2026-07-21 and 2026-08-24 —
-  [landmarks.md](../pledged/design/landmarks.md)): the `.rlql` JSON5
-  schema (stem-identified, dimensions-only pinning — the mode
-  half dropped as unverifiable), the similarity metric
+- The GUI asset spec: **delivered** (F65, 2026-08-24 —
+  [docs/spec/landmarks.md](../../docs/spec/landmarks.md)): the
+  `.rlql` JSON5 schema (stem-identified, dimensions-only pinning —
+  the mode half dropped as unverifiable), the similarity metric
   (pixel-equal fraction, per-region judgment), and reference
   placement — `@name` in every screen-condition position; this
   bullet used to say "landmark-block placement within a script",
-  a phrase from before D12 deleted the embedded block.
+  a phrase from before D12 deleted the embedded block. It is kept
+  here only to say the question is closed, and goes with the
+  entry.
 - Pointer input end to end: **designed** (owner round,
   2026-08-24 — [design/pointer-input.md](design/pointer-input.md)):
   the seam is one carrier method in RFB's `PointerEvent` shape
@@ -286,15 +289,13 @@ Deliverables:
    `pointer_event` carrier method, the `pointing-device` machine
    field, and the `click` verb, with pacing and composition
    control-plane-owned.
-3. Landmarks: **the watch-only half is pledged as F65**
-   (owner, 2026-08-24;
-   [../pledged/FEATURES.md](../pledged/FEATURES.md), the design
-   travelling to
-   [../pledged/design/landmarks.md](../pledged/design/landmarks.md)
-   with it) — the `.rlql` kind, the matcher, the `@name`
-   condition. What stays here: the cursor-parking contract, the
-   park-zone mask, and the match-and-click verbs composed on the
-   primitives, which ride deliverable 2's pledge.
+3. Landmarks: **the watch-only half is delivered** (F65, owner,
+   2026-08-24;
+   [docs/spec/landmarks.md](../../docs/spec/landmarks.md)) — the
+   `.rlql` kind, the matcher, the `@name` condition. What stays
+   here: the cursor-parking contract, the park-zone mask, and the
+   match-and-click verbs composed on the primitives, which ride
+   deliverable 2's pledge.
 4. Win9x/WinNT platform workflows: GUI installer scripting for
    the setup GUIs text scraping cannot reach, keyboard-first
    where NT-era setup allows it.
@@ -440,13 +441,15 @@ proposal:
 - Beyond citation, three designs exist for pillars whose demand was
   never pledged — `backend-adapter.md`,
   [guest-communication.md](../design/guest-communication.md) and
-  [landmarks.md](../pledged/design/landmarks.md) — all demoted by D33
-  *for lack of use-case backing* after their designs were written.
+  landmarks — all demoted by D33 *for lack of use-case backing*
+  after their designs were written.
   *Backend-adapter left this list on 2026-07-28, by the remedy the
   traceability rule names: the demand was found and pledged (U7),
   not the work deleted. Landmarks left it by the same remedy: U5
-  re-pledged (D110, 2026-08-21), and the design travelled to
-  `pledged/design/` with F65's pledge (2026-08-24). One left.*
+  re-pledged (D110, 2026-08-21), pledged as F65 and delivered
+  (2026-08-24), its design now the normative
+  [docs/spec/landmarks.md](../../docs/spec/landmarks.md). One
+  left.*
   This is the retrospective pass over what predates the current
   shelving, where a design sits with the feature it serves and is
   swept with it.

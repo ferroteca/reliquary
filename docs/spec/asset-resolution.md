@@ -6,19 +6,15 @@ SPDX-License-Identifier: GPL-3.0-only
 # Authored-asset resolution and the working directories
 
 > **Status:** normative. The six placeable directories, the
-> non-placeable `fonts` directory (F61), the codex-is-not-a-tier
-> rule, the extension-and-name identity rule, the recorded blueprint
-> source, and the default layout are implemented and are what the
-> code answers to; the layout is a world-facing contract, so changes
-> to it follow the surface-change rule
-> ([SURFACES.md](../../planning/SURFACES.md)). Two things
-> below are **reserved**, named so they are not mistaken for
-> today's behaviour: the `ObjectSource` fileless third source, and
-> landmark declarations (`.rlql`, the home `landmarks/` folder) —
-> settled design in
-> [landmarks.md](../../planning/pledged/design/landmarks.md) and
-> entirely unbuilt, so no asset kind is declared for them. Details
-> may change before first release.
+> non-placeable `fonts` and `landmarks` directories (F61, F65), the
+> codex-is-not-a-tier rule, the extension-and-name identity rule,
+> the recorded blueprint source, and the default layout are
+> implemented and are what the code answers to; the layout is a
+> world-facing contract, so changes to it follow the surface-change
+> rule ([SURFACES.md](../../planning/SURFACES.md)). One thing below
+> is **reserved**, named so it is not mistaken for today's
+> behaviour: the `ObjectSource` fileless third source. Details may
+> change before first release.
 >
 > This banner was absent until 2026-07-27, and the document had
 > drifted in six places behind it — the directory's own rule is
@@ -31,7 +27,7 @@ artifact-residency split ([ARCHITECTURE.md](../../ARCHITECTURE.md) P4);
 the individual asset formats are specified in
 [blueprint-model.md](blueprint-model.md),
 [media-spec.md](media-spec.md), [script-spec.md](script-spec.md),
-and [landmarks.md](../../planning/pledged/design/landmarks.md).
+and [landmarks.md](landmarks.md).
 
 ## Assets are identified by extension
 
@@ -39,27 +35,33 @@ Assets are identified by **extension**, not location: `.rlqb` a
 machine blueprint (`.json` is accepted as its legacy spelling),
 `.rlqs` a script, `.rlqf` an authored glyph font (F61) — its
 4096-byte bank attached by stem adjacency, `<name>.bin`, not
-discovery. There is **no media file kind** — `.rlqm` retired with
-the composed model, and a media is a spec inside a `.rlqb` (D30),
-resolved through the component namespace rather than by this rule.
-Reserved: `.rlql` a landmark declaration (its `<name>.<n>.png`
-variant renderings attaching by stem adjacency the same way —
-[landmarks.md](../../planning/pledged/design/landmarks.md)), which
-no source resolves today.
+discovery — and `.rlql` a landmark declaration (F65), its
+`<name>.<n>.png` variant renderings attaching by stem-and-number
+adjacency the same way ([landmarks.md](landmarks.md)). There is
+**no media file kind** — `.rlqm` retired with the composed model,
+and a media is a spec inside a `.rlqb` (D30), resolved through the
+component namespace rather than by this rule.
 
 An asset's **identity** is its
 declared `name` when it carries one, else its filename stem; two
 files of one kind resolving to the same effective name within a
-source are an error. A script and a font carry no `name` field, so
-both are always stem-identified.
+source are an error. A script, a font and a landmark carry no
+`name` field, so all three are always stem-identified — and for the
+two binary kinds that is not merely a convention: the binaries
+attach by *stem* adjacency, so a `name` field diverging from the
+stem would break the adjacency that attaches them.
 
-**One reference pool.** A font's name is checked against the same
-collision-checked `@` pool a media's name already occupies
+**One reference pool, three kinds.** A font's and a landmark's name
+are each checked against the same collision-checked `@` pool a
+media's name already occupies
 (`planning/design/authored-binary-assets.md`, "one reference
-pool") — a font sharing a name with a media is an error naming
-both files, checked wherever a script actually resolves a font
-(`fonts.py`), the same lazy discipline the media namespace already
-answers to.
+pool") — a duplicate visible to one script is an error naming both
+files, checked wherever a script actually resolves one of them
+(`fonts.py`, `landmarks.py`), the same lazy discipline the media
+namespace already answers to. Which kind a `@name` must be is
+decided by **where it is used**: a landmark in `insert` position and
+a media in condition position are each refused naming the use and
+the kind.
 
 ## Two axes: where a kind lives, and whether the codex backs it
 
@@ -193,6 +195,9 @@ With only the home assigned, the six land like this:
 ├── fonts/               authored glyph fonts, <name>.rlqf beside
 │                        <name>.bin — not independently placeable
 │                        (F61)
+├── landmarks/           authored landmarks, <name>.rlql beside its
+│                        <name>.<n>.png renderings — not
+│                        independently placeable (F65)
 ├── user.properties      personal user properties (line-based
 │                        key = value; ordinary values and @secret
 │                        markers for host-stored secrets)
@@ -210,12 +215,14 @@ With only the home assigned, the six land like this:
 Each of `blueprints`/`scripts`/`cache` is only where the directory
 *derives* to; any of them may be assigned elsewhere, and
 `media`/`machines` follow an assigned `cache` rather than the home.
-`fonts` derives from the home alone and is never independently
-assigned (above). A `landmarks/` folder joins this same layout with
-landmark support and is reserved until then (see the banner); the
-recorder's drafts land in the `blueprints` / `scripts` directories
-the session ran with, which for a project is its own tree rather
-than the home.
+`fonts` and `landmarks` each derive from the home alone and are
+never independently assigned (above): a read-only binary asset kind
+adds no seventh placeable root, which is the cost accepted so the
+six-slot model is not widened for each one. A project whose
+`scripts`/`blueprints` live outside the home therefore still finds
+its fonts and landmarks under the home. The recorder's drafts land
+in the `blueprints` / `scripts` directories the session ran with,
+which for a project is its own tree rather than the home.
 
 Everything under the cache is Reliquary's and disposable. Nothing is
 ever hand-placed there; pre-existing content enters a machine

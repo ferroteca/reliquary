@@ -32,7 +32,8 @@ this same seam.
 import os
 
 from .errors import PreflightError
-from .home import blueprints_dir, fonts_dir, scripts_dir
+from .home import (blueprints_dir, fonts_dir, landmarks_dir,
+                   scripts_dir)
 
 
 # Authored-asset file extensions by kind. ``.json`` is the accepted
@@ -41,14 +42,15 @@ from .home import blueprints_dir, fonts_dir, scripts_dir
 # One kind is deliberately absent, reserved in
 # docs/spec/asset-resolution.md rather than declared here: ``.rlqm``
 # retired with the composed model — a media is a spec inside a
-# ``.rlqb`` (D30). ``.rlql`` landmarks stay reserved there too —
-# nothing requests the kind yet — but ``.rlqf`` fonts (F61) are no
-# longer in that state: `fonts.py` requests them, and `fonts_dir`
-# resolves the directory they read from.
+# ``.rlqb`` (D30). The two binary-asset kinds are both live now:
+# ``.rlqf`` fonts (F61) and ``.rlql`` landmarks (F65), each reading
+# from its own fixed leaf under the home (`fonts_dir`,
+# `landmarks_dir`) and each attaching its binaries by stem adjacency.
 KIND_EXTENSIONS = {
     "blueprint": (".rlqb", ".json"),
     "script": (".rlqs",),
     "font": (".rlqf",),
+    "landmark": (".rlql",),
 }
 
 
@@ -113,6 +115,7 @@ class DirectorySource(AssetSource):
         "blueprint": blueprints_dir,
         "script": scripts_dir,
         "font": fonts_dir,
+        "landmark": landmarks_dir,
     }
 
     def __init__(self, context=None):
@@ -165,3 +168,32 @@ def index_by_name(files, name_of, kind):
                 rule_id="name.asset-collision")
         index[effective] = path
     return index
+
+
+def guard_pool(kind, claims, other_kind, others):
+    """Refuse a name two kinds of the one ``@`` pool both claim.
+
+    Media, fonts (F61) and landmarks (F65) share **one** reference
+    pool (planning/design/authored-binary-assets.md), so a script
+    reading ``@welcome`` must find exactly one thing under that name.
+    Both maps are ``effective name -> a human location``, and the
+    refusal names both sides: what an author has to do about it is
+    rename one of two files, and a message naming neither is a
+    message they cannot act on.
+
+    Folded case-insensitively, like every other name in this pool
+    (``resolve.build_namespace``'s own rule), and it says which of
+    the two collisions it found — an exact duplicate and a
+    case-difference read very differently at a keyboard.
+    """
+    folded = {name.lower(): name for name in others}
+    for name, where in claims.items():
+        other = folded.get(name.lower())
+        if other is None:
+            continue
+        how = ("the same name" if other == name
+               else "names that differ only by case")
+        raise PreflightError(
+            f"{kind} {name!r} and {other_kind} {other!r} share the @ "
+            f"pool ({how}):\n  {where}\n  {others[other]}",
+            rule_id="name.pool-collision")

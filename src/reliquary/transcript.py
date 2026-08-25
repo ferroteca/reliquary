@@ -427,6 +427,19 @@ class RecordingSession:
             writer.write_frame(rows, attributes)
         return rows, attributes
 
+    def framebuffer(self):
+        """Pass the capture through; the transcript holds no pixels.
+
+        A transcript is a *text-screen* format — rows and attribute
+        tokens (planning/design/screen-transcripts.md) — so a
+        framebuffer read is offered nothing to record. Recording a run
+        that watches a landmark therefore keeps working and produces
+        a capture that cannot reconstruct that wait, which
+        :meth:`ReplaySession.framebuffer` says out loud rather than
+        improvising a screen (P11).
+        """
+        return self._inner.framebuffer()
+
     def screenshot(self, path):
         result = self._inner.screenshot(path)
         self._writer.write_call("screenshot",
@@ -700,6 +713,20 @@ class ReplaySession:
                 f"{entry.data.get('elapsed', '?')}s: "
                 f"expected {expected!r}, got {got!r}",
                 rule_id="transcript.send-keys-mismatch")
+
+    def framebuffer(self):
+        """Refused: a transcript records screens, never pixels.
+
+        The format holds character rows and attribute tokens, which
+        no landmark can be matched against. A reconstruction that
+        improvised one would report a match or a miss the recorded run
+        never made, so the replay says what it was asked for and
+        stops (P11).
+        """
+        raise TranscriptError(
+            "a transcript records text screens and holds no "
+            "framebuffer; a landmark condition cannot be replayed",
+            rule_id="transcript.no-framebuffer")
 
     def screenshot(self, path):
         """Check the image's *name*, which is the part the script chose.

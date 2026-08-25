@@ -64,6 +64,90 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Landmarks: the `.rlql` authored kind and the `@name` screen
+  condition** (F65, serving U5). A script could only watch a screen
+  it could *read* as text, so a GUI installer — the whole point of
+  the era U5 names — was unreachable: the recognizer returns noise
+  on a page that was never a text mode, and there was nothing else
+  to wait on. A landmark is one declaration and N renderings:
+  `<name>.rlql`, a JSON5 document pinning the screen dimensions and
+  carrying optional regions and named spots, with its variant
+  renderings attached as plain `<name>.<n>.png` files beside it by
+  stem-and-number adjacency — so refreshing an asset is file
+  creation, never file rewriting. It resolves from
+  `<home>/landmarks`, a fixed leaf like `fonts` and not a seventh
+  placeable root, and its name joins the one collision-checked `@`
+  pool media and font names already share. Every refusal lands
+  before a machine starts: a region or spot outside the pinned
+  screen, `similarity` on an `ignore` region or missing from a
+  `fuzzy` one, a percent outside the exclusive `(0%, 100%)` range,
+  an unknown field, no variant rendering at all, and a variant off
+  the pinned dimensions. A packaged JSON schema ships beside the
+  blueprint's (`src/reliquary/schemas/landmark-schema-v1.json`), and
+  `docs/spec/landmarks.md` is normative for everything a schema
+  cannot express.
+- **The match is pixel-equal, judged per region.** Every pixel of a
+  capture sits in exactly one regime: an `ignore` region excludes it
+  and wins where regions overlap, a `fuzzy` region judges its own
+  surviving pixels against its own declared percent, and the
+  residual demands 100% — the bare landmark's rule applied
+  uniformly. A variant matches when its residual is clean and every
+  fuzzy region clears its bar; the landmark matches when any variant
+  does. One pooled screen score was declined: a small failing region
+  drowns in a large matching screen's average, which fails toward
+  the *wrong* screen and loses the geography. A miss reports the
+  nearest variant by filename with its failing regions and the
+  percentage each achieved, in the failure report's new
+  `landmark-miss` field. The reference side is normalized through
+  the capture plane's stated pixel format first — a seam point that
+  is the identity on every plane built today and costs nothing until
+  one quantizes.
+- **`@name` stands wherever a screen condition stands** — a
+  single-form `wait`, an `on` arm, an `always` handler — carrying
+  `stable=` and `timeout` like any screen condition. It is a new
+  *value spelling* of the unprefixed screen channel rather than a
+  new channel or new syntax, which is the language's own growth
+  rule doing what it was written for. Kind is checked at binding:
+  the `@` pool holds three kinds, so the use decides which is meant
+  and a reference landing on another is refused naming both — new
+  `landmark.wrong-kind`, and `media.wrong-kind` / `font.wrong-kind`
+  reading the same rule in the other two directions, where a
+  landmark in `insert` or `font` position previously reported a name
+  nobody declared. `--dry-run`'s timing plan names the landmark each
+  observation watches.
+- **Capability is preflighted at the condition's granularity.** A
+  landmark condition needs framebuffer capture, so the adapter seam
+  gained `capture_format(plane)` — the pixel format a control
+  plane's *screen carrier* captures in, `None` where it captures
+  none, which is the honest default — and sessions on a plane that
+  states one gained the `framebuffer()` carrier beside
+  `text_screen()`. QEMU's agentless-display plane scrapes characters
+  the guest already resolved out of VGA text memory and states
+  nothing, so a landmark condition there is refused by name
+  (`machine.plane-no-framebuffer`) before any guest input; QEMU's
+  VNC plane and VirtualBox's display plane both interpret a captured
+  framebuffer and state `rgb`. A script watching no landmark asks
+  the plane for nothing and is unaffected. The `screenshot` verb and
+  the automatic failure capture are a different carrier and keep
+  working everywhere.
+- **The quiescence gate's contract generalizes from cells to
+  pixels.** A landmark compare has no cells, so `screen_stability`
+  now also takes a captured frame and measures the proportion of
+  *pixels* that held still — the same window, the same default, the
+  same recurrence mask — and a `Reading` carries the unit it
+  counted, so an expiry says "pixel" where it counted pixels. A
+  landmark-only wait skips the recognizer entirely: on a GUI screen
+  matching glyphs is work thrown away.
+- **What is deliberately not here.** No `click` and no pointer
+  surface: spots are parsed and validated because the schema is
+  settled and a recorder writes them, and nothing reads one yet.
+  Before any pointer verb exists nothing moves the guest's cursor,
+  so a capture and a keyboard-only run agree by construction; the
+  cursor-parking contract arrives with the pointer piece and is
+  stated rather than mechanized. Selecting regions stay deferred.
+  A transcript holds character rows and attribute tokens, so a
+  recorded run's landmark waits cannot be replayed and the replay
+  says so by name rather than improvising a screen.
 - **Per-drive QEMU options through the machine-scoped hatch**
   (D118). A drive-scoped `backend-settings` section was declined:
   QEMU's own `-set drive.<slot>.<option>=<value>` addresses one

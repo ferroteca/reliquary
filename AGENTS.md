@@ -339,7 +339,37 @@ workflow:
   rather than kept beside it. One interaction the cut exposed and `control_display._BASELINE_READS` now records:
   **settling and recognizing decoration want different amounts of looking** — a clock moves two cells and is
   settled on sight, but nothing can know it is a clock until it has ticked repeatedly, so a baseline that stops
-  at the first settled frame hands back an empty mask.
+  at the first settled frame hands back an empty mask. **The contract generalizes from cells
+  to pixels** (F65): `observe` also takes a Pillow image, for the landmark compares where
+  there are no cells, and measures the same fraction over the same window at the same
+  default; a `Reading` carries the unit it counted so a diagnostic says "pixel" where it
+  counted pixels. A monitor stays on the kind it was first handed — mixing them would read
+  every sample as a total repaint.
+  `landmarks.py` is the **image-match asset and its matcher** (F65; normative spec:
+  `docs/spec/landmarks.md`) — the `.rlql` authored kind beside `.rlqb` / `.rlqs` / `.rlqf`,
+  stem-identified like a script and a font, with its variant renderings attached as plain
+  `<name>.<n>.png` files by stem-and-number adjacency so an asset refresh is file *creation*
+  and never file rewriting. It resolves out of `home.landmarks_dir` — `<home>/landmarks`, a
+  fixed leaf like `fonts` and not a seventh placeable root — and its name is checked against
+  the one collision-checked `@` pool media and fonts already share, which `assets.guard_pool`
+  now serves for all three. **The metric is pixel-equal fraction, judged per region** (never
+  one pooled score, which would let a small failing region drown in a large matching screen's
+  average): an `ignore` region excludes its pixels and wins overlaps, a `fuzzy` region judges
+  its own surviving pixels against its own declared percent, and the residual demands 100%. A
+  variant matches when its residual is clean and every fuzzy region clears its bar; the
+  landmark matches when any variant does; a miss reports the **nearest** variant with its
+  failing regions and their achieved percentages. The reference side is normalized through the
+  capture plane's stated pixel format first — the seam point `hyperv-screen.md` settled, an
+  identity on every plane built today and costing nothing until one quantizes.
+  **What decides whether a machine can watch a landmark is the plane's screen carrier, not the
+  backend**: `BackendAdapter.capture_format(plane)` reports the pixel format a plane captures
+  in, or `None` where it captures none (the honest default, as `settings_keys` is empty by
+  default), and a session whose plane states a format offers the `framebuffer()` carrier
+  beside `text_screen()`. QEMU's agentless-display plane scrapes characters the guest already
+  resolved and states nothing, so a landmark condition on it is a named preflight refusal
+  (`machine.plane-no-framebuffer`); QEMU's VNC plane and VirtualBox's display plane both
+  interpret a captured framebuffer and state `rgb`. `screendump` / `screenshotpng` stay a
+  *diagnostic* carrier on every plane and are not a screen a landmark is matched against.
   `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
   adapter (prompt-based readiness and command completion — **the echo and the prompt are identified by
   provenance, never by shape alone**: the echo is the row the command was typed at with the rows that were above
@@ -1012,14 +1042,16 @@ Doctrine to preserve:
   `pytest --integration` asks for the tier: a marker says the tier
   was chosen, where a skip could not say whether it was chosen or
   suffered. So **any** skip is a defect to fix, not a configuration
-  to tolerate. That the two runs differ — 2,167 tests from the
-  repository, 2,113 from an sdist, four deselected in each — is the
+  to tolerate. That the two runs differ — 2,293 tests from the
+  repository, 2,236 from an sdist, four deselected in each — is the
   isolation working; neither skips. Selecting the tier on a host
   without the backend is a **failure naming the gap** (P11) and not a
   skip either: the run was asked for.
-- Pillow is the image library: screenshot conversion uses it, and the
-  planned landmark assets (decode normalization, pixel comparison, PNG
-  text chunks) build on it rather than on hand-written encoders.
+- Pillow is the image library: screenshot conversion uses it, the
+  landmark assets do their decode normalization and pixel comparison
+  through it (`landmarks.py`, F65), and the pixel half of the
+  quiescence measure differences its frames with `ImageChops` rather
+  than pixel by pixel in Python. Nothing here hand-writes an encoder.
 - Support Python 3.12 and newer, and **check it** — the floor run in
   "Required checks" is what makes that a claim rather than a hope. It was
   `>=3.9` until the check was first run and 3.9, 3.10 and 3.11 all failed
@@ -1213,8 +1245,8 @@ $env:PYTHONPATH = "src"; pytest
 That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
 unittest tests` is no longer the entry point, and with the conversion finished (F60) it collects nothing at all —
 the hook that made it work is gone. It was taken because pytest is packaged everywhere a packager works. Expect
-**2,113 tests, four deselected and none
-skipped**, against the repository's 2,167 ("Test expectations", above): the difference is `tests/source_tree/`, which
+**2,236 tests, four deselected and none
+skipped**, against the repository's 2,293 ("Test expectations", above): the difference is `tests/source_tree/`, which
 ships nowhere, and a *skip* there is a defect exactly as it is here. `tests/conftest.py` ships with the suite, so the
 integration tier is deselected in a stranger's run exactly as it is here. Install the wheel into a clean environment and check it by using it —
 `rlq --version` and an import — since it carries no suite to run.
@@ -1448,7 +1480,7 @@ scope).
 Keysight's eggPlant Functional is the closer analogue for the display seam specifically: a commercial GUI test tool
 that drives its system under test over VNC **or** RDP, matches screens by image, and carries the click point inside
 the matched image. Its vocabulary lands almost one-to-one on the settled landmark design
-(`planning/pledged/design/landmarks.md`) — hot spot to spot, image collection to variant, search rectangle to the
+(`docs/spec/landmarks.md`) — hot spot to spot, image collection to variant, search rectangle to the
 deferred selecting region, tolerance to the similarity percent — and that convergence is the useful part: it says the
 asset model is well-trodden rather than novel. Proprietary, so the concept-reference rule applies by default; the
 public documentation is the whole of what is readable, and it is the *only* thing to be read — no trial binaries
@@ -1457,7 +1489,7 @@ decompiled, no EULA-gated material, no support-portal content.
 eggPlant is the one reference here where the relicensing reservation *raises* rather than lowers the stakes. A GPL
 hobby project converging on a commercial tool's vocabulary is unremarkable; a project that has publicly reserved the
 right to relicense is a more attractive target for a patent holder in the same space, and the convergence documented
-against `planning/pledged/design/landmarks.md` is a discoverable record. The convergence is genuine and independently
+against `docs/spec/landmarks.md` is a discoverable record. The convergence is genuine and independently
 arrived at, which is exactly why it should stay documented as such — evidence of parallel design, not of borrowing.
 Should the reservation ever be exercised, this is the reference to review first, with advice.
 
