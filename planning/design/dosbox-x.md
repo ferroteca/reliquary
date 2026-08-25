@@ -6,29 +6,63 @@ SPDX-License-Identifier: GPL-3.0-only
 # DOSBox-X as a backend
 
 > **Status:** investigated 2026-08-22 against **DOSBox-X 2026.08.02**
-> (the install at `C:\DOSBox-X`), ruled **not a goal against that
-> build** — the ruling is the non-goal bullet in
-> [backend-adapter.md](backend-adapter.md), and this document is the
-> evidence behind it. **R12's reopen condition has since been met**,
-> independently verified 2026-08-24 against a control channel added
-> on a personal fork (below), which is a different fact from the
-> ruling changing: the control half the non-goal names is no longer
-> missing, but it exists nowhere Reliquary could depend on today
-> without adopting that fork. It sits in `design/` because it serves
-> no single feature ([README.md](../README.md)); **R12**
-> ([RECURRING.md](../RECURRING.md)) is the standing watch, now
-> retargeted to the adoption question the technical one resolved
-> into. Shaped by **P11** (capability honesty — reported, never
-> emulated), **P2** (agentless operation is permanent) and **P21** (a
-> dependency must pull its weight); the demand a fifth backend would
-> serve is **U12**'s unattended install and **U1**'s single command,
-> which the DOS workflow already reaches on QEMU today. **It
-> authorizes no implementation.** DOSBox-X arriving as a backend, on
-> whatever binary, would be its own proposal under the surface-change
-> rule ([SURFACES.md](../SURFACES.md)), taking a place in **D66**'s
-> priority order as part of that act — and adopting a personal fork
-> as a build dependency is a separate, prior question this document
-> does not answer.
+> (the install at `C:\DOSBox-X`), initially ruled **not a goal against
+> that build** on account of the missing control half. **R12's reopen
+> condition was met 2026-08-24**, independently verified against a
+> control channel added on a personal fork (below). This document then
+> stated that the technical finding **authorized no implementation** —
+> adopting a personal fork as a build dependency was named as a
+> separate, prior question. **That question has since been answered:
+> D120 ([DECISIONS.md](../DECISIONS.md), owner, 2026-08-25) adopts
+> DOSBox-X as Reliquary's fifth backend on this fork, overriding R12's
+> own stated bar** ("a fork staying a fork, however capable, does not
+> discharge this") as a deliberate, cost-accepted call rather than by
+> satisfying that bar on its own terms. **R12 is retired**
+> ([RECURRING.md](../RECURRING.md)) — its watch is discharged by the
+> override. The backend lives in `src/reliquary/backend_dosbox_x.py`
+> and `src/reliquary/dosboxx_control.py`; this document remains the
+> investigation record — the machine/control split below, the gaps
+> the adopted backend still carries, and the evidence D120 cites —
+> and is no longer the ruling itself, which is D120's.
+
+## Known gaps, consolidated
+
+Everything the adopted backend does not do, gathered in one place
+rather than left scattered across the investigation below — this is
+the section to read for "what doesn't work," and it stays current as
+gaps close (`SCREEN`'s attribute byte did; the FreeDOS LiveCD boot
+issue has not). Each row is explained in full where the investigation
+below first found it.
+
+| Gap | Why | Affects |
+|---|---|---|
+| No SMP | DOSBox-X's local APIC is faked, not emulated | a `cpus` above 1 is refused at `start`, naming the gap |
+| No `vvfat` | `MOUNT` of a host directory is a built-in-DOS, pre-`BOOT` feature that does not survive the handoff | a directory-source drive cannot be declared on this backend |
+| No framebuffer / no landmark support | the screen carrier reads resolved characters out of VGA text memory, never pixels | `capture_format` is always `None`; a `.rlql` landmark condition is refused at preflight |
+| No pointer input | the control channel carries no pointer-event command of any kind | `pointing_devices` is empty; `click` is refused at preflight |
+| No floppy/hdd eject-to-empty | not implemented on this control channel | `change_medium(path=None)` on a floppy or hdd is refused, naming the gap |
+| No live insert into a drive that started the machine empty | `MOUNT` only appends to a drive that already holds a mounted image | a removable drive declared empty at `create` can never receive media while running |
+| No live insert of a new, never-mounted cdrom image | `MOUNT` explicitly excludes `isoDrive` | only cycling among images already given at launch (multiple `-t iso` paths, via `SWAP`) works while running |
+| Cannot boot the FreeDOS LiveCD ISO | this build's El Torito handling supports floppy emulation only; the LiveCD uses a no-emulation boot record | the shipped `freedos-install` codex recipe does not run on this backend — core boot-handling, unrelated to the control channel |
+| `SCREENSHOT` not personally re-verified | rests on the branch author's own testing, not mine | lower risk — it shares its capture buffer and mechanism class with the independently-verified `SCREEN` — but named rather than silently assumed |
+| The fork itself | unmerged, not upstream, and not the stock `C:\DOSBox-X` install this document was first written against | a build/maintenance dependency rather than a released artifact; **D120** accepts this cost explicitly rather than waiting it out |
+
+**Closed along the way, named so it is not mistaken for a live gap.**
+`SCREEN` originally read only the character half of each VGA text
+cell, dropping the attribute byte the seam's `text_screen` contract
+needs for cursor-menu highlight detection (a color-only DOS menu
+highlight would otherwise be invisible to `select`). A new `ATTR`
+command was added to the fork and independently re-verified the same
+way the original four commands were (see "The bar was met," below).
+
+**One implementation wrinkle, recorded so it is not rediscovered:**
+the fork's own `Set_help()` text for `control.token` documents
+`-set control.token=<value>` (dotted), but DOSBox-X's `-set` parser
+does not split on `.` — the working form is space-separated,
+`-set "control token=<value>"`. Confirmed by reading `Config`'s own
+`-set` handling (`GetSectionFromProperty` does no dot-splitting) and
+by a live launch: the dotted form logs `No such section or property`
+for every `-set` and the control channel never comes up.
 
 ## Why the question is worth asking
 
@@ -267,23 +301,26 @@ None of Reliquary's codex recipes currently need the first two; the
 last two were already named as honest gaps in "The machine half
 fits" above and are unaffected by this branch.
 
-**What no amount of testing changes.** The channel lives on an
-**unmerged personal fork**, not upstream DOSBox-X and not the stock
-`C:\DOSBox-X` install this document was first written against. An
-adapter built against it would depend on that fork specifically —
-maintain it, upstream it, or track someone else's release of it —
-which is a commitment distinct from "the capability now exists
-somewhere," and not one this document decides.
+**What no amount of testing changes — and what D120 decided anyway.**
+The channel lived on an **unmerged personal fork**, not upstream
+DOSBox-X and not the stock `C:\DOSBox-X` install this document was
+first written against. An adapter built against it depends on that
+fork specifically — maintain it, upstream it, or track someone else's
+release of it — which is a commitment distinct from "the capability
+now exists somewhere." This document did not decide that commitment
+was worth making; **D120** ([DECISIONS.md](../DECISIONS.md)) did,
+2026-08-25, as a deliberate override rather than as a consequence of
+anything argued here.
 
-## Where DOSBox-X does have a place
+## DOSBox-X's other place: the image boundary
 
-Not as a backend, but at the image boundary. It reads raw, VHD and
-qcow2 — including the qcow2 the QEMU adapter already produces — so
-a disk image Reliquary builds is a disk image DOSBox-X can boot,
-with no adapter in between. Under **P20** installation media is
-input and disk images are output, and handing that output to a tool
-the user drives themselves is the **exporter** family's territory,
-not a backend's. That is the same disposition
-[backend-adapter.md](backend-adapter.md) already records for
-orchestrators and external harnesses: a handoff target is not a
-provider.
+Independent of its now-built backend, DOSBox-X also sits at the image
+boundary. It reads raw, VHD and qcow2 — including the qcow2 the QEMU
+adapter already produces — so a disk image Reliquary builds is a disk
+image DOSBox-X can boot, with no adapter in between. Under **P20**
+installation media is input and disk images are output, and handing
+that output to a tool the user drives themselves is the **exporter**
+family's territory. This does not compete with the adapter D120
+adopted; a user's own, unpatched DOSBox-X booting a Reliquary-built
+image by hand needs none of the control channel the adapter depends
+on.

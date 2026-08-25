@@ -28,7 +28,7 @@ from . import json5reader
 from .errors import PreflightError, StaticError
 
 _PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
-_BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
+_BACKENDS = {"qemu", "virtualbox", "dosbox-x", "vmware", "hyperv"}
 _CONTROLLERS = {"ide", "sata", "scsi", "nvme", "virtio"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
 _POINTING_DEVICES = {"tablet", "mouse"}

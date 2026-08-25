@@ -27,10 +27,11 @@ from unittest import mock
 
 import pytest
 
+from reliquary import backend_dosbox_x as dosboxx_module
 from reliquary import backend_qemu as qemu_module
 from reliquary import backend_virtualbox as vbox
 from reliquary import backends
-from reliquary.errors import PreflightError, StaticError
+from reliquary.errors import PreflightError, RunFailure, StaticError
 from tests.vga_bank import vga_bank
 
 _OTHER_UUID = "99999999-9999-9999-9999-999999999999"
@@ -65,6 +66,8 @@ class _QemuDriver:
     #: The command that would reach a VM the identity check must stop
     #: short of.
     destructive = "quit"
+    #: Reads a host-installed font for its VNC plane's recognizer.
+    has_glyph_banks = True
 
     def executable(self, root):
         return os.path.join(root, "qemu-system-i386")
@@ -149,6 +152,8 @@ class _VirtualBoxDriver:
     pointer_planes = {"agentless-display": False}
     pointing_devices = ()
     destructive = "controlvm"
+    #: Reads a host-installed font for its display plane's recognizer.
+    has_glyph_banks = True
 
     def executable(self, root):
         return os.path.join(root, "VBoxManage.exe")
@@ -198,7 +203,84 @@ class _VirtualBoxDriver:
             yield (lambda: vbox.stop(vm)), commands
 
 
-DRIVERS = (_QemuDriver(), _VirtualBoxDriver())
+class _DosboxDriver:
+    """DOSBox-X on a fake host: the binary alone, no font recognizer.
+
+    Its screen carrier reads resolved characters over the control
+    channel — the same shape as QEMU's agentless-display plane — and
+    it has no second, framebuffer-reading plane the way QEMU's VNC one
+    is, so there is no host font to extract at all
+    (``has_glyph_banks = False``).
+    """
+
+    name = "dosbox-x"
+    extension = ".vhd"
+    vvfat = False
+    control_planes = ("agentless-display",)
+    capture_formats = {"agentless-display": None}
+    pointer_planes = {"agentless-display": False}
+    pointing_devices = ()
+    destructive = "STOP"
+    has_glyph_banks = False
+
+    def executable(self, root):
+        return os.path.join(root, dosboxx_module._DOSBOXX_BIN)
+
+    def found(self, root):
+        return mock.patch.object(dosboxx_module, "find_dosbox_x",
+                                 return_value=self.executable(root))
+
+    def absent(self):
+        return mock.patch.object(
+            dosboxx_module, "find_dosbox_x",
+            side_effect=PreflightError(
+                "dosbox-x not found",
+                rule_id="machine.backend-not-found"))
+
+    def unreachable(self):
+        return mock.patch.object(
+            dosboxx_module, "find_dosbox_x",
+            side_effect=AssertionError("must not re-extract"))
+
+    @contextlib.contextmanager
+    def mismatched_stop(self):
+        """A stop aimed at a control channel reporting another instance."""
+        commands = []
+
+        class _FakeClient:
+            def __init__(self, host, port, timeout=10.0):
+                pass
+
+            def identify(self):
+                commands.append("IDENTIFY")
+                return {"backend-id": "unrelated-vm",
+                       "auth-required": "yes", "authenticated": "no"}
+
+            def auth(self, token):
+                commands.append("AUTH")
+                raise RunFailure("should not be reached",
+                                 rule_id="dosboxx.auth-failed")
+
+            def stop(self):
+                commands.append("STOP")
+
+            def close(self):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                self.close()
+
+        identity = {"backend": "dosbox-x", "backend-id": "reliquary-plain-0",
+                    "token": _OUR_UUID, "endpoint": {"port": 54321},
+                    "pid": 1234}
+        with mock.patch.object(dosboxx_module, "ControlClient", _FakeClient):
+            yield (lambda: dosboxx_module.stop(identity)), commands
+
+
+DRIVERS = (_QemuDriver(), _VirtualBoxDriver(), _DosboxDriver())
 
 
 @pytest.fixture(params=DRIVERS, ids=[driver.name for driver in DRIVERS])
@@ -305,6 +387,9 @@ def test_the_guest_font_is_read_off_the_installation(driver, tmp_path):
     the suite carries no other project's font while still proving the
     adapter reads one out of its install.
     """
+    if not driver.has_glyph_banks:
+        pytest.skip(f"{driver.name} has no framebuffer-reading plane and "
+                   "so reads no host font")
     own = vga_bank()
     root = str(tmp_path)
     driver.install_font(root, b"\x11" * 500 + own + b"\x22" * 30)
@@ -314,6 +399,9 @@ def test_the_guest_font_is_read_off_the_installation(driver, tmp_path):
 
 def test_the_font_is_cached_under_the_backends_support_dir(driver,
                                                            tmp_path):
+    if not driver.has_glyph_banks:
+        pytest.skip(f"{driver.name} has no framebuffer-reading plane and "
+                   "so reads no host font")
     own = vga_bank()
     root = str(tmp_path / "install")
     cache = str(tmp_path / "cache")
@@ -334,6 +422,9 @@ def test_the_font_is_cached_under_the_backends_support_dir(driver,
 
 
 def test_an_installation_with_no_font_fails_closed(driver, tmp_path):
+    if not driver.has_glyph_banks:
+        pytest.skip(f"{driver.name} has no framebuffer-reading plane and "
+                   "so reads no host font")
     root = str(tmp_path)
     driver.install_font(root, b"\x00" * 9000)
     with driver.found(root):

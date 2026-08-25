@@ -40,7 +40,7 @@
         },
         "backend": {
           "description": "The materializing backend. Never supplied by a reference.",
-          "enum": ["qemu", "virtualbox", "vmware", "hyperv"]
+          "enum": ["qemu", "virtualbox", "dosbox-x", "vmware", "hyperv"]
         },
         "memory": {
           "description": "A size string, a whole-MiB integer, or a reference supplying one.",
@@ -80,7 +80,7 @@
         },
         "backend-settings": {
           "type": "object",
-          "propertyNames": {"enum": ["qemu", "virtualbox", "vmware", "hyperv"]},
+          "propertyNames": {"enum": ["qemu", "virtualbox", "dosbox-x", "vmware", "hyperv"]},
           "additionalProperties": {"type": "object"}
         },
         "parameters": {"type": "object"}

@@ -237,6 +237,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the method for `wait_text` were weighed and declined. The README
   and `docs/dos-automation.md` show the keyword and name
   `wait_text` as the general authored wait.
+- **DOSBox-X, Reliquary's fifth backend** (D120), on a personal fork
+  (`pgalbraith/dosbox-x`, branch `control-channel`) that adds the one
+  thing stock DOSBox-X lacked: a host-side control channel against an
+  already-booted guest. `backend-id: dosbox-x` boots real DOS from
+  floppy, hard-disk and ISO images over `IMGMOUNT`/`BOOT`, materializes
+  a native dynamic VHD (`new`/`difference`/`copy`/`use`, the last two
+  via `VHDMAKE` and a plain file copy), and drives the running guest
+  agentlessly — key injection, text-and-attribute screen readback, a
+  diagnostic screenshot carrier, and a fail-closed stop, all over the
+  fork's loopback socket (`src/reliquary/dosboxx_control.py`, the wire;
+  `src/reliquary/backend_dosbox_x.py`, the adapter). No framebuffer, no
+  pointer input, and no `vvfat`: capability is reported rather than
+  emulated (P11), and `backends.PRIORITY` places it after VirtualBox
+  and ahead of the two capability-less stubs. Three narrower gaps are
+  likewise reported rather than worked around — no floppy/hdd
+  eject-to-empty, no live insert into a drive that started the machine
+  empty, no live insert of a new cdrom image while running — none
+  needed by a shipped codex recipe today. **The codex's FreeDOS
+  install recipe is not yet one of them**: this DOSBox-X build cannot
+  boot the actual FreeDOS LiveCD ISO the recipe boots directly (a
+  no-emulation El Torito record DOSBox-X's own boot handling does not
+  support, unrelated to the control channel), so no `dosbox-x`
+  integration test claims that recipe. D120 overrides the standing
+  non-goal `planning/design/dosbox-x.md` recorded 2026-08-22 and
+  `planning/RECURRING.md`'s retired R12, a deliberate call rather than
+  a consequence of either document's own terms.
 
 ### Fixed
 

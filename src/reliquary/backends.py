@@ -29,19 +29,25 @@ from typing import Optional, Tuple
 from .errors import PreflightError, StaticError
 
 
-#: The default assignment order (D66, owner 2026-07-28), ranking
+#: The default assignment order (D66, owner 2026-07-28; amended by
+#: D120 to insert ``dosbox-x``, owner 2026-08-25), ranking
 #: *agentless* scriptability — the capability every guest gets,
 #: because assignment happens at materialization, before any guest
 #: exists, and the install that follows is agentless by definition
 #: (P3's arc). It breaks ties among candidates already available *and*
 #: capable, so it never stands in for a capability check (P11).
-PRIORITY = ("qemu", "virtualbox", "vmware", "hyperv")
+#: ``dosbox-x`` sits after the two full agentless-scriptable backends
+#: and before the two capability-less stubs: real, if narrower,
+#: capability outranks an adapter that claims none
+#: (planning/design/dosbox-x.md).
+PRIORITY = ("qemu", "virtualbox", "dosbox-x", "vmware", "hyperv")
 
 #: Where each adapter lives. Imported on demand so that naming a
 #: backend costs nothing until one is actually asked for.
 _ADAPTERS = {
     "qemu": (".backend_qemu", "QemuAdapter"),
     "virtualbox": (".backend_virtualbox", "VirtualBoxAdapter"),
+    "dosbox-x": (".backend_dosbox_x", "DosboxXAdapter"),
     "vmware": (".backend_stubs", "VMwareAdapter"),
     "hyperv": (".backend_stubs", "HyperVAdapter"),
 }

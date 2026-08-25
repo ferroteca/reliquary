@@ -223,27 +223,30 @@ materialization.
   a Vagrantfile / box handoff around a provider VM — but it does
   not own the native virtualization capabilities Reliquary needs to
   verify. The real backend remains the provider underneath.
-- **Emulators without a management interface are not backends —
-  DOSBox-X in particular** (investigated 2026-08-22; the
-  evidence and the reopen condition are
-  [dosbox-x.md](dosbox-x.md), watched by **R12**). The machine
-  half fits — it boots real DOS from floppy, hard-disk and ISO
-  images over emulated IDE, and reads raw, VHD and qcow2 with a
-  native differencing image of its own. **The control half does
-  not exist**: every carrier this seam requires is a host-side
-  command against a *running* machine, and DOSBox-X's whole
-  external surface is the command line at launch and the SDL
-  window after it — no monitor, socket or pipe, so no key
-  injection, no screen readback, no medium swap, and no
-  identity to verify or fail closed on. The tools that could
-  drive it (`AUTOTYPE`, `DX-CAPTURE`, `IMGSWAP`) belong to the
-  DOS it supplies, which is the DOS an install replaces.
-  Driving the host window instead would be the brittle
-  UI-automation plane
-  [guest-communication.md](guest-communication.md) refuses, and
-  an `agentless-display` *emulated* rather than reported (P11).
-  It is a handoff target at the image boundary, like the two
-  entries above, rather than a provider.
+- **DOSBox-X was an "emulator without a management interface" —
+  not any more, on a personal fork.** Investigated 2026-08-22; the
+  evidence, the near-miss gaps, and the eventual reopening are
+  [dosbox-x.md](dosbox-x.md). Stock DOSBox-X's whole external
+  surface is the command line at launch and the SDL window after
+  it — no monitor, socket or pipe, so no key injection, no screen
+  readback, no medium swap, and no identity to verify or fail
+  closed on; the tools that could drive it (`AUTOTYPE`,
+  `DX-CAPTURE`, `IMGSWAP`) belong to the DOS it supplies, which is
+  the DOS an install replaces. A personal fork,
+  `pgalbraith/dosbox-x` branch `control-channel`, adds exactly the
+  missing control half — a loopback TCP socket carrying key
+  injection, text-and-attribute screen readback, media swap and a
+  fail-closed stop against an already-booted guest — independently
+  verified 2026-08-24. **D120** ([DECISIONS.md](../DECISIONS.md))
+  adopted it as the fifth backend, 2026-08-25, overriding the
+  standing "a fork staying a fork does not discharge this" bar
+  ([RECURRING.md](../RECURRING.md)'s retired **R12**) as a
+  deliberate, cost-accepted call. The adapter is
+  `src/reliquary/backend_dosbox_x.py`; three gaps remain honestly
+  reported rather than emulated (P11) — no floppy/hdd
+  eject-to-empty, no live insert into a drive that started empty,
+  no live insert of a new cdrom image — none needed by a shipped
+  codex recipe today.
 
 ## Backend assignment
 
@@ -265,17 +268,22 @@ walk — that backend is probed alone, and `create` fails closed if
 it is unavailable or incapable. The assignment is recorded in the
 machine state, so the machine stays on that backend thereafter.
 
-The priority order is **QEMU, VirtualBox, VMware Workstation,
-Hyper-V** (owner, 2026-07-28; D66 — the seam extraction's
-decide-first, settled with the pledge it travelled on, and F2 now
-carries none). It ranks *agentless* scriptability, the capability
+The priority order is **QEMU, VirtualBox, DOSBox-X, VMware
+Workstation, Hyper-V** (owner, 2026-07-28; D66 — the seam
+extraction's decide-first, settled with the pledge it travelled on,
+and F2 now carries none; amended by D120, owner, 2026-08-25, to
+insert DOSBox-X). It ranks *agentless* scriptability, the capability
 every guest gets: QEMU alone has the full control plane set today;
 VBoxManage is the closest match to it, covering lifecycle,
-scancode input, screenshots and serial redirection; VMware
-Workstation exposes VNC but no comparable scancode surface; and
-Hyper-V has no VNC at all, leaving it with no agentless display
-plane. Order breaks ties among candidates already available and
-capable, so it never substitutes for a capability check.
+scancode input, screenshots and serial redirection; DOSBox-X's
+control channel (D120) covers lifecycle, key injection and
+text-and-attribute screen readback but no framebuffer or pointer
+input, ranking it behind VirtualBox and ahead of the two stubs that
+claim no capability at all; VMware Workstation exposes VNC but no
+comparable scancode surface; and Hyper-V has no VNC at all, leaving
+it with no agentless display plane. Order breaks ties among
+candidates already available and capable, so it never substitutes
+for a capability check.
 
 **What the remaining stubs claim is nothing.** Their host probe is
 real — knowing whether VMware or Hyper-V is installed costs nothing

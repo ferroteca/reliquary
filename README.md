@@ -233,9 +233,9 @@ resolved plan, and where each media would come from, while building
 none of it. Nothing is seeded, fetched or written, and nothing is
 asked for; a media that is not cached yet is simply reported as one
 that would be downloaded. `--backend` turns it into a question about
-somewhere else: whether the blueprint would work on VirtualBox or
-Hyper-V, answered from what that backend can do, with nothing
-installed and nothing booted.
+somewhere else: whether the blueprint would work on VirtualBox,
+DOSBox-X, or Hyper-V, answered from what that backend can do, with
+nothing installed and nothing booted.
 
 ```powershell
 rlq create-machine --blueprint freedos --dry-run

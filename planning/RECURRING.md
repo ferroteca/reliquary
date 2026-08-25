@@ -159,19 +159,3 @@ discharge is judgment work, never a script's verdict alone.
   its weight better than the stdlib?
 - **Stale after**: one month.
 - **Last performed**: 2026-08-01.
-
-### R12 — Watch DOSBox-X's control channel for a path to adoption
-
-- **Check**: originally, whether DOSBox-X had grown a host-side
-  control channel meeting the four capabilities in
-  [design/dosbox-x.md](design/dosbox-x.md) — met 2026-08-24,
-  independently verified against `pgalbraith/dosbox-x`'s
-  `control-channel` branch ("The bar was met, on a personal fork").
-  **Retargeted to what that resolved into**: whether the channel (or
-  an equivalent) has reached somewhere Reliquary could depend on
-  without maintaining a fork itself — merged upstream, or released
-  in an official build. A fork staying a fork, however capable,
-  does not discharge this.
-- **Stale after**: six months — an upstream merge is an
-  infrequent event, not a point release.
-- **Last performed**: 2026-08-24.

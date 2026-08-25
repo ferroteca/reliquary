@@ -128,7 +128,10 @@ def test_a_declared_key_and_an_empty_section_are_accepted(section):
 
 def test_the_priority_order_is_the_decided_one():
     # D66: ranked by agentless scriptability, not host ubiquity.
-    assert backends.PRIORITY == ("qemu", "virtualbox", "vmware", "hyperv")
+    # D120: dosbox-x inserted after the two full backends, ahead of
+    # the two capability-less stubs.
+    assert backends.PRIORITY == (
+        "qemu", "virtualbox", "dosbox-x", "vmware", "hyperv")
 
 
 def test_the_first_available_and_capable_backend_wins(install):
@@ -153,6 +156,8 @@ def test_nothing_capable_fails_closed_listing_every_refusal(install):
         qemu=fake_backend.FakeAdapter("qemu", available=False),
         virtualbox=fake_backend.FakeAdapter(
             "virtualbox", capabilities=Capabilities(backend="virtualbox")),
+        **{"dosbox-x": fake_backend.FakeAdapter(
+            "dosbox-x", available=False)},
         vmware=fake_backend.FakeAdapter("vmware", available=False),
         hyperv=fake_backend.FakeAdapter("hyperv", available=False))
     with pytest.raises(PreflightError) as caught:

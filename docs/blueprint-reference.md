@@ -102,6 +102,7 @@ The virtualization backend hosting the machine:
 |--------------|--------------------|
 | `qemu`       | QEMU               |
 | `virtualbox` | VirtualBox         |
+| `dosbox-x`   | DOSBox-X           |
 | `vmware`     | VMware Workstation |
 | `hyperv`     | Hyper-V            |
 
@@ -320,6 +321,7 @@ The backend's own identifier for this machine:
 |--------------|-----------------------------|
 | `qemu`       | QEMU instance name          |
 | `virtualbox` | VM UUID                     |
+| `dosbox-x`   | the launch's `backend-id`, reported over the control channel |
 | `vmware`     | path to the `.vmx` file     |
 | `hyperv`     | Hyper-V VM id               |
 
@@ -873,6 +875,31 @@ give, and QEMU reports it against the drive):
 This section renders **last**, after everything Reliquary owns, so
 in the launch command line Reliquary logs, your own arguments are
 the tail — which is also what lets `-set` find the drive it names.
+
+### `dosbox-x`
+
+One key, the same escape-hatch shape as QEMU's `args` and for the
+same reason (a second spelling for anything Reliquary already owns
+would be a second source for one fact):
+
+| key | value | becomes |
+|---|---|---|
+| `args` | array of arguments | appended verbatim, after Reliquary's own |
+
+These are refused, each naming its owner:
+
+| refused | owned by |
+|---|---|
+| `-headless` | the display choice a start is given |
+| `-c` | the machine's drives and boot target |
+| `-conf`, `-defaultdir`, `-savedir` | reliquary's own per-launch configuration |
+| `-set control ...` | the recorded VM identity |
+| `-set dosbox memsize=...` | [`memory`](#memory) |
+
+DOSBox-X's `cpus` gap is **not** silent the way QEMU's is: a
+[`cpus`](#cpus) above 1 is refused at start rather than resolved and
+quietly dropped — DOSBox-X's local APIC is faked, not emulated, so
+there is no partial support to fall back on.
 
 ---
 

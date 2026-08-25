@@ -118,6 +118,81 @@ is waiting on an answer today.
 
 ## Decided
 
+- D120 — DOSBOX-X ADOPTED AS A FIFTH BACKEND, ON A PERSONAL FORK,
+  OVERRIDING THE STANDING NON-GOAL — DECIDED (owner, 2026-08-25).
+  Supports U1, U12; P2, P11, P21. Amends D66's priority order; reopens
+  design/dosbox-x.md's ruling and closes RECURRING.md's R12 by
+  deliberate override rather than by the condition R12 itself named.
+
+  design/dosbox-x.md (investigated 2026-08-22) ruled DOSBox-X not a
+  goal as a backend: the machine half fits, but stock DOSBox-X has no
+  host-side control channel, so none of the seam's carriers have
+  anywhere to attach. Independently verified 2026-08-24 against
+  `pgalbraith/dosbox-x` branch `control-channel` (a personal fork), the
+  document held that the *technical* bar was met but explicitly
+  **authorized no implementation** — adopting a personal fork as a
+  build dependency was named as "a separate, prior question this
+  document does not answer." R12, updated the same day, retargeted its
+  watch accordingly: "a fork staying a fork, however capable, does not
+  discharge this."
+
+  The owner now overrides that standing position deliberately, knowing
+  what it costs: the fork is not upstream and not the stock DOSBox-X
+  install the design document was first written against, so this
+  backend depends on maintaining, rebuilding and re-verifying that fork
+  (or eventually its upstreaming) rather than on a released artifact
+  anyone can install. That cost is accepted in exchange for what the
+  fork's control channel actually delivers — agentless key injection,
+  text-and-attribute screen readback, media swap, and a fail-closed
+  stop against an already-booted DOS guest, meeting U12's unattended
+  install and U1's single command the way QEMU already does.
+
+  One further change rides with the adoption rather than preceding it:
+  the fork's `SCREEN` command read only the character half of each VGA
+  text cell, dropping the attribute byte the seam's `text_screen`
+  contract needs (an opaque, equality-comparable per-cell token,
+  without which a color-only DOS menu highlight is invisible to
+  `select`). A new `ATTR` command was added to `hostcontrol.cpp`,
+  additive to the already-verified `SCREEN` reply, and re-verified the
+  same way the original four commands were — against a built binary,
+  driven over the socket, through a real BIOS→guest boot handoff.
+
+  Three capability gaps are accepted as honestly reported (P11) rather
+  than as blockers, all inherited from what the control channel's
+  `MOUNT`/`EJECT` can do to a *running* instance: floppy/hdd have no
+  eject-to-empty; a drive that starts the machine empty can never
+  receive a live insert (`MOUNT` only appends to an already-mounted
+  drive); a cdrom can only cycle among images given at launch, never
+  receive a new one while running. None of Reliquary's shipped codex
+  recipes need any of the three today.
+
+  A fourth gap is **not** merely narrow: this build's `IMGMOUNT
+  -bootcd` cannot boot the actual FreeDOS LiveCD ISO the shipped
+  `freedos-install` recipe boots directly (a no-emulation El Torito
+  boot record; DOSBox-X's El Torito handling supports floppy
+  emulation only) — core boot-handling, predating and unrelated to
+  the control channel. **The codex's worked FreeDOS example does not
+  yet run on this backend.** Closing it needs either a DOSBox-X core
+  fix (upstream or on the fork) or a different installer-delivery
+  shape (a hard-disk image rather than a CD), neither of which this
+  decision makes. No integration test claiming that recipe was added
+  for this backend — one would be a known, standing failure recorded
+  as if it were coverage, which is worse than no test at all.
+
+  WEIGHED AND DECLINED: waiting for R12's condition to be met on its
+  own terms (an upstream merge or an official build carrying the
+  channel) — open-ended, and the owner judged the capability worth
+  having now against the explicit cost of a maintained fork, rather
+  than worth deferring indefinitely for a cleaner dependency story.
+
+  FOLDED: design/dosbox-x.md's status banner (ruling changed from "not
+  a goal" to "adopted as backend #5"); RECURRING.md R12 (retired,
+  discharged by this override rather than by its own stated
+  condition); design/backend-adapter.md's DOSBox-X non-goal bullet;
+  `backends.PRIORITY`'s ordering comment (`backends.py`); the blueprint
+  schema's `backend` enum and `docs/blueprint-reference.md`'s backend
+  table.
+
 - D119 — ONE SEMANTIC SURFACE, THREE NORMS WITH DISJOINT CLAIMS,
   AND THE CONTRACT HOME GOVERNS — DECIDED (owner, 2026-08-22),
   closing the "two norms for one semantic surface" watch.
