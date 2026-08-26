@@ -34,7 +34,8 @@ from .library import codex_blueprint_available
 from .interaction_agentless import AgentlessGuestExec
 from .machine_handle import Machine
 from .machine_state import (allocate_machine_id, backend_dir,
-                            blueprint_alloc_lock, list_machines,
+                            blueprint_alloc_lock,
+                            list_machines as _list_machines_state,
                             load_machine_state, machine_dir_path,
                             machine_disks_dir, machine_id_for,
                             machine_lock, machines_for_blueprint,
@@ -1440,6 +1441,43 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
         state["boot"] = normalized
         state["generation"] = state.get("generation", 0) + 1
         write_state(machine_id, state, context)
+
+
+def list_machines(context=None, blueprint=None):
+    """Return machine states, corroborating a recorded ``running`` phase.
+
+    ``machine.json`` records the phase reliquary itself last drove a
+    machine to; only ``stop``/``mark_stopped`` update it, so a guest
+    that powered itself off, a killed process, or a host crash between
+    runs leaves a stale ``running`` behind with nothing to notice. Every
+    machine reported ``running`` here is corroborated live against its
+    backend first (the same identity-verified ``session()`` a script
+    run already opens), and reconciled to ``ready`` on a confirmed
+    ``machine.vm-unreachable`` before being handed back — so the phase
+    this returns is never a blind echo of the last write, regardless of
+    what actually shut the machine down. A check that cannot confirm
+    either way (a different backend refusal) reports the recorded
+    phase unevaluated rather than raising and failing the whole list.
+    """
+    return [_corroborated(state, context)
+           for state in _list_machines_state(context, blueprint)]
+
+
+def _corroborated(state, context):
+    """One machine's ``running`` phase, live-checked and reconciled."""
+    vm = state.get("vm")
+    if state.get("phase") != "running" or not vm:
+        return state
+    backend = vm.get("backend") or state.get("backend") or "qemu"
+    try:
+        with backends.adapter(backend).session(vm):
+            pass
+    except ReliquaryError as error:
+        if error.rule_id != "machine.vm-unreachable":
+            return state
+        mark_stopped(state["id"], context)
+        return load_machine_state(state["id"], context)
+    return state
 
 
 def mark_stopped(machine_id, context=None):

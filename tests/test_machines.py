@@ -503,6 +503,38 @@ def test_list_orders_by_number(rig):
         "plain-0", "plain-2"]
 
 
+def test_list_machines_confirms_a_live_vm(rig):
+    machine_id = _ready(rig)
+    rig.force(machine_id, "running", vm=True)
+    state = list_machines(context=rig.home)[0]
+    assert state["phase"] == "running"
+    assert len(rig.backend.sessions) == 1
+
+
+def test_list_machines_reconciles_a_vm_shut_down_some_other_way(rig):
+    """A guest halted outside reliquary is caught on read, not just on
+    the next script sample or explicit stop-machine (T19's sibling)."""
+    machine_id = _ready(rig)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.session_error = PreflightError(
+        "the recorded reliquary VM is no longer reachable",
+        rule_id="machine.vm-unreachable")
+    state = list_machines(context=rig.home)[0]
+    assert state["phase"] == "ready"
+    assert "vm" not in state
+    assert rig.state(machine_id)["phase"] == "ready"
+
+
+def test_list_machines_reports_recorded_phase_on_ambiguous_refusal(rig):
+    """A check that cannot confirm the VM is gone changes nothing."""
+    machine_id = _ready(rig)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.session_error = PreflightError("QMP identity mismatch")
+    state = list_machines(context=rig.home)[0]
+    assert state["phase"] == "running"
+    assert rig.state(machine_id)["phase"] == "running"
+
+
 def test_resolve_by_blueprint_sole(rig):
     machine_id = _ready(rig, "freedos")
     assert resolve_machine(blueprint="freedos",

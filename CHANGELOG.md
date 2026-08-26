@@ -13,6 +13,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`list-machines` no longer reports a machine `running` after it was
+  shut down some other way.** ``machine.json``'s ``phase`` is written
+  by reliquary's own ``start``/``stop``, and until now nothing else
+  ever corrected it: a guest that powered itself off, a killed QEMU
+  process, or a host crash between runs left a stale ``running``
+  behind that only a live script run touching the machine happened to
+  notice. Every machine reported ``running`` is now corroborated live
+  against its backend (the same identity-verified session a script
+  run already opens) and reconciled to ``ready`` on a confirmed
+  ``machine.vm-unreachable`` before being handed back, reusing
+  ``mark_stopped``'s existing reconciliation rather than a second
+  liveness doctrine. A refusal that cannot confirm the VM is gone
+  reports the recorded phase unevaluated (P11) rather than raising and
+  failing the whole listing.
 - **The QEMU adapter launches the system binary the guest's
   architecture needs** (F64's spike 0). It launched
   `qemu-system-i386` for every machine, whatever the blueprint's
