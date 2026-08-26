@@ -176,8 +176,10 @@ alias for `rlq restart-machine --machine freedos-0`).
 
 ### `rlq destroy-machine [ID] (--blueprint NAME | --machine ID)`
 
-Destroy a machine. The machine id may be given as a positional argument
-(`rlq destroy-machine freedos-0` is a short alias for
+Destroy a machine, stopping it first if it is running — the
+per-machine lock is held across both halves, as for
+`restart-machine`. The machine id may be given as a positional
+argument (`rlq destroy-machine freedos-0` is a short alias for
 `rlq destroy-machine --machine freedos-0`). Frees the machine number for reuse.
 
 ### `rlq recreate-machine (--blueprint NAME | --machine ID)`

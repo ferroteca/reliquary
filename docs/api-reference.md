@@ -112,9 +112,10 @@ read-only vocabulary.
   held across both halves, so nothing can start the machine or change
   its media in between. A machine that is already stopped is simply
   started. CLI twin: `restart-machine`.
-- `destroy_machine(machine_id)` - Delete the machine
-  entirely; frees its number for reuse. CLI twin:
-  `destroy-machine`.
+- `destroy_machine(machine_id)` - Stop the machine first if it is
+  running, then delete it entirely; frees its number for reuse. The
+  per-machine lock is held across both halves, as for
+  `restart_machine`. CLI twin: `destroy-machine`.
 - `recreate_machine(*, machine=None, blueprint=None,
   properties=None)` -
   Destroy the selected machine and recreate it under the same id,

@@ -428,7 +428,7 @@ def _add_machine_commands(subcommands):
 
     # destroy-machine
     command = subcommands.add_parser(
-        "destroy-machine", help="delete a stopped machine")
+        "destroy-machine", help="stop a running machine, then delete it")
     _add_selectors(command)
     command.add_argument(
         "machine_id", nargs="?", default=None,

@@ -581,8 +581,9 @@ rlq recreate-machine (--blueprint <name> | --machine <id>)
 ```
 
 `destroy-machine` deletes the machine entirely — its cache
-directory and the backend's machine. The blueprint is never
-touched.
+directory and the backend's machine. A running machine is stopped
+first, the per-machine lock held across both halves as for
+`restart-machine`. The blueprint is never touched.
 
 `recreate-machine` is destroy + create as one command under the
 same id.

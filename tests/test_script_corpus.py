@@ -235,8 +235,10 @@ SHARED_IDS = {
     # V17 put a *static* site on the machine layer's own rule rather
     # than inventing a second name for it, which is the pattern this
     # check exists to hold: one condition, one answer, whichever
-    # layer noticed.
-    "machine.must-be-stopped": 5,
+    # layer noticed. `destroy_machine` stopped being a fifth site
+    # when destroy started stopping a running machine itself instead
+    # of refusing it.
+    "machine.must-be-stopped": 4,
     "machine.not-running": 3,
     "machine.no-selector": 3,
     "machine.no-vm-identity": 3,

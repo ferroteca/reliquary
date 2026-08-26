@@ -121,6 +121,7 @@ stateDiagram-v2
     creating --> ready
     ready --> running: start
     running --> stopping: stop
+    running --> stopping: destroy
     stopping --> ready
     ready --> ready: apply
     ready --> destroying: destroy
@@ -129,7 +130,10 @@ stateDiagram-v2
 
 `destroy` removes the machine entirely — there is no
 half-destroyed resting phase, because a machine is nothing but
-its cache directory. `recreate` is `destroy` + `create` as one
+its cache directory. A running machine is stopped first, the
+per-machine lock held across both halves the same way `restart`
+holds it across stop and start, so nothing else can touch the
+machine in the gap. `recreate` is `destroy` + `create` as one
 command, reusing the same id. On startup Reliquary detects a
 machine stranded in a transitional phase and completes a safe
 rollback or fails with recovery instructions (see below).
@@ -159,7 +163,8 @@ backend — both enumerated by scanning `cache/machines/`.
 materializes a new machine under the next free `<blueprint>-<n>`
 id — state, writable drives, backend object — and prints the id.
 `destroy-machine` deletes the machine entirely: the whole cache
-directory and the backend machine. `recreate-machine` is
+directory and the backend machine, stopping it first if it is
+running. `recreate-machine` is
 `destroy-machine` followed by `create-machine` as one command,
 reusing the same id. `delete-blueprint` takes only `--blueprint`: it
 removes the blueprint file itself and fails closed while any

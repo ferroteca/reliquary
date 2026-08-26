@@ -296,6 +296,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   customized prompt off; that residue on the public surface is
   **T28**.
 
+### Changed
+
+- **`destroy-machine` stops a running machine first, rather than
+  refusing** (S1, S2). A running machine used to fail closed with
+  `machine.must-be-stopped`, naming `stop-machine` as the caller's
+  next step for what `destroy` can just as well finish itself —
+  the same reasoning `restart-machine` already applies to `start`.
+  The per-machine lock is now held across both halves, as
+  `restart-machine` holds it across stop and start, so nothing else
+  can touch the machine in the gap; a stop that fails closed (an
+  identity mismatch, say) leaves the machine `running` and
+  propagates rather than destroying anything. CLI and API move
+  together, as always (P26).
+
 ## 0.1.0a3 - 2026-08-22
 
 ### Added

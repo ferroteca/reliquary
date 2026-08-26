@@ -62,6 +62,7 @@ stateDiagram-v2
     Running --> Ready: stop (or guest shutdown)
     Ready --> Ready: apply — adopt blueprint edits
     Ready --> [*]: destroy
+    Running --> [*]: destroy (stops first)
 ```
 
 `recreate` is exactly `destroy` + `create` as one command, under
@@ -459,7 +460,8 @@ rlq recreate-machine --blueprint msdos
 ```
 
 `destroy` deletes the machine entirely — its directory (state,
-drive images, screenshots) and the backend's machine — and never
+drive images, screenshots) and the backend's machine, stopping it
+first if it is running — and never
 touches the blueprint; `create` makes a fresh machine from the
 blueprint whenever one is wanted again. `recreate` is exactly
 `destroy` + `create` as one command, reusing the same id. Drives

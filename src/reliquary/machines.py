@@ -1683,12 +1683,17 @@ def _running_guest(verb, machine, blueprint, context):
 
 
 def destroy_machine(machine_id, context=None):
-    """Delete a machine's cache directory entirely.
+    """Stop a machine if it is running, then delete its cache directory
+    entirely.
 
-    Under the per-machine lock. A ``ready`` machine passes through the
-    transitional ``destroying`` phase; a machine already ``destroying``
-    or rolled-back-from ``creating`` completes its removal. A running
-    machine is refused. A deletion interrupted by a host lock can be
+    Under the per-machine lock, held across both halves for the same
+    reason `restart_machine` holds it across stop and start: nothing
+    else can start the machine, swap its media or apply a blueprint in
+    the gap between the stop and the removal. A ``running`` machine is
+    stopped first (`_stop_locked`); a ``ready`` machine then passes
+    through the transitional ``destroying`` phase; a machine already
+    ``destroying`` or rolled-back-from ``creating`` completes its
+    removal. A deletion interrupted by a host lock can be
     retried — a failure from ``ready`` restores ``ready`` so it does
     not strand the machine in ``destroying``.
     """
@@ -1696,9 +1701,9 @@ def destroy_machine(machine_id, context=None):
         state = load_machine_state(machine_id, context)
         phase = state.get("phase")
         if phase == "running":
-            raise PreflightError(
-                f"machine {machine_id} is running; "
-                "stop it before destroying", rule_id="machine.must-be-stopped")
+            _stop_locked(machine_id, context)
+            state = load_machine_state(machine_id, context)
+            phase = state.get("phase")
         if phase not in ("ready", "destroying", "creating"):
             raise PreflightError(
                 f"machine {machine_id} cannot be destroyed "

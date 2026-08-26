@@ -112,7 +112,8 @@ class Session:
             events=events, cancelled=cancelled)
 
     def destroy_machine(self, machine_id):
-        """Remove a machine's materialization directory."""
+        """Stop a machine if it is running, then remove its
+        materialization directory."""
         return machines.destroy_machine(machine_id, self._context)
 
     def apply_blueprint(self, *, machine=None, blueprint=None,

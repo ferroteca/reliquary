@@ -767,12 +767,25 @@ def test_destroy_completes_a_stranded_destroy(rig):
     assert not os.path.exists(machine_dir_path(machine_id, rig.home))
 
 
-def test_destroy_rejects_running(rig):
+def test_destroy_stops_a_running_machine_first(rig):
     machine_id = _ready(rig)
-    rig.force(machine_id, "running")
-    with pytest.raises(PreflightError) as caught:
+    rig.force(machine_id, "running", vm=True)
+    root = machine_dir_path(machine_id, rig.home)
+    destroy_machine(machine_id, context=rig.home)
+    assert len(rig.backend.stops) == 1
+    assert not os.path.exists(root)
+
+
+def test_destroy_propagates_a_stop_that_fails_closed(rig):
+    machine_id = _ready(rig)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.stop_error = PreflightError(
+        "QMP identity mismatch", rule_id="machine.vm-identity-mismatch")
+    with pytest.raises(PreflightError):
         destroy_machine(machine_id, context=rig.home)
-    assert "stop it before destroying" in str(caught.value)
+    state = rig.state(machine_id)
+    assert state["phase"] == "running"
+    assert "vm" in state
 
 
 def test_generation_advances(rig):
