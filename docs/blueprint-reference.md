@@ -756,10 +756,11 @@ configuration.
 
 The NIC chipset (D122). Valid on either attachment:
 
-| value   | chipset                              | backends |
-|---------|---------------------------------------|----------|
-| `pcnet` | AMD Am79C970A ("PCnet-II")            | QEMU, VirtualBox |
-| `ne2k`  | Novell/Eagle NE2000 (QEMU: `ne2k_isa`) | QEMU only |
+| value    | chipset                                    | backends |
+|----------|----------------------------------------------|----------|
+| `pcnet`  | AMD Am79C970A ("PCnet-II")                  | QEMU, VirtualBox |
+| `ne2k`   | Novell/Eagle NE2000 (QEMU: `ne2k_isa`)       | QEMU only |
+| `virtio` | paravirtualized NIC (QEMU: `virtio-net-pci`) | QEMU only |
 
 ```json
 {"devices": {"net0": {"attachment": "nat", "model": "ne2k"}}}
@@ -772,11 +773,12 @@ actually emulate, the same reasoning that makes `ide` the universal
 needs (a packet driver or network stack that only ships an NE2000
 driver, for instance) is exactly the case `model` exists for.
 Checked against the assigned backend the same way `controller` is:
-`ne2k` is real hardware, just not hardware VirtualBox emulates, so
-declaring it on a machine assigned to any other backend is a
-capability error naming both, the same test `controller`'s
-`nvme`/`virtio` already pass — the bar is whether the chipset is
-real, general hardware, not whether every backend emulates it today.
+`ne2k` and `virtio` are real hardware, just not hardware VirtualBox
+emulates, so declaring either on a machine assigned to any other
+backend is a capability error naming both, the same test
+`controller`'s `nvme`/`virtio` already pass — the bar is whether the
+chipset is real, general hardware, not whether every backend emulates
+it today.
 
 #### What a NIC entry deliberately leaves unsaid
 

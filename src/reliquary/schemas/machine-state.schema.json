@@ -155,7 +155,7 @@
       "properties": {
         "attachment": {"enum": ["nat", "bridged"]},
         "interface": {"type": ["string", "null"]},
-        "model": {"enum": ["pcnet", "ne2k"]}
+        "model": {"enum": ["pcnet", "ne2k", "virtio"]}
       },
       "required": ["attachment", "interface", "model"],
       "additionalProperties": false

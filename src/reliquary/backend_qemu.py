@@ -152,8 +152,12 @@ RESERVED_ARGUMENTS = {
 #: appropriate bus for a card real NE2000s shipped on — QEMU also has
 #: a PCI variant (`ne2k_pci`), but nothing in the blueprint
 #: vocabulary names it, and DOS-era platforms have no PCI bus to put
-#: it on anyway.
-_NIC_QEMU_MODELS = {"pcnet": "pcnet", "ne2k": "ne2k_isa"}
+#: it on anyway. `virtio` renders as `virtio-net-pci`, QEMU's
+#: paravirtualized NIC — real to the guest only in the sense that
+#: `controller`'s own `virtio` value already is, and just as reliant
+#: on the guest actually carrying a virtio driver.
+_NIC_QEMU_MODELS = {"pcnet": "pcnet", "ne2k": "ne2k_isa",
+                    "virtio": "virtio-net-pci"}
 
 #: The `-drive` properties Reliquary already renders for every drive.
 #: These are refused through ``-set drive.<slot>.<property>`` for the
@@ -1118,7 +1122,7 @@ class QemuAdapter(BackendAdapter):
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
             pointing_devices=("tablet", "mouse"),
-            network_models=("pcnet", "ne2k"),
+            network_models=("pcnet", "ne2k", "virtio"),
             network_attachments=("nat", "bridged"),
         )
 

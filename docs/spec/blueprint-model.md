@@ -164,7 +164,8 @@ cannot carry.
   values already pass (above): a name only needs to be real,
   general hardware, not honored by every backend today. `pcnet`
   (AMD's Am79C970A, "PCnet-II") runs on both QEMU and VirtualBox;
-  `ne2k` (Novell/Eagle NE2000) only exists on QEMU today, checked and
+  `ne2k` (Novell/Eagle NE2000) and `virtio` (QEMU's paravirtualized
+  NIC, `virtio-net-pci`) only exist on QEMU today, checked and
   refused by name on any other backend at materialization.
   `interface` names the host network interface to bridge onto,
   taking a plain string or a `${key}` reference bound the same way a

@@ -409,6 +409,16 @@ def test_network_model_ne2k_renders_the_isa_variant():
                     "-device", "ne2k_isa,netdev=net0,id=net0"]
 
 
+def test_network_model_virtio_renders_the_pci_device():
+    # D122: same override mechanism as ne2k, targeting the
+    # paravirtualized NIC instead.
+    network = {"net0": {"attachment": "nat", "interface": None,
+                        "model": "virtio"}}
+    args = qemu_module.network_args(network)
+    assert args == ["-netdev", "user,id=net0",
+                    "-device", "virtio-net-pci,netdev=net0,id=net0"]
+
+
 def test_network_bridged_with_an_interface_names_it():
     network = {"net0": {"attachment": "bridged", "interface": "eth0",
                         "model": "pcnet"}}
@@ -736,7 +746,7 @@ def test_the_qemu_adapter_reports_the_pointing_devices_it_renders():
 
 def test_the_qemu_adapter_reports_the_network_devices_it_renders():
     report = qemu_module.QemuAdapter().capabilities()
-    assert report.network_models == ("pcnet", "ne2k")
+    assert report.network_models == ("pcnet", "ne2k", "virtio")
     assert report.network_attachments == ("nat", "bridged")
 
 
