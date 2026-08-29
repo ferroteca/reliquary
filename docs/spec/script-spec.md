@@ -21,41 +21,43 @@ SPDX-License-Identifier: GPL-3.0-only
 > transcript contract remain later milestones; details may still
 > change before first release.
 
-A Reliquary script automates a guest: it watches observable guest
-and machine state, supplies input, swaps media, and moves files
-across the VM seam. Scripts are authored assets — `.rlqs` files,
-identified by extension. They resolve from the `scripts` directory,
-walked recursively, which defaults to `<home>/scripts` and is
-placeable with `--scripts-dir`; a miss never falls back to the
-built-in codex, which reaches a tree only through `seed-script` or
-the blueprint that names it (docs/spec/asset-resolution.md).
-One `<name>.rlqs` file per script; a run selects its machine with
-`--machine <id>` or, when the
-blueprint has exactly one machine, `--blueprint <name>`:
+A Reliquary script automates a guest operating system: it watches
+observable guest and machine state, sends input, swaps media, and
+moves files between the host and the guest. Scripts are authored
+files with the `.rlqs` extension, identified by that extension.
+They resolve from the `scripts` directory, searched recursively;
+that directory defaults to `<home>/scripts` and can be changed with
+`--scripts-dir`. If a script isn't found there, Reliquary does not
+fall back to the built-in codex — the codex is only reached through
+`seed-script`, or through a blueprint that names it
+(docs/spec/asset-resolution.md). Each script is one `<name>.rlqs`
+file. A run selects its machine with `--machine <id>`, or with
+`--blueprint <name>` when that blueprint has exactly one machine:
 
 ```powershell
 rlq run-script install --blueprint freedos
 ```
 
-After preflight, `run-script` resolves its machine
-(creating one when `--blueprint` names a
-blueprint with no machine yet), brings it to the state the script's
-[`machine` header](#header) expects — starting a stopped machine
-when the script expects `running`, failing when the script expects
-`stopped` but the machine is running — then executes the script. The
-machine stays in whatever state the last executed step left it.
-Failure likewise leaves the machine in its observed state for
-diagnosis; no command implicitly tears it down. The embedding
-API's twin is `run_script`, taking the same identifiers under
-CLI–API parity.
+After preflight, `run-script` resolves its machine — creating one
+if `--blueprint` names a blueprint that has none yet — and brings it
+to the state the script's [`machine` header](#header) expects: it
+starts a stopped machine if the script expects `running`, and fails
+if the script expects `stopped` but the machine is running. It then
+executes the script. The machine is left in whatever state the last
+executed step put it in; on failure, it's left in its observed state
+for diagnosis too — no command tears it down automatically. The
+embedding API's equivalent function is `run_script`, which takes the
+same identifiers: the CLI and the API accept the same inputs for
+this operation.
 
-Scripts are authored documents: Reliquary reads but never rewrites
-them — with one named exception: the authoring recorder's opt-in
-fragment apply (U6; [recorder.md](../../planning/proposed/design/recorder.md)) inserts a captured
-fragment at its playback anchor
-and touches no other byte. They belong in version control beside
-the machine blueprints (media components and all) on which they
-depend.
+Scripts are authored documents: Reliquary reads them but never
+rewrites them, with one exception. The authoring recorder's opt-in
+"fragment apply" feature (U6;
+[recorder.md](../../planning/proposed/design/recorder.md)) inserts a
+captured fragment at its playback anchor point and changes no other
+byte. Scripts belong in version control next to the machine
+blueprints they depend on, including those blueprints' media
+components.
 
 ## Primary language goals
 
@@ -63,49 +65,53 @@ Every language decision is judged against these. They are numbered
 so later decisions, reviews, and spec sections can cite them, and
 so a proposed feature can be rejected by naming the goal it costs.
 
-- **G1 — Agentless at the guest seam.** The guest is a black box
-  that cannot be configured, only watched and typed at. No feature
-  may depend on guest cooperation. This is a permanent requirement
+- **G1 — No agent runs inside the guest.** The guest is a black
+  box: Reliquary can only watch it and type at it, never install
+  anything inside it to help. No feature may depend on the guest
+  cooperating. This is a permanent requirement
   ([AGENTS.md](../../AGENTS.md); U10), not a current limitation.
 - **G2 — Non-computational.** No expressions, variables,
   arithmetic, functions, or general-purpose loops. Anything
   computational belongs in Python via the embedding API, which
   remains a first-class surface.
-- **G3 — Statically inspectable before the machine starts.**
-  Parsing, binding, control-flow analysis, and whole-script
-  capability preflight all complete before the first guest input.
-  The authored graph is explicit and finite even when a run cycles.
-- **G4 — Legible in real time.** A run is usually long, unattended,
-  and watched by someone who wants to know where it is. The
-  language's own structure — named phases, the pending observation,
-  declared budgets — must be sufficient to answer "where am I, what
-  is it waiting for, how long has it got" without extra syntax.
-- **G5 — Backend- and control-plane-agnostic at the surface.** A
+- **G3 — Checkable before the machine starts.** Parsing, binding,
+  control-flow analysis, and whole-script capability preflight all
+  complete before the first guest input. The authored graph is
+  explicit and finite even when a run cycles.
+- **G4 — Readable while it runs.** A run is usually long,
+  unattended, and watched by someone who wants to know where it is.
+  The language's own structure — named phases, the pending
+  observation, declared budgets — must be enough to answer "where
+  am I, what is it waiting for, how long has it got" without extra
+  syntax.
+- **G5 — Works the same regardless of backend or control plane.** A
   script says "wait for this text"; the machine's backend and
-  selected control plane decide how that is observed. Verbs stay
-  intent-level, above portable input events.
+  selected control plane decide how that's actually observed.
+  Verbs describe intent, not the specific keypresses or pointer
+  events that implement it.
 - **G6 — Small and unambiguous.** Brevity, succinctness, structure,
-  clarity. One concept, one spelling. Surface area is the scarce
-  resource; deletion is the preferred remedy.
+  clarity. One concept, one spelling. Every added piece of syntax
+  has a cost, so deletion is the preferred fix over addition.
 - **G7 — Grows coherently.** New capabilities extend observation and
   action without adding a second control-flow model or a second
   syntax. Growth stays explicit and preflightable.
 
 ## The procedural–declarative seam
 
-The language is deliberately a hybrid, and the seam between its two
-halves is the most load-bearing decision in the design. Naming the
-seam early is what keeps later decisions consistent; most of the
-language's prohibitions exist to keep it clean. The rule itself is
-stated with the language model below; this section is the argument
-behind it.
+The language is deliberately a hybrid of two halves — a declarative
+half and a procedural half — split at a specific boundary. Where
+that boundary falls is the most load-bearing decision in the
+design: most of the language's prohibitions exist only to keep the
+two halves from bleeding into each other. The rule itself is stated
+with the language model below; this section explains why it's drawn
+where it is.
 
-Everything knowable before the run starts is declared — the
+Everything knowable before the run starts is declared: the
 platform, the machine state the script expects, which phases exist,
 their timing budgets, the media it needs, the inputs it binds.
-Everything the guest dictates is procedural — which key to send,
+Everything the guest dictates is procedural: which key to send,
 what text to wait for, the order its own installer screens arrive
-in. The seam falls where our knowledge ends:
+in. The boundary falls exactly where our knowledge ends:
 
 | concern | paradigm | why |
 |---|---|---|
@@ -115,75 +121,81 @@ in. The seam falls where our knowledge ends:
 | keystrokes and observations within a phase | procedural | the guest's installer dictates the order |
 | which route the run takes | procedural choice over a declarative graph | the guest chooses at run time |
 
-**Why not fully declarative.** OS installation has a mature
-declarative form — Kickstart, preseed, AutoYaST, Windows
-`unattend.xml` — in which the author states what the installed
-system should be and the installer does the rest. Where those
-exist they are strictly better: Reliquary does not invent a
-competing declarative install language. For guests that accept
-them, it serves the answer file the way Packer does today — a
-local HTTP server the installer fetches from
-([http-serve.md](http-serve.md)).
-Procedural keystroke scripting remains for the guests where
-answer files do not exist: DOS, Win9x, and similar. G1's
-agentless requirement is about the control plane — no dependence
-on a guest agent or other cooperating software for observation
-and input — not a ban on an installer's native answer-file
-path. Using Kickstart (or its kin) is that path; it is not a
-substitute for agentless scripting on guests that lack one.
+**Why not fully declarative.** OS installation already has a mature
+declarative form: Kickstart, preseed, AutoYaST, Windows
+`unattend.xml`. In each of those, the author states what the
+installed system should look like and the installer does the rest.
+Where one of those exists for a guest, it's strictly better, and
+Reliquary does not invent a competing declarative install language
+to replace it. For guests that accept an answer file, Reliquary
+serves it the way Packer does today: from a local HTTP server that
+the installer fetches from ([http-serve.md](http-serve.md)).
+Procedural keystroke scripting is for the guests where no
+answer-file format exists: DOS, Win9x, and similar. G1's "no agent
+in the guest" requirement is about the control plane — Reliquary
+can't depend on a guest agent or other cooperating software for
+observation and input — not a ban on using an installer's own
+native answer-file mechanism. Using Kickstart (or its kin) is that
+native mechanism; it doesn't replace agentless scripting for guests
+that don't have one.
 
 **Why not fully procedural.** A plain imperative script — the
-AutoHotkey or Expect shape — would be shorter to specify and would
-need no phase concept at all. It is rejected because it forfeits
-G3 and G4 together: a straight-line script with ad-hoc loops has
-no statically knowable shape to analyze, and no named units to
-report progress against. The declarative half is what makes a run
-checkable before it starts and legible while it runs.
+AutoHotkey or Expect style — would be shorter to specify and
+wouldn't need a phase concept at all. It's rejected because it
+gives up G3 and G4 together: a straight-line script with ad-hoc
+loops has no shape a tool can statically analyze, and no named
+units to report progress against. The declarative half is what
+lets a run be checked before it starts and read while it runs.
 
-**The tensions this creates, which we accept.** These are real and
-should not be papered over; several are already catalogued as
-residual problems in [`script-examples/`](../../planning/design/script-examples/):
+**The tensions this creates, and that we accept.** These are real,
+not papered over; several are already catalogued as open problems
+in [`script-examples/`](../../planning/design/script-examples/):
 
-- `phase` is a declarative construct whose body is procedural. The
-  hybrid is not hidden; it is the point.
-- A sequential phase is procedural, a reactive phase is
-  declarative, and both are spelled `phase`. The two are forbidden
-  to mix rather than given a combined semantics — a prohibition,
-  not a definition.
-- The paradigm boundary shows in the handler keywords: `on` is a
-  case in a branching `wait`, `always` a standing rule in a
-  reactive phase — one shape, two named lifetimes, which the
-  keyword split resolved.
-- Declarative timing scopes annotate procedural statements, so an
-  observation's effective bound is not locally readable
-  (`script-examples/03`, open).
-- Procedural `insert`/`eject`/`set-boot` mutate declarative
-  machine state that outlives the run, deliberately diverging a
-  machine from its blueprint until restored — the `set-` prefix
-  naming the persistence is what settled the spelling.
+- `phase` is a declarative construct whose body is procedural. That
+  mix isn't hidden — it's the point.
+- A sequential phase is procedural and a reactive phase is
+  declarative, but both are written with the same `phase` keyword.
+  Rather than give the two a combined meaning, the language forbids
+  mixing them within one phase.
+- The declarative/procedural split also shows up in the handler
+  keywords: `on` is a case inside a branching `wait`, and `always`
+  is a standing rule inside a reactive phase. Same shape, two
+  different lifetimes — which is why they're spelled differently.
+- Declarative timing scopes annotate procedural statements, so you
+  can't always tell an observation's effective time limit just by
+  looking at that line (`script-examples/03`, still open).
+- The procedural verbs `insert`, `eject`, and `set-boot` change
+  declarative machine state that outlives the run, deliberately
+  making a machine diverge from its blueprint until something
+  restores it. The `set-` prefix marks that this change persists —
+  that's why it's spelled that way.
 - The [`with` block](#scoped-machine-state-changes) gives one such
-  mutation a declarative extent and undoes it at the edge, which
-  is the seam's own shape applied to the divergence above; it is
-  also the language's only construct whose scope is **dynamic**,
-  since every phase body ends in a transition and a lexical one
-  would revert at the first `goto`.
+  change a declarative scope and undoes it at the end of that
+  scope, applying the same declarative/procedural split to the
+  divergence described above. It's also the only construct in the
+  language whose scope is **dynamic**: every phase body ends in a
+  transition, so a lexical scope would already have been undone by
+  the time a `goto` happened.
 
-**The prohibitions that keep the seam clean.** Each exists to stop
-the procedural half from eroding the declarative half:
+**The prohibitions that keep the two halves from mixing.** Each one
+exists to stop the procedural half from eroding the declarative
+half:
 
-- no author-side conditionals — the only decisions that matter are
+- No author-side conditionals: the only decisions that matter are
   the guest's, expressed as observations of what it actually
-  showed, never as the script author's logic (G2);
-- inputs supply data and may never select a branch, a phase, or a
-  path, so the graph stays static (G3, P19);
-- no fallthrough and no anonymous phases, so every route is named
-  and searchable (G3, G4);
-- no `sleep` or `delay`, so every pause is justified by an
-  observation rather than a guess about guest speed (G1, G5);
-- no implicit machine teardown, so a failed run leaves state to
-  diagnose rather than a tidied crime scene. A `with` scope is not
-  an exception to this: it tidies exactly what the author wrote a
-  scope around, and the run says what it took.
+  showed — never as logic the script author wrote (G2).
+- Inputs supply data and can never select a branch, a phase, or a
+  path, so the graph stays static (G3, P19).
+- No fallthrough and no anonymous phases, so every route is named
+  and searchable (G3, G4).
+- No `sleep` or `delay`: every pause has to be justified by an
+  observation, never by a guess about how fast the guest is (G1,
+  G5).
+- No implicit machine teardown: a failed run leaves its state in
+  place for diagnosis instead of cleaning up the evidence. A `with`
+  scope is not an exception to this — it only cleans up exactly
+  what the author wrote the scope around, and the run reports what
+  it took.
 
 OS installation automation is expressed as install and verify scripts
 attached to machine blueprints. Media acquisition (download, hash-verify,
@@ -210,45 +222,46 @@ select "English (United States)"
 - **Observations** establish that the guest or machine has reached
   a known state: `wait`, in its single-condition and branching
   forms, and reactive `always` handlers.
-- **Actions** deliver intent-level input or perform supporting host
-  operations: `enter`, `type`, `press`, `select`, `click`, `insert`,
-  `eject`, `set-boot`, `set`, `screenshot`, `start`, and `stop`.
+- **Actions** deliver input or perform supporting host operations:
+  `enter`, `type`, `press`, `select`, `click`, `insert`, `eject`,
+  `set-boot`, `set`, `screenshot`, `start`, and `stop`.
 
-Intent-level verbs remain above portable input events. `select`
+Every action verb describes intent, not raw input events. `select`
 means choosing a visible menu entry, not sending a guessed number
 of Down keys; `click` means a spot on a matched landmark, not a
-guessed pixel. The selected control plane composes the necessary
-key or pointer events and owns their pacing (G5).
+guessed pixel. The selected control plane works out the actual key
+or pointer events needed and paces them (G5).
 
-Three design rules govern the whole surface:
+Three design rules govern the whole language:
 
 - **One shape.** Every line of a script is a *node*: a name,
   positional arguments, `name=value` properties, and optionally a
-  block. The entire structural grammar is that one production.
+  block. That single pattern is the entire structural grammar.
 - **Spelling reveals role.** Every token class has exactly one
-  spelling and every punctuation mark exactly one role; a reader
-  can classify any token without context. See
+  spelling, and every punctuation mark exactly one role, so a
+  reader can classify any token without needing context. See
   [lexical rules](#lexical-rules).
 - **Nouns declare, verbs act.** Declarative nodes (headers,
-  `property`, `phase`) begin with a noun; imperative nodes begin with
-  a verb. The declarative zone precedes the imperative zone, and
-  the grammar enforces the boundary.
+  `property`, `phase`) start with a noun; imperative nodes start
+  with a verb. The declarative part of a script always comes before
+  the imperative part, and the grammar enforces that order.
 
 That third rule reflects a deliberate split: **a script is
-declarative about everything Reliquary owns, and procedural at the
-seam with the guest.** What is knowable before the run starts is
-declared — the platform, the expected machine state, which phases
-exist, their budgets, the properties it binds. What the guest dictates
-is procedural — which key to send, what text to wait for, the order
-its own installer screens arrive in. The guest is a black box that
-cannot be configured, only watched and typed at, so interaction
-with it is necessarily a sequence of acts; everything else is a
-description. Several rules below exist to keep that seam intact —
-notably that a phase is either sequential or reactive but never
-both, that properties may supply data but never select a branch or a
-phase, and that there are no author-side conditionals, because the
-only decisions that matter are the guest's. The reasoning is
-recorded above, under "The procedural–declarative seam".
+declarative about everything Reliquary controls, and procedural
+about everything the guest controls.** What's knowable before the
+run starts is declared: the platform, the expected machine state,
+which phases exist, their budgets, the properties it binds. What
+the guest dictates is procedural: which key to send, what text to
+wait for, the order its own installer screens arrive in. The guest
+is a black box that can't be configured — only watched and typed
+at — so interacting with it necessarily takes the form of a
+sequence of actions; everything else is a description. Several
+rules below exist to keep that split intact: a phase is either
+sequential or reactive but never both, properties can supply data
+but never select a branch or a phase, and there are no author-side
+conditionals, because the only decisions that matter are the
+guest's. The reasoning behind this is laid out above, under "The
+procedural–declarative seam".
 
 The authored control-flow graph is statically finite, but a run may
 be unbounded when transitions form a cycle. Execution is
@@ -264,41 +277,41 @@ they do not add expression or decision syntax.
 
 ## Processing model
 
-A script passes through a fixed pipeline: **lex → parse →
-desugar → validate → bind → preflight → execute**. Tokens form
-nodes ([lexical rules](#lexical-rules)); nodes parse under the
-typed grammar; [derived forms](#derived-forms) rewrite to the
-core language; validation and binding check what follows; and
-the [execution model](#execution-model) gives the result its
-run-time meaning.
+A script passes through a fixed pipeline: **lex → parse → desugar
+→ validate → bind → preflight → execute**. Tokens form nodes
+([lexical rules](#lexical-rules)); nodes parse under the typed
+grammar; [derived forms](#derived-forms) rewrite them to the core
+language; validation and binding check what follows; and the
+[execution model](#execution-model) gives the result its run-time
+meaning.
 
-Every rule in this spec belongs to one of three enforcement
-tiers:
+Every rule in this spec falls into one of three enforcement tiers:
 
 - **Legality rules** — checkable from the script text alone: the
   lexical rules, the grammar, and the
   [syntactic restrictions](#syntactic-restrictions) (V-ids).
-  Violations are STATIC ERRORs.
-- **Machine rules** — need something beyond the text in scope:
-  the media namespace, the filesystem, a machine or
+  Violating one of these is a STATIC ERROR.
+- **Machine rules** — need something beyond the script text to
+  check: the media namespace, the filesystem, a machine or
   blueprint, explicit property values. Capability preflight, slot
   and drive existence, property binding, and media reconciliation
-  live here ([validation and preflight](#validation-and-preflight)).
-  Violations are PREFLIGHT ERRORs, raised before any guest
-  input.
+  all live here
+  ([validation and preflight](#validation-and-preflight)).
+  Violating one of these is a PREFLIGHT ERROR, raised before any
+  guest input.
 - **Dynamic semantics** — the meaning of execution itself
-  ([the execution model](#execution-model)). What goes wrong
-  here is a RUN FAILURE.
+  ([the execution model](#execution-model)). What goes wrong here
+  is a RUN FAILURE.
 
 `run-script --dry-run` has exactly two modes, one per checkable
-tier: without a machine it applies every legality rule; with
-`--machine`/`--blueprint` (and optionally
-explicit property values) it adds the machine rules. **That is why
-the selector is optional under `--dry-run` and required for a
-run** — its presence is how a caller names the tier. Dynamic
-semantics are exercised only by a run. See
-[error classes](#error-classes-and-exit-codes) for how the tiers
-surface to callers.
+tier: without a machine, it applies every legality rule; with
+`--machine`/`--blueprint` (and optionally explicit property
+values), it also applies the machine rules. **That's why the
+machine selector is optional under `--dry-run` and required for a
+real run** — whether you supply it is how you tell Reliquary which
+tier to check. Dynamic semantics are only exercised by an actual
+run. See [error classes](#error-classes-and-exit-codes) for how the
+tiers show up to callers.
 
 ## Lexical rules
 
@@ -321,11 +334,10 @@ surface to callers.
   separates tokens and carries no other meaning, including at the
   start of a line: block indentation and column-aligned headers
   are alignment, not syntax.
-- Exactly two adjacencies are load-bearing and admit no
-  surrounding space: `name=value` and `key+key` are each one
-  token. `timeout = 5m` is not a modifier — `timeout` would read
-  as a positional argument — and is a parse error, as is
-  `ctrl + c`.
+- Exactly two things must be written with no space around them:
+  `name=value` and `key+key` are each one token. `timeout = 5m` is
+  not a modifier — `timeout` would read as a positional argument —
+  and is a parse error, as is `ctrl + c`.
 - A token ends at whitespace, `{`, `}`, or the line terminator,
   except that `"..."` and `/.../` end at their closing delimiter.
   No token spans a line. Tokens are maximal munch: `5ms` is one
@@ -362,13 +374,13 @@ text:
 Any other backslash is literal. Inside a string, a property reference
 is written `${key}` and is expanded only where the containing
 argument accepts it; a `$` not followed by `{` is literal. String
-content is text and only text: keys never travel inside a string —
-they are `press`'s job.
+content is only ever text: key presses are never written inside a
+string — that's what `press` is for.
 
 There is no raw-string form. Backslashes are already literal, so a
-raw form would only save the `\${` escape — one token
-class is too high a price for that, and it would break the rule
-that a token is classified by its first character.
+raw form would only save the `\${` escape — adding a whole second
+string syntax just to save one escape isn't worth it, and it would
+break the rule that a token is classified by its first character.
 
 Expanded text must be representable by the selected input control
 plane. An unmappable character is a named input error, never a
@@ -384,30 +396,31 @@ wait /installed [0-9]+ of [0-9]+ packages/
 
 `\/` produces a literal slash; every other character, including
 backslashes, passes through to the regex engine unchanged. The
-dialect is Python's `re` syntax — named deliberately as the
-language's contract rather than inherited as an implementation
-detail: an implementation in another language must provide this
-dialect, not substitute its host's. A regex is a screen condition;
+dialect is Python's `re` syntax. That's stated here deliberately as
+part of the language's contract, not left as an implementation
+detail: an implementation written in another language must still
+provide this exact dialect, not substitute whatever regex flavor
+its own host language uses. A regex is a screen condition;
 `machine=` accepts only a machine-state word. Property references are
 never expanded inside a regex.
 
 ### References
 
-`@name` references a media by name; it resolves through the
-blueprint namespace — the `media` specs across the `.rlqb`
-files in the active source, never carried in the script. A media
-name is a `media-name` token, not a `name`: it may lead with a
-digit (`@86Box`), because the `@` sigil has already classified the
-token where a bare word could not be. A property key may not — it
-also appears bare at its `property` declaration, where a leading
-digit lexes as a duration. That is the whole of the difference
-(D24). `$key`
-references a declared
-[property](#properties) and must stand alone
-as a whole argument; inside strings the braced form `${key}` is
-used instead, and dotted keys are valid in both forms. The
-`property` key is a bare name at its declaration site; the
-sigils mark use sites.
+`@name` references a media by name. It resolves through the
+blueprint namespace — the `media` specs across the `.rlqb` files in
+the active source — and is never carried inside the script itself.
+A media name is a `media-name` token, not a plain `name` token: it
+can start with a digit (`@86Box`), because the `@` sigil has
+already told the parser what kind of token this is, something a
+bare word can't do on its own. A property key can't start with a
+digit, because it also appears bare at its `property` declaration
+line, where a leading digit would instead be read as a duration.
+That's the entire difference between the two (D24). `$key`
+references a declared [property](#properties) and must stand alone
+as a whole argument; inside strings, use the braced form `${key}`
+instead. Dotted keys are valid in both forms. The `property`
+keyword itself is written bare at the point where a property is
+declared; the `@` and `$` sigils only appear where a value is used.
 
 ## Core grammar
 
@@ -417,24 +430,24 @@ Every line of every script is one structural shape:
 node = name , { argument } , { modifier } , [ block ] ;   (* informative *)
 ```
 
-This is the shape a parser recognizes before typing; conformance
-is defined solely by the typed grammar below together with the
-static-validation rules that follow it. The core view is
-structural — what a line looks like; the typed view is normative
-for admissibility.
+This is the shape a parser recognizes before it looks at types.
+What's actually legal is defined only by the typed grammar below,
+together with the static-validation rules that follow it. This
+first grammar just describes structure — what a line looks like;
+the typed grammar is what decides whether a script is admissible.
 
-Every block holds nodes. Milestone 5's HTTP `content` declaration
-does not use a block: it attaches either a raw triple-quoted body
-or a `from=` source file whose lines are served as an installer
-answer file
-([http-serve.md](http-serve.md)). A script carries no JSON: media
-travel as `media` components in the blueprint and landmark
-declarations are authored files of their own, resolved from the
-active source (docs/spec/asset-resolution.md),
-and answer files are `content` entries with inline or file-backed
-bodies.
+Every block holds nodes. The one exception is milestone 5's HTTP
+`content` declaration, which doesn't use a block: it attaches
+either a raw triple-quoted body, or a `from=` source file whose
+lines get served as an installer answer file
+([http-serve.md](http-serve.md)). A script never carries JSON
+directly: media are supplied as `media` components in the
+blueprint, landmark declarations are their own authored files
+resolved from the active source (docs/spec/asset-resolution.md),
+and answer files are `content` entries with either an inline body
+or a file-backed one.
 
-A typing layer over the node shape supplies the rest of the
+On top of that node shape, a typing layer supplies the rest of the
 language definition:
 
 - **Ordering.** Header nodes come first, then `property`
@@ -444,9 +457,10 @@ language definition:
 - **Signatures.** Each node name fixes its argument types, allowed
   modifiers, and whether it takes a block. The complete signature
   tables follow; an argument or modifier outside a node's
-  signature is a parse error. The tables are informative
-  summaries — the typed grammar and the
-  [syntactic restrictions](#syntactic-restrictions) govern.
+  signature is a parse error. The tables are reference summaries —
+  the typed grammar and the
+  [syntactic restrictions](#syntactic-restrictions) below are what
+  actually govern.
 
 Header nodes:
 
@@ -502,10 +516,11 @@ And the two block declarations, the phase and the scope:
 
 ### Grammar (normative)
 
-The signature tables above expand into this complete EBNF. Every
-production is an instance of the node shape. A parser may parse
-structurally and then type-check, but
-this grammar and the static rules below decide what is legal:
+The signature tables above expand into this complete EBNF grammar.
+Every production here is an instance of the one node shape. A
+parser is free to parse structurally first and type-check
+afterward, but this grammar, together with the static rules below,
+is what decides what's actually legal:
 
 ```text
 script          = { header } , { property-def } , { http-def } ,
@@ -812,33 +827,42 @@ the CFG. Each has a stable id; diagnostics cite them:
   `http.start-without-content`, `http.stop-takes-nothing`,
   `http.undeclared-content`, `http.unknown-action`.
 
-- **V17** — a **stopped-only verb is never reached with the machine
-  running**, wherever the plan can promise it is reached at all.
-  `set-boot` and a scoped `boot` head write a launch-time firmware
-  order, which is stopped-only as a property of the machine; the
-  header declares the starting state and the language knows which
-  verbs start and stop the machine, so the answer is decidable from
-  the text. A scope's **exit** is checked with its entry, that being
-  the half no author can see coming — it is reached by finishing and
-  by every failure too.
+- **V17** — **a stopped-only verb is never reached while the
+  machine is running**, in every case where the static check can be
+  sure whether it's reached at all. `set-boot` and a scoped `boot`
+  head both write the machine's launch-time firmware boot order,
+  and that only works while the machine is stopped. Because the
+  script's `machine` header declares the starting state, and the
+  language knows which verbs start and stop the machine, the check
+  can work out — from the text alone — whether the machine is known
+  to be stopped or running at any given point. A scope's **exit**
+  is checked the same way its entry is; the exit is the half
+  authors don't expect, since it's reached not just by finishing
+  the scope normally but by every failure path too.
 
-  **The rule is bounded by what a static pass can promise, and is
-  silent everywhere else.** Control reaching a handler body is the
-  guest's decision, so nothing inside one is judged and no phase
-  only a handler transfers to is reached — the same boundary the
-  reachability count is drawn on. A handler body is still walked for
-  its *effect* on the machine, and two paths that disagree answer
-  `unknown` and refuse nothing. A false refusal would be far worse
-  than the late failure this replaces: the run-time refusal remains,
-  and is what catches everything the plan could not promise.
+  **The check only fires where a static pass can actually be sure,
+  and stays silent everywhere else.** Whether control reaches a
+  handler body (`on` or `always`) is the guest's decision at run
+  time, so the check doesn't judge anything inside one — and it
+  doesn't count a phase as reached if the only way to reach it is
+  through a handler's `goto`. That's the same boundary the check
+  uses everywhere. A handler body is still walked to work out its
+  *effect* on the machine's state: if two different paths through
+  the script leave the machine in different states, the check marks
+  that point `unknown` and refuses nothing there. Wrongly refusing a
+  valid script would be worse than letting the mistake surface
+  later — so when the static check can't be sure, it lets the run
+  proceed, and the same rule still runs at run time to catch
+  anything the static check couldn't rule on.
 
   A `wait machine=stopped` that completes has *observed* the machine
-  down, so it leaves it stopped for this analysis — a reading rather
-  than an assumption, and the shape every script that powers a guest
-  off from inside already ends with.
-  Id: `machine.must-be-stopped` — **the run-time id, unchanged**.
-  One rule, one answer for a consumer; what V17 adds is when it is
-  noticed, not what it means.
+  stopped, so from that point on the check treats it as stopped —
+  that's based on an actual observation, not a guess, and it matches
+  how every script that powers a guest off from the inside is
+  already written: it ends with exactly that wait.
+  Id: `machine.must-be-stopped` — **the same id the run-time check
+  uses**. It's one rule with one meaning either way; what V17 adds
+  is catching it earlier, not changing what it means.
 
 The grammar is line-oriented and LL(1) over the token stream in
 [lexical rules](#lexical-rules), given one lexical rule: a bare
@@ -897,10 +921,11 @@ deadline    45m
   implicitly powered off — and the script performs its own explicit
   `start`, typically after inserting the media it needs. An install
   script that must insert its installer medium before first boot
-  declares `machine stopped`. There is deliberately no undiverged
-  variant of the precondition: whether a diverged machine matters
-  is the operator's call, and `apply` is the documented recovery —
-  divergence policy never lives in a script header.
+  declares `machine stopped`. There is deliberately no separate
+  "must not be diverged" precondition: whether a diverged machine
+  is a problem is the operator's call, not the script's, and
+  `apply` is the documented way to fix it — a script header never
+  encodes divergence policy.
 - `entry` names the phase where a phased script begins. It is
   required in a phased script and forbidden in a linear one.
 - `timeout` optionally changes the script-wide observation default
@@ -1009,14 +1034,16 @@ There are no anonymous phases and no implicit phase entry.
 
 ## Properties
 
-A script declares the properties it consumes; references supply
-their bound values to statements while control flow stays fixed.
-The declared name *is* the property key every
-[source](script-properties.md) speaks — there is no separate input namespace
-(owner, 2026-07-21 — the property-construct round): a dotted key
-joins the shared personal vocabulary, an undotted key is
-script-scoped by convention, and every supply source speaks the
-same keys.
+A script declares the properties it consumes. References supply
+their bound values to statements; control flow itself never
+changes based on a property. The name declared in the script *is*
+the property key that every [source](script-properties.md) uses —
+there's no separate namespace for script input versus everything
+else (owner, 2026-07-21 — the property-construct round). A dotted
+key (like `identity.full-name`) joins the shared personal
+vocabulary; an undotted key is scoped to the script by convention.
+Every source that can supply a property value uses these same
+keys.
 
 ```rlqs
 property identity.full-name prompt="Registered owner"
@@ -1045,31 +1072,33 @@ key is declared once per script — a duplicate declaration is a
 static error — and referenced as often as needed, so one bound
 value serves every use of the key.
 
-`default=` declares the key's *derivation* — the script's own
-answer when no outer source supplies one. Its value is a quoted
-string in the reference grammar below: literal text, `${key}`
-references to other declared keys, and the `rlq.*` system
-facts ([script
-properties](script-properties.md#property-sources)). A
-derivation is not an expression — no transforms, no
-conditionals — and it binds statically: references among
-defaults form a static dependency graph, a cycle is a static
-error, and a reference to an undeclared, non-system key is a
-static error. At binding time a derivation whose references all
-bind answers the key — a literal default always answers, so
-`default="paul"` simply stops resolution at the derivation —
-while one touching an empty or unavailable fact does not
-answer, and the key falls to the ask. `default=` may repeat:
-the candidates are tried in declaration order and the first
-that answers supplies the key — alternation on availability,
-never on a value test — so a curated fact prefers itself over
-a raw fallback (`default="${rlq.host.full-name}"
+`default=` declares the key's *derivation*: the script's own
+answer for when no outer source supplies one. Its value is a
+quoted string using the reference grammar shown below: literal
+text, `${key}` references to other declared keys, and the `rlq.*`
+system facts
+([script properties](script-properties.md#property-sources)). A
+derivation is not an expression — no transforms, no conditionals —
+and it's resolved statically: references between defaults form a
+dependency graph checked at parse time, a cycle in that graph is a
+static error, and a reference to a key that's neither declared nor
+a system fact is also a static error. At binding time, a
+derivation whose references all resolve successfully answers the
+key. A literal default always resolves — so `default="paul"`
+simply stops resolution right there — while a derivation that
+touches an empty or unavailable fact does not resolve, and the key
+falls through to the interactive ask. `default=` can be repeated:
+the candidates are tried in the order they're declared, and the
+first one that resolves supplies the key. This is alternation
+based on whether a candidate is available, never on the value it
+produces, so a curated fact can be preferred over a raw fallback
+(`default="${rlq.host.full-name}"
 default="${rlq.env.FULLNAME}"`). A literal candidate anywhere
-but last is a static error — the candidates below it are dead.
-A `secret` declaration
-may not carry `default=`, and no derivation may reference a
-secret key. `prompt=` and `default=` compose: the prompt is
-simply never shown unless the derivation fails to answer.
+except last is a static error, because every candidate below it
+could then never be reached. A `secret` declaration can't carry
+`default=`, and no derivation may reference a secret key.
+`prompt=` and `default=` work together: the prompt is simply never
+shown unless the derivation fails to resolve.
 
 References use `$key` as a whole argument and `${key}` inside
 strings; dotted keys are valid in both forms:
@@ -1088,119 +1117,127 @@ expressions and cannot control watch conditions, transitions, or
 phase selection. A `secret` property follows the text
 interpolation rules only inside `enter` and `type`.
 
-That prohibition also bounds what any source can
-customize: no property — whatever supplies it — can retarget a
-script at a different-language installer, whose every screen
-differs. Locale-class customization is a *composition* seam owned
-by the machine blueprint, which selects the media/script pair;
-value seams supply
-data only, and each script stands alone against the guest it was
-written for (U5; see [customization
+That prohibition also limits what any source is allowed to
+customize: no property, whatever supplies it, can redirect a
+script at a different-language installer, since every one of that
+installer's screens would differ from what the script expects.
+Localizing a blueprint to a different language is a *composition*
+seam, owned by the machine blueprint — it's the blueprint that
+picks which media/script pair runs. Value seams (property values)
+only ever supply data; each script still stands alone against the
+one guest it was written for (U5; see [customization
 seams](../blueprint-guide.md#customization-seams)).
 
 ### The property sources
 
 Before the machine starts, Reliquary binds each declared property
-from the first source that answers. Everything that can answer is
-a property source, in one flattened order; each source answers
-for a different owner (owner, 2026-07-21 — the property-construct
-round). This list is normative; other documents summarize it and
-link here:
+from the first source that has an answer for it. Every kind of
+source that can supply a value is tried in one fixed order; each
+rank in that order answers for a different owner (owner,
+2026-07-21 — the property-construct round). This list is
+normative; other documents summarize it and link here:
 
 1. **An explicit CLI value** — *the caller's* answer for this
-   invocation: a repeatable `--property <key>=<value>`; the API
-   twins take the same values as their in-memory `properties=`
-   mapping under parity. It beats everything, the design
-   included. A key given twice is an error, and every explicitly
-   supplied key must be declared by the running script — an
-   unknown key is a preflight error, never a silent ignore.
+   invocation: a repeatable `--property <key>=<value>`; the
+   equivalent API calls take the same values through their
+   in-memory `properties=` mapping (CLI and API accept the same
+   inputs here). This beats every other source, including the
+   blueprint's own design. Supplying a key twice is an error, and
+   every explicitly supplied key must be declared by the running
+   script — an unknown key is a preflight error, never something
+   silently ignored.
 2. **A [blueprint
-   parameter](../blueprint-reference.md#parameters)** —
-   *the design's* answer, for every machine of the blueprint: a
+   parameter](../blueprint-reference.md#parameters)** — *the
+   design's* answer, for every machine of the blueprint: either a
    direct value, or a *redirect* (`{"property": "<key>"}`) that
-   resolves another key through the remaining sources below.
-   Parameters never chain through other parameters, and a
-   redirect replaces resolution of the declared key entirely —
-   never falling back to it.
+   resolves a different key through the remaining sources below.
+   Parameters never chain through other parameters, and a redirect
+   replaces resolution of the declared key entirely — it never
+   falls back to the declared key's own value.
 3. **The environment** — `RELIQUARY_PROPERTY_*` ([spelling and
    mangling](script-properties.md#property-sources)): *the
-   session's* standing values, the CI injection path. An ambient
-   variable never overrides a designed value; the explicit flag
-   above is the override path.
+   session's* standing values, and the way CI injects values. An
+   ambient environment variable never overrides a value the
+   blueprint designed in; the explicit `--property` flag above is
+   the only thing that overrides the design.
 4. **The user properties file** — `user.properties`, or the file
-   selected by `--properties <path>`: *the person's* durable
-   values and secret markers
-   ([script properties](script-properties.md)).
-5. **The declared derivation** — *the script's* computed
-   answer: the declaration's `default=` candidates, tried in
-   declaration order, each resolved in the reference grammar
-   over literal text, other declared keys, and the `rlq.*`
-   system facts ([Properties](#properties)). The first
-   candidate whose references all bind answers the key — a
-   literal always answers, so declaring one is opting to stop
-   here — while a candidate touching an empty or unavailable
-   fact does not, and a key no candidate answers falls
-   through.
-6. **The interactive ask** — one ask per unresolved key,
-   presented with the declaration's `prompt=` text; the answer
-   serves every reference to the key and is invocation-local,
-   never written back.
+   named by `--properties <path>`: *the person's* durable values
+   and secret markers ([script properties](script-properties.md)).
+5. **The declared derivation** — *the script's* own computed
+   answer: the declaration's `default=` candidates, tried in the
+   order they're declared, each resolved with the reference
+   grammar over literal text, other declared keys, and the
+   `rlq.*` system facts ([Properties](#properties)). The first
+   candidate whose references all resolve answers the key — a
+   literal candidate always resolves, so declaring one means
+   stopping here — while a candidate that touches an empty or
+   unavailable fact does not resolve, and if no candidate answers,
+   resolution falls through to the next source.
+6. **The interactive ask** — one prompt per still-unresolved key,
+   shown using the declaration's `prompt=` text. The answer serves
+   every reference to that key for this run, and is never written
+   back anywhere.
 
-Nothing binds uninvited (owner, 2026-07-21, restated by this
-round): no value reaches a script unless a declaration names its
-key, and the one environment channel is the declared
-`RELIQUARY_PROPERTY_*` spelling, sitting below the design.
+Nothing binds without a script asking for it (owner, 2026-07-21,
+restated by this round): no value reaches a script unless a
+declaration names its key, and the only environment channel is the
+declared `RELIQUARY_PROPERTY_*` spelling, ranked below the
+blueprint's own design.
 
-The order itself is closed at this surface — it is semantics,
-each rank encoding an adjudicated argument, never
-configuration. How the model grows without opening it — new
-tiers at design-decided ranks, provider plurality inside a
-tier, programmatic injection through the embedding API with
-mandatory provenance — is recorded with the operator-side
-mechanics ([script
-properties](script-properties.md#growth-the-order-is-closed-the-seams-are-named);
+This order itself is fixed at this surface — it's part of the
+language's meaning, with each rank settling a real disagreement
+about precedence, not something a caller can reconfigure. How the
+model can still grow without changing this order — new tiers at
+positions the design decides, multiple providers within one tier,
+programmatic injection through the embedding API with mandatory
+provenance — is recorded alongside the operator-side mechanics
+([script
+properties](script-properties.md#growth-the-order-is-fixed-but-three-routes-let-it-grow);
 planning/DECISIONS.md, 2026-07-23).
 
-Asking requires an interactive context: stdin and stderr both
-ttys — prompt text writes to stderr, the answer reads from
-stdin (the CLI output discipline, docs/spec/cli.md) — under the
-interactive progress renderings (`auto`/`pretty`). Without one — no
-terminal, or an explicit `plain`/`jsonl` progress selection — a
-still-unbound property fails before
-execution, so a program can never hang on a hidden prompt. A
-blueprint's designed values override personal standing defaults —
-a blueprint that fixes its user name as
-"testuser" keeps it fixed on every machine of it — while an
-explicit `--property` overrides even the design for one run
-(U5). A media value is resolved after binding, and a
-media ask lists the media names valid
-for that property.
+Prompting the user requires an interactive context: stdin and
+stderr both have to be ttys — the prompt text is written to
+stderr, and the answer is read from stdin (the CLI's output
+discipline, docs/spec/cli.md) — and only under the interactive
+progress renderings (`auto`/`pretty`). Without that (no terminal,
+or an explicit `plain`/`jsonl` progress selection), a property
+that's still unbound fails before execution starts, so a run can
+never hang on a hidden prompt. A blueprint's designed values
+override a person's own standing defaults — a blueprint that fixes
+its user name as "testuser" keeps that fixed on every machine
+built from it — while an explicit `--property` overrides even the
+blueprint's design, for that one run (U5). A `media` property is
+resolved after the rest of binding is done, and a media prompt
+lists only the media names valid for that property.
 
-Ordinary properties are strings. Secret properties keep only a
-marker in the properties file; their values live in the host
-credential store. `text` and `media` declarations require
-ordinary stored values, while `secret` requires a secret
-property. Kind
-mismatches fail rather than silently downgrading protected data.
-Blueprint parameters follow the same kind rules, and a `secret`
-declaration never takes a direct blueprint value — the [field
+Ordinary properties are stored as plain strings. Secret properties
+keep only a marker in the properties file; their actual values
+live in the host's credential store instead. `text` and `media`
+declarations need an ordinary stored value, while `secret` needs a
+secret-store entry — mismatching the two fails outright rather
+than silently exposing protected data. Blueprint parameters follow
+the same rule, and a `secret` declaration can never take a direct
+value straight from a blueprint — the [field
 reference](../blueprint-reference.md#parameters) states the
-blueprint-side rules. A secret never travels through
-`--property` — argv leaks into process listings and shell
-history, exactly the `set-property` rule; the environment may
-supply one (the warned plaintext class), the API mapping may (an
-in-memory value), and the ask enters one without echo.
-See the [script-properties specification](script-properties.md) for
-the file format, maintenance commands, precise failure rules, and
+blueprint-side rules for this. A secret value can never travel
+through `--property`, because command-line arguments leak into
+process listings and shell history — the same reasoning behind the
+`set-property` command's own rule. The environment variable path
+may carry one (and is flagged as a plaintext risk when it does),
+the API's in-memory mapping may carry one, and the interactive
+prompt reads one without echoing it to the screen. See the
+[script-properties specification](script-properties.md) for the
+file format, maintenance commands, exact failure rules, and the
 security boundary.
 
-The transcript records property keys, redirect targets, and
-supplying sources (flag, parameter, environment, file, or ask) —
-never values. For a `secret`, it also omits the entire expanded
-argument, redacts the value from textual diagnostics, and
-suppresses later automatic failure screenshots. An explicitly
-requested screenshot and the guest's own display, logs, or command
-history remain capable of exposing guest-entered data.
+The transcript records property keys, redirect targets, and which
+source supplied each one (flag, parameter, environment, file, or
+ask) — never the values themselves. For a `secret`, it also leaves
+out the entire expanded argument, redacts the value from any
+textual diagnostics, and suppresses automatic failure screenshots
+taken afterward. An explicitly requested screenshot, and the
+guest's own display, logs, or command history, can still expose
+guest-entered data.
 
 ## Execution model
 
@@ -1327,34 +1364,38 @@ Expiry produces the failure the [timing section](#timing)
 promises: the diagnostic names the expired clock and the scope
 that supplied it.
 
-**Severability follows the guest seam.** Input delivery is
-atomic: once a verb begins composing events — a `type` string, a
-`press` sequence, a `select` traversal step — the delivery
-completes even if a deadline passes meanwhile; the expiry is
-declared at the next boundary. A torn half-typed command would
-leave the guest in a state no observation could account for.
-Host-side operations are the opposite: a media fetch crosses no
-guest seam and aborts cleanly at deadline, however long it had
-run.
+**Whether a deadline can cut an operation off partway through
+depends on which side of the guest boundary it's on.** Input
+delivery is atomic: once a verb starts sending events — a `type`
+string, a `press` sequence, a `select` traversal step — the
+delivery runs to completion even if a deadline passes in the
+middle of it; the expiry is only declared at the next boundary. A
+command cut off half-typed would leave the guest in a state no
+observation could account for. Host-side operations are the
+opposite: a media fetch never crosses into the guest, so it aborts
+cleanly the moment a deadline hits, no matter how long it had been
+running.
 
 ### The run event stream
 
-Every run emits one normative event stream — JSON Lines, each
-event carrying a sequence number, timestamp, elapsed time, and
-kind — as **live output** to the run's driver, never a stored
-file (owner, 2026-07-24; D36: the run returns its output and
-stores nothing; the persisted `run-events.jsonl` and the run
-directory are async-backlog work, proposed/FEATURES.md "Asynchronous
-runs"). Under `--progress jsonl` / `run_script`'s event
-iterator the stream *is* the machine-readable output; the pretty
-and plain displays and the transcript a caller keeps are
-*renderers* of it — no surface reports anything the stream does
-not carry.
+Every run emits one normative event stream: JSON Lines, where each
+event carries a sequence number, a timestamp, elapsed time, and a
+kind. This is **live output** to whatever's driving the run, never
+a file Reliquary writes to disk itself (owner, 2026-07-24; D36: a
+run returns its output and stores nothing on its own; a persisted
+`run-events.jsonl` file and a run directory are planned but not
+built yet, proposed/FEATURES.md "Asynchronous runs"). Under
+`--progress jsonl`, or through `run_script`'s event iterator, this
+stream *is* the machine-readable output. The pretty and plain
+console displays, and any transcript a caller chooses to keep, are
+just *renderers* of this same stream — nothing shown on any of
+those surfaces can go beyond what the stream itself carries.
 
-Spans in the stream mirror the activation tree the clocks above
-define — a run span (the run deadline's scope), a span per phase
-activation (the phase deadline's scope), a span per observation
-(its timeout's scope). The minimum vocabulary the runtime emits:
+Spans in the stream mirror the activation tree defined by the
+clocks above: one run span (matching the run deadline's scope),
+one span per phase activation (matching the phase deadline's
+scope), and one span per observation (matching its timeout's
+scope). At minimum, every runtime emits:
 
 - preflight identification: the selected backend, and the
   control plane serving each operation;
@@ -1363,73 +1404,82 @@ activation (the phase deadline's scope), a span per observation
 - observation arm, match (with the matched row and elapsed
   time), and timeout;
 - a scope's entry and its restore (`scope.enter`,
-  `scope.restore`), naming the target and what the exit put the
-  machine back to — the change itself is an ordinary action and
-  reports as one, so *that it was scoped* is carried only here;
+  `scope.restore`), naming the target and what value the exit
+  restored it to — the underlying change itself is reported as an
+  ordinary action, so these two events are the only place that
+  records *that it happened inside a scope*;
 - handler fires, and each action's start and completion — input
-  deliveries, `insert` / `eject` / `set-boot`, `start` / `stop`,
-  `screenshot`. An `insert` names the media it actually mounted,
-  so a `$property` argument reports the **resolved** name and not
-  the property's: the two sigils are equally definite on the
-  page — `@` fixed, `$` deferred to the run — and the stream is
-  where that difference becomes visible;
-- transfer progress only where an honest total exists — media
-  fetch bytes, `select` traversal
-  steps — never invented denominators: renderers show phases and
-  observations as "elapsed / limit" pairs, not progress bars;
+  deliveries, `insert`/`eject`/`set-boot`, `start`/`stop`,
+  `screenshot`. An `insert` event names the media it actually
+  mounted, so a `$property` argument reports the **resolved**
+  media name, not the property's name: both the `@` and `$`
+  sigils name something definite in the script text, but `@` is
+  fixed at authoring time while `$` isn't resolved until the run
+  happens — the event stream is where that difference becomes
+  visible;
+- progress updates only where a real total exists — media fetch
+  bytes, `select` traversal steps — never a made-up denominator:
+  renderers show phases and observations as "elapsed / limit"
+  pairs, not progress bars;
 - once, when a run first knows them: the **quiescence guard's**
   measured cadence, the decoration window that cadence earned, and
   whether the gate stood down for want of one it could observe
   (`guard.cadence`, above under `stability`) — measured rather than
   configured, so it cannot be reported before a screen is read;
-- on failure: the pending condition or action, the expired clock
-  and its source scope, **every scoped change the run put back**,
-  the route taken with phase revisit
+- on failure: the condition or action that was pending, the clock
+  that expired and the scope it came from, **every scoped change
+  the run put back**, the route taken along with phase revisit
   counts, the nearest-miss screen row, the reason the last screen
-  could not be read where it could not be, **how many of its cells
-  matched no glyph** where any did not, the automatic
-  screenshot reference, and the suggested next command. The first
-  three answer different cases and are not alternatives: a screen
-  with rows has a nearest miss; a screen with none — a guest
-  painting in a video mode the display plane cannot describe — has
-  the captured shape instead; and a screen that *arrived* but was
-  drawn in a font the host does not hold (**U25**) has rows that
-  were partly substituted, so its nearest miss is measured against
-  text that was never read. A recognized screen is a measurement, and one
-  reporting no confidence cannot be told from a good one; an
-  expiry therefore never reports silence where it had a reason,
-  nor certainty it does not have. A backend that scrapes resolved
-  characters out of text memory recognizes nothing and so reports
-  no unread cells;
-- reserved, designed but not emitted: `screen`'s CLI-only read
-  kind, which waits on the guest-console commands carrying a
-  stream at all (only `run-script` and `fetch-media` do today);
-  and, with the backlogged record model (D36), interaction runs'
-  neutral `ended` terminal event and the authoring recorder's
-  (U6) handover kinds — control passing from script to human and
-  back, a capture session as one record with mixed drivers. A
-  reserved kind has no constant in the implementation: the
-  vocabulary the code declares is the vocabulary it emits.
+  couldn't be read (when it couldn't), **how many of its cells
+  matched no glyph** (when any didn't), the automatic screenshot
+  reference, and the suggested next command. Three of these — the
+  nearest-miss row, the unreadable-screen reason, and the
+  unmatched-glyph count — answer different cases rather than
+  serving as alternatives to each other: a screen with rows has a
+  nearest miss; a screen with no rows at all — the guest painted in
+  a video mode the display plane can't describe — has the captured
+  shape reported instead; and a screen that *did* arrive, but was
+  drawn in a font the host doesn't have (**U25**), has rows that
+  were only partly substituted, so its nearest miss is measured
+  against text that was never actually read. A recognized screen is
+  a measurement, and a low-confidence reading can't be told apart
+  from a good one just by looking at it — so a failure report never
+  claims silence where it actually had something to say, and never
+  claims more certainty than it has. A backend that reads resolved
+  characters straight out of text memory isn't recognizing glyphs
+  at all, so it reports zero unread cells;
+- reserved, designed but not yet emitted: `screen`'s CLI-only read
+  kind, waiting on the guest-console commands to carry an event
+  stream at all (today only `run-script` and `fetch-media` do);
+  and, once the backlogged record model lands (D36), interaction
+  runs' neutral `ended` terminal event and the authoring
+  recorder's (U6) handover kinds, which mark control passing from
+  script to human and back, so a capture session is one record
+  even though different things were driving it at different
+  points. A reserved kind has no constant in the implementation
+  yet: the vocabulary the code actually declares is the vocabulary
+  it emits.
 
-Events carry their originating statement's source line and
+Events carry their originating statement's source line and line
 number wherever one exists (owner, 2026-07-22) — action,
-observation, and transition events name the line they execute —
-so a transcript line can always cite its source.
-Events carry property keys and supplying sources, never
-bound values; the secret contract applies to the stream
-exactly as it applies to transcripts.
+observation, and transition events all name the line they're
+executing — so a transcript line can always cite where it came
+from. Events carry property keys and which source supplied them,
+never the bound values themselves; the same secret-handling rules
+apply to the stream as apply to transcripts.
 
-The stream is a contracted machine surface (owner, 2026-07-22):
-from 1.0 it grows additively only — new event kinds and new
-fields may appear in any release, an existing field never
-changes type or meaning, and a removal or rename is a breaking
-change — and consumers must ignore unknown event kinds and
-unknown fields. Pre-1.0 the shapes track this spec with no
-stability promise. The human renderings (`pretty`/`plain`) are
-deliberately uncontracted; the machine surfaces are this
-stream (as live output), `--json` documents, and exit codes
-(docs/spec/cli.md; run-record files dropped with
-persistence, D36).
+The event stream is a contracted machine-readable surface (owner,
+2026-07-22): starting at 1.0, it can only grow — new event kinds
+and new fields may appear in any release, an existing field never
+changes type or meaning, and removing or renaming one is a
+breaking change. Consumers must ignore event kinds and fields they
+don't recognize. Before 1.0, the shapes just track this spec, with
+no stability promise yet. The human-facing renderings
+(`pretty`/`plain`) are deliberately not part of this contract; the
+actual machine surfaces are this event stream (as live output),
+the `--json` documents, and exit codes (docs/spec/cli.md;
+persisted run-record files are dropped until persistence lands,
+D36).
 
 ## Observations
 
@@ -1455,12 +1505,13 @@ wait machine=stopped     # the machine: non-default, always named
 | `machine=` | machine state reported by the backend | `stopped` |
 
 Machine state has exactly one spelling, `machine=stopped`; there
-is no bare `stopped` condition. This split is deliberate twice
-over: a bare word and a quoted string in the same argument
-position must never mean two different observation domains, so
-the non-default domain is always named — and the default domain
-is *only* unprefixed, because two spellings of one observation
-would be two dialects in miniature.
+is no bare `stopped` condition. This split is deliberate for two
+reasons: a bare word and a quoted string in the same argument
+position must never mean two different kinds of observation, so
+the non-default kind is always named — and the default (the
+screen) is *only* ever unprefixed, because letting it have a
+second, prefixed spelling would recreate the exact ambiguity this
+rule exists to avoid.
 
 An observation carries exactly one condition. To wait for the
 first of several, including conditions on different channels, use
@@ -1697,7 +1748,8 @@ the construct it annotates, `stable` strengthens one observation,
 checked, and how expiry is declared are defined by the
 [execution model's clock table](#clocks).
 
-The four families scope differently, and placement is the law:
+The four families scope differently, and where you write one
+decides what it applies to:
 
 - **Per-observation settings (`timeout`, `stable`) are lexically
   scoped.** An observation bound is a parameter of an observation,
@@ -1765,40 +1817,43 @@ The four families scope differently, and placement is the law:
   this and cannot waive it; it is a property of how the machine's
   backend reads a screen.
 
-  Two reading paths, and they are an order of magnitude apart.
-  Where the backend has VGA text memory the guest has already
-  resolved its characters and a read is effectively free — measured
-  at **16ms or less**, comfortably inside the requirement. Where
-  the screen must be **interpreted from a framebuffer** — the
-  GUI-only case, a screenshot decoded and matched against a glyph
-  bank — a read costs the better part of a second, measured at
-  **~0.83s**, roughly five times the minimum. Such a run therefore
-  has a slower cadence imposed on it by the host, and the runtime
-  adapts rather than pretending otherwise:
+  There are two ways a backend can read a screen, and they differ
+  by an order of magnitude. Where the backend has VGA text memory,
+  the guest has already resolved its own characters, so a read is
+  effectively free — measured at **16ms or less**, comfortably
+  inside what's needed. Where the screen has to be **interpreted
+  from a framebuffer** — the GUI-only case, where a screenshot is
+  decoded and matched against a bank of glyphs — a read costs the
+  better part of a second, measured at **~0.83s**, roughly five
+  times the minimum. A run on that slower path ends up with a
+  slower cadence imposed on it by the host, and the runtime adapts
+  to that rather than pretending it isn't happening:
 
   - the measured cadence is rounded **up** — to the nearest second
-    where screens are interpreted, to 0.1s where they are scraped,
-    since the two paths' jitter differs by that much and a window
-    resized on noise would judge two identical runs differently;
-  - the decoration window **widens** to what that cadence can
-    observe, so the guard keeps working instead of switching off,
-    and inside the wider window a slow reader recognizes exactly
-    the decoration a fast one does;
-  - past a cap the window stops widening, because "changed three
-    times recently" would stop describing decoration and start
-    describing a screen painted in stages. A cadence that cannot be
-    accommodated inside the cap **stands the gate down** for the
-    run: every sample is judged, as it was before the gate existed.
-    The gate never causes a failure on its own, and that holds at
-    every cadence.
+    where screens are interpreted, to 0.1s where they're read from
+    text memory, because the jitter on the two paths differs by
+    that much, and a window sized off noisy measurements would
+    judge two identical runs differently;
+  - the decoration window **widens** to match what that cadence can
+    actually observe, so the guard keeps working instead of
+    switching off — and within the wider window, a slow reader
+    recognizes exactly the same decoration a fast one would;
+  - past a cap, the window stops widening, because "changed three
+    times recently" would stop meaning decoration and start meaning
+    a screen that's being painted in stages instead. When a cadence
+    can't be accommodated within that cap, the gate **stands down**
+    for the run: every sample gets judged, exactly as it would have
+    before the gate existed. The gate never causes a failure on its
+    own, at any cadence.
 
-  **The run says which happened**, once, on the event stream
-  (`guard.cadence`; [the stream's vocabulary](#the-run-stream)) —
-  naming the cadence measured, the window it earned, and whether
-  the gate stood down. A guard that quietly went inactive would
-  otherwise be indistinguishable from one that passed, and an
-  author who wrote `stability=` would have no way to learn the host
-  could not honor it.
+  **The run reports which of these happened**, once, on the event
+  stream (`guard.cadence`; [the stream's
+  vocabulary](#the-run-stream)) — naming the cadence it measured,
+  the window that cadence earned, and whether the gate stood down.
+  Otherwise a guard that had quietly gone inactive would look
+  identical to one that had actually passed, and an author who
+  wrote `stability=` would have no way to find out the host
+  couldn't honor it.
 
 Where each word may appear, and what it means there — any other
 placement is a parse error:
@@ -1813,12 +1868,14 @@ placement is a parse error:
 | `enter` / `type` / `press` / `select` / `click` | error | error | error | error — it compares nothing | gap before this delivery |
 | every other statement | error | error | error | error — it compares nothing | error — it delivers no input |
 
-**`stability` and `pacing` are opposite numbers**, and the table is
-the clearest place to see it: each sits on exactly the statement
-kind whose hazard it addresses — pacing guards the actor and lives
-on the five verbs that deliver input, stability guards the compare
-and lives on the observations — so neither overlaps the other and
-no word needs position-sensitive semantics.
+**`stability` and `pacing` mirror each other**, and the table above
+is the clearest place to see it: each one only appears on the kind
+of statement whose risk it addresses. `pacing` protects the side
+that's acting, so it only lives on the five verbs that deliver
+input; `stability` protects the side that's comparing, so it only
+lives on observations. Neither overlaps the other's territory, so
+neither word needs to mean something different depending on where
+it's written.
 
 Three placements are rejected deliberately rather than tolerated:
 `deadline` on a single observation would be an exact synonym for
@@ -1855,18 +1912,20 @@ stated duration before succeeding:
 wait "Formatting" stable=2s
 ```
 
-**`stable` and `stability` are two axes, not two spellings**, and
-the difference decides which one an author wants. `stable` asks
-whether a *matched condition* is the durable state rather than a
-transient one; `stability` asks whether the *frame* the compare ran
-on is trustworthy at all. A condition can hold perfectly on a
-half-painted screen — that is the case only `stability` catches —
-and a screen can be perfectly quiet while showing text about to be
-overwritten, which is the case only `stable` catches. Neither
-subsumes the other, which is why **`stability` does not retire
-`stable`**, and why one word could not carry both: a duration and a
-proportion told apart only by whether the author wrote `2s` or
-`0.99` is two meanings in one spelling, which **G6** refuses.
+**`stable` and `stability` measure two different things, not two
+spellings of the same thing**, and knowing the difference tells
+you which one you want. `stable` asks whether a *matched
+condition* is the lasting state rather than a passing one;
+`stability` asks whether the *frame* the comparison ran on can be
+trusted at all. A condition can match perfectly on a screen that's
+still half-painted — that's the case only `stability` catches. And
+a screen can be perfectly still while showing text that's about to
+be overwritten — that's the case only `stable` catches. Neither
+one covers the other's case, which is why **`stability` doesn't
+replace `stable`**, and why one word couldn't do both jobs: telling
+a duration from a proportion only by whether the author wrote `2s`
+or `0.99` would be one spelling doing two different things, and
+**G6** rules that out.
 
 In practice the gate absorbs most *uses* of `stable=`, this
 example among them: what an author usually means by
@@ -1881,23 +1940,28 @@ pause encodes a guess about guest speed that will be wrong on
 another host. Every pause must be justified by an observation;
 `stable` strengthens one rather than blindly pausing after it.
 
-**`pacing` is not that verb, and the prohibition stands.** The
-distinction is between a pause an author *sequences* and a pause
-that is a property of *delivering input*. A `delay` verb would be
-the first: a step in the script, standing between two others,
+**`pacing` is not that forbidden `delay` verb, and the rule against
+`delay` still stands.** The distinction is between a pause an
+author deliberately *inserts as a step*, and a pause that's simply
+part of *how input gets delivered*. A `delay` verb would be the
+first kind: a step in the script sitting between two others,
 encoding a guess about how long something takes. `pacing` is the
-second — the control plane's own gap before it starts typing,
-which it takes whether or not anyone writes the word. What the
-language adds is the ability to tune that gap, not to insert one.
+second kind — the control plane's own gap before it starts typing,
+which happens whether or not anyone writes the word `pacing` at
+all. What the language adds is the ability to tune that existing
+gap, not the ability to insert a new one.
 
-The gap exists because agentlessly a guest's *input* readiness is
-unobservable where its output is not (G1): an installer paints its
-welcome screen before it begins reading the keyboard, so a control
-plane that types the instant a screen appears asserts something it
-cannot know. `send_keys` already paces *between* key events; this
-is the missing pause before the first. Screen polling remains
-control-plane-owned and untunable; input-event pacing is
-control-plane-owned and tunable, on the ladder above.
+The gap exists because, without an agent in the guest, a guest's
+readiness to *receive* input can't be observed, even though its
+output can (G1): an installer paints its welcome screen before
+it's actually reading the keyboard, so a control plane that starts
+typing the instant a screen appears is asserting something it has
+no way to know. `send_keys` already paces the gaps *between* key
+events; this is the missing pause before the very first one.
+Screen polling stays entirely the control plane's own business,
+with no author-facing tuning; pacing the first input event is also
+the control plane's business, but this one is tunable, as shown in
+the placement table above.
 
 A swallowed first keystroke is this gap being too short, and it
 does not surface as an input failure: the verb completes, having
@@ -2037,10 +2101,12 @@ machine is refused by name rather than attempted with a
 calibration guess. Every refusal lands before the first guest
 input (G3).
 
-**First cut: left-single-click only.** `button=`, `count=`, and a
-drag verb are additive sibling growth (G7) with no named demand
-yet — the seam itself already carries any mask and any sequence,
-so growth here never touches an adapter.
+**For now: only a single left click.** `button=`, `count=`, and a
+drag verb are natural future additions (G7) that nothing currently
+demands. Adding them later won't require changing the backend
+adapter interface, since that interface already supports arbitrary
+button masks and event sequences — only the script-facing
+vocabulary would need to grow.
 
 ## Phase transitions
 
@@ -2146,9 +2212,9 @@ immediate action, and its name says so. Every key must name a
 drive the machine already
 declares; duplicates are rejected. The machine must be stopped —
 the new order takes effect on the next `start`, and **a `set-boot`
-the plan promises is reached with the machine running is refused
-before the run starts** (V17) rather than five minutes into an
-install. Like
+the static check can prove is reached with the machine running is
+refused before the run starts** (V17) rather than five minutes
+into an install. Like
 `insert`/`eject`, the change diverges the machine from its
 blueprint until a later `set-boot`, or
 [`apply`](../blueprint-guide.md#applying-blueprint-edits), restores
@@ -2198,12 +2264,13 @@ slot, so an alias and its indexed form are the same drive.
 spellings, two meanings, which is the one thing a closed grammar
 cannot afford to blur.
 
-**A block wraps the enclosing shape's own units** — phases in a
-phased script, statements in a linear one, and nested `with` blocks
-in either. That is what gives the language a word for a **stage**: a
-group of phases. It is also the only form in which an install is
-expressible, since an install's stage spans phases and every phase
-body ends in a transition.
+**A `with` block wraps whatever unit the surrounding script already
+uses** — phases in a phased script, statements in a linear one, and
+nested `with` blocks in either. That's also what gives the language
+a word for a **stage**: a group of phases wrapped together. It's
+the only way to express that grouping at all, since an install's
+stage spans multiple phases, and every phase body has to end in a
+transition.
 
 **The scope is where control is, not where the text is.** It holds
 while control is inside the group; it is entered by reaching any
@@ -2217,33 +2284,35 @@ cancellation at a boundary. A host crash restores nothing, and
 [`apply`](../blueprint-guide.md#applying-blueprint-edits) remains
 its recovery — exactly as for an unscoped change.
 
-**A boot restore requires a stopped machine.** The boot order is
-launch-time firmware configuration and stopped-only as a property of
-the machine, not as a courtesy to the author, so a restore is not
-exempted from the rule a second writer would erode. An exit reached
-with the machine running **fails the run**, naming the change it
-could not undo — and where the plan can promise that exit is reached
-running, it is an authoring refusal instead (V17), which is where
-most of the cost goes. What is left of it is real and accepted: a
-run whose route the guest chose can fail at its last act, and the
-remedy is to say in the script's own shape that the stage ends with
-the machine down.
-Media restores carry no such rule — `insert` and `eject` are
-running-or-stopped, so a media restore is live where the machine is
-up.
+**Restoring the boot order requires a stopped machine.** The boot
+order is launch-time firmware configuration, and it's stopped-only
+as a property of the machine itself, not just as a courtesy to the
+author — so the scope's restore doesn't get an exemption from that
+rule; exempting it would just be a second, unguarded way to write
+the boot order. If the scope's exit point is reached while the
+machine is running, that **fails the run**, naming the change it
+couldn't undo. Wherever the static check can prove that exit point
+is reached while running, it's an authoring-time refusal instead
+(V17), which is where most such mistakes actually get caught.
+What's left over is real and accepted: a run whose route the guest
+chose can still fail on its very last act, and the fix is to
+structure the script itself so the stage ends with the machine
+down. Media restores carry no such rule — `insert` and `eject`
+work whether the machine is running or stopped, so a media restore
+can happen live while the machine is up.
 
-**One scope per target.** The boot order is one target however many
-drives a head names; a medium's target is its slot, so an `insert`
-and an `eject` on one slot collide. Two scopes on the same target,
-nested or overlapping, are refused; scopes on different targets nest
-freely.
+**One scope per target.** The boot order counts as one target no
+matter how many drives a `boot` head names; a medium's target is
+its slot, so an `insert` and an `eject` on one slot collide. Two
+scopes on the same target, nested or overlapping, are refused;
+scopes on different targets nest freely.
 
 Entry and the restore are reported on the [run event
 stream](#the-run-event-stream) (`scope.enter`, `scope.restore`), and
-a failure report names every restore the run performed. That is not
-decoration: what a scope takes back is state a diagnostician would
-otherwise have found on the machine, so a run that took it back has
-to say so.
+a failure report names every restore the run performed. That's not
+just decoration: what a scope restores is state a diagnostician
+would otherwise have found still on the machine, so a run that
+restored it has to say so explicitly.
 
 ### `set`
 
@@ -2260,34 +2329,39 @@ in the machine's state document, where any process reads it with
 `get-machine-var` (twin `get_machine_var`) while the run is still
 going or long after it ends.
 
-Variables are **cleared at each `start`**, so one always reports
-what the current boot produced rather than what a previous boot
-left behind. They are the consumer's names for the consumer's
-values: reliquary stores them and reads no meaning into either
-(G2, P18).
+Variables are **cleared at each `start`**, so a variable always
+reflects what the current boot produced, never what a previous boot
+left behind. The names and values both belong entirely to whoever
+is consuming them: Reliquary just stores them and attaches no
+meaning of its own to either (G2, P18).
 
-**Readiness rides this channel.** reliquary ships no readiness
-*policy* — what "ready" means belongs to the workflow being built,
-not to reliquary (P18) — and a consumer's own ready script `set`s a
-variable as its last step to say so.
+**This is also how "readiness" gets signaled.** Reliquary ships no
+readiness *policy* of its own — what "ready" means belongs to
+whatever workflow is being built on top of it, not to Reliquary
+(P18) — so a consumer's own script signals it by calling `set` on a
+variable as its last step.
 
-How the host reads it back depends on who is doing the setting, and
-there are two shapes rather than one hand-written loop:
+How the host reads a variable back depends on who set it, and there
+are two supported shapes rather than one hand-written polling loop:
 
-- **The run that sets it is the one you are waiting on.**
-  `run-script <label> --expect ready=yes` contracts the run on the
-  variable: the run blocks, so by the time it returns the value is
-  final, and a run that did not leave it raises rather than being
-  discovered later by a caller who read `get-machine-var` and found
-  nothing. One call, and a failure that names key, wanted and got.
-- **Somebody else sets it** — a run driven from another thread, or
-  one being followed rather than owned. `wait-machine-var ready`
-  polls until it arrives, which is the only case where an interval
-  means anything.
+- **The run that sets it is the same run you're waiting on.**
+  `run-script <label> --expect ready=yes` ties the run's own
+  success to that variable: the run blocks until it finishes, so by
+  the time it returns, the value is final — and a run that never
+  sets the variable raises an error immediately, rather than being
+  discovered later by a caller who reads `get-machine-var` and
+  finds nothing there. One call gets you a failure that names the
+  key, what was expected, and what was actually found.
+- **Someone else sets it** — a run driven from another thread, or
+  one you're only observing rather than the one that owns it.
+  `wait-machine-var ready` polls until the variable appears, which
+  is the only case where a polling interval actually means
+  anything.
 
-An unset variable and a machine that never ran still read alike
-through `get-machine-var`, deliberately; what the two verbs above
-add is a way to say that the silence was not expected.
+An unset variable and a machine that's never been run both read the
+same way through `get-machine-var`, deliberately. What the two
+verbs above add is a way to say explicitly that the silence
+*wasn't* expected.
 
 ### `font`
 
@@ -2308,26 +2382,29 @@ literal `@name` naming no font in the active source fails static
 preflight, before any guest input, exactly like `insert`'s
 `media.unknown` (below).
 
-**The match order is a real priority, not a tie-break.** The
-recognizer tries the first font in the (authored, then host) list
-whose best match for a cell is inside its distance threshold and
-stops there; a bank named later is consulted only when every
-earlier one misses. That is what makes naming a font *narrow* the
-answer rather than merely add one more candidate shape to a global
-scan, and it is also what makes a per-font codepage well defined:
-without an ordered decision, "the font that matched" names nothing.
-A font's declaration states what its bytes cannot — the cell
-geometry and the codepage its indices mean — and a cell matched
-through it decodes through that codepage; the host's own fonts keep
-today's mapping unconditionally.
+**The list order is a real priority order, not a tiebreak rule.**
+The recognizer tries fonts in list order (authored fonts first,
+then the host's own) and stops at the first one whose best match
+for a cell falls inside its distance threshold; a font named later
+in the list is only consulted once every earlier one has missed.
+That's what makes naming a font *narrow down* the answer, rather
+than just add one more candidate shape to a single big search
+across everything. It's also what makes a per-font codepage well
+defined: without a fixed order to decide it, there would be no way
+to say which font actually matched a given cell. A font's
+declaration states what its raw bytes can't: the cell geometry, and
+which codepage its indices mean. A cell matched through a given
+font is decoded using that font's codepage; the host's own built-in
+fonts keep their existing mapping unconditionally.
 
-It is deliberately not a `with` head: the three the language has
-are all durable machine changes the scope exists to undo, and a
-font changes nothing on the machine and has nothing to put back
-(see [Scoped machine-state changes](#scoped-machine-state-changes)
-above). It is equally not a header declaration, which cannot say
-*when* in the boot the painting authority changes — only the script
-knows that.
+`font` is deliberately not a `with` head: the three heads the
+language has are all durable machine changes that a scope exists to
+undo, and a font changes nothing on the machine — there's nothing
+for a scope to put back (see [Scoped machine-state
+changes](#scoped-machine-state-changes) above). It's equally not a
+header declaration, because a header can't say *when during the
+boot* the active font should change — only the script itself knows
+that.
 
 **A wrong font says so.** The failure report's unread-cell count
 gains the fonts the last read was matched through, in the order
@@ -2338,31 +2415,33 @@ was actually consulted rather than left with a silent timeout (P11).
 
 The language deliberately has no file-exchange verbs (owner,
 2026-07-22). Moving files across the host/guest boundary is the
-caller's side of the seam, like every interpretation of what a
-run produced (G2): while a machine is stopped on every control
-plane, its drives are plain host state — a
-[directory-source media](media-spec.md#the-media-component)
-*is* its directory, and drive images are readable and
-writable with the user's own tools — so exchange is ordinary
-out-of-band host work against the machine directory
-(`get-machine-dir` reports it; contract in
-[the instance model](instance-model.md)). The omission also
-keeps every quoted string in a script on one side of one
-boundary: string content is guest-facing text, never a host
-path.
+caller's job, not the script's — the same way interpreting what a
+run produced is the caller's job (G2). While a machine is stopped,
+on every control plane, its drives are just plain host state: a
+[directory-source media](media-spec.md#the-media-component) *is*
+its directory, and drive images are readable and writable with the
+user's own ordinary tools. So file exchange is ordinary host work
+done outside the script, against the machine directory
+(`get-machine-dir` reports where that is; the contract for it is
+in [the instance model](instance-model.md)). Leaving this out of
+the language also keeps every quoted string in a script meaning
+one thing: string content is guest-facing text, never a host path.
 
-**Nor is it a CLI/API capability** (D108). Reliquary places no
-file on a machine's drives, reads none back and maps no volume to
-a guest letter, on any surface: a machine's file content is out of
-purview by design (**P16**'s carve-out). A caller that needs a
-file in or out supplies the drive and moves the file itself — a
-directory-source media attaching a host directory, an image
-swapped live with `insert-media --file` (U20), or the machine
-directory `get-machine-dir` reports, opened with the caller's own
-tools. Future live guest-agent transfer would get its own distinct
-capability with an explicitly stronger guarantee. None of this
-lands in the *language*: the omission above stands, and reopening
-it is a language decision under the growth goals.
+**This isn't a CLI or API capability either** (D108). Reliquary
+never places a file onto a machine's drives, never reads one back,
+and never maps a volume to a guest drive letter, on any surface: a
+machine's file content is deliberately outside what Reliquary
+handles (**P16**'s carve-out). A caller that needs to move a file
+in or out has to supply the drive and move the file itself — by
+attaching a directory-source media to a host directory, by
+swapping an image live with `insert-media --file` (U20), or by
+opening the machine directory that `get-machine-dir` reports with
+their own tools. A future live guest-agent transfer feature would
+get its own distinct capability, with an explicitly stronger
+guarantee than any of this. None of that changes the *language*,
+though: the omission described above stands, and reopening it
+would be a separate language decision, governed by the growth
+goals.
 
 ### `start` and `stop`
 
@@ -2433,11 +2512,12 @@ scope, preflight further rejects, naming what it needed:
   unavailable from a secure host
   store (the property sources).
 
-Every one of those needs more than the text. What the text alone
-decides is settled before preflight is reached, V17 included: a
-stopped-only verb the plan promises runs while the machine is up is
-a legality error, not a preflight one, and the machine it would have
-needed is never consulted.
+Every one of those checks needs more than the script text alone.
+What the text alone can decide is settled before preflight is even
+reached — V17 included: if the static check can prove a
+stopped-only verb runs while the machine is up, that's a legality
+error, not a preflight one, and the machine it would have needed is
+never even consulted.
 
 Static analysis warns about unreachable phases, reactive phases
 with no possible exit, obvious shadowed literal conditions, a
@@ -2461,27 +2541,26 @@ rlq run-script <script_name> --dry-run
     [--property <key>=<value>]... [--properties <path>]
 ```
 
-performs parsing and static
-analysis — including the resolved timing plan, each observation's
-effective timeout, and its source scope, and a count of the
-statements no static pass can promise will run — without executing
-the script, changing the user's properties, accessing secret
-values, or writing any file. Supplying a machine (and any
-explicit values) also performs typed binding — reporting each
-declared property's supplying
-source (flag, blueprint parameter — direct or redirect —
-environment, file, or ask) — and
-capability preflight.
-Source-aware checking reports property presence, kind, and
-supplying source; it
-never reveals a property value. Its two modes are the two
-checkable tiers of the [processing model](#processing-model);
-the embedding API's twin is `run_script(dry_run=True)`, which
-returns a `DryRun` and never a `ScriptRun` —
-`start_script` joins them as `run-script --detach`'s twin,
-returning the run handle whose operations the CLI `run` family
-mirrors, and `attach_run` reopens that handle from a fresh
-process — taking the same identifiers under CLI–API parity.
+performs parsing and static analysis — including the resolved
+timing plan, each observation's effective timeout and which scope
+supplied it, and a count of the statements no static pass can
+guarantee will actually run — without executing the script,
+changing the user's properties, accessing secret values, or
+writing any file. Supplying a machine (and any explicit property
+values) also runs typed binding — reporting which source supplied
+each declared property (flag, blueprint parameter — direct or
+redirect — environment, file, or ask) — and capability preflight.
+This source-aware checking reports whether a property is present,
+its kind, and which source supplied it; it never reveals the
+property's actual value. Its two modes correspond to the two
+checkable tiers described in the
+[processing model](#processing-model). The embedding API's
+equivalent is `run_script(dry_run=True)`, which returns a
+`DryRun` object rather than a `ScriptRun`. `start_script` is the
+API's counterpart to `run-script --detach`: it returns a run
+handle whose operations the CLI's `run` family mirrors, and
+`attach_run` reopens that same handle from a fresh process — the
+CLI and the API accept the same identifiers throughout.
 
 ### Error classes and exit codes
 
@@ -2506,41 +2585,48 @@ under the `ReliquaryError` root every deliberate Reliquary error
 subclasses (docs/spec/api.md), and exit `1` is precisely
 an error outside those four.
 
-**The classes are not this surface's alone** (D58). They are named
-for a run's enforcement tiers and hold unchanged on every
-surface, because the questions that decide them never mention a
-script: is it settled by the authored input alone, does the world
-satisfy that input, did the work itself fail. So a malformed
-blueprint is a STATIC ERROR exactly as a malformed script is,
-naming a machine that does not exist is a PREFLIGHT ERROR exactly
-as an undeclared drive slot is, and a failed image transfer is a
-RUN FAILURE with no run in sight. A capability Reliquary declares
-but has not implemented is a PREFLIGHT ERROR: the request is
-legal, and the world — which includes what this build
-implements — does not satisfy it.
+**These three classes aren't specific to scripts** (D58). They're
+named after a run's enforcement tiers, but they apply unchanged
+across every surface in Reliquary, because the question that
+decides which class applies never actually mentions a script: is
+this settled by the authored input alone? does the world satisfy
+that input? did the work itself fail? So a malformed blueprint is
+a STATIC ERROR exactly like a malformed script is; naming a
+machine that doesn't exist is a PREFLIGHT ERROR exactly like naming
+an undeclared drive slot is; and a failed image transfer is a RUN
+FAILURE with no script run involved at all. A capability that
+Reliquary declares but hasn't actually implemented yet is a
+PREFLIGHT ERROR: the request itself is legal, and the world —
+which includes what this particular build implements — just
+doesn't satisfy it.
 
-Exit `1` therefore means a **fault**, never a user's mistake, and
-has two populations that are both Reliquary's own: a deliberate
-`InternalError` (Python), which is an invariant Reliquary detected
-in its own state and carries no user input to correct, and a
-genuine accident that never was a `ReliquaryError`. A deliberate
-raise always lands in the hierarchy, so `except ReliquaryError`
-stays the catch-all it is documented to be; a bare builtin is left
-to the invariants the language itself enforces.
+Exit `1` therefore always means a **bug in Reliquary itself**,
+never a mistake by the caller, and it can happen two ways, both of
+them Reliquary's own fault: a deliberate `InternalError` (Python)
+— an invariant Reliquary caught itself violating, with no user
+input that could have fixed it — or a genuine accident: an
+exception that was never wrapped as a `ReliquaryError` at all.
+Every deliberate `raise` in the package lands somewhere in the
+`ReliquaryError` hierarchy, so `except ReliquaryError` remains the
+documented catch-all; an unwrapped builtin exception is the one
+case that slips past it, caught only by whatever invariant the
+language runtime itself enforces.
 
 Every diagnostic
 carries a stable dotted identifier naming its rule
 (`obs.two-channels` style); identifiers share one namespace
 across the classes, and the full id index is deferred to beta.
 
-**Ids are finer than the V-numbered rules.** A V-number names a
-restriction; an id names one diagnostic under it — V7 is one rule
-and `obs.two-channels` is one of the six ways to break it. The
-two are not competing schemes and a message carries only the id;
-the [syntactic restrictions](#syntactic-restrictions) list the
-ids that enforce each rule, which is where a reader goes from one
-to the other. The prefix is the subject, never the error class or
-the surface, because the namespace is shared across both: `obs.`,
+**Diagnostic ids are more fine-grained than the V-numbered rules.**
+A V-number names a whole restriction; an id names one specific
+diagnostic under it — V7 is one rule, and `obs.two-channels` is
+just one of the six ways to break it. These aren't two competing
+schemes: a message only ever carries the id, and the
+[syntactic restrictions](#syntactic-restrictions) section lists
+which ids enforce each V-numbered rule, which is how a reader gets
+from one to the other. An id's prefix names its subject, never its
+error class or which surface raised it, because the same prefix
+namespace is shared across all of them: `obs.`,
 `wait.`, `handler.`, `flow.`, `name.`, `prop.`, `time.`, `key.`,
 `node.`, `http.`, `media.`, `font.`, `machine.`, `platform.`,
 `progress.`, `store.`, `lex.`, `syn.`, `ref.`, `value.`, `field.`,
@@ -2578,17 +2664,20 @@ the list grows by an edit here, and a test holds the code and this
 list to each other in both directions — an id with an unlisted
 subject fails, and a listed subject nothing raises fails too.
 
-The subject rule is what lets **one rule keep one id across
-surfaces**, which is its whole purpose. `media.unknown` is raised
-where the resolution namespace defines no such media *and* where a
-script's `insert` names one: one condition, one answer for a
-caller asking what went wrong. `name.duplicate-property` covers a
-script declaring a property twice and a properties file defining a
-key twice. `machine.not-running` covers the CLI, the script runner
-and the machine verbs. Had the prefix named the tier or the
-surface, each of those would have carried two or three ids for one
-rule, and a consumer would have had to know which layer noticed
-before it could tell what happened.
+This subject-based naming is exactly what lets **one rule keep one
+id across every surface it applies to** — that's its whole
+purpose. `media.unknown` fires both where the resolution namespace
+defines no such media, and where a script's `insert` names one
+that doesn't exist: one underlying condition, one id, one answer
+for a caller asking what went wrong. `name.duplicate-property`
+covers both a script that declares a property twice and a
+properties file that defines the same key twice.
+`machine.not-running` covers the CLI, the script runner, and the
+machine verbs alike. If the prefix had instead named the
+enforcement tier or the surface that raised it, each of these
+would need two or three different ids for what is really one rule,
+and a caller would have to already know which layer caught the
+problem before it could even tell what went wrong.
 
 An id is a **contract**: it is what a consumer switches on, so it
 is stable where the message text is not. The message wording,
@@ -2614,15 +2703,16 @@ package carries an id, every id's subject is one this list names,
 and both conformance corpora check that the id a fixture declares
 is the id that fires.
 
-**The blueprint surface is located too** (D70). A script
+**Blueprint diagnostics are located too** (D70). A script
 diagnostic cites a line and column, or the statement it came from;
 a blueprint diagnostic cites its field breadcrumb *and* the line
-and column that field was written at, rendered by the same
-skeleton — `<path>:<line>:<column>: error: <message> (<id>)`, with
-the source line and a caret beneath it. The breadcrumb did not
-move into the rendering: it stays in the message, because it says
-which field and the position says where, and the two answer
-different questions.
+and column that field was written at, rendered with the same
+layout — `<path>:<line>:<column>: error: <message> (<id>)`, with
+the source line and a caret underneath it. The field breadcrumb
+didn't move into that rendered layout — it stays in the message
+text, because the breadcrumb says *which field*, and the
+line/column say *where in the file*, and those are two different
+questions.
 
 Position is **optional and its absence is not a defect**. It comes
 from the document's text, so a blueprint loaded from a path has
@@ -2632,30 +2722,34 @@ Other surfaces stand where they stood: a preflight diagnostic
 about the media namespace has no document position to cite and
 carries an id alone.
 
-The grammar's own rejections are the coarsest ids in the scheme:
-`syn.unexpected-token` and `syn.unexpected-end` name a token, not
-a rule, because that is all a parser knows. That is the cost this
-spec accepts by keeping the V-rules above the CFG, and it is
-visible where it bites — a construct the grammar refuses cannot
-carry the id of the rule it violates.
+The grammar's own rejections are the least specific ids in the
+whole scheme: `syn.unexpected-token` and `syn.unexpected-end` name
+a token, not a rule, because a token is all a parser actually
+knows at that point. That's the cost of keeping the V-numbered
+rules layered above the context-free grammar rather than folded
+into it, and it shows up exactly where you'd expect: a construct
+the grammar itself refuses can't carry the id of whichever V-rule
+it happens to violate.
 
 ## The run's output and failure
 
 A run drives the machine and **returns its output** to whoever
-started it; it stores nothing (owner, 2026-07-24; D36). The
-output is the [event stream](#the-run-event-stream) — rendered
-live to the run's driver (pretty for a person, jsonl for a
-program) and gone when the run ends. There is no run directory,
-no persisted `run-events.jsonl` or `transcript.txt`, no
-retention, and no `run` management family: persistence is the
-substrate a cross-process follower would read, and following a
-run from a process that did not start it is asynchronous work in
-the backlog (proposed/FEATURES.md "Asynchronous runs", D35/D36) —
-which is where the whole record model now lives (the `runs/<n>/`
-archive, monotonic numbering, retention, `list-runs` / `run
-status` / `run delete`, and interaction runs). Milestone 9
-stores nothing; each run returns to its own caller, which is what
-keeps the multithreaded case free of a shared store.
+started it; it stores nothing on disk (owner, 2026-07-24; D36).
+That output is the [event stream](#the-run-event-stream) —
+rendered live to whatever's driving the run (pretty for a person,
+jsonl for a program) — and it's gone once the run ends. There's no
+run directory, no persisted `run-events.jsonl` or `transcript.txt`,
+no retention policy, and no `run` management command family:
+persistence is what a cross-process follower would need to read
+from, and letting a process that didn't start a run follow it
+anyway is asynchronous work still in the backlog
+(proposed/FEATURES.md "Asynchronous runs", D35/D36) — that's also
+where the entire record model now lives (the `runs/<n>/` archive,
+monotonic numbering, retention, `list-runs`/`run status`/`run
+delete`, and interaction runs). As of milestone 9, nothing is
+stored: each run returns straight to its own caller, which is
+exactly what keeps the multithreaded case free of needing a shared
+store.
 
 The stream ends with a **terminal event** stating the outcome:
 success, a failure class, or cancelled — Ctrl-C on a foreground
@@ -2674,18 +2768,19 @@ action, the clock that expired and the scope that supplied it
 observed screen text, machine state, and an automatic screenshot
 when available.
 
-A run's **product is the consumer's**, never a record Reliquary
-keeps: the value returned, a small value read from a machine
-variable, or a whole disk image swapped out and read by the
-caller's own tools. Reliquary attaches
-no meaning to any of it and has no test-result vocabulary — no
-pass/fail schema, no result parsing (G2). A primitive-driven
-loop needs no bracket to be recorded: the caller's own driving
-code, collecting each call's returned output, is its record.
-Per-run selection travels as ordinary script properties;
-granular results come out as the caller's own files and values.
-The consumer keeps, organizes, and discards on its own side of
-the seam (P4, P18).
+**Whatever a run produces belongs to the consumer**, never to a
+record Reliquary keeps: the returned value, a small value read
+back from a machine variable, or a whole disk image swapped out
+and read with the caller's own tools. Reliquary attaches no
+meaning to any of it, and has no test-result vocabulary at all —
+no pass/fail schema, no result parsing (G2). A loop built directly
+on the primitives needs no special bracket to be recorded: the
+caller's own driving code, collecting each call's returned output,
+already *is* the record. Choosing what to run, per run, travels as
+ordinary script properties; detailed results come out as whatever
+files and values the caller itself produces. It's the consumer's
+job, not Reliquary's, to keep, organize, or discard any of it (P4,
+P18).
 
 There is no automatic retry. Re-running an installation against a
 partially modified disk is not generally safe and is not described
@@ -2695,33 +2790,35 @@ semantics.
 
 ### Interaction runs — the recording bracket
 
-A primitive-driven loop needs no recording bracket in milestone 9:
-each command returns its output, and the caller's own driving code
-collecting those outputs is its record (D36). The `begin-run` /
-`end-run` bracket that records such a loop into one persisted run
-record is part of the record model, which moved to the
-asynchronous-runs backlog with the rest of persistence (proposed/FEATURES.md
-"Asynchronous runs", D35/D36); it returns if that work
-schedules.
+A loop built directly on the primitives needs no recording bracket
+as of milestone 9: each command returns its own output, and the
+caller's own driving code, collecting those outputs, already is
+the record (D36). A `begin-run`/`end-run` bracket that would
+record such a loop into one persisted run record is part of the
+record model, which moved to the asynchronous-runs backlog along
+with the rest of persistence (proposed/FEATURES.md "Asynchronous
+runs", D35/D36); it comes back if that work gets scheduled.
 
-U14's unit-test loop is served without it: per-run test selection
-travels as ordinary script properties (`--property` / the
-`properties=` mapping, interpolated by property references);
-granular results are a caller-authored artifact (JUnit XML, TAP)
-the caller takes directly — swapped out as a disk image and opened
-with its own tools (U20), read off a directory-source results
-drive on the host, or captured as text through `exec` — and keeps
-on its own side of the seam. Reliquary has
-deliberately no test-result vocabulary — no pass/fail schema, no
-result parsing (G2). Granularity comes from run structure: one
-iteration is one returned output.
+U14's unit-test loop works fine without it: which tests to run,
+per run, travels as ordinary script properties (`--property` or
+the `properties=` mapping, interpolated through property
+references); detailed results are a caller-authored artifact
+(JUnit XML, TAP) that the caller takes directly — swapped out as a
+disk image and opened with its own tools (U20), read off a
+directory-source results drive on the host, or captured as text
+through `exec` — and the caller is responsible for keeping it.
+Reliquary deliberately has no test-result vocabulary of its own —
+no pass/fail schema, no result parsing (G2). Granularity comes
+from the run's own structure: one iteration is one returned
+output.
 
 ## How the vocabulary grows
 
-The text-mode vocabulary is a foundation, not a promise that every
-future feature must fit an already frozen grammar before the first
-implementation has validated it. Before beta, empirical use may
-still reshape the language coherently.
+The current vocabulary is a foundation to build on, not a promise
+that every future feature has to squeeze into an already-frozen
+grammar before real-world use has even tested it. Before beta,
+actual use of the language may still reshape it, as long as that
+reshaping stays coherent.
 
 The intended post-beta growth discipline is (G7):
 
@@ -2845,43 +2942,47 @@ with boot cdrom0 {
 ```
 
 The blueprint declares `cdrom0` empty and boots
-`["hdd0", "cdrom0"]` — what the machine *is*, a system that boots
-its own disk. **Booting the installer is true of the install and
-not of the machine**, so the script says it, in the one place it
-holds: `with boot cdrom0` puts the optical drive in front of the
-blueprint's order for the whole install and puts the order back
-when the run ends. The scope wraps the phases rather than sitting
-inside one because the stage spans phases — the
-`cd-boot` ⇄ `partitioning` cycle crosses them twice — and every
-phase body ends in a transition.
+`["hdd0", "cdrom0"]` — that's what the machine *is*: a system that
+boots its own hard disk. **Booting from the installer is true of
+this particular install, not of the machine itself**, so the
+script is where that fact belongs: `with boot cdrom0` puts the
+optical drive ahead of the blueprint's own order for the whole
+install, and puts the order back once the run ends. The scope
+wraps the phases, rather than sitting inside just one of them,
+because the stage spans multiple phases — the `cd-boot` ⇄
+`partitioning` cycle crosses between them twice — and every phase
+body has to end in a transition anyway.
 
-**The eject is what hands the disk its turn.** While the stage
-holds, every boot takes the optical drive, so the disk is reached
-only once that drive is empty, and no boot in the run depends on
-firmware moving past a partitioned disk. Ejecting in `formatting`
-rather than after the reboot selection keeps it off that reboot's
-critical path. The guest-driven reboot is expressed by the
-installer selection and the resulting screen, not by a Reliquary
-reboot command — and it is the guest's alone: the machine never
-stops, so the boot order it was launched with is the one firmware
-reads again.
+**The `eject` is what actually hands the disk its turn.** While
+the scope holds, every boot takes the optical drive first, so the
+hard disk only gets reached once that drive is empty — no boot in
+this run ever depends on firmware skipping past a partitioned
+disk. Ejecting during `formatting`, rather than after the reboot
+selection, keeps the eject off that reboot's critical path. The
+guest-driven reboot itself is expressed through the installer's
+own menu selection and the screen that follows, not through any
+Reliquary reboot command — it belongs entirely to the guest: the
+machine itself never stops, so firmware reads the same boot order
+it was launched with, again.
 
 The second visit to `cd-boot` reaches the other branch of its
 closing `wait` because the disk has been partitioned.
 
-The scope's exit is reached in `shutdown`, with the guest powered
-off — which is what a boot restore requires. Had the script handed
-back a running machine, the run would have failed at its last act
-naming the order it could not put back.
+The scope's exit point is reached in `shutdown`, with the guest
+already powered off — which is exactly what restoring the boot
+order requires. If the script had handed back a running machine
+instead, the run would have failed on its very last act, naming
+the boot order it couldn't put back.
 
-Verification is a separate script needing no machine
-reconfiguration at all: the install returned both the medium and
-the order, so the machine is in its blueprint shape and a plain
-`start` boots the installed hard disk past an empty optical drive.
-The verify script declares `machine stopped` too and issues that
-`start`. If a run was interrupted before its restore — a host
-crash, which no scope survives — `apply` returns the machine to
-its blueprint shape.
+Verification is a separate script that needs no machine
+reconfiguration at all: the install already returned both the
+medium and the boot order, so the machine is back in its blueprint
+shape, and a plain `start` boots the installed hard disk right
+past an empty optical drive. The verify script also declares
+`machine stopped` and issues that `start` itself. If a run was
+interrupted before it could restore anything — a host crash, which
+no scope survives — `apply` is what returns the machine to its
+blueprint shape.
 
 ## Sharing
 

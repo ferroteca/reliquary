@@ -1,5 +1,5 @@
 // invalid: a reserved qualifier fails closed naming itself
-// spec: Dispatch and degenerates
+// spec: Dispatch and edge cases
 // id: ref.qualifier-reserved
 [
   { "type": "media", "name": "x", "location": "${env:ISO_PATH}" }

@@ -30,11 +30,13 @@ distinction was never a property of the artifact, only of the
 use. Scripts (`.rlqs`) and landmark declarations (`.rlql`)
 remain their own kinds.
 
-The format is deliberately **logic-free** and stays that way:
-what it may say is capped by P14, and the ceiling is stated here
-as a closed grammar rather than left to judgment. See
+The format is deliberately **logic-free**, and that will not
+change: P14 limits what the format may express, and this
+document states that limit as a closed grammar instead of
+leaving it to judgment. See
 [Format stability](#format-stability-none-yet)
-for the growth rule; this document states the grammar it closes.
+for the rule on how the format is allowed to grow; this document
+states the grammar that rule closes.
 
 ## The file
 
@@ -148,32 +150,38 @@ cannot carry.
   **declares and has not disabled**, and are unique by slot: the
   same slot twice, in either spelling, fails validation. An empty
   or non-bootable drive is a **valid** entry: whether firmware
-  moves past one is the firmware's business rather than this
-  model's, and it is not uniform — an empty optical drive is
-  skipped everywhere, a disk partitioned without an active
-  partition is not. So an installer-carrying blueprint states the
-  medium **first** and its script ejects when the disk is ready
-  (the measured table is in the blueprint reference); an order
-  written to be fallen through is a bet on the host's firmware.
-  Omitted, the order is the slot-0 floppy,
+  moves past one depends on the firmware, not on this model, and
+  firmware does not behave uniformly — an empty optical drive is
+  skipped everywhere, but a disk partitioned without an active
+  partition is not. So a blueprint that carries an installer
+  states the install medium **first** in `boot`, and its script
+  ejects that medium once the disk is ready (the measured table
+  of what each firmware does is in the blueprint reference).
+  Writing an order that depends on the firmware falling through
+  to a later entry means relying on host firmware behavior that
+  is not guaranteed. Omitted, the order is the slot-0 floppy,
   else the slot-0 hard disk, else the first cdrom; the resolved
   order is recorded.
-- **`control-planes`** is an **ordered preference**. Entries are
-  unique — one listed twice fails validation — and **the first
-  entry drives the run**: the session's guest-facing carriers are
-  the first declared plane's. Every entry must appear in the
-  assigned backend's capability report, failing closed at
-  materialization naming the plane and the backend (P11): the
-  policy is every plane Reliquary may use, so recording one
-  nothing can probe would make the state lie. The vocabulary is
-  the model's whole set and the parser accepts all of it; whether
-  a plane can be honored is the backend's answer — `vnc` is
-  served on QEMU and refused where a backend cannot provide it,
-  and a plane no backend has built is refused everywhere.
-  Omitted, it resolves to the platform's default, which is
-  `["agentless-display"]` for every platform today — the
-  universal, cooperation-free plane. Defaults that differ by
-  platform arrive with the planes that justify them.
+- **`control-planes`** is an **ordered preference**. Entries must
+  be unique — listing one twice fails validation — and **the
+  first entry drives the run**: the session talks to the guest
+  using whichever carriers that first listed plane provides.
+  Every entry must appear in the assigned backend's capability
+  report, or materialization fails closed naming the plane and
+  the backend (P11): `control-planes` records every plane
+  Reliquary is allowed to use, so recording a plane the backend
+  cannot actually check would leave the saved state claiming
+  something false. The field accepts the model's whole
+  vocabulary of planes — the parser does not reject any of
+  them — but whether a given plane actually works depends on the
+  backend: `vnc` is served on QEMU and refused on a backend that
+  can't provide it, and a plane no backend has built yet is
+  refused everywhere. Omitted, it resolves to the platform's
+  default, which is `["agentless-display"]` for every platform
+  today — the one plane that works everywhere because it needs
+  nothing installed or running in the guest. Defaults that differ
+  by platform will arrive once a platform has planes that justify
+  a different default.
 - **`pointing-device`** (F66) is `tablet` or `mouse`, judged the
   same way as `control-planes`: capability-checked against the
   assigned backend at materialization, failing closed naming both
@@ -182,10 +190,11 @@ cannot carry.
   applies acceleration the host cannot observe (P10) — so `click`
   preflight-refuses a `mouse` machine by name rather than
   attempting a calibration guess. Omitted, it resolves to `mouse`
-  — the stock relative device every platform's machine carries
-  anyway, so the default records reality rather than aspiring to
-  one; a GUI-era platform earns a richer default the way
-  `control-planes` will earn one of its own.
+  — the plain relative device every platform's machine has
+  anyway, so the default matches what's actually there rather
+  than assuming something better. A GUI-era platform will get a
+  richer default once it has one to justify it, the same way
+  `control-planes` will.
 - **`backend-settings`** is the **only** place backend-specific
   configuration may appear, which is what makes a blueprint
   without it portable by construction. One section per backend
@@ -199,29 +208,38 @@ cannot carry.
   materialization rather than being carried into the state and
   silently ignored (P11). An adapter that reads no settings
   defines no keys, and therefore refuses every one. Second, **a
-  section may not touch what Reliquary owns** through first-class
-  fields (memory, drives, boot order, CPU count) or through the
-  recorded VM identity, and the adapter refuses the overlap in
-  its own configuration language — two sources for one fact is
-  the one thing the hatch must not become. Third, **the section
-  that validates is the section that renders**: what a create
-  accepts is what a start applies.
+  section may not touch what Reliquary already owns** through
+  first-class fields (memory, drives, boot order, CPU count) or
+  through the recorded VM identity — the adapter refuses that
+  overlap in its own configuration language, because
+  `backend-settings` exists to carry backend-specific
+  configuration, not to give one fact two different places to be
+  set. Third, **the section that validates is the section that
+  renders**: what `create` accepts is exactly what `start`
+  applies.
 
-  Only the assigned backend's section is judged, because no
-  adapter can speak for another's vocabulary — which is also why
-  an inert section is preserved unexamined.
+  Only the assigned backend's section is checked, because no
+  adapter can validate another backend's vocabulary — which is
+  also why an inert section is kept as-is without being checked.
 
-  **Sections narrow assignment.** Where a blueprint declares no
-  `backend`, sections for **exactly one** backend narrow the walk
-  to that backend, which then fails closed if it is unavailable
-  or incapable, naming what narrowed it. A blueprint carrying one
-  section has already said which backend it is written for, and
-  walking past it to another that could never honor those
-  settings would be assignment ignoring the blueprint. Two or
-  more sections narrow nothing: each stays inert until its
-  backend wins the ordinary walk. **Presence narrows, not
-  content** — an empty section names its backend just as a full
-  one does. A declared `backend` outranks any narrowing.
+  **A `backend-settings` section can narrow which backend gets
+  picked.** Where a blueprint declares no `backend`, and it
+  carries a `backend-settings` section for **exactly one**
+  backend, Reliquary picks that backend instead of trying the
+  usual priority order (ARCHITECTURE.md, "The seams" —
+  installed backends are tried QEMU, then VirtualBox, then VMware
+  Workstation, then Hyper-V). That pick then fails closed if the
+  named backend is unavailable or can't handle what the machine
+  needs, naming the section that forced the pick. A blueprint
+  carrying one section has already said which backend it's
+  written for, so trying a different backend that could never
+  apply those settings would mean ignoring what the blueprint
+  said. Two or more sections narrow nothing: each stays inert
+  until its own backend wins the ordinary priority-order search.
+  **What narrows the pick is the section being present, not what
+  it contains** — an empty section names its backend exactly as a
+  full one does. A `backend` field written explicitly always
+  outranks this narrowing.
 
 ### media
 
@@ -248,16 +266,18 @@ A media owns all content and materialization.
 - **`location`** — where the payload comes from. One field, one
   grammar: [The location grammar](#the-location-grammar).
 - **`sha256`** — the payload's hash, verified on every use.
-  **Required once any remote rung is present** (checked at
-  resolution, not parse — see
+  **Required once any of the location's entries is remote**
+  (checked at resolution, not parse — see
   [Two-phase validation](#two-phase-validation)), optional for
-  local and derived payloads. Optional is a feature: a local
-  media may omit it to attach a drive image still being
-  *evolved*, where a pin would fail on every edit; hermetic
-  workflows add the hash when they want the pin. The hash is the
-  build pin *independent of the location kind* — a trusted local
-  payload can still verify it is the exact build the scripts
-  target (U4).
+  local and derived payloads. Being optional here is deliberate: a
+  local media may leave `sha256` out so you can attach a drive
+  image that is still being actively edited, where a pinned hash
+  would fail every time the image changes. A hermetic workflow —
+  one that wants a fully reproducible, pinned build — adds the
+  hash when it wants that guarantee. The hash pins the build
+  regardless of where the payload comes from — even a trusted
+  local payload can use it to verify it is the exact build the
+  scripts target (U4).
 - **`read-only`** — present the drive read-only. Orthogonal to
   `materialize`. **Defaults true on a cdrom** (no backend
   meaningfully emulates writing a virtual ISO; a writable cdrom
@@ -283,10 +303,12 @@ is the pair **`(name, type)`** — a media named `dos622` and a
 machine named `dos622` coexist, because every reference is
 type-directed.
 
-**The name is the membership bit.** A spec is either named —
-explicitly, or derived from content-intrinsic material — and in
-the catalog, or it is the one anonymous citizen and in no
-namespace at all.
+**Having a name is what makes a spec a member of the catalog.**
+A spec either has a name — given explicitly, or derived from its
+own content — and belongs to the catalog, or it is the one kind
+of spec allowed to have no name at all (the anonymous blank,
+described in [The anonymous blank](#the-anonymous-blank) below),
+which belongs to no namespace.
 
 ### The name charter
 
@@ -296,26 +318,36 @@ A name is checked against one production:
 media-name = ( letter | digit ) , { letter | digit | "." | "_" | "-" } ;
 ```
 
-This is the script language's `name` production with a leading
-digit allowed, split from the letter-initial `property-key`. The
-split is one clause and it is load-bearing in only one
-direction: a media name has no bare site in any surface (`@name`
-in scripts, a JSON string in blueprints), while a property key
-appears bare at a declaration, where a leading digit would lex
-as a duration. So `86Box` is a perfectly good media name.
+This is the script language's `name` production, with one
+change: a leading digit is now allowed. The script language
+splits `name` from `property-key`, which must start with a
+letter, and that split matters here only in one direction. A
+media name is never written bare — it always appears inside a
+marker: `@name` in scripts, or a plain JSON string in
+blueprints — so a leading digit never causes ambiguity for a
+media name. A property key, by contrast, is sometimes written
+bare at a declaration site, and there a leading digit would be
+read by the parser as a duration (like `5m`) instead of a key.
+That is why `property-key` must stay letter-initial while
+`media-name` does not have to. So `86Box` is a perfectly good
+media name.
 
-What is mechanically forced out regardless: whitespace, `{`,
-`}`, `#`, `/` (the containment separator — `${media:C:/x}` is
-otherwise ambiguous), and control characters. **A machine name
-carries one clause more** — never all digits, since it becomes
-the `<name>-<n>` id segment — and the charter is otherwise shared
-with media. Parentheses and
-brackets are excluded by **argv, not grammar**: every media name
-is a command-line argument at `fetch-media` / `add-media` /
-`clean-media`, and `rlq fetch-media FD(1)` is a shell syntax
-error exactly as `FD[1]` is — a name needing per-shell quoting
-is a permanent papercut against P7, and brackets add a glob
-hazard over `cache/media/` on top.
+Some characters are forced out regardless of any of this:
+whitespace, `{`, `}`, `#`, and `/` (which is reserved as the
+containment separator — `${media:C:/x}` would otherwise be
+ambiguous), plus control characters. **A machine name has one
+rule more than a media name**: it may never be all digits, since
+it becomes the `<name>-<n>` id segment, and `42-0` would not
+read as the pair it is. Otherwise the rules are the same for
+machine and media names. Parentheses and brackets are excluded
+for a different reason — **the command line, not the name
+grammar**: every media name is used as a command-line argument
+to `fetch-media`, `add-media`, and `clean-media`, and
+`rlq fetch-media FD(1)` is a shell syntax error just as
+`FD[1]` is. A name that needs shell-specific quoting is a small
+but permanent annoyance that P7 rules out, and brackets would
+also make a name behave like a glob pattern over
+`cache/media/`, on top of that.
 
 ### Derivation, repair, and failure
 
@@ -330,7 +362,7 @@ naming both the derived name and the source it came from
 yield a legal name — the stem is empty, or repairs to nothing —
 or where there is **no stem to derive from at all** (a `${…}`
 location, a reference-bearing path suffix, a mirror list whose
-first rung is a reference), it **fails closed demanding an
+first entry is a reference), it **fails closed demanding an
 explicit `name`**. The derived key must be visible to the author
 who will later type `@name`, which is why silent sanitization
 was declined.
@@ -355,30 +387,38 @@ exactly.
   naming both files.
 - **In-file duplicates always error**, identical or not.
 
-Composition — merging fragments of one spec across files — was
-worked through and **declined**: it was a second personal-values
-mechanism in disguise. The supply seam is
-**edit-your-seeded-copy** (home) or a **property-valued
-location** (project, CI).
+Composing a spec — merging fragments of it across files — was
+considered and **declined**: it would only have been a second
+version of the property mechanism that already exists for
+supplying personal values and secrets (see
+[blueprint-guide.md](../blueprint-guide.md)). Instead, when you
+need to supply your own value, you either **edit your own seeded
+copy of the blueprint directly** (at home) or **supply the value
+through a property** (in a project or in CI).
 
 ### The anonymous blank
 
 The content-free blank — a drive-inline `{ "size": "20M" }` — is
-the **sole anonymous citizen**: it belongs to no namespace, is
-identified only by its site, is named for its **slot** at
-materialization, and cannot be referenced from a script. It has
-no content to derive a name from and no reason to be shared;
-anything else must be named. Document-scoped anonymous names
-were declined — anonymous means *absent*, not *private*.
+the **only spec allowed to have no name**: it belongs to no
+namespace, is identified only by where it is written, is named
+for its **slot** once materialized, and cannot be referenced
+from a script. It has no content to derive a name from and no
+reason to be shared; everything else must be named. Giving
+anonymous specs a name scoped to just their own document was
+considered and declined — anonymous means the spec has *no
+name*, not that its name is *private* to that document.
 
 ## Resolution
 
 Resolution reads **every `.rlqb` in the blueprints directory**,
-walked recursively — the home's folder by default, a project's own
-tree where `--blueprints-dir` says so — into one catalog, then binds
-every reference by name. The residency split is unchanged in
-substance, and now absolute: a miss never falls back to the codex,
-on either surface (P4).
+walked recursively — the home directory's blueprints folder by
+default, or a project's own tree where `--blueprints-dir` points
+there instead — into one catalog, then binds every reference by
+name. Where blueprints live still works the same way it always
+has: the home directory for the CLI's convenience, a project's
+own tree for automation (P4). What's new is that this is now
+absolute: if a name isn't found, resolution never falls back to
+the codex, on either the CLI or the API.
 
 Resolution is **order-independent** and forward references are
 legal. Containment cycles and a self-parent fail closed naming
@@ -429,40 +469,45 @@ The same graph, written from the child side:
 ]
 ```
 
-Nesting is unbounded and needs no chaining syntax: a child that
-is itself a container simply has `children` of its own. One
-remote rung high in the tree downloads once; every descendant
-derives from the cached parent.
+Nesting has no depth limit and needs no special chaining syntax:
+a child that is itself a container simply has `children` of its
+own. If just one ancestor high in the tree is remote, it
+downloads once; every descendant below it is then extracted from
+that cached copy.
 
-**The reading is decided at the reference site, not in the
-spec.** A drive or a script `insert` **mounts** a media; a
-parent location or a `children` walk **extracts** from it. Dual
-roles are legal and unremarkable — one ISO mounted at `cdrom0`
-and container-read for its boot floppy is the same media used
-two ways. This is why the archive type could be absorbed: it
-described a use, not an artifact.
+**Whether a media gets mounted or extracted from is decided by
+where it's referenced, not by anything in the spec itself.** A
+drive, or a script's `insert`, **mounts** a media. A `parent`
+location, or walking a `children` list, **extracts** from it.
+Both at once are fine and unremarkable — the same ISO can be
+mounted at `cdrom0` and also read as a container for its boot
+floppy; it's the same media used two different ways. This is why
+the old separate archive type could be folded into media: it was
+describing a use of a media, not a different kind of artifact.
 
-**Container reading is roster-gated by format.** Milestone 7
-supports **zip** only; an unsupported container fails closed
-naming its format. ISO9660, including its `[BOOT]` El Torito
-virtual paths, is the recorded follow-on; reading filesystem
-images is out pre-beta.
+**Reading into a container only works for formats Reliquary
+supports.** Milestone 7 supports **zip** only; trying to read an
+unsupported container format fails closed, naming the format it
+found. Reading ISO9660, including its `[BOOT]` El Torito virtual
+paths, is planned as a follow-on; reading filesystem images at
+all is out of scope before beta.
 
 A **path glob** in `children` was declined: names must be
 static, because the catalog can never depend on a download (G3).
 
 ## The location grammar
 
-One field, `location`, under one format-wide law:
+One field, `location`, and one rule applies to it everywhere it
+appears:
 
 ### Strings are interpreted, objects are explicit
 
-**Every interpreted string has exactly one object desugaring**,
-and that object is the canonical form — what the machine state
-records, what the embedding API emits, and the escape hatch
-whenever a string would be ambiguous. The object is also the
-option point: attributes that have no string spelling live
-there.
+**Every string form has exactly one equivalent object form**, and
+that object form is the canonical one — it's what the machine
+state records, what the embedding API emits, and what you write
+instead whenever a string would be ambiguous. The object form is
+also where extra options live: any attribute with no string
+spelling can only be set there.
 
 Strings are interpreted **by position**:
 
@@ -496,11 +541,13 @@ absolute-only.
 
 ### Mirror lists
 
-A location may be a **list** of locations, tried in order, with
-mixed schemes allowed — the hash, not the URL, is the arbiter. A
-**one-element list is simply the scalar** (no special case), an
-**empty list is an error**, and **nested lists are illegal**.
-`sha256` is required once any rung is remote.
+A location may be a **list** of locations, tried in order, and
+the entries can mix schemes freely — what decides whether the
+payload is correct is the hash, not which URL supplied it. A
+**one-element list is simply the scalar value** (no special
+handling needed), an **empty list is an error**, and **nested
+lists are illegal**. `sha256` is required once any entry in the
+list is remote.
 
 ## The universal reference
 
@@ -556,9 +603,9 @@ Everything else a scalar position accepts may be referenced:
 `location`, `parameters` values, `description`, and the open
 numerics `memory`, `cpus`, `size`. **`sha256` stays
 interpolable** — a hash is not a closed vocabulary, and
-excluding it would buy nothing, since what forces the
+excluding it would buy nothing, since what pushes the
 required-once-remote check to resolution time is a *referenced
-location rung*, not the hash field.
+location entry*, not the hash field.
 
 Reach is **asymmetric**: widening it later is compatible,
 narrowing it is not. That is why these exclusions are stated
@@ -581,14 +628,15 @@ paths are `/`-separated always, following the container formats'
 own convention. The path normalizes, and `..`, absolute paths,
 and empty segments are **refused as containment escapes**. A
 backslash anywhere in the body is an error naming the `/` rule —
-the Windows author's first guess — and trailing or doubled
-slashes are errors.
+the mistake a Windows-using author is likely to try first — and
+trailing or doubled slashes are also errors.
 
-Inside, not after, so that **the closure test sees the whole
-location** (D32): a qualified reference is whole-value, and with
-the path inside, "whole-value" means the string is *exactly* one
-reference with no trailing text to disambiguate. It is also what
-the character class earns its `/` for.
+The path lives inside the braces, not after them, so that **the
+closure test can see the whole location** (D32): a qualified
+reference is whole-value, and with the path inside, "whole-value"
+means the string is *exactly* one reference with no trailing text
+left over to disambiguate. This is also the reason the character
+class includes `/` at all.
 
 ### The closure: operations closed, namespaces open
 
@@ -612,37 +660,47 @@ halves. Neither alone is sufficient:
    dotted property key — and *neither has a position an operator
    could occupy*.
 
-The second half is not decoration. `${mem:-512M}` — the likeliest
-request of all — is built **entirely from legal characters** and
-passes the class; it is refused because the text before the
-first colon is the qualifier and `mem` is not one. A closure
-whose stated test is wrong invites exactly the feature it exists
-to refuse.
+The second test is not there just for show. `${mem:-512M}` — the
+most likely request anyone will ever make — is built **entirely
+from legal characters** and passes the character class; it is
+refused because the text before the first colon is read as the
+qualifier, and `mem` is not a known qualifier. If the stated test
+were wrong in some way that let this pass, it would let in
+exactly the feature the closure exists to keep out.
 
 **Closed permanently:** every operator — defaults (`${key:-x}`),
 pipes and filters, calls, indexing, arithmetic, comparison,
-ternaries, nesting (`${${a}}`), and any second escape. A
-proposal that does not fit is a **layer-switch signal, never a
-grammar extension**. Each such feature will arrive with a real
-user and a good case, and unanimous individual justification is
-precisely how the Helm shape is reached (P14).
+ternaries, nesting (`${${a}}`), and any second escape character.
+A proposal for one of these is a signal that what's wanted is a
+whole new authoring layer on top of blueprints, never an
+extension to this grammar — see
+[When it is time for a layer](#when-it-is-time-for-a-layer)
+below. Each such feature would only ever be added once a real
+user has a genuinely good case for it — and that is exactly the
+trap: justifying each feature individually, one at a time, is the
+same process that let Kubernetes's Helm grow from a plain
+templating tool into what is effectively a programming language
+embedded in YAML. Keeping this grammar closed for good is what
+keeps that from happening here (P14).
 
 **Open:** new **qualifiers**. A qualifier names a *namespace to
 look in*, never an *operation to perform*, and adding one costs
 no new character. `env:`, `file:`, `machine:`, `script:`,
 `landmark:`, and `secret:` are reserved.
 
-### Dispatch and degenerates
+### Dispatch and edge cases
 
 The qualifier is the text before the **first** colon, so a
-property key never contains one (the charter agrees).
-Qualifiers are lowercase-only. Unqualified `${media}` is
-rejected with a did-you-mean rather than read as a property of
-that name. Unknown qualifiers fail closed naming themselves
-(P11); `property:` is reserved-and-rejected under a nudge to
-drop the qualifier. `${}`, `${media:}`, `${:x}`, an unterminated
-`${`, and whitespace inside the braces are all parse errors
-naming the malformed reference.
+property key can never contain a colon (the name charter agrees
+with this, since `:` is not a legal character in a name).
+Qualifiers must be lowercase. Unqualified `${media}` is rejected
+with a did-you-mean hint rather than read as a property literally
+named "media". Unknown qualifiers fail closed, naming themselves
+in the error (P11). `property:` is reserved but rejected, with an
+error suggesting you drop the qualifier — `${key}` unqualified
+already means a property lookup. `${}`, `${media:}`, `${:x}`, an
+unterminated `${`, and whitespace inside the braces are all parse
+errors naming the malformed reference.
 
 **Recorded, not a defect:** scripts reference media as `@name`
 and blueprints as `${media:<name>}`. JSON has no token classes,
@@ -659,12 +717,11 @@ This is the cost of the interpolation reach, and it is work the
 - At **parse**: structure, vocabulary, the name charter, the
   reference grammar, containment shape, and every rule stated
   above that does not need a resolved value.
-- At **resolution**: the
-  **`sha256`-required-once-remote** check — a `${key}` rung may
-  resolve to a URL, so parse time cannot know — and **coercion**
-  at non-string positions, which is the field's own parser run
-  over the resolved string, failing closed naming field, value,
-  and source.
+- At **resolution**: the **`sha256`-required-once-remote** check
+  — a `${key}` entry may resolve to a URL, so parse time cannot
+  know that yet — and **coercion** at non-string positions, which
+  is the field's own parser run over the resolved string, failing
+  closed naming field, value, and source.
 
 A property reference in a location resolves at `create` /
 `apply` into the machine state, never at `start`.
@@ -683,35 +740,45 @@ always `<name>.<ext>` with the extension from the location or
 the `extension` override.
 
 Nothing else is recorded about a cached file — the filename is
-the whole of its identity, and there is no sidecar (D41 deleted
-the identity ledger). The cache can afford that because it is
-**entirely reconstructible**: nothing enters it except by
-download or extraction, so no payload there is irreplaceable.
+its whole identity, and there is no separate metadata file next
+to it (D41 deleted the ledger that used to track where each file
+came from). This is safe because the cache is **entirely
+reconstructible**: nothing enters it except by download or
+extraction, so no payload in it is irreplaceable — losing it just
+means downloading or extracting it again.
 
-The **preflight identity check before any fetch** stands on its
-own — hashing the cached file against the media's pin, which
-catches both a version bump and a cross-project name collision
-without needing to know which it found. The on-mismatch message
-names both causes and points at `--media-dir`, the flag that
-isolates one project's media cache from another's.
+The **identity check Reliquary runs before any fetch** is
+justified on its own: it hashes the cached file against the
+media's pinned hash, which catches both a version bump and a
+name collision between two unrelated projects, without needing
+to know in advance which of the two it found. The message on a
+mismatch names both possible causes and points at `--media-dir`,
+the flag that keeps one project's media cache separate from
+another's.
 
-**Content addressing was weighed and declined twice.** An opaque
-hash-named cache cuts against "the cache is not a surface",
-and the pinned hash already makes a silent collision impossible —
-detection was never what name-keying lacked. It stays the
-recorded escalation if collision friction ever proves real.
+**Naming cached files by content hash instead of by media name
+was considered and declined, twice.** An opaque hash-named cache
+would work against the principle that the cache is internal
+implementation detail, not one of Reliquary's public surfaces —
+and it wouldn't even buy anything: the pinned hash already makes
+a silent collision impossible, so detecting collisions was never
+something name-keying lacked. Content addressing stays on record
+as the fallback to switch to, if two unrelated media sharing one
+name ever turns out to be enough of a real problem in practice to
+justify the change.
 
-### The command family
+### The media cache commands
 
-Each has an API twin (P6):
+Each of these has a matching API call (P6):
 
-- **`clean-media`** — blunt reclamation; everything goes, since
-  everything here can be got again. Skips payloads attached to a
-  running machine.
-- **`clean-media <name>`** — targeted eviction.
-- **`prune-media`** — attachment-closure prune: keep what the
-  scope's machines and blueprints actually need, drop the rest.
-  Scope-relative, with `--dry-run`.
+- **`clean-media`** — deletes everything in the cache, since
+  anything in it can always be downloaded or extracted again.
+  Skips any payload currently attached to a running machine.
+- **`clean-media <name>`** — deletes just the one named payload.
+- **`prune-media`** — keeps whatever the current scope's machines
+  and blueprints actually need — including anything they need
+  indirectly, through a containment chain — and deletes the rest.
+  Applies to one scope at a time, and supports `--dry-run`.
 
 `add-media <name> <file>` is **not** in this family: it authors
 a media declaration for a file already on disk, computing its
@@ -753,14 +820,14 @@ here because the model depends on it.
   read-only `use` attaches the shared `cache/media/<name>`
   payload, the local file, or the directory **directly**, with no
   per-machine copy.
-- **`new` is ephemeral.** A blank lives only in the disposable
-  machine; destroying it loses the image unless
-  `export-drive <key> <destination>` took it out first — durable
-  artifacts leave through the export door (P1). The build-and-keep
-  loop for a bootable floppy needs no new concept: `new` blank →
-  a run makes it bootable → export → reference the exported
-  `.img` as a local media (`use` + `read-only`, or
-  `difference`).
+- **`new` is temporary.** A blank image lives only inside the
+  disposable machine; destroying the machine loses the image
+  unless `export-drive <key> <destination>` already copied it out
+  — `export-drive` is the only way a durable artifact leaves a
+  machine (P1). The build-and-keep loop for a bootable floppy
+  needs no new concept: `new` blank → a run makes it bootable →
+  export → reference the exported `.img` as a local media
+  (`use` + `read-only`, or `difference`).
 - **Medium compatibility** is checked at resolution and fails
   closed naming media and slot: a directory on a cdrom, a `new`
   size onto a cdrom, an ISO into an `hdd` slot.
@@ -802,12 +869,13 @@ here because the model depends on it.
 ]
 ```
 
-Every child is a media. Names derive from stems —
-`FD14-LiveCD`, `FD14LIVE`, `FDBOOT`, `FDSTD01`… — and the bare
-strings under the floppy edition are paths. Only the one remote
-rung carries a `sha256`. The machine here is a *user's* pinned
-vintage, which is exactly where version-bound names belong; the
-codex's own entries are generic (D21).
+Every child is a media. Their names are derived from filename
+stems — `FD14-LiveCD`, `FD14LIVE`, `FDBOOT`, `FDSTD01`… — and the
+bare strings under the floppy edition are paths, not names. Only
+the one remote location carries a `sha256`. The machine here
+belongs to a user's own pinned version of FreeDOS, which is
+exactly where a version-specific name like `freedos-1.4` belongs;
+the codex's own built-in entries stay generic (D21).
 
 ### 2 — an overlay over another media
 
@@ -826,12 +894,14 @@ The bare `${media:golden}` — no path — is the parent's own
 bytes. A local location leaves the hash optional, so `golden`
 may keep evolving.
 
-### 3 — pinned but unlocated, and the two supply seams
+### 3 — pinned but unlocated, and the two ways to supply the file
 
-A media may pin a `sha256` with a location nothing supplies yet:
-the licensed, non-redistributable case (U4). Resolution fails
-closed naming the media, and there are two ways to supply it —
-neither of which edits the shipped spec's identity.
+A media may pin a `sha256` while its location has nothing to
+supply yet — the case of a licensed, non-redistributable payload
+that Reliquary can't fetch on your behalf (U4). Resolution fails
+closed, naming the media, and there are two ways to supply the
+missing file — neither one changes the identity of the shipped
+spec.
 
 ```json5
 // shipped: pinned, located by property
@@ -842,12 +912,16 @@ neither of which edits the shipped spec's identity.
 ]
 ```
 
-In a **project or CI**, the property supplies the path — the
-hermetic seam, since the committed hash still determines the
-input. At the **home CLI**, `add-media windows-install-cd
-D:/isos/en_windows.iso` resolves it by cache hit against the
-pin. Editing your seeded copy is always the third option, and
-that is the point of seeding.
+In a **project or CI**, a property supplies the path. This keeps
+the build reproducible: the committed hash still determines
+exactly what input gets accepted, no matter what file ends up at
+that path. At the **home CLI**, running
+`add-media windows-install-cd D:/isos/en_windows.iso` supplies
+the file, and Reliquary accepts it once its hash is a match
+against the pinned `sha256`. Editing your own seeded copy of the
+blueprint directly is always a third option too — and letting you
+do exactly that is the whole reason a blueprint is seeded as an
+editable copy in the first place.
 
 ## Format stability: none, yet
 
@@ -870,16 +944,20 @@ There is deliberately no version field. Versioning is
 compatibility machinery, and the blueprint carries none until a real
 second format version exists — no earlier than 1.0.
 
-For the same reason a blueprint carries no `$schema` field: a
-document pinning the schema it was written against is a version
-field in disguise, and pre-1.0 a document has no format vintage —
-the only schema that matters is the installed Reliquary's, which
-editors bind by file association (tracking the installation, where
-an embedded pin would go stale and let the editor pass what
-Reliquary rejects). When versioning arrives, no earlier than 1.0,
-`$schema` as a versioned URL is the leading candidate spelling of
-the version field (planning/DECISIONS.md "Open questions" (was "Decisions still
-needed").
+For the same reason, a blueprint carries no `$schema` field
+either: a document that pins the schema it was written against is
+really just a version field wearing a different name, and before
+1.0 a document has no format version to pin in the first place.
+The only schema that actually matters is the one belonging to the
+Reliquary installation that will read the document, and editors
+already bind to that by file association — which tracks the
+installed version automatically, where an embedded schema pin
+would instead go stale over time and let the editor accept
+documents Reliquary itself would reject. When versioning does
+arrive, no earlier than 1.0, `$schema` as a versioned URL is the
+leading candidate for what the version field will look like
+(planning/DECISIONS.md, "Open questions", formerly "Decisions
+still needed").
 
 The blueprint's value model is ordinary JSON data — there is no
 YAML form, and none is planned. Because a blueprint is a document
@@ -890,84 +968,101 @@ comments, trailing commas, unquoted keys, single-quoted strings,
 hexadecimal and signed numbers, and the other JSON5 productions.
 `NaN`, `Infinity`, and `-Infinity` are refused so the parsed
 value tree stays ordinary JSON. Comments are the author's margin
-notes — a seeded built-in blueprint uses them to point out its
-customization seams (U5) — and carry no meaning: Reliquary never
-reads them, and nothing normative may live in one; anything the
-contract needs is a field. A blueprint written as strict JSON
+notes — a seeded built-in blueprint uses them to mark the places
+you're meant to customize it, its
+[customization seams](../blueprint-guide.md#customization-seams)
+(U5) — and they carry no meaning to Reliquary: it never reads
+them, and nothing that affects behavior may live in one; anything
+the format actually needs is a field, not a comment. A blueprint
+written as strict JSON
 remains valid JSON5; one that uses JSON5 syntax is not parseable
 by strict JSON tooling — a deliberate trade. Machine-written
 documents are different: the state — and every other file
 Reliquary writes — is strict canonical JSON, always.
 
-The format's growth rule is likewise decided ahead of the
-growth (planning/DECISIONS.md, 2026-07-23). Computational
-expansion is an anticipated pressure — variant expansion,
-member itemization, derived values — and one line governs it:
-**a construct that enriches values may land as data;
-computation that decides structure never enters the tree.** A
-bounded, purpose-built declarative construct (a member glob, a
-variant matrix) may be added when it earns its keep, expanded
-by Reliquary, never by an author-side expression. General
-computation — arithmetic, conditionals, string interpolation,
-user logic of any kind — is a layer switch, not a tree
-extension: it would arrive only as a layer that *produces*
-plain blueprints, either generation above (the embedding API is
-computation's designated home, the same principle the script
-language records as G2) or a JSON-superset evaluation layer
-emitting the format documented here — leaving parsing,
-validation, and resolution unchanged underneath. In-tree
-function objects and string templating are permanently
-rejected.
+The rule for how the format is allowed to grow was decided
+before that growth pressure actually arrives (planning/DECISIONS.md,
+2026-07-23). Reliquary expects pressure to add computation to the
+format over time — expanding a set of variants, itemizing the
+members of something, deriving one value from another — and one
+rule governs all of it: **a construct that adds more data for
+Reliquary to work with may be added to the format; computation
+that decides the shape of the document itself never may.** A
+bounded, purpose-built declarative construct — something like a
+member glob or a variant matrix — may be added once it has earned
+its place, but it is always expanded by Reliquary itself, never
+evaluated by something the author wrote. General-purpose
+computation — arithmetic, conditionals, string interpolation, or
+user-written logic of any kind — cannot be added to the format at
+all; wanting it is a signal to move to a separate layer, not to
+extend the document tree. That layer would only ever *produce*
+plain blueprints as its output — either code written above the
+format (the embedding API is where computation belongs, the same
+rule the scripting language follows as G2), or a separate
+evaluation step that reads some JSON-superset input and writes
+out the format documented here, leaving the blueprint's own
+parsing, validation, and resolution completely unchanged.
+Functions embedded in the document, and string templating, are
+permanently ruled out.
 
-The tree rule has a twin governing the *strings*, because a
-format of this kind dies from the inside as readily as from the
-top (planning/DECISIONS.md, D26): **the `${…}` reference body is
-closed, and operations are closed while namespaces are open.**
-The body is one of exactly two productions — a qualified
-`qualifier:media-name[/path]`, or a dotted property key — and
-neither has a position an operator could occupy. No operator
-ever joins them: no defaults, no filters or pipes, no calls, no
-indexing, no arithmetic, no comparison, no nesting, no second
-escape.
+The rule above governs the document's tree structure. A twin rule
+governs the *strings* inside it, because a format like this can
+be undermined just as easily by what's allowed inside one
+reference string as by what's allowed in the tree
+(planning/DECISIONS.md, D26): **the `${…}` reference body is
+closed, permanently — new namespaces may be added to it, but no
+new operation ever may.** The body must be one of exactly two
+productions — a qualified `qualifier:media-name[/path]`, or a
+dotted property key — and neither one has a position an operator
+could occupy. No operator ever joins them: no defaults, no
+filters or pipes, no calls, no indexing, no arithmetic, no
+comparison, no nesting, no second escape character.
 
-Two tests apply in order, and both are needed (D27). The
-character class `[A-Za-z0-9._:/-]` is the **first screen** —
-every character in it is load-bearing already (`:` separates the
-qualifier, `/` the containment path, `.` the property dot-path,
-`_` and `-` the media-name charter), so anything reaching for
-`|`, `(`, `[`, `?`, `=`, or whitespace is rejected on sight. The
-**productions decide** the rest, which matters because an
-operator can be assembled from legal characters: `${mem:-512M}`
-passes the class and is still refused, the text before the first
-colon being the qualifier and `mem` not being one. A proposal
-that fails either test is a layer switch, not a grammar
-extension.
+Two tests apply, in order, and both are necessary (D27). The
+character class `[A-Za-z0-9._:/-]` is the **first screen**: every
+character allowed in it is already doing real work (`:` separates
+the qualifier, `/` the containment path, `.` the property
+dot-path, and `_` and `-` come from the media-name charter), so
+anything reaching for `|`, `(`, `[`, `?`, `=`, or whitespace is
+rejected immediately. **The two productions decide the rest**,
+and this second test matters because an operator can be built
+entirely out of legal characters: `${mem:-512M}` passes the
+character class and is still refused, because the text before its
+first colon is read as the qualifier, and `mem` is not a
+recognized one. A proposal for something new that fails either
+test is a signal to build a separate layer, not to extend this
+grammar.
 
-What stays open is new *qualifiers* (`env:`, `file:`,
-`machine:`, `script:`, `landmark:`, `secret:` are reserved): a
-qualifier names a namespace to look in, never an operation to
-perform, and adds no position an operator could take.
+What can still be added is new *qualifiers* — `env:`, `file:`,
+`machine:`, `script:`, `landmark:`, and `secret:` are already
+reserved for future use. A qualifier only names a namespace to
+look values up in; it never performs an operation, and adding one
+never creates a position an operator could occupy.
 
 ### When a request arrives
 
-The standing answer is not "no." An author writes: *"CI needs
-2G, my laptop 512M — let `memory` take `${mem:-512M}` so an
-unset property still boots."* The answer is **that already
-works, one channel over.** A default is not missing from
-Reliquary; it lives in the property channel, which is built to
-have exactly this argument — the project's properties file gives
-CI its 2G, the user file gives the laptop its 512M, and the
-blueprint says `${mem}` and needs no fallback at all. Where a
-value must survive an unset property, that is a question about
-property sources and their precedence
-([script-properties.md](script-properties.md), the repeatable
-`default=` candidates), answered where defaults already live.
+The standing answer to a request like this is not "no." Picture
+an author writing: *"CI needs 2G, my laptop needs 512M — let
+`memory` take `${mem:-512M}` so it still boots when the property
+is unset."* The real answer is **that this already works, just
+through a different channel.** Reliquary is not missing a way to
+set a default; it already has one, in the property channel, which
+exists specifically to handle exactly this situation — the
+project's properties file gives CI its 2G, the user's own file
+gives their laptop its 512M, and the blueprint itself just says
+`${mem}` and needs no fallback written into it at all. Where a
+value truly must survive an unset property, that's a question
+about which property sources take precedence over which
+([script-properties.md](script-properties.md) covers the
+repeatable `default=` candidates), and it's answered there, where
+defaults already live.
 
-This is the shape of nearly every such request. The feature is
-not absent from the project; it is present in another channel
-and has been addressed to the grammar because the grammar is the
-surface the author had open. The first move is always to find
-where it already lives.
+This is the shape of nearly every request like this. The feature
+being asked for is not missing from the project — it already
+exists, in a different channel, and it only got raised against
+the reference grammar because the grammar is the part of the
+format the author happened to have open when they hit the need.
+The first move is always to find where the feature already lives.
 
 The danger of simply agreeing is not the default itself but what
 the default makes sayable next. `${mem:-512M}` requires deciding
@@ -982,51 +1077,63 @@ is what the plain format was chosen to buy (U4, U5).
 
 ### When it is time for a layer
 
-Not a threshold — a conjunction. Volume is not a signal: a
-hundred requests for defaults and conditionals mean the property
-channel is under-documented, not that the ceiling is wrong. The
-signal is all four of these holding at once.
+This isn't a matter of crossing some threshold — it's a
+conjunction: all four of the following have to be true at once.
+Volume alone is not a signal: a hundred requests for defaults and
+conditionals mean the property channel needs better
+documentation, not that the format's ceiling is set wrong.
 
-1. **The need is structural, not value-shaped.** It asks *how
-   many specs exist*, or *which*, rather than what goes in a
-   field. Value-shaped needs always have an answer; structural
-   ones may not. Twelve near-identical blueprints differing only
-   in a localized ISO's URL and hash is structural.
-2. **It recurs across independent authors.** Not one project's
-   convenience — a shape two or more unrelated consumers hit, or
-   one the codex itself wants.
-3. **The declarative escape was tried and failed.** The ceiling
-   has its own growth route: a bounded construct that enriches
-   values, expanded by Reliquary. A variant matrix must be
-   designed against the real case first, and must either fail to
-   express it or turn into a language when specified. Skipping
-   this gate is how a layer gets adopted for a problem a
-   twenty-line construct would have solved.
-4. **Generation above fails for the user who has no project and
-   no language.** The embedding API can emit twelve blueprints
-   today, and P4 puts the generator and its output in the
-   consuming project's tree — so for the automating author (U4)
-   this gate is rarely passed. It is the *home* CLI user (U1,
-   U5), with no repository and no host language beyond the
-   shell, for whom both routes are genuinely poor. That user is
-   the layer's constituency, and the residency split predicts
-   it.
+1. **The need is about structure, not about what goes in a
+   value.** It asks *how many specs exist*, or *which ones*,
+   rather than what value to put in one field. A need shaped
+   around a value always has an answer already; a need shaped
+   around structure may not. Twelve near-identical blueprints that
+   differ only in one localized ISO's URL and hash is a structural
+   need.
+2. **It comes up again and again, from independent authors.**
+   Not just one project's convenience — a shape that two or more
+   unrelated people hit on their own, or one the codex itself
+   needs.
+3. **Solving it with a bounded declarative construct was tried,
+   and it failed.** The format's ceiling has its own way to grow:
+   a bounded construct that adds more data to work with, expanded
+   by Reliquary itself. A variant matrix has to be designed
+   against the real case first, and it has to either fail to
+   express that case, or turn into a full language once it's
+   fully specified. Skipping this step is how a whole new layer
+   ends up getting adopted for a problem a twenty-line construct
+   would have solved just fine.
+4. **Generating blueprints from code fails for the user who has
+   no project and no programming language to write that code in.**
+   The embedding API can already emit twelve blueprints today, and
+   P4 requires the generator and its output to live in the
+   consuming project's own tree — so for someone automating a
+   project (U4), this condition is rarely met; they already have a
+   good option. It's the *home* CLI user (U1, U5) — with no
+   repository and nothing beyond the shell to write code in — for
+   whom neither route works well. That's exactly the user this
+   layer would be built for, and it follows directly from where
+   blueprints live: the home directory exists for a person working
+   alone at a shell prompt, with neither a project to put a
+   generator in nor a language to write one in.
 
-With all four holding, the answer is an evaluation step: a
-`freedos.rlqb.jsonnet` producing an ordinary `freedos.rlqb`, as
-its own file kind. Argued and recorded under the
-surface-change rule when it happens — never pre-committed
-here, and never as a mode flag that makes the existing parser
-evaluate.
+When all four of those hold at once, the answer is an evaluation
+step: something like a `freedos.rlqb.jsonnet` file that produces
+an ordinary `freedos.rlqb`, as its own separate file kind. That
+step gets argued through and recorded under the surface-change
+rule when it actually happens — it is not pre-committed to here,
+and it would never take the form of a mode flag that makes the
+existing parser start evaluating things.
 
-When the layer switch does come, it arrives as a **separate file
-kind or an explicit step** — never as a widening of what `.rlqb`
-means. A document evaluated before it is read cannot be
-schema-validated or completed by an editor, and that cost would
-otherwise fall on every blueprint in the format, including the
-large majority wanting no computation at all. Plain `.rlqb`
-keeps its schema, its completion, and its strictness
-permanently.
+When this new layer does eventually arrive, it will take the form
+of a **separate file kind, or an explicit extra step** — never a
+widening of what `.rlqb` itself means. A document that has to be
+evaluated before it can even be read can't be checked against a
+schema or completed by an editor, and that cost would fall on
+every blueprint in the format if `.rlqb` grew this capability
+itself — including the large majority of blueprints that want no
+computation at all. Plain `.rlqb` keeps its schema, its editor
+completion, and its strictness, permanently.
 
 
 ## What this supersedes
@@ -1041,17 +1148,21 @@ permanently.
   7); until then they describe the implemented pre-composition
   surface.
 - The two published JSON Schemas collapse into **one** blueprint
-  schema with a two-variant root — machine requiring its declared
-  `type`, media accepting its absence. Its closed vocabularies
-  stay plain `enum`s and are **never widened to admit a reference
-  pattern**: that is what the reach trim buys, and the editor
-  completion it protects is the point.
-- **Parked:** the two candidate value-enriching constructs the
-  growth rule admits (above, "Format stability"), neither with a
-  case yet: a succinct extraction short-circuit for long itemized
-  child lists — wanted, not now, and never at the cost of static
-  names — and a variant matrix for near-identical blueprints
-  differing in a localized medium's location and hash. Each is
-  designed against the real case when one arrives, and argued
-  under the surface-change rule then; nothing here pre-commits
-  either.
+  schema with a two-variant root: the machine variant requires its
+  declared `type`, and the media variant accepts leaving `type`
+  out. Its closed vocabularies stay plain `enum`s and are **never
+  widened to accept a `${…}` reference in their place**: that is
+  exactly what excluding them from reach (above, "Reach: where a
+  reference may appear") is for — protecting the editor completion
+  a published schema gives you is the whole point.
+- **Parked, with no case yet to justify either one:** the two
+  candidate constructs the growth rule allows for (above, "Format
+  stability"). One is a compact shorthand for extracting many
+  children at once, instead of listing each one out the way the
+  worked example above lists `FDSTD01` through `FDSTD07` — wanted,
+  but not now, and never at the cost of requiring static, glob-free
+  names. The other is a variant matrix for near-identical
+  blueprints that differ only in one localized medium's location
+  and hash. Each will be designed against a real case once one
+  arrives, and argued through under the surface-change rule at
+  that point; nothing here commits to either one in advance.

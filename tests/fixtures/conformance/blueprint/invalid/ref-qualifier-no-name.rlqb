@@ -1,5 +1,5 @@
 // invalid: a qualifier with no name is a parse error
-// spec: Dispatch and degenerates
+// spec: Dispatch and edge cases
 // id: ref.media-without-name
 [
   { "type": "media", "name": "x", "location": "${media:}" }
