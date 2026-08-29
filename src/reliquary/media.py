@@ -101,7 +101,7 @@ def _attached_media(context=None):
         except (OSError, PreflightError):
             continue
         running = state.get("phase") == "running"
-        for drive in state.get("drives", {}).values():
+        for drive in state.get("devices", {}).values():
             name = drive.get("media")
             if name:
                 attached[name] = attached.get(name, False) or running

@@ -111,7 +111,7 @@ DOCUMENT = (
     '    "type": "machine",\n'
     '    // a comment, which must shift nothing below it\n'
     '    "name": "box",\n'
-    '    "drives": {\n'
+    '    "devices": {\n'
     '      "hdd0": { "media": "disk", "bogus": 1 }\n'
     '    },\n'
     '    "boot": ["hdd0", "cdrom0"]\n'
@@ -135,7 +135,7 @@ def test_the_value_is_the_same_value(located):
 
 def test_a_member_is_located_at_its_key(spec):
     assert json5reader.position_of(spec, "name") == (5, 5)
-    assert json5reader.position_of(spec, "drives") == (6, 5)
+    assert json5reader.position_of(spec, "devices") == (6, 5)
 
 
 def test_every_recorded_position_lands_on_its_own_key(located, spec):
@@ -163,7 +163,7 @@ def test_every_recorded_position_lands_on_its_own_key(located, spec):
 
 
 def test_a_nested_member_is_located(spec):
-    drive = spec["drives"]["hdd0"]
+    drive = spec["devices"]["hdd0"]
     assert json5reader.position_of(drive, "bogus") == (7, 34)
 
 

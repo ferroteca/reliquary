@@ -55,7 +55,7 @@ def new_blueprint(name, *, platform="dos", context=None):
             "name": name,
             "platform": platform,
             "memory": 16 if platform == "dos" else 64,
-            "drives": {"hdd0": "blank-256m"},
+            "devices": {"hdd0": "blank-256m"},
         },
         {
             "type": "media",

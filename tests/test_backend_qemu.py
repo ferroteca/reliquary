@@ -399,6 +399,16 @@ def test_network_nat_renders_a_user_mode_netdev():
                     "-device", "pcnet,netdev=net0,id=net0"]
 
 
+def test_network_model_ne2k_renders_the_isa_variant():
+    # D122: an explicit model override selects the QEMU device model
+    # directly, bypassing the platform default.
+    network = {"net0": {"attachment": "nat", "interface": None,
+                        "model": "ne2k"}}
+    args = qemu_module.network_args(network)
+    assert args == ["-netdev", "user,id=net0",
+                    "-device", "ne2k_isa,netdev=net0,id=net0"]
+
+
 def test_network_bridged_with_an_interface_names_it():
     network = {"net0": {"attachment": "bridged", "interface": "eth0",
                         "model": "pcnet"}}
@@ -468,7 +478,7 @@ def test_start_asks_for_the_binary_its_platform_needs(root):
     state = {
         "id": "openbsd-0", "backend-id": "reliquary-openbsd-0",
         "platform": "openbsd", "memory": 512, "boot": ["hdd0"],
-        "drives": {"hdd0": {"medium": "hdd", "slot": 0,
+        "devices": {"hdd0": {"medium": "hdd", "slot": 0,
                             "path": _image(root, "disk.qcow2")}},
     }
     with mock.patch.object(qemu_module, "_find_qemu_tool",
@@ -485,7 +495,7 @@ def test_start_renders_the_state_and_launches_it(root):
     state = {
         "id": "plain-0", "backend-id": "reliquary-plain-0",
         "memory": 32, "boot": ["cdrom0"],
-        "drives": {"cdrom0": {"medium": "cdrom", "slot": 0,
+        "devices": {"cdrom0": {"medium": "cdrom", "slot": 0,
                               "path": _image(root, "live.iso")}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
@@ -548,8 +558,8 @@ def test_the_key_shapes_are_checked(section, rule):
 #: over all arguments.
 _OWNED_ARGUMENTS = {
     "-m": "memory", "-smp": "cpus", "-boot": "boot",
-    "-drive": "drives", "-hda": "drives", "-fda": "drives",
-    "-cdrom": "drives", "-machine": "machine", "-M": "machine",
+    "-drive": "devices", "-hda": "devices", "-fda": "devices",
+    "-cdrom": "devices", "-machine": "machine", "-M": "machine",
     "-name": "identity", "-uuid": "identity",
     "-qmp": "control channel", "-display": "display",
     "-nographic": "display",
@@ -593,14 +603,14 @@ def test_a_per_drive_option_reaches_a_drive_through_set(args):
     "drive.hdd0.index=3",
     "drive.floppy0.id=x",
 ], ids=["file", "if", "media", "index", "id"])
-def test_set_on_a_rendered_drive_property_is_refused_naming_drives(target):
-    # `-drive` is refused because `drives` renders it; `-set` reaching
+def test_set_on_a_rendered_drive_property_is_refused_naming_devices(target):
+    # `-drive` is refused because `devices` renders it; `-set` reaching
     # the same property is the same second source for one fact
     for args in (["-set", target], [f"-set {target}"]):
         with pytest.raises(StaticError) as caught:
             qemu_module.settings_args({"args": args})
         assert caught.value.rule_id == "machine.settings-reserved-argument"
-        assert "drives" in str(caught.value)
+        assert "devices" in str(caught.value)
 
 
 def test_the_hatch_still_passes_a_device_and_a_cpu_model():
@@ -631,7 +641,7 @@ def test_start_renders_this_backends_section_last():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "hatch-0", "backend-id": "reliquary-hatch-0",
-        "memory": 32, "boot": [], "drives": {},
+        "memory": 32, "boot": [], "devices": {},
         "backend-settings": {
             "qemu": {"machine": "pc", "args": ["-cpu", "486"]},
             # Another backend's section is inert, and reading it
@@ -654,7 +664,7 @@ def test_pointing_device_tablet_renders_the_usb_device():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "tab-0", "backend-id": "reliquary-tab-0", "memory": 32,
-        "boot": [], "drives": {}, "pointing-device": "tablet",
+        "boot": [], "devices": {}, "pointing-device": "tablet",
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -668,7 +678,7 @@ def test_pointing_device_mouse_renders_nothing_extra():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "mouse-0", "backend-id": "reliquary-mouse-0", "memory": 32,
-        "boot": [], "drives": {}, "pointing-device": "mouse",
+        "boot": [], "devices": {}, "pointing-device": "mouse",
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -726,7 +736,7 @@ def test_the_qemu_adapter_reports_the_pointing_devices_it_renders():
 
 def test_the_qemu_adapter_reports_the_network_devices_it_renders():
     report = qemu_module.QemuAdapter().capabilities()
-    assert report.network_models == ("pcnet",)
+    assert report.network_models == ("pcnet", "ne2k")
     assert report.network_attachments == ("nat", "bridged")
 
 
@@ -956,7 +966,7 @@ def test_start_serves_vnc_when_named_and_the_first_plane_drives(
     """
     adapter = qemu_module.QemuAdapter()
     state = {"id": "plain-0", "backend-id": "reliquary-plain-0",
-             "memory": 32, "boot": [], "drives": {}}
+             "memory": 32, "boot": [], "devices": {}}
     if planes is not None:
         state["control-planes"] = planes
     launched = {"backend": "qemu", "backend-id": "reliquary-plain-0",

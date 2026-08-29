@@ -95,7 +95,7 @@ class _Dry:
         """A machine touching every materialization path at once."""
         return {
             "platform": "dos",
-            "drives": {
+            "devices": {
                 "hdd0": {"type": "media", "size": "20M"},
                 "cdrom0": "livecd",
                 "floppy0": "tools",
@@ -236,9 +236,9 @@ def test_the_plan_is_what_the_create_writes(dry):
     assert plan["boot"] == state["boot"]
     assert plan["control-planes"] == state["control-planes"]
 
-    predicted = {drive["key"]: drive for drive in plan["drives"]}
-    assert sorted(predicted) == sorted(state["drives"])
-    for key, built in state["drives"].items():
+    predicted = {drive["key"]: drive for drive in plan["devices"]}
+    assert sorted(predicted) == sorted(state["devices"])
+    for key, built in state["devices"].items():
         for field in ("medium", "slot", "controller", "media",
                       "materialize", "size", "path"):
             if field not in built:
@@ -294,7 +294,7 @@ def test_a_missing_local_payload_refuses_naming_every_one(dry):
     away = os.path.join(dry.home, "away.img")
     dry.write("demo", {
         "platform": "dos",
-        "drives": {"hdd0": "one", "floppy0": "two"},
+        "devices": {"hdd0": "one", "floppy0": "two"},
     }, [
         {"name": "one", "materialize": "use",
          "location": {"local": gone}},
@@ -314,7 +314,7 @@ def test_a_missing_local_payload_refuses_naming_every_one(dry):
 def test_a_container_child_names_the_download_behind_it(dry):
     dry.write("demo", {
         "platform": "dos",
-        "drives": {"cdrom0": "inner"},
+        "devices": {"cdrom0": "inner"},
     }, [
         {"name": "outer", "sha256": "1" * 64,
          "location": "https://example.invalid/bundle.zip",
@@ -335,7 +335,7 @@ def test_a_cached_container_hides_the_download_behind_it(dry):
     # container either.
     dry.write("demo", {
         "platform": "dos",
-        "drives": {"cdrom0": "inner"},
+        "devices": {"cdrom0": "inner"},
     }, [
         {"name": "outer", "sha256": "1" * 64,
          "location": "https://example.invalid/bundle.zip",
@@ -353,7 +353,7 @@ def test_a_cached_container_hides_the_download_behind_it(dry):
 
 # A location nothing answers is reported, never asked for.
 
-_VENDOR_MACHINE = {"platform": "dos", "drives": {"cdrom0": "vendor"}}
+_VENDOR_MACHINE = {"platform": "dos", "devices": {"cdrom0": "vendor"}}
 _VENDOR_MEDIA = [{"name": "vendor", "materialize": "use",
                   "read-only": True, "location": "${license-iso}"}]
 
@@ -694,7 +694,7 @@ def test_with_a_machine_media_slots_are_preflighted(tmp_path):
         machines.resolve_machine.return_value = "plain-0"
         machines.load_machine_state.return_value = {
             "scripts": {},
-            "drives": {"hdd0": {"medium": "hdd"}},
+            "devices": {"hdd0": {"medium": "hdd"}},
         }
         with pytest.raises(PreflightError) as caught:
             _dry_script("use-cd", machine="plain-0", context=home)

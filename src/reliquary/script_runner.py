@@ -968,7 +968,7 @@ class _ScriptEngine:
                                              self._context)
         if scope.head == "boot":
             return tuple(state.get("boot") or ())
-        drive = (state.get("drives") or {}).get(
+        drive = (state.get("devices") or {}).get(
             scope.action.arguments[0]) or {}
         return (drive.get("media"), drive.get("path"))
 
@@ -1089,7 +1089,7 @@ class _ScriptEngine:
         media, path = captured
         state = _machines.load_machine_state(self._machine_id,
                                              self._context)
-        drive = (state.get("drives") or {}).get(slot) or {}
+        drive = (state.get("devices") or {}).get(slot) or {}
         if drive.get("path") is not None:
             _machines.eject_media(self._machine_id, slot,
                                   context=self._context)
@@ -2483,7 +2483,7 @@ def _preflight_machine_rules(script, machine_state, script_path,
     separately from media's, since a script that names no font never
     has to resolve one.
     """
-    drives = machine_state.get("drives", {})
+    devices = machine_state.get("devices", {})
     namespace = None
     font_namespace = None
     for statement in _walk(script):
@@ -2511,12 +2511,16 @@ def _preflight_machine_rules(script, machine_state, script_path,
         else:
             continue
         for slot in slots:
-            drive = drives.get(slot)
+            drive = devices.get(slot)
             if drive is None:
                 raise ScriptPreflightError(
                     f"the machine declares no drive {slot}",
                     statement=statement, path=script_path,
                     rule_id="machine.slot-not-declared")
+            if "medium" not in drive:
+                raise ScriptPreflightError(
+                    f"{slot} is not a drive slot", statement=statement,
+                    path=script_path, rule_id="machine.slot-not-declared")
             if (removable_only
                     and drive.get("medium") not in _REMOVABLE_MEDIA):
                 raise ScriptPreflightError(

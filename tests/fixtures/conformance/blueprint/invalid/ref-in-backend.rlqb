@@ -4,5 +4,5 @@
 // id: ref.not-allowed-here
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "backend": "${host.backend}", "drives": { "cdrom0": null } }
+    "backend": "${host.backend}", "devices": { "cdrom0": null } }
 ]

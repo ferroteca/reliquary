@@ -64,7 +64,7 @@ own path (see above). Add a `floppy0` drive whose media is a host
 directory before running the script:
 
 ```json
-"drives": {
+"devices": {
   "floppy0": {
     "type": "media",
     "location": "./font-exchange",

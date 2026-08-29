@@ -1,11 +1,14 @@
-// valid: network is a slot-keyed attachment map, bare string or an
-//        object adding interface for bridged only (D120)
+// valid: net slots share the devices map with drives (D121); a NIC's
+//        value is a bare attachment string or an object adding
+//        interface for bridged only (D120) and an optional model
+//        override on either attachment (D122)
 // spec: Machine topology
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "network": {
+    "devices": {
+      "cdrom0": null,
       "net0": "nat",
-      "net1": { "attachment": "bridged", "interface": "eth0" }
-    },
-    "drives": { "cdrom0": null } }
+      "net1": { "attachment": "bridged", "interface": "eth0" },
+      "net2": { "attachment": "nat", "model": "ne2k" }
+    } }
 ]

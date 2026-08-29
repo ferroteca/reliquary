@@ -85,7 +85,7 @@ and one floppy drive, saved as `blueprints/msdos.rlqb`:
     "platform": "dos",
     "memory": "1M",
     "description": "A 1 MB MS-DOS box with one floppy drive",
-    "drives": {
+    "devices": {
       // Declared but empty: what goes in is a per-machine choice.
       "floppy0": null
     },
@@ -128,7 +128,7 @@ rather than a variant of the first:
     "platform": "dos",
     "memory": "16M",
     "description": "A 16 MB DOS box that boots from CD",
-    "drives": {
+    "devices": {
       "hdd0": { "type": "media", "size": "20M" },
       "cdrom0": null
     },
@@ -333,7 +333,7 @@ Reliquary's fixed-font recognizer. Nothing changes in the guest, so
 it is equally agentless — see `control-planes` in the
 [blueprint field reference](docs/blueprint-reference.md).
 
-Any DOS with a bootable image works. A machine's drives each name a
+Any DOS with a bootable image works. A machine's drive slots each name a
 **media** component, and that media component determines its own
 content — a blank `materialize: new` disk of a given `size`, a
 `difference`/`copy` over a payload, or a `use` attach (an ISO, or a
@@ -347,7 +347,7 @@ program's raw output as-is; interpreting it is left to the caller.
 
 1. **Describe the machine.** Write a `<name>.rlqb` blueprint (by hand,
    with `rlq new-blueprint`, or by seeding one from the codex) declaring
-   the platform, memory, and drives. Each drive names a **media**
+   the platform, memory, and devices. Each drive names a **media**
    component, and that media component decides how it is built
    (materialized) — a blank `new` disk, a `difference`/`copy` over a
    payload, or a `use` attach. To hand the guest its own files, the

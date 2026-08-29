@@ -224,7 +224,7 @@ def test_removing_a_controller_passes_the_name_as_two_tokens():
     with mock.patch.object(vbox, "find_vboxmanage",
                            return_value="VBoxManage"), \
             mock.patch("subprocess.run", side_effect=run):
-        vbox.configure_vm({"drives": {"hdd0": {"medium": "hdd"}}},
+        vbox.configure_vm({"devices": {"hdd0": {"medium": "hdd"}}},
                           "reliquary-plain-0")
 
     removal = next(c for c in calls
@@ -249,7 +249,7 @@ def _configure(network):
     with mock.patch.object(vbox, "find_vboxmanage",
                            return_value="VBoxManage"), \
             mock.patch("subprocess.run", side_effect=run):
-        vbox.configure_vm({"network": network}, "reliquary-plain-0")
+        vbox.configure_vm({"devices": network}, "reliquary-plain-0")
     return next(c for c in calls if c[1] == "modifyvm")
 
 
@@ -305,7 +305,7 @@ def test_hard_disks_take_the_ide_slots_before_cdroms():
     master, stranding the boot disk on the slave, where a PC BIOS
     told to boot `disk` stops at `No active partition`.
     """
-    state = {"drives": {
+    state = {"devices": {
         "cdrom0": {"medium": "cdrom"},
         "hdd0": {"medium": "hdd"},
     }}
@@ -321,7 +321,7 @@ def test_hard_disks_take_the_ide_slots_before_cdroms():
 
 
 def test_several_disks_keep_key_order_within_their_kind():
-    state = {"drives": {
+    state = {"devices": {
         "cdrom0": {"medium": "cdrom"},
         "hdd0": {"medium": "hdd"},
         "hdd1": {"medium": "hdd"},
@@ -365,7 +365,7 @@ def state(tmp_path):
         "memory": 32,
         "cpus": 1,
         "boot": ["hdd0"],
-        "drives": {
+        "devices": {
             "hdd0": {"medium": "hdd",
                      "path": str(tmp_path / "disk.vdi")},
         },

@@ -947,12 +947,12 @@ admit one. P25's bar is about the device or adapter concept being
 general, not about every backend honoring every value in a portable
 field's vocabulary today — `controller`'s `nvme` and `virtio` are
 portable while only one backend actually claims them, and are
-refused by capability check wherever they aren't. `network` (D120)
-sidesteps the question entirely for its own field: it names an
-attachment (`nat`/`bridged`), never a chipset, so nothing
-single-backend is ever authored there in the first place — the
-chipset is resolved per platform, the same way a drive's `controller`
-default is.
+refused by capability check wherever they aren't. A `net` device
+(D120) sidesteps the question entirely: it names an attachment
+(`nat`/`bridged`), never a chipset, so nothing single-backend is
+ever authored there in the first place — the chipset is resolved
+per platform, the same way a drive's `controller` default is.
+Drives and NICs share the model's one device map, `devices` (D121).
 
 Where a guest supports both control planes, the same test suites
 should validate agentless and guest-agent operation and expect

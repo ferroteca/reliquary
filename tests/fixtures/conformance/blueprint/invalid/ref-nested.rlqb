@@ -3,5 +3,5 @@
 // id: ref.malformed
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "memory": "${${which}}", "drives": { "cdrom0": null } }
+    "memory": "${${which}}", "devices": { "cdrom0": null } }
 ]

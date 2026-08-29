@@ -90,7 +90,7 @@ AT_PREFLIGHT = corpus.fixtures(
 #: `medium` its removability is read from. The fixtures name
 #: `cdrom7`, `hdd6` and the like precisely because nothing
 #: plausible declares them.
-MACHINE = {"drives": {"floppy0": {"medium": "floppy"},
+MACHINE = {"devices": {"floppy0": {"medium": "floppy"},
                       "cdrom0": {"medium": "cdrom"},
                       "hdd0": {"medium": "hdd"}}}
 

@@ -80,9 +80,10 @@ workflow:
     (`${…}`) is restricted to exactly two forms — a character class does a first screen, then the two
     productions decide — and references are refused in identity positions, in the dependency graph, and in
     fields with a closed set of allowed values. `document.py` validates the full set of machine fields:
-    `platform`, `backend`, `memory`, `cpus`, `drives` (a media name, `null`, `{media, controller, enabled}`, or
-    an inline media definition, including an anonymous blank one), `network` (an attachment name — `nat` or
-    `bridged` — or `{attachment, interface}`, D120), `boot`, `name` (the id-safe identity, not a
+    `platform`, `backend`, `memory`, `cpus`, `devices` (drives and NICs sharing one slot-keyed map, D121: a drive
+    value is a media name, `null`, `{media, controller, enabled}`, or an inline media definition, including an
+    anonymous blank one; a NIC value is an attachment name — `nat` or `bridged` — or `{attachment, interface,
+    model}`, D120/D122 — `model` overrides the platform-resolved chipset), `boot`, `name` (the id-safe identity, not a
     display label), `description`, `scripts`, `control-planes`, `pointing-device` (F66), `backend-settings`, and
     `parameters`.
   - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,
@@ -254,12 +255,13 @@ workflow:
     only needs the second one. `_set_adapter` is the test hook that lets tests substitute a fake adapter, the
     same way `credentials._set_provider` substitutes a fake keyring.
   - `backend_qemu.py` contains everything that's specific to QEMU: finding the QEMU binary, running `qemu-img`
-    for image work, rendering a machine's drives and boot order into QEMU arguments (the `pointing-device:
-    tablet` field renders as `-usb -device usb-tablet,id=pointer0`, F66), the `backend-settings.qemu` escape
+    for image work, rendering a machine's drives, NICs, and boot order into QEMU arguments (the `pointing-device:
+    tablet` field renders as `-usb -device usb-tablet,id=pointer0`, F66; `network_args` renders each `devices`
+    NIC entry into a `-netdev`/`-device` pair, D120/D121), the `backend-settings.qemu` escape
     hatch (`SETTINGS_KEYS` = `machine` / `args`; `RESERVED_ARGUMENTS` lists what a blueprint field or the VM
     identity already owns, checked case-sensitively — `-m` is memory and `-M` is the machine type, but
     deliberately not `-device` or `-cpu`; `RESERVED_DRIVE_PROPERTIES` similarly reserves the `-drive` properties
-    that `drives` already renders, and so also refuses them via `-set drive.<slot>.<property>` — QEMU addresses
+    that `devices` already renders, and so also refuses them via `-set drive.<slot>.<property>` — QEMU addresses
     each drive's own options through `id=<slot>`, which is why there's no separate drive-scoped settings section,
     D118; `settings_args` both validates and renders the settings, which is what makes a settings section that a
     `create` accepts the same one a `start` applies, and it renders last so a caller's own arguments appear at

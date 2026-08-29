@@ -116,7 +116,7 @@ def rig(tmp_path):
 
 def test_create_populates_the_machine_cache_directory(rig):
     machine_id = rig.create(
-        "freedos", {"platform": "dos", "drives": {"hdd0": "blank"}},
+        "freedos", {"platform": "dos", "devices": {"hdd0": "blank"}},
         media=[_BLANK])
     root = machine_dir_path(machine_id, rig.home)
     assert os.path.isfile(os.path.join(root, "machine.json"))
@@ -126,7 +126,7 @@ def test_create_populates_the_machine_cache_directory(rig):
 
 def test_state_records_bookkeeping_and_defaults(rig):
     machine_id = rig.create(
-        "freedos", {"platform": "dos", "drives": {"hdd0": "blank"},
+        "freedos", {"platform": "dos", "devices": {"hdd0": "blank"},
                     "description": "A description.",
                     "scripts": {"install": "install-script"}},
         media=[_BLANK])
@@ -160,44 +160,71 @@ def test_a_declared_pointing_device_is_resolved_into_state(rig):
 
 def test_a_nat_network_is_resolved_into_state(rig):
     machine_id = rig.create(
-        "nat-rig", {"platform": "dos", "network": {"net0": "nat"}})
-    assert rig.state(machine_id)["network"] == {
+        "nat-rig", {"platform": "dos", "devices": {"net0": "nat"}})
+    assert rig.state(machine_id)["devices"] == {
         "net0": {"attachment": "nat", "interface": None, "model": "pcnet"}}
 
 
 def test_a_bridged_network_with_an_explicit_interface_is_resolved(rig):
     machine_id = rig.create(
-        "bridge-rig", {"platform": "dos", "network": {
+        "bridge-rig", {"platform": "dos", "devices": {
             "net0": {"attachment": "bridged", "interface": "eth0"}}})
-    assert rig.state(machine_id)["network"]["net0"] == {
+    assert rig.state(machine_id)["devices"]["net0"] == {
         "attachment": "bridged", "interface": "eth0", "model": "pcnet"}
 
 
 def test_a_machine_with_no_network_declares_none(rig):
     machine_id = rig.create("no-net-rig", {"platform": "dos"})
-    assert rig.state(machine_id)["network"] == {}
+    assert rig.state(machine_id)["devices"] == {}
 
 
 def test_a_bridged_interface_property_from_an_explicit_value(rig):
-    rig.write("prop-net", {"platform": "dos", "network": {
+    rig.write("prop-net", {"platform": "dos", "devices": {
         "net0": {"attachment": "bridged", "interface": "${host-nic}"}}})
     machine_id = create_machine(
         "prop-net", context=rig.home, properties={"host-nic": "eth0"})
-    entry = rig.state(machine_id)["network"]["net0"]
+    entry = rig.state(machine_id)["devices"]["net0"]
     assert entry["interface"] == "eth0"
     # The recorded interface is concrete: no ${...} survives.
     assert "${" not in json.dumps(entry)
 
 
 def test_an_unbound_bridged_interface_property_is_asked(rig):
-    rig.write("needy-net", {"platform": "dos", "network": {
+    rig.write("needy-net", {"platform": "dos", "devices": {
         "net0": {"attachment": "bridged", "interface": "${host-nic}"}}})
     asker = mock.Mock(return_value="eth0")
     with mock.patch("reliquary.binding.console_asker", return_value=asker):
         create_machine("needy-net", context=rig.home)
     asker.assert_called_once_with("host-nic", "host-nic", False)
-    entry = rig.state("needy-net-0")["network"]["net0"]
+    entry = rig.state("needy-net-0")["devices"]["net0"]
     assert entry["interface"] == "eth0"
+
+
+def test_an_explicit_model_overrides_the_platform_default(rig):
+    machine_id = rig.create(
+        "ne2k-rig", {"platform": "dos", "devices": {
+            "net0": {"attachment": "nat", "model": "ne2k"}}})
+    assert rig.state(machine_id)["devices"]["net0"]["model"] == "ne2k"
+
+
+def test_an_omitted_model_still_gets_the_platform_default(rig):
+    machine_id = rig.create(
+        "default-model-rig", {"platform": "dos", "devices": {"net0": "nat"}})
+    assert rig.state(machine_id)["devices"]["net0"]["model"] == "pcnet"
+
+
+def test_a_network_model_the_backend_cant_provide_is_refused(tmp_path):
+    report = Capabilities(
+        backend="qemu", control_planes=("agentless-display",),
+        media=("floppy", "hdd", "cdrom"), controllers=("ide",),
+        materialize=("new", "difference", "copy", "use"),
+        network_models=("pcnet",), network_attachments=("nat", "bridged"))
+    with fake_backend.installed(capabilities=report) as backend:
+        rig = _Rig(str(tmp_path), backend)
+        with pytest.raises(PreflightError) as caught:
+            rig.create("no-ne2k", {"platform": "dos", "devices": {
+                "net0": {"attachment": "nat", "model": "ne2k"}}})
+        assert "network device 'ne2k'" in str(caught.value)
 
 
 def test_a_network_attachment_the_backend_cant_provide_is_refused(tmp_path):
@@ -209,18 +236,18 @@ def test_a_network_attachment_the_backend_cant_provide_is_refused(tmp_path):
     with fake_backend.installed(capabilities=report) as backend:
         rig = _Rig(str(tmp_path), backend)
         with pytest.raises(PreflightError) as caught:
-            rig.create("no-bridge", {"platform": "dos", "network": {
+            rig.create("no-bridge", {"platform": "dos", "devices": {
                 "net0": "bridged"}})
         assert "network attachment 'bridged'" in str(caught.value)
 
 
 def test_apply_resolves_a_newly_declared_network(rig):
     machine_id = rig.create("net-apply", {"platform": "dos"})
-    assert rig.state(machine_id)["network"] == {}
+    assert rig.state(machine_id)["devices"] == {}
     rig.write("net-apply", {"platform": "dos",
-                            "network": {"net0": "nat"}})
+                            "devices": {"net0": "nat"}})
     apply_blueprint(machine=machine_id, context=rig.home)
-    assert rig.state(machine_id)["network"]["net0"]["attachment"] == "nat"
+    assert rig.state(machine_id)["devices"]["net0"]["attachment"] == "nat"
 
 
 def test_optional_fields_absent(rig):
@@ -229,13 +256,13 @@ def test_optional_fields_absent(rig):
     assert state["memory"] == 16
     assert state["description"] is None
     assert "scripts" not in state
-    assert state["drives"] == {}
+    assert state["devices"] == {}
     assert state["boot"] == []
 
 
 def test_new_media_creates_qcow2_image(rig):
     rig.write("sized", {"platform": "dos",
-                        "drives": {"hdd0": "blank", "floppy1": "boot"}},
+                        "devices": {"hdd0": "blank", "floppy1": "boot"}},
               media=[_BLANK,
                      {"name": "boot", "materialize": "new",
                       "size": "720K"}])
@@ -246,25 +273,25 @@ def test_new_media_creates_qcow2_image(rig):
     assert rig.images() == [("blank.qcow2", "new", "20M"),
                             ("boot.qcow2", "new", "720K")]
     state = rig.state(machine_id)
-    assert state["drives"]["hdd0"]["size"] == "20M"
-    assert state["drives"]["hdd0"]["materialize"] == "new"
+    assert state["devices"]["hdd0"]["size"] == "20M"
+    assert state["devices"]["hdd0"]["materialize"] == "new"
 
 
 def test_use_media_attaches_the_payload_path(rig):
     machine_id = rig.create(
         "with-media", {"platform": "dos",
-                       "drives": {"hdd0": "blank",
+                       "devices": {"hdd0": "blank",
                                   "cdrom0": "freedos-livecd"},
                        "boot": ["cdrom0", "hdd0"]},
         media=[_BLANK, rig.livecd()])
-    cdrom = rig.state(machine_id)["drives"]["cdrom0"]
+    cdrom = rig.state(machine_id)["devices"]["cdrom0"]
     assert cdrom["media"] == "freedos-livecd"
     assert cdrom["materialize"] == "use"
     assert os.path.normpath(cdrom["path"]) == os.path.normpath(rig.iso_path)
 
 
 def test_difference_media_materializes_an_overlay(rig):
-    rig.write("based", {"platform": "dos", "drives": {"hdd0": "base"}},
+    rig.write("based", {"platform": "dos", "devices": {"hdd0": "base"}},
               media=[{"name": "base", "materialize": "difference",
                       "location": {"local": rig.iso_path}}])
     machine_id = create_machine("based", context=rig.home)
@@ -272,34 +299,34 @@ def test_difference_media_materializes_an_overlay(rig):
     assert os.path.basename(path) == "base.qcow2"
     assert mode == "difference"
     assert base == rig.iso_path
-    assert rig.state(machine_id)["drives"]["hdd0"]["materialize"] == (
+    assert rig.state(machine_id)["devices"]["hdd0"]["materialize"] == (
         "difference")
 
 
 def test_copy_media_materializes_a_duplicate(rig):
-    rig.write("dup", {"platform": "dos", "drives": {"hdd0": "base"}},
+    rig.write("dup", {"platform": "dos", "devices": {"hdd0": "base"}},
               media=[{"name": "base", "materialize": "copy",
                       "location": {"local": rig.iso_path}}])
     machine_id = create_machine("dup", context=rig.home)
     assert [mode for _p, mode, _s, _b in rig.backend.images] == ["copy"]
-    assert rig.state(machine_id)["drives"]["hdd0"]["materialize"] == "copy"
+    assert rig.state(machine_id)["devices"]["hdd0"]["materialize"] == "copy"
 
 
 def test_directory_source_media_attaches_the_directory(rig):
     work = rig.path("work")
     os.makedirs(work)
     machine_id = rig.create(
-        "hd", {"platform": "dos", "drives": {"hdd0": "shared"}},
+        "hd", {"platform": "dos", "devices": {"hdd0": "shared"}},
         media=[{"name": "shared", "materialize": "use",
                 "location": {"local": work}}])
-    drive = rig.state(machine_id)["drives"]["hdd0"]
+    drive = rig.state(machine_id)["devices"]["hdd0"]
     # The state records the host directory itself; rendering it as
     # a vvfat drive is the adapter's (test_backend_qemu.py).
     assert os.path.normpath(drive["path"]) == os.path.normpath(work)
 
 
 def test_cdrom_rejects_a_new_media(rig):
-    rig.write("bad", {"platform": "dos", "drives": {"cdrom0": "blank"}},
+    rig.write("bad", {"platform": "dos", "devices": {"cdrom0": "blank"}},
               media=[_BLANK])
     with pytest.raises(StaticError) as caught:
         create_machine("bad", context=rig.home)
@@ -312,7 +339,7 @@ def test_a_controller_no_backend_wires_fails_closed(rig):
     # machine naming the requirement rather than quietly wiring it
     # to ide.
     rig.write("scsi", {"platform": "dos",
-                       "drives": {"hdd0": {"media": "blank",
+                       "devices": {"hdd0": {"media": "blank",
                                            "controller": "scsi"}}},
               media=[_BLANK])
     with pytest.raises(PreflightError) as caught:
@@ -330,7 +357,7 @@ def test_a_pinned_incapable_backend_fails_closed(rig, backend):
     """
     rig.write(backend, {"platform": "dos",
                         "backend": backend,
-                        "drives": {"hdd0": "blank"}},
+                        "devices": {"hdd0": "blank"}},
               media=[_BLANK])
     with pytest.raises(PreflightError) as caught:
         create_machine(backend, context=rig.home)
@@ -344,7 +371,7 @@ def test_a_pinned_incapable_backend_fails_closed(rig, backend):
 def test_the_default_backend_is_qemu_and_is_recorded(rig, declared):
     # The gate must not refuse what it is meant to allow, whether
     # the blueprint names qemu or leaves it out.
-    spec = {"platform": "dos", "drives": {"hdd0": "blank"}}
+    spec = {"platform": "dos", "devices": {"hdd0": "blank"}}
     if declared is not None:
         spec["backend"] = declared
     name = f"be-{declared or 'default'}"
@@ -359,7 +386,7 @@ def test_a_plane_the_backend_cannot_provide_fails_closed(rig):
     # honor each entry (the rig's fake claims agentless-display
     # alone, so vnc is as unhonorable here as guest-agent).
     rig.write("vnc", {"platform": "dos",
-                      "drives": {"hdd0": "blank"},
+                      "devices": {"hdd0": "blank"},
                       "control-planes": ["agentless-display", "vnc",
                                          "guest-agent"]},
               media=[_BLANK])
@@ -374,7 +401,7 @@ def test_a_plane_the_backend_cannot_provide_fails_closed(rig):
 
 def test_declared_agentless_display_is_recorded(rig):
     machine_id = rig.create(
-        "cp", {"platform": "dos", "drives": {"hdd0": "blank"},
+        "cp", {"platform": "dos", "devices": {"hdd0": "blank"},
                "control-planes": ["agentless-display"]},
         media=[_BLANK])
     assert rig.state(machine_id)["control-planes"] == ["agentless-display"]
@@ -385,7 +412,7 @@ def test_a_settings_section_is_validated_against_the_assigned_backend(rig):
     # it does not define is refused before any image work.
     with fake_backend.installed(settings_keys=("machine",)) as adapter:
         rig.write("hatch", {"platform": "dos",
-                            "drives": {"hdd0": "blank"},
+                            "devices": {"hdd0": "blank"},
                             "backend-settings": {"qemu": {"machine": "pc"}}},
                   media=[_BLANK])
         machine_id = create_machine("hatch", context=rig.home)
@@ -394,7 +421,7 @@ def test_a_settings_section_is_validated_against_the_assigned_backend(rig):
             "qemu": {"machine": "pc"}}
 
         rig.write("bad", {"platform": "dos",
-                          "drives": {"hdd0": "blank"},
+                          "devices": {"hdd0": "blank"},
                           "backend-settings": {"qemu": {"cpus": 2}}},
                   media=[_BLANK])
         adapter.images.clear()
@@ -412,7 +439,7 @@ def test_another_backends_section_is_inert_and_never_judged(rig):
     with fake_backend.installed(settings_keys=()) as adapter:
         machine_id = rig.create(
             "inert", {"platform": "dos", "backend": "qemu",
-                      "drives": {"hdd0": "blank"},
+                      "devices": {"hdd0": "blank"},
                       "backend-settings": {"vmware": {"nonsense": True}}},
             media=[_BLANK])
         assert adapter.validated == [None]
@@ -426,7 +453,7 @@ def test_a_lone_settings_section_narrows_assignment_to_its_backend(rig):
     with fake_backend.installed(name="vmware",
                                 settings_keys=("machine",)) as vmware:
         rig.write("narrow", {"platform": "dos",
-                             "drives": {"hdd0": "blank"},
+                             "devices": {"hdd0": "blank"},
                              "backend-settings": {"vmware": {"machine": "x"}}},
                   media=[_BLANK])
         machine_id = create_machine("narrow", context=rig.home)
@@ -440,7 +467,7 @@ def test_a_lone_settings_section_narrows_assignment_to_its_backend(rig):
 
 def test_two_sections_narrow_nothing_and_the_walk_decides(rig):
     machine_id = rig.create(
-        "both", {"platform": "dos", "drives": {"hdd0": "blank"},
+        "both", {"platform": "dos", "devices": {"hdd0": "blank"},
                  "backend-settings": {"vmware": {}, "hyperv": {}}},
         media=[_BLANK])
     assert rig.state(machine_id)["backend"] == "qemu"
@@ -449,7 +476,7 @@ def test_two_sections_narrow_nothing_and_the_walk_decides(rig):
 def test_a_declared_backend_outranks_a_narrowing_section(rig):
     machine_id = rig.create(
         "pinned", {"platform": "dos", "backend": "qemu",
-                   "drives": {"hdd0": "blank"},
+                   "devices": {"hdd0": "blank"},
                    "backend-settings": {"vmware": {}}},
         media=[_BLANK])
     assert rig.state(machine_id)["backend"] == "qemu"
@@ -458,17 +485,17 @@ def test_a_declared_backend_outranks_a_narrowing_section(rig):
 def test_disabled_drive_excluded_from_state(rig):
     machine_id = rig.create(
         "disabled", {"platform": "dos",
-                     "drives": {"hdd0": "blank",
+                     "devices": {"hdd0": "blank",
                                 "hdd1": {"media": "big", "enabled": False}}},
         media=[_BLANK, {"name": "big", "materialize": "new",
                         "size": "50M"}])
     state = rig.state(machine_id)
-    assert "hdd0" in state["drives"]
-    assert "hdd1" not in state["drives"]
+    assert "hdd0" in state["devices"]
+    assert "hdd1" not in state["devices"]
 
 
 def test_blueprint_source_recorded_and_digest_stable(rig):
-    rig.write("twin", {"platform": "dos", "drives": {"hdd0": "blank"}},
+    rig.write("twin", {"platform": "dos", "devices": {"hdd0": "blank"}},
               media=[_BLANK])
     first = create_machine("twin", context=rig.home)
     second = create_machine("twin", context=rig.home)
@@ -483,12 +510,12 @@ def test_location_property_binds_at_create_and_records_the_path(rig):
     # parameter, materializes -- and the resolved path lands in
     # state, so start never re-resolves the reference.
     rig.write("param", {"platform": "dos",
-                        "drives": {"cdrom0": "livecd"},
+                        "devices": {"cdrom0": "livecd"},
                         "parameters": {"live.iso": rig.iso_path}},
               media=[{"name": "livecd", "materialize": "use",
                       "read-only": True, "location": "${live.iso}"}])
     machine_id = create_machine("param", context=rig.home)
-    entry = rig.state(machine_id)["drives"]["cdrom0"]
+    entry = rig.state(machine_id)["devices"]["cdrom0"]
     assert entry["path"] == rig.iso_path
     # The recorded location is concrete: no ${...} survives.
     assert "${" not in json.dumps(entry)
@@ -496,25 +523,25 @@ def test_location_property_binds_at_create_and_records_the_path(rig):
 
 def test_location_property_from_an_explicit_value(rig):
     rig.write("explicit", {"platform": "dos",
-                           "drives": {"cdrom0": "livecd"}},
+                           "devices": {"cdrom0": "livecd"}},
               media=[{"name": "livecd", "materialize": "use",
                       "read-only": True, "location": "${live.iso}"}])
     machine_id = create_machine(
         "explicit", context=rig.home,
         properties={"live.iso": rig.iso_path})
-    entry = rig.state(machine_id)["drives"]["cdrom0"]
+    entry = rig.state(machine_id)["devices"]["cdrom0"]
     assert entry["path"] == rig.iso_path
 
 
 def test_an_unbound_location_property_is_asked(rig):
-    rig.write("needy", {"platform": "dos", "drives": {"cdrom0": "livecd"}},
+    rig.write("needy", {"platform": "dos", "devices": {"cdrom0": "livecd"}},
               media=[{"name": "livecd", "materialize": "use",
                       "read-only": True, "location": "${live.iso}"}])
     asker = mock.Mock(return_value=rig.iso_path)
     with mock.patch("reliquary.binding.console_asker", return_value=asker):
         create_machine("needy", context=rig.home)
     asker.assert_called_once_with("live.iso", "live.iso", False)
-    entry = rig.state("needy-0")["drives"]["cdrom0"]
+    entry = rig.state("needy-0")["devices"]["cdrom0"]
     assert entry["path"] == rig.iso_path
 
 
@@ -546,7 +573,7 @@ def _ready(rig, name="test-bp", **machine):
     # home without a media (name, type) collision.
     machine.setdefault("platform", "dos")
     blank = f"{name}-blank"
-    machine.setdefault("drives", {"hdd0": blank})
+    machine.setdefault("devices", {"hdd0": blank})
     return rig.create(name, machine,
                       media=[{"name": blank, "materialize": "new",
                               "size": "20M"}])
@@ -639,7 +666,7 @@ def test_resolve_by_full_id_and_rejections(rig):
 def test_start_hands_the_state_to_the_adapter_and_sets_running(rig):
     machine_id = rig.create(
         "bootable", {"platform": "dos",
-                     "drives": {"hdd0": "blank",
+                     "devices": {"hdd0": "blank",
                                 "cdrom0": "freedos-livecd"},
                      "boot": ["cdrom0", "hdd0"]},
         media=[_BLANK, rig.livecd()])
@@ -650,7 +677,7 @@ def test_start_hands_the_state_to_the_adapter_and_sets_running(rig):
     # directories that are its to write in.
     launch = rig.backend.starts[-1]
     assert launch["state"]["boot"] == ["cdrom0", "hdd0"]
-    assert set(launch["state"]["drives"]) == {"hdd0", "cdrom0"}
+    assert set(launch["state"]["devices"]) == {"hdd0", "cdrom0"}
     assert launch["machine_dir"] == machine_dir_path(machine_id, rig.home)
     assert launch["backend_dir"] == os.path.join(
         machine_dir_path(machine_id, rig.home), "qemu")
@@ -668,7 +695,7 @@ def test_start_probes_the_backend_for_this_machines_platform(rig):
     # and the preflight would pass on one while the guest boots on
     # the other. The platform crosses the seam with the question.
     machine_id = rig.create(
-        "bootable", {"platform": "dos", "drives": {"hdd0": "blank"},
+        "bootable", {"platform": "dos", "devices": {"hdd0": "blank"},
                      "boot": ["hdd0"]},
         media=[_BLANK])
     start_machine(machine_id, context=rig.home)
@@ -944,7 +971,7 @@ def test_interrupted_destroy_completes(rig):
 
 
 def test_failed_materialization_rolls_back(rig):
-    rig.write("doomed", {"platform": "dos", "drives": {"hdd0": "blank"}},
+    rig.write("doomed", {"platform": "dos", "devices": {"hdd0": "blank"}},
               media=[_BLANK])
     with mock.patch.object(rig.backend, "create_image",
                            side_effect=RunFailure("disk full")):
@@ -968,7 +995,7 @@ def test_recreate_reuses_id(rig):
 
 
 def test_recreate_keeps_id_at_gap(rig):
-    rig.write("g", {"platform": "dos", "drives": {"hdd0": "blank"}},
+    rig.write("g", {"platform": "dos", "devices": {"hdd0": "blank"}},
               media=[_BLANK])
     create_machine("g", context=rig.home)
     create_machine("g", context=rig.home)
@@ -981,11 +1008,11 @@ def test_recreate_keeps_id_at_gap(rig):
 def test_apply_absorbs_memory_and_boot(rig):
     machine_id = rig.create(
         "ap", {"platform": "dos", "memory": "16M",
-               "drives": {"hdd0": "blank", "cdrom0": None},
+               "devices": {"hdd0": "blank", "cdrom0": None},
                "boot": ["hdd0", "cdrom0"]}, media=[_BLANK])
     digest0 = rig.state(machine_id)["blueprint-digest"]
     rig.write("ap", {"platform": "dos", "memory": "32M",
-                     "drives": {"hdd0": "blank", "cdrom0": None},
+                     "devices": {"hdd0": "blank", "cdrom0": None},
                      "boot": ["cdrom0", "hdd0"]}, media=[_BLANK])
     apply_blueprint(machine=machine_id, context=rig.home)
     state = rig.state(machine_id)
@@ -996,9 +1023,9 @@ def test_apply_absorbs_memory_and_boot(rig):
 
 def test_apply_fails_closed_on_size_change(rig):
     machine_id = rig.create(
-        "sz", {"platform": "dos", "drives": {"hdd0": "blank"}},
+        "sz", {"platform": "dos", "devices": {"hdd0": "blank"}},
         media=[_BLANK])
-    rig.write("sz", {"platform": "dos", "drives": {"hdd0": "blank"}},
+    rig.write("sz", {"platform": "dos", "devices": {"hdd0": "blank"}},
               media=[{"name": "blank", "materialize": "new",
                       "size": "50M"}])
     with pytest.raises(PreflightError) as caught:
@@ -1009,19 +1036,19 @@ def test_apply_fails_closed_on_size_change(rig):
 def test_apply_reconciles_diverged_media(rig):
     machine_id = rig.create(
         "dv", {"platform": "dos",
-               "drives": {"hdd0": "blank", "cdrom0": None},
+               "devices": {"hdd0": "blank", "cdrom0": None},
                "boot": ["hdd0", "cdrom0"]},
         media=[_BLANK, rig.livecd()])
     insert_media(machine_id, "cdrom0", "freedos-livecd", context=rig.home)
-    assert rig.state(machine_id)["drives"]["cdrom0"]["media"] is not None
+    assert rig.state(machine_id)["devices"]["cdrom0"]["media"] is not None
     apply_blueprint(machine=machine_id, context=rig.home)
-    assert rig.state(machine_id)["drives"]["cdrom0"]["media"] is None
+    assert rig.state(machine_id)["devices"]["cdrom0"]["media"] is None
 
 
 def test_apply_adds_and_removes_drives(rig):
     machine_id = rig.create(
         "ar", {"platform": "dos",
-               "drives": {"hdd0": "blank", "hdd1": "big"}},
+               "devices": {"hdd0": "blank", "hdd1": "big"}},
         media=[_BLANK, {"name": "big", "materialize": "new",
                         "size": "30M"}])
     disks_root = os.path.join(machine_dir_path(machine_id, rig.home),
@@ -1029,12 +1056,12 @@ def test_apply_adds_and_removes_drives(rig):
     # The dropped drive's per-machine image is named for its media.
     open(os.path.join(disks_root, "big.qcow2"), "w").close()
     rig.write("ar", {"platform": "dos",
-                     "drives": {"hdd0": "blank", "cdrom0": None}},
+                     "devices": {"hdd0": "blank", "cdrom0": None}},
               media=[_BLANK])
     apply_blueprint(machine=machine_id, context=rig.home)
     state = rig.state(machine_id)
-    assert "hdd1" not in state["drives"]
-    assert "cdrom0" in state["drives"]
+    assert "hdd1" not in state["devices"]
+    assert "cdrom0" in state["devices"]
     assert not os.path.exists(os.path.join(disks_root, "big.qcow2"))
 
 
@@ -1049,11 +1076,11 @@ def test_apply_resolves_a_newly_declared_pointing_device(rig):
 def test_apply_refuses_an_unimplemented_control_plane(rig):
     machine_id = rig.create(
         "cpa", {"platform": "dos",
-                "drives": {"hdd0": "blank", "hdd1": "big"}},
+                "devices": {"hdd0": "blank", "hdd1": "big"}},
         media=[_BLANK, {"name": "big", "materialize": "new",
                         "size": "30M"}])
     rig.write("cpa", {"platform": "dos",
-                      "drives": {"hdd0": "blank"},
+                      "devices": {"hdd0": "blank"},
                       "control-planes": ["serial-console"]},
               media=[_BLANK])
     with pytest.raises(PreflightError) as caught:
@@ -1062,7 +1089,7 @@ def test_apply_refuses_an_unimplemented_control_plane(rig):
     # Refused before the drives are reconciled, so the dropped
     # drive is still there and the machine is as it was.
     state = rig.state(machine_id)
-    assert "hdd1" in state["drives"]
+    assert "hdd1" in state["devices"]
     assert state["control-planes"] == ["agentless-display"]
 
 
@@ -1070,11 +1097,11 @@ def test_apply_absorbs_a_settings_change_and_refuses_a_bad_one(rig):
     with fake_backend.installed(settings_keys=("machine",)):
         machine_id = rig.create(
             "sa", {"platform": "dos",
-                   "drives": {"hdd0": "blank", "hdd1": "big"}},
+                   "devices": {"hdd0": "blank", "hdd1": "big"}},
             media=[_BLANK, {"name": "big", "materialize": "new",
                             "size": "30M"}])
         rig.write("sa", {"platform": "dos", "backend": "qemu",
-                         "drives": {"hdd0": "blank", "hdd1": "big"},
+                         "devices": {"hdd0": "blank", "hdd1": "big"},
                          "backend-settings": {"qemu": {"machine": "pc"}}},
                   media=[_BLANK, {"name": "big", "materialize": "new",
                                   "size": "30M"}])
@@ -1085,14 +1112,14 @@ def test_apply_absorbs_a_settings_change_and_refuses_a_bad_one(rig):
         # An edited section this backend cannot honor is refused
         # with the capability gate, before a drive is touched.
         rig.write("sa", {"platform": "dos", "backend": "qemu",
-                         "drives": {"hdd0": "blank"},
+                         "devices": {"hdd0": "blank"},
                          "backend-settings": {"qemu": {"cpus": 2}}},
                   media=[_BLANK])
         with pytest.raises(StaticError) as caught:
             apply_blueprint(machine=machine_id, context=rig.home)
     assert caught.value.rule_id == "machine.settings-unknown-key"
     state = rig.state(machine_id)
-    assert "hdd1" in state["drives"]
+    assert "hdd1" in state["devices"]
     assert state["backend-settings"] == {"qemu": {"machine": "pc"}}
 
 
@@ -1119,13 +1146,13 @@ def test_apply_reconciles_a_vm_shut_down_some_other_way(rig):
 def _installer(rig):
     return rig.create(
         "installer", {"platform": "dos",
-                      "drives": {"hdd0": "blank", "cdrom0": None},
+                      "devices": {"hdd0": "blank", "cdrom0": None},
                       "boot": ["hdd0", "cdrom0"]},
         media=[_BLANK, rig.livecd()])
 
 
 def test_create_records_empty_removable_drive(rig):
-    cdrom = rig.state(_installer(rig))["drives"]["cdrom0"]
+    cdrom = rig.state(_installer(rig))["devices"]["cdrom0"]
     assert cdrom["medium"] == "cdrom"
     assert cdrom["media"] is None
     assert cdrom["path"] is None
@@ -1134,7 +1161,7 @@ def test_create_records_empty_removable_drive(rig):
 def test_insert_persists_media(rig):
     machine_id = _installer(rig)
     insert_media(machine_id, "cdrom0", "freedos-livecd", context=rig.home)
-    cdrom = rig.state(machine_id)["drives"]["cdrom0"]
+    cdrom = rig.state(machine_id)["devices"]["cdrom0"]
     assert cdrom["media"] == "freedos-livecd"
     assert os.path.normpath(cdrom["path"]) == os.path.normpath(rig.iso_path)
 
@@ -1143,7 +1170,7 @@ def test_eject_returns_slot_to_empty(rig):
     machine_id = _installer(rig)
     insert_media(machine_id, "cdrom0", "freedos-livecd", context=rig.home)
     eject_media(machine_id, "cdrom0", context=rig.home)
-    cdrom = rig.state(machine_id)["drives"]["cdrom0"]
+    cdrom = rig.state(machine_id)["devices"]["cdrom0"]
     assert cdrom["media"] is None
     assert cdrom["path"] is None
 
@@ -1192,7 +1219,7 @@ def test_inserted_media_survives_start(rig):
     machine_id = _installer(rig)
     insert_media(machine_id, "cdrom0", "freedos-livecd", context=rig.home)
     start_machine(machine_id, context=rig.home)
-    cdrom = rig.backend.starts[-1]["state"]["drives"]["cdrom0"]
+    cdrom = rig.backend.starts[-1]["state"]["devices"]["cdrom0"]
     assert os.path.normpath(cdrom["path"]) == os.path.normpath(rig.iso_path)
 
 
@@ -1218,7 +1245,7 @@ def test_insert_on_running_changes_live(rig):
                      context=rig.home)
     live.assert_called_once()
     assert live.call_args.args[1] == "cdrom0"
-    assert rig.state(machine_id)["drives"]["cdrom0"]["media"] == (
+    assert rig.state(machine_id)["devices"]["cdrom0"]["media"] == (
         "freedos-livecd")
 
 
@@ -1246,7 +1273,7 @@ def test_insert_reconciles_a_vm_shut_down_some_other_way(rig):
     live.assert_not_called()
     state = rig.state(machine_id)
     assert state["phase"] == "ready"
-    assert state["drives"]["cdrom0"]["media"] == "freedos-livecd"
+    assert state["devices"]["cdrom0"]["media"] == "freedos-livecd"
 
 
 def test_eject_reconciles_a_vm_shut_down_some_other_way(rig):
@@ -1261,7 +1288,7 @@ def test_eject_reconciles_a_vm_shut_down_some_other_way(rig):
     live.assert_not_called()
     state = rig.state(machine_id)
     assert state["phase"] == "ready"
-    assert state["drives"]["cdrom0"]["media"] is None
+    assert state["devices"]["cdrom0"]["media"] is None
 
 
 def test_a_live_change_goes_through_the_adapter_session(rig):
@@ -1285,7 +1312,7 @@ def test_insert_on_stopped_is_state_only(rig):
         insert_media(machine_id, "cdrom0", "freedos-livecd",
                      context=rig.home)
     live.assert_not_called()
-    assert rig.state(machine_id)["drives"]["cdrom0"]["media"] == (
+    assert rig.state(machine_id)["devices"]["cdrom0"]["media"] == (
         "freedos-livecd")
 
 
@@ -1309,7 +1336,7 @@ def test_mark_stopped_leaves_ready_alone(rig):
 def _anonymous_rig(rig):
     machine_id = rig.create(
         "rig", {"platform": "dos",
-                "drives": {"hdd0": "blank", "floppy0": None}},
+                "devices": {"hdd0": "blank", "floppy0": None}},
         media=[_BLANK])
     image = rig.path("round-1.img")
     with open(image, "wb") as handle:
@@ -1320,7 +1347,7 @@ def _anonymous_rig(rig):
 def test_a_file_mounts_in_place_with_no_catalog_identity(rig):
     machine_id, image = _anonymous_rig(rig)
     insert_media(machine_id, "floppy0", file=image, context=rig.home)
-    floppy = rig.state(machine_id)["drives"]["floppy0"]
+    floppy = rig.state(machine_id)["devices"]["floppy0"]
     # Anonymous: no media name, attached ("use") in place.
     assert floppy["media"] is None
     assert floppy["materialize"] == "use"
@@ -1342,7 +1369,7 @@ def test_a_rebuilt_image_is_picked_up_at_the_next_start(rig):
     start_machine(machine_id, context=rig.home)
     # Mutable and unverified: no hash is re-checked, and the path
     # the consumer just rewrote is what the adapter is handed.
-    floppy = rig.backend.starts[-1]["state"]["drives"]["floppy0"]
+    floppy = rig.backend.starts[-1]["state"]["devices"]["floppy0"]
     assert os.path.normpath(floppy["path"]) == os.path.normpath(image)
 
 
@@ -1393,7 +1420,7 @@ def _sized_image(rig, name, size):
 def _running_rig(rig, launched=None):
     machine_id = rig.create(
         "rig", {"platform": "dos",
-                "drives": {"hdd0": "blank", "floppy0": None}},
+                "devices": {"hdd0": "blank", "floppy0": None}},
         media=[_BLANK])
     if launched is not None:
         insert_media(machine_id, "floppy0", file=launched, context=rig.home)
@@ -1409,7 +1436,7 @@ def test_a_same_sized_swap_is_allowed(rig):
         insert_media(machine_id, "floppy0", file=second, context=rig.home)
     change.assert_called_once()
     assert os.path.normpath(
-        rig.state(machine_id)["drives"]["floppy0"]["path"]) == (
+        rig.state(machine_id)["devices"]["floppy0"]["path"]) == (
         os.path.normpath(second))
 
 
@@ -1441,20 +1468,20 @@ def test_a_stopped_insert_is_never_geometry_checked(rig):
     image = _sized_image(rig, "round-1.img", 1474560)
     insert_media(machine_id, "floppy0", file=image, context=rig.home)
     assert os.path.normpath(
-        rig.state(machine_id)["drives"]["floppy0"]["path"]) == (
+        rig.state(machine_id)["devices"]["floppy0"]["path"]) == (
         os.path.normpath(image))
 
 
 def test_a_cdrom_swap_is_not_constrained(rig):
     machine_id = rig.create(
         "rig", {"platform": "dos",
-                "drives": {"hdd0": "blank", "cdrom0": None}},
+                "devices": {"hdd0": "blank", "cdrom0": None}},
         media=[_BLANK, rig.livecd()])
     start_machine(machine_id, context=rig.home)
     with mock.patch("reliquary.machines._change_media_live"):
         insert_media(machine_id, "cdrom0", "freedos-livecd",
                      context=rig.home)
-    assert rig.state(machine_id)["drives"]["cdrom0"]["media"] == (
+    assert rig.state(machine_id)["devices"]["cdrom0"]["media"] == (
         "freedos-livecd")
 
 
@@ -1462,7 +1489,7 @@ def test_a_cdrom_swap_is_not_constrained(rig):
 
 def _plain_rig(rig):
     return rig.create(
-        "rig", {"platform": "dos", "drives": {"hdd0": "blank"}},
+        "rig", {"platform": "dos", "devices": {"hdd0": "blank"}},
         media=[_BLANK])
 
 

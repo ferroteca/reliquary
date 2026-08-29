@@ -59,7 +59,7 @@ def _write_blueprint(home_dir, name):
     """A composed one-machine blueprint with a blank disk."""
     specs = [
         {"type": "machine", "name": name, "platform": "dos",
-         "drives": {"hdd0": "blank"}},
+         "devices": {"hdd0": "blank"}},
         {"type": "media", "name": "blank", "materialize": "new",
          "size": "20M"},
     ]

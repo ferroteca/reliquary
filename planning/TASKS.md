@@ -149,8 +149,8 @@ doesn't keep those.
 ### Backends
 
 - **T32 — Detect a usable bridge interface for QEMU's `bridged`
-  network attachment.** `network`'s `bridged` attachment (D120) works
-  today by naming an `interface` explicitly, or by falling back to
+  network attachment.** A `net` device's `bridged` attachment (D120)
+  works today by naming an `interface` explicitly, or by falling back to
   QEMU's own default (the conventional bridge name `br0`), which
   fails closed if the host hasn't set one up. This task adds
   detection: read the host's default-route interface and use it only

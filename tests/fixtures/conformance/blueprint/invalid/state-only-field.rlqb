@@ -4,5 +4,5 @@
 // id: field.state-only
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "drives": { "cdrom0": null }, "id": "rig-0" }
+    "devices": { "cdrom0": null }, "id": "rig-0" }
 ]

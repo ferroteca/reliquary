@@ -229,7 +229,7 @@ def test_projects_do_not_adopt_each_others_machines(tmp_path):
     for root in roots:
         _write(os.path.join(root, "shared.rlqb"),
                {"type": "machine", "name": "shared", "platform": "dos",
-                "drives": {"cdrom0": None}})
+                "devices": {"cdrom0": None}})
 
     def context(root):
         return Context(home_dir=home, blueprints_dir=root,

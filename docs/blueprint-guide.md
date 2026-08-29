@@ -13,7 +13,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > is wrong.
 
 > **Status:** implemented, on top of the composed blueprint model. A
-> machine's `drives` field names **media** components
+> machine's `devices` field names **media** components
 > ([media spec](spec/media-spec.md)), resolved from the `.rlqb`
 > namespace, with empty removable slots written as `null`. Along with
 > `platform`, `memory`, `boot`, `description`, and `scripts`, this
@@ -251,7 +251,7 @@ A minimal blueprint that boots a DOS floppy image:
   "type": "machine",
   "name": "msdos622",
   "platform": "dos",
-  "drives": {
+  "devices": {
     "floppy": "msdos622-boot"
   }
 }
@@ -373,7 +373,7 @@ produces, on a host where QEMU was selected:
   "backend-id": "reliquary-msdos-0",
   "memory": 16,
   "cpus": 1,
-  "drives": {
+  "devices": {
     "floppy0": {
       "medium": "floppy",
       "slot": 0,
@@ -681,7 +681,7 @@ script's `wait` conditions look for, so the script's structure stays
 fixed no matter what values are plugged in. Switching editions has
 to happen by composition instead, and the blueprint already has both
 of the pieces you'd swap: its
-[`drives`](blueprint-reference.md#drives) media references name the
+[`devices`](blueprint-reference.md#drives) media references name the
 vendor media, and its [`scripts`](blueprint-reference.md#scripts) map
 names the scripts that drive the install. A customized blueprint
 points both at a different, localized pair, since each script only
@@ -693,7 +693,7 @@ Reliquary never guesses at what a blueprint means, and never
 silently degrades what you asked for. Two kinds of checks apply:
 
 **Format checks** reject a malformed document outright: unknown
-fields, bad values, clashing drive slots, state-only fields showing
+fields, bad values, clashing device slots, state-only fields showing
 up in a blueprint. See the [field reference](blueprint-reference.md)
 for each field's exact rules.
 
@@ -751,9 +751,10 @@ reference a value, never compute with one.
 ## Where to next
 
 - [Field reference](blueprint-reference.md) — `platform`,
-  `backend`, `drives` (naming media components),
-  `boot`, `control-planes`, `parameters`, `backend-settings`, and
-  the state-only fields, with every rule and per-field examples.
+  `backend`, `devices` (drives and NICs: media components and
+  network attachments), `boot`, `control-planes`, `parameters`,
+  `backend-settings`, and the state-only fields, with every rule
+  and per-field examples.
 - [Cookbook](blueprint-cookbook.md) — complete blueprints for
   common machine shapes, with the state documents they resolve
   into.

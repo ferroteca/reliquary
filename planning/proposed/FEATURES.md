@@ -284,11 +284,12 @@ Decide first:
   type, not new fields — each item was checked against P25's two
   gates (is there real demand, and does it apply across multiple
   backends), and each rejection has its own written reason.
-  Network: **delivered in part** (D120, 2026-08-29). `network`
-  (`net0`, `net1`, …) is now a first-class machine field naming an
-  attachment (`nat`/`bridged`) — the chipset stays unauthored,
-  resolved per platform, exactly as this round originally called
-  for. `http`'s own reachability path is unaffected, and still keeps
+  Network: **delivered** (D120/D121/D122, 2026-08-29). `net`
+  slots (`net0`, `net1`, …) join `devices` alongside drives, naming
+  an attachment (`nat`/`bridged`) — the chipset resolves per
+  platform by default, but an optional `model` overrides it (D122),
+  since some DOS-era software needs a specific chipset. `http`'s own
+  reachability path is unaffected, and still keeps
   being worked out from the script's `http` block, generalized to
   work per backend. Detecting a usable bridge interface for QEMU
   automatically is tracked separately (T32); no automatic bridge

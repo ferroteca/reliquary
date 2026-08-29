@@ -125,14 +125,14 @@ RESERVED_ARGUMENTS = {
     "m": "the machine's `memory`",
     "smp": "the machine's `cpus`",
     "boot": "the machine's `boot` order",
-    "drive": "the machine's `drives`",
-    "hda": "the machine's `drives`",
-    "hdb": "the machine's `drives`",
-    "hdc": "the machine's `drives`",
-    "hdd": "the machine's `drives`",
-    "fda": "the machine's `drives`",
-    "fdb": "the machine's `drives`",
-    "cdrom": "the machine's `drives`",
+    "drive": "the machine's `devices`",
+    "hda": "the machine's `devices`",
+    "hdb": "the machine's `devices`",
+    "hdc": "the machine's `devices`",
+    "hdd": "the machine's `devices`",
+    "fda": "the machine's `devices`",
+    "fdb": "the machine's `devices`",
+    "cdrom": "the machine's `devices`",
     "machine": "this section's own `machine` key",
     "M": "this section's own `machine` key",
     "name": "the recorded VM identity",
@@ -141,15 +141,19 @@ RESERVED_ARGUMENTS = {
     "vnc": "the machine's `control-planes` policy",
     "display": "the display choice a start is given",
     "nographic": "the display choice a start is given",
-    "netdev": "the machine's `network`",
-    "net": "the machine's `network`",
+    "netdev": "the machine's `devices`",
+    "net": "the machine's `devices`",
 }
 
-#: The NIC chipset name each platform resolves to (`machines._PLATFORM_NIC`,
-#: D120), mapped to the QEMU device model that renders it. Only
-#: `pcnet` is reachable today, since nothing in the blueprint
-#: authors a chipset directly.
-_NIC_QEMU_MODELS = {"pcnet": "pcnet"}
+#: The blueprint's NIC model names — the platform default
+#: (`machines._PLATFORM_NIC`, D120) or an explicit `model` override
+#: (D122) — mapped to the QEMU device model that renders them.
+#: `ne2k` renders as the ISA-bus part (`ne2k_isa`), the historically
+#: appropriate bus for a card real NE2000s shipped on — QEMU also has
+#: a PCI variant (`ne2k_pci`), but nothing in the blueprint
+#: vocabulary names it, and DOS-era platforms have no PCI bus to put
+#: it on anyway.
+_NIC_QEMU_MODELS = {"pcnet": "pcnet", "ne2k": "ne2k_isa"}
 
 #: The `-drive` properties Reliquary already renders for every drive.
 #: These are refused through ``-set drive.<slot>.<property>`` for the
@@ -1114,7 +1118,7 @@ class QemuAdapter(BackendAdapter):
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
             pointing_devices=("tablet", "mouse"),
-            network_models=("pcnet",),
+            network_models=("pcnet", "ne2k"),
             network_attachments=("nat", "bridged"),
         )
 
@@ -1201,9 +1205,14 @@ class QemuAdapter(BackendAdapter):
         # can run it at all (_PLATFORM_ARCH).
         args = [find_qemu(state.get("platform")), "-name", vm_name,
                 "-m", str(memory)]
-        args += drive_args(state.get("drives", {}))
-        args += network_args(state.get("network", {}))
-        boot = _boot_order(state.get("boot", []), state.get("drives", {}))
+        devices = state.get("devices", {})
+        drives = {key: entry for key, entry in devices.items()
+                 if "medium" in entry}
+        network = {key: entry for key, entry in devices.items()
+                  if "attachment" in entry}
+        args += drive_args(drives)
+        args += network_args(network)
+        boot = _boot_order(state.get("boot", []), drives)
         if boot is not None:
             args += ["-boot", f"order={boot}"]
         if state.get("pointing-device") == "tablet":
@@ -1349,7 +1358,7 @@ def _reserved_set(value):
     specific object's property, and for the ``drive`` group it can
     reach exactly what ``-drive`` sets — so any property Reliquary
     already renders is refused here the same way ``-drive`` itself is
-    refused, naming ``drives`` as the owner (D118). Any value that
+    refused, naming ``devices`` as the owner (D118). Any value that
     isn't shaped like that is left for QEMU itself to reject.
     """
     if not isinstance(value, str):
@@ -1359,8 +1368,8 @@ def _reserved_set(value):
     if len(parts) != 3 or parts[0] != "drive":
         return None
     if parts[2] in RESERVED_DRIVE_PROPERTIES:
-        return (f"the machine's `drives` (`{parts[2]}` of drive "
-                f"{parts[1]!r} is what `drives` renders)")
+        return (f"the machine's `devices` (`{parts[2]}` of drive "
+                f"{parts[1]!r} is what `devices` renders)")
     return None
 
 

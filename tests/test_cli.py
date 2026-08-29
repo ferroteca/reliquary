@@ -24,7 +24,7 @@ from tests import fake_backend
 
 _PLAIN = [
     {"type": "machine", "name": "plain", "platform": "dos",
-     "drives": {"hdd0": "blank-20m"}},
+     "devices": {"hdd0": "blank-20m"}},
     {"type": "media", "name": "blank-20m", "materialize": "new",
      "size": "20M"},
 ]
@@ -467,7 +467,7 @@ def test_list_blueprints_shows_a_description_in_its_row(plain_home):
          "description": ("A described machine whose text is long enough "
                          "that the listing has to wrap it across more "
                          "than one indented line beneath the row"),
-         "drives": {"hdd0": "blank-20m"}},
+         "devices": {"hdd0": "blank-20m"}},
         {"type": "media", "name": "blank-20m", "materialize": "new",
          "size": "20M"},
     ])
@@ -513,7 +513,7 @@ def test_list_blueprints_scans_the_blueprints_folder_recursively(plain_home):
     nested_path = os.path.join(nested, "nested.rlqb")
     with open(nested_path, "w", encoding="utf-8") as handle:
         json.dump({"platform": "dos",
-                   "drives": {"hdd": {"size": "20M"}}}, handle)
+                   "devices": {"hdd": {"size": "20M"}}}, handle)
     # Assert via --json: the human table may fold a long path across
     # lines, so a contiguous "nested.rlqb" substring is not promised.
     result, out = _json_out(plain_home, ["list-blueprints"])
@@ -702,7 +702,7 @@ def test_list_scripts_with_blueprint_uses_scripts_map(plain_home):
     os.makedirs(scripts)
     _write_blueprint(plain_home, "cust", [
         {"type": "machine", "name": "cust", "platform": "dos",
-         "drives": {"hdd0": "blank"},
+         "devices": {"hdd0": "blank"},
          "scripts": {"setup": "cust-setup", "teardown": "cust-teardown"}},
         {"type": "media", "name": "blank", "materialize": "new",
          "size": "20M"},
@@ -908,7 +908,7 @@ def rig_home(home):
     os.makedirs(os.path.join(home, "blueprints"))
     _write_blueprint(home, "rig", [
         {"type": "machine", "name": "rig", "platform": "dos",
-         "drives": {"hdd0": "blank-20m", "floppy0": "exchange-dir"}},
+         "devices": {"hdd0": "blank-20m", "floppy0": "exchange-dir"}},
         {"type": "media", "name": "blank-20m", "materialize": "new",
          "size": "20M"},
         {"type": "media", "name": "exchange-dir", "materialize": "use",
@@ -956,7 +956,7 @@ def test_insert_media_mounts_a_file_by_path(rig_home):
     # A void twin: the narration is stderr, stdout stays empty.
     assert out == ""
     assert image in err
-    floppy = load_machine_state("rig-0", home)["drives"]["floppy0"]
+    floppy = load_machine_state("rig-0", home)["devices"]["floppy0"]
     assert floppy["media"] is None
     assert os.path.normpath(floppy["path"]) == os.path.normpath(image)
 

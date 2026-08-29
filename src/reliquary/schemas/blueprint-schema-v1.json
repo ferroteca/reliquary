@@ -47,13 +47,14 @@
           "type": ["string", "integer"]
         },
         "cpus": {"type": ["string", "integer"]},
-        "drives": {
+        "devices": {
+          "description": "Drives and NICs share one slot-keyed map (D121).",
           "type": "object",
           "propertyNames": {
             "description": "Slot keys are fixed and never take a reference: an object key is authored graph.",
-            "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
+            "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?|net[0-3])$"
           },
-          "additionalProperties": {"$ref": "#/$defs/drive"}
+          "additionalProperties": {"$ref": "#/$defs/device"}
         },
         "boot": {
           "type": "array",
@@ -78,14 +79,6 @@
           "description": "The pointer input device (F66). Omitted, it resolves to the platform's default (mouse, today). Never supplied by a reference.",
           "enum": ["tablet", "mouse"]
         },
-        "network": {
-          "description": "NIC slots (D120): attachment only, never a chipset. Slot keys are fixed and never take a reference: an object key is authored graph.",
-          "type": "object",
-          "propertyNames": {
-            "pattern": "^net[0-3]$"
-          },
-          "additionalProperties": {"$ref": "#/$defs/networkDevice"}
-        },
         "backend-settings": {
           "type": "object",
           "propertyNames": {"enum": ["qemu", "virtualbox", "vmware", "hyperv"]},
@@ -94,6 +87,14 @@
         "parameters": {"type": "object"}
       },
       "additionalProperties": false
+    },
+
+    "device": {
+      "description": "A drive (floppy/hdd/cdrom) or a NIC (net), discriminated by slot key medium, not by shape — anyOf rather than oneOf because a bare media name and a bare attachment name are both plain strings and can't be told apart by shape alone; the parser is what actually discriminates, by the slot key (D121).",
+      "anyOf": [
+        {"$ref": "#/$defs/drive"},
+        {"$ref": "#/$defs/networkDevice"}
+      ]
     },
 
     "drive": {
@@ -119,7 +120,7 @@
     },
 
     "networkDevice": {
-      "description": "An attachment name, or an object carrying attachment plus, for bridged only, interface (D120).",
+      "description": "An attachment name, or an object carrying attachment plus interface (bridged only) and model (D120/D122).",
       "oneOf": [
         {
           "description": "A closed vocabulary: never widened to admit a reference pattern.",
@@ -136,6 +137,10 @@
             "interface": {
               "description": "The host bridge interface to attach to. Valid only when attachment is bridged. A plain string, or a reference supplying one.",
               "type": "string"
+            },
+            "model": {
+              "description": "The NIC chipset, overriding the platform default (D122). A closed vocabulary: never widened to admit a reference pattern.",
+              "enum": ["pcnet", "ne2k"]
             }
           },
           "additionalProperties": false

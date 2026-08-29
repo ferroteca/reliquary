@@ -40,7 +40,7 @@ always wins, and no number is ever reissued.
 
 ## The marks
 
-- **The next D-number to issue is D121** — used for decisions,
+- **The next D-number to issue is D123** — used for decisions,
   recorded in [DECISIONS.md](DECISIONS.md).
 - **The next F-number to issue is F68** — used for features,
   drafted in [proposed/FEATURES.md](proposed/FEATURES.md), or,

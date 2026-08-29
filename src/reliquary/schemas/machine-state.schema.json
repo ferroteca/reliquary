@@ -84,19 +84,14 @@
       "description": "The resolved pointer input device (F66).",
       "enum": ["tablet", "mouse"]
     },
-    "network": {
-      "description": "The resolved NIC slots keyed by slot key (D120). Each entry carries its declared attachment, the resolved interface (null when none was named), and the platform-resolved chipset.",
-      "type": "object",
-      "additionalProperties": {"$ref": "#/$defs/networkState"}
-    },
     "backend-settings": {
       "description": "The blueprint's per-backend settings sections, carried through verbatim.",
       "type": "object"
     },
-    "drives": {
-      "description": "The resolved, enabled drives keyed by drive key. Each entry carries the drive's medium and slot plus the realized cache path (a per-machine image under disks/, an attached payload, a host directory, or null for an empty removable slot).",
+    "devices": {
+      "description": "The resolved, enabled drives and NICs, keyed by device key, sharing one map (D121). A drive entry carries its medium and slot plus the realized cache path (a per-machine image under disks/, an attached payload, a host directory, or null for an empty removable slot). A NIC entry carries its declared attachment, the resolved interface (null when none was named), and the platform-resolved chipset.",
       "type": "object",
-      "additionalProperties": {"$ref": "#/$defs/driveState"}
+      "additionalProperties": {"$ref": "#/$defs/deviceState"}
     },
     "vm": {
       "description": "The live VM identity, present only while phase is 'running' and written atomically with phase (the former standalone vm.json, folded in). The adapter verifies a session against backend-id + token before touching the VM, so a same-named VM of another home is never mistaken for this one.",
@@ -115,6 +110,13 @@
     "driveKey": {
       "type": "string",
       "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
+    },
+    "deviceState": {
+      "description": "A resolved drive or a resolved NIC (D121) — the two shapes never overlap (driveState requires medium, networkState requires attachment, and additionalProperties is false on both), so oneOf discriminates safely, unlike the blueprint schema's bare-string device shorthand.",
+      "oneOf": [
+        {"$ref": "#/$defs/driveState"},
+        {"$ref": "#/$defs/networkState"}
+      ]
     },
     "driveState": {
       "description": "One resolved drive. medium and slot are always present; controller is present for non-floppy drives; media names the resolved media (null in an empty removable slot, and also null for an anonymous image mounted by insert-media --file, which has no catalog identity) and materialize records how it is realized (new/difference/copy/use, null for an empty slot); size is present for a 'new' image; path is the cache location, the host path of an anonymous mounted image, or null for an empty removable slot. Beside the resolved shape sit the recorded observations, which never enter the blueprint digest: volumes and geometry for a hard disk, launch-size for a floppy.",
@@ -148,12 +150,12 @@
       "additionalProperties": false
     },
     "networkState": {
-      "description": "One resolved NIC slot (D120). attachment and model are always present; interface is present, and null when none was named or resolved.",
+      "description": "One resolved NIC slot (D120). attachment and model are always present; interface is present, and null when none was named or resolved. model is whatever the blueprint named (D122), or the platform default when it named none.",
       "type": "object",
       "properties": {
         "attachment": {"enum": ["nat", "bridged"]},
         "interface": {"type": ["string", "null"]},
-        "model": {"enum": ["pcnet"]}
+        "model": {"enum": ["pcnet", "ne2k"]}
       },
       "required": ["attachment", "interface", "model"],
       "additionalProperties": false

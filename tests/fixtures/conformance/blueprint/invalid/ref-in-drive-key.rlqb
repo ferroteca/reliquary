@@ -4,5 +4,5 @@
 // id: ref.not-allowed-here
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "drives": { "${slot}": null } }
+    "devices": { "${slot}": null } }
 ]

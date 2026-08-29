@@ -387,22 +387,28 @@ names the number it superseded.
   should be host-only (`nat`, the same path the install server
   already uses) or visible to the wider network (`bridged`) is a
   fact about what the machine is *for*, so the blueprint states it
-  directly; which chipset actually drives the connection is not —
-  that's resolved per platform, the same way a drive's `controller`
-  defaults to `ide` without being named (P10), because it depends on
-  what the guest's own driver expects, not on anything the blueprint
-  author is choosing between.
+  directly. Which chipset actually drives the connection defaults to
+  a platform default (`pcnet`), the same way a drive's `controller`
+  defaults to `ide` without being named (P10) — but DOS-era
+  networking software is often written against one specific chipset,
+  not "a network card" in the abstract (packet drivers above all), so
+  naming a `model` explicitly is how a blueprint reaches software the
+  default chipset's driver can't talk to.
 
   Precondition: the blueprint copied out of the library —
   `rlq seed-blueprint <name>` (U11).
 
-  1. **Declare the attachment.** In the blueprint's `network`
+  1. **Declare the attachment.** In the blueprint's `devices`
      section, name how the NIC reaches the world:
-     `"network": {"net0": "nat"}`, or `{"net0": "bridged"}` to put
+     `"devices": {"net0": "nat"}`, or `{"net0": "bridged"}` to put
      it on the host's own network — naming a specific host interface
      with `{"net0": {"attachment": "bridged", "interface":
      "${host-nic}"}}` when the default isn't the right one.
-  2. **Run it.** `rlq create-machine --blueprint <name>` or
-     `rlq run-script install --blueprint <name>`. An attachment the
-     assigned backend can't provide fails closed at materialization,
-     naming both (P11).
+  2. **Name the chipset, if the driver on hand needs a specific one.**
+     `{"net0": {"attachment": "nat", "model": "ne2k"}}` for software
+     that only ships an NE2000 packet driver. Leave `model` out and
+     the platform default applies.
+  3. **Run it.** `rlq create-machine --blueprint <name>` or
+     `rlq run-script install --blueprint <name>`. An attachment or a
+     model the assigned backend can't provide fails closed at
+     materialization, naming both (P11).

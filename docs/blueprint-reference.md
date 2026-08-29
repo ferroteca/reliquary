@@ -22,10 +22,12 @@ SPDX-License-Identifier: GPL-3.0-only
 > place that defines them.
 
 > **Status:** every field in this reference is validated at parse
-> time — `platform`, `backend`, `memory`, `cpus`, `drives` (a media
-> name, `null`, or an object with `controller`/`enabled`/`media`),
-> `network` (an attachment name, or an object with
-> `attachment`/`interface`), `boot`, `name`, `description`,
+> time — `platform`, `backend`, `memory`, `cpus`, `devices` (a drive
+> — a media name, `null`, or an object with `controller`/`enabled`/
+> `media` — or a NIC — an attachment name, or an object with
+> `attachment`/`interface`/`model`, sharing one slot-keyed map,
+> D121/D122),
+> `boot`, `name`, `description`,
 > `scripts`, `control-planes`, `backend-settings`, and `parameters`
 > — along with accepting JSON5
 > syntax and resolving media names. When a machine is materialized,
@@ -403,19 +405,26 @@ Virtual CPU count. Default `1`.
 
 ---
 
-## `drives`
+## `devices`
 
 **blueprint (optional) · object**
 
-The machine's drive inventory — this only describes the topology,
-not the content. Each key declares a medium and a slot; each value
-names the **media** that slot carries (or leaves it empty), plus
-optional hardware attributes. What the content actually *is*, and
-how it gets materialized, is entirely up to the named
-[media component](spec/media-spec.md) — never up to the drive
-itself.
+The machine's device inventory: drives (floppy/hdd/cdrom) and NICs
+(net) share one slot-keyed map (D121). A key's medium decides which
+kind it is — there's no separate `type` field — and both kinds are
+checked for slot clashes together, so `hdd0` and `net0` can coexist
+freely but a slot can't be declared twice under two spellings.
 
-### Keys: medium and slot
+### Drives
+
+Drives only describe topology, not content. Each key declares a
+medium and a slot; each value names the **media** that slot carries
+(or leaves it empty), plus optional hardware attributes. What the
+content actually *is*, and how it gets materialized, is entirely up
+to the named [media component](spec/media-spec.md) — never up to
+the drive itself.
+
+#### Keys: medium and slot
 
 | medium   | slots         | keys                      |
 |----------|---------------|---------------------------|
@@ -447,18 +456,18 @@ fewer slots of a given medium than were declared — it fails with a
 capability error naming the backend and the drive. Drives are never
 silently dropped.
 
-### Values
+#### Values
 
 A value is a **media-name string** (shorthand):
 
 ```json
-{"drives": {"cdrom": "freedos-livecd"}}
+{"devices": {"cdrom": "freedos-livecd"}}
 ```
 
 or an **object** carrying the media name plus hardware attributes:
 
 ```json
-{"drives": {"hdd0": {"media": "dos622-installed", "controller": "scsi"}}}
+{"devices": {"hdd0": {"media": "dos622-installed", "controller": "scsi"}}}
 ```
 
 The drive names one [`media`](#media--optional--string) component
@@ -478,7 +487,7 @@ A removable drive (`cdrom`, `floppy`) may instead be declared
 **empty** with the value `null`:
 
 ```json
-{"drives": {"cdrom0": null}}
+{"devices": {"cdrom0": null}}
 ```
 
 The slot exists as guest-visible hardware, just with no medium
@@ -503,7 +512,7 @@ Reliquary chose (see [image naming](#image-naming-and-formats)). You
 never name, place, or reference these files yourself; the media's
 name is the only handle you need.
 
-#### `media` — optional · string
+##### `media` — optional · string
 
 The name of a [media component](spec/media-spec.md):
 
@@ -537,7 +546,7 @@ an optical medium has nothing to size, difference, or synthesize,
 so a `new`/`difference`/`copy` media on a `cdrom` fails validation,
 naming the drive.
 
-#### `controller` — optional · string
+##### `controller` — optional · string
 
 The kind of storage controller the drive attaches to. This is
 hardware the guest can see, and the guest needs a driver for that
@@ -558,7 +567,7 @@ The default for every current platform is `ide`, resolved into the
 state when the machine is created.
 
 ```json
-{"drives": {"hdd0": {"media": "system-disk", "controller": "scsi"}}}
+{"devices": {"hdd0": {"media": "system-disk", "controller": "scsi"}}}
 ```
 
 What the blueprint deliberately leaves unsaid:
@@ -597,7 +606,7 @@ describes a machine that can't actually be built yet: the one
 adapter that exists only wires up `ide`, and says so by name if a
 blueprint asks for more than that.
 
-#### `enabled` — optional · boolean · default `true`
+##### `enabled` — optional · boolean · default `true`
 
 Setting this to `false` keeps the entry in the document but removes
 the drive from the machine entirely — no slot, no hardware at all.
@@ -605,7 +614,7 @@ This is useful for switching between configurations without
 deleting entries outright:
 
 ```json
-{"drives": {"hdd1": {"media": "scratch-100m", "enabled": false}}}
+{"devices": {"hdd1": {"media": "scratch-100m", "enabled": false}}}
 ```
 
 This is different from an empty removable drive (`null`): an empty
@@ -614,7 +623,7 @@ disabled drive doesn't exist on the machine at all. (Temporarily
 mounted installer media need neither of these — see the
 [`media`](#media--optional--string) convention above.)
 
-### Image naming and formats
+#### Image naming and formats
 
 A drive's per-machine image (from a media whose `materialize` is
 `new`, `difference`, or `copy`) always lives at
@@ -670,41 +679,44 @@ error naming both.
 
 ---
 
-## `network`
+### Network devices (NICs)
 
-**blueprint (optional) · object**
+Each `net` key names a slot; each value names the **attachment** —
+whether the NIC reaches the host (`nat`) or the wider network
+(`bridged`) — and, optionally, the **chipset**. The chipset resolves
+per platform when left unstated, the same way a drive's `controller`
+defaults to `ide` without being named; naming `model` explicitly
+overrides that default. A machine with no `net` key in `devices` has
+no NIC at all.
 
-The machine's NIC inventory (D120). Each key names a slot; each
-value names the **attachment** — whether the NIC reaches the host
-(`nat`) or the wider network (`bridged`). The chipset that actually
-drives the connection is never named here: it's resolved per
-platform at materialization, the same way a drive's `controller`
-defaults to `ide` without being stated. An omitted `network` section
-means the machine has no NIC at all.
-
-### Keys: slots
+#### Keys: slots
 
 | kind      | slots | keys                |
 |-----------|-------|---------------------|
 | `network` | 0–3   | `net0` ... `net3`   |
 
-Unlike `drives`, there's no bare-name shorthand for slot 0 — every
+Unlike a drive, there's no bare-name shorthand for slot 0 — every
 NIC is named by its full slot key.
 
-### Values
+#### Values
 
 A network entry is either a bare attachment name, or an object
-carrying `attachment` plus, for `bridged` only, `interface`:
+carrying `attachment` plus optional `interface` (`bridged` only) and
+`model`:
 
 ```json
-{"network": {"net0": "nat"}}
+{"devices": {"net0": "nat"}}
 ```
 
 ```json
-{"network": {"net0": {"attachment": "bridged", "interface": "eth0"}}}
+{"devices": {"net0": {"attachment": "bridged", "interface": "eth0"}}}
 ```
 
-#### `attachment` — required · string
+```json
+{"devices": {"net0": {"attachment": "nat", "model": "ne2k"}}}
+```
+
+##### `attachment` — required · string
 
 | value      | reaches                                    |
 |------------|---------------------------------------------|
@@ -715,7 +727,7 @@ Checked against the assigned backend the same way every other
 capability is (P11): an attachment the backend can't provide is a
 capability error naming both.
 
-#### `interface` — optional · string
+##### `interface` — optional · string
 
 The host network interface to bridge onto. Valid only when
 `attachment` is `bridged`; naming it on `nat` fails validation. Takes
@@ -725,7 +737,7 @@ a host interface name is exactly the kind of host-specific fact that
 shouldn't be hardcoded into a blueprint meant to be shared:
 
 ```json
-{"network": {"net0": {"attachment": "bridged", "interface": "${host-nic}"}}}
+{"devices": {"net0": {"attachment": "bridged", "interface": "${host-nic}"}}}
 ```
 
 Omitted, each backend does whatever it does with no interface named.
@@ -740,12 +752,34 @@ separately (planning/TASKS.md, T32); Reliquary will not create one
 automatically even then, since that would mutate host network
 configuration.
 
-### What the blueprint deliberately leaves unsaid
+##### `model` — optional · string
 
-- **Which chipset drives the connection.** This is a fact about the
-  guest's own drivers, resolved per platform, never a choice the
-  blueprint makes — the same way it never names a `controller`'s
-  exact silicon.
+The NIC chipset (D122). Valid on either attachment:
+
+| value   | chipset                              | backends |
+|---------|---------------------------------------|----------|
+| `pcnet` | AMD Am79C970A ("PCnet-II")            | QEMU, VirtualBox |
+| `ne2k`  | Novell/Eagle NE2000 (QEMU: `ne2k_isa`) | QEMU only |
+
+```json
+{"devices": {"net0": {"attachment": "nat", "model": "ne2k"}}}
+```
+
+Omitted, the chipset resolves per platform — every current platform
+defaults to `pcnet`, since it's the one chipset both built backends
+actually emulate, the same reasoning that makes `ide` the universal
+`controller` default. Naming a model the guest's own driver actually
+needs (a packet driver or network stack that only ships an NE2000
+driver, for instance) is exactly the case `model` exists for.
+Checked against the assigned backend the same way `controller` is:
+`ne2k` is real hardware, just not hardware VirtualBox emulates, so
+declaring it on a machine assigned to any other backend is a
+capability error naming both, the same test `controller`'s
+`nvme`/`virtio` already pass — the bar is whether the chipset is
+real, general hardware, not whether every backend emulates it today.
+
+#### What a NIC entry deliberately leaves unsaid
+
 - **Any interface name at all, for `nat`.** A NAT attachment needs
   nothing host-specific, which is exactly why it needs no override.
 
@@ -1063,6 +1097,8 @@ when it asks for:
 - a control plane the backend can't offer;
 - a network attachment the backend can't provide (`bridged` on a
   backend that hasn't built it);
+- a NIC model the backend can't provide (`ne2k` on any backend but
+  QEMU);
 - a boot order the backend can't honor;
 - a `backend-settings` key the assigned backend doesn't define, or
   one of its arguments that restates a field Reliquary already

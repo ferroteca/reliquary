@@ -31,19 +31,23 @@ different arguments.
 
 ## Network: real demand exists, but it isn't a machine-shape question
 
-> **Superseded in part (D120, 2026-08-29).** Real demand for a
+> **Superseded (D120/D121/D122, 2026-08-29).** Real demand for a
 > first-class network field showed up (owner, U28) — for choosing
-> whether a NIC is host-only or reaches the wider network, not for
-> naming a chipset. `network` (`net0`, `net1`, …) is now first-class
-> vocabulary, closed to the attachment `nat`/`bridged`, exactly the
-> shape this section originally called for ("its cross-backend
-> vocabulary should describe *attachment* ... never specific card
-> names") — that conclusion held throughout and is what shipped. What
-> changed is only the "not right now" half: the field existed as a
-> design, not code, until real demand actually showed up. The NIC
-> chipset still never appears in the blueprint, exactly as this
-> section said — it's resolved per platform, the same table platform
-> memory defaults already live in.
+> whether a NIC is host-only or reaches the wider network. `net`
+> slots (`net0`, `net1`, …) are now first-class vocabulary, closed to
+> the attachment `nat`/`bridged`, exactly the shape this section
+> originally called for ("its cross-backend vocabulary should
+> describe *attachment* ... never specific card names") — landed
+> first as its own `network` field (D120), then folded into the same
+> `devices` map drives already live in, hours later (D121). This
+> section's flat claim that the chipset should *never* be named did
+> not hold, though: DOS-era networking software is often written
+> against one specific chipset, and the platform default isn't always
+> it, so `model` became an optional override the same day (D122),
+> checked per backend the same way `controller`'s `nvme`/`virtio`
+> already are. The chipset still defaults per platform when
+> unstated — this section's reasoning about the *default* was right,
+> its reasoning about there being no *override* wasn't.
 
 This is the one item here with demand that's already been delivered.
 The script's `http` block (docs/spec/http-serve.md) declares that the

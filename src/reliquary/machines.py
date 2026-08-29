@@ -91,13 +91,11 @@ _PLATFORM_MEMORY = {
     "winnt": 256,
 }
 
-#: The NIC chipset each platform gets by default (D120). Every
+#: The NIC chipset each platform gets by default (D120), when a
+#: `devices` NIC doesn't name one itself (`model`, D122). Every
 #: current platform gets `pcnet`, since it's the one chipset both
 #: built backends actually emulate — the same reasoning that makes
-#: `ide` the universal `controller` default. There is no author
-#: override: which chipset drives a connection is a fact about the
-#: guest's own drivers, not a choice a blueprint makes (P10) — only
-#: the attachment (`nat`/`bridged`) is authored.
+#: `ide` the universal `controller` default.
 _PLATFORM_NIC = {
     "dos": "pcnet",
     "openbsd": "pcnet",
@@ -113,12 +111,11 @@ def _resolve_nic_model(platform):
 def _resolve_network(network, platform, bound_values):
     """This machine's ``network`` slots, resolved into state entries.
 
-    The chipset is the platform default (D120) — never authored, so
-    never something to reconcile per slot. ``interface`` is
-    substituted from ``bound_values`` when it's a property reference;
-    a plain string or an omitted interface passes through unchanged.
+    ``model`` is whatever the blueprint named (D122), or the platform
+    default (D120) when it named none. ``interface`` is substituted
+    from ``bound_values`` when it's a property reference; a plain
+    string or an omitted interface passes through unchanged.
     """
-    model = _resolve_nic_model(platform)
     resolved = {}
     for key, net in sorted(network.items()):
         interface = net.interface
@@ -127,7 +124,7 @@ def _resolve_network(network, platform, bound_values):
                 interface, bound_values, f"network.{key}.interface")
         resolved[key] = {
             "attachment": net.attachment, "interface": interface,
-            "model": model,
+            "model": net.model or _resolve_nic_model(platform),
         }
     return resolved
 
@@ -137,7 +134,6 @@ def _dry_network(network, platform, bound_values):
     interface — a dry run must never fail on a key nothing answered,
     the same leniency :func:`_dry_payload` already gives a location.
     """
-    model = _resolve_nic_model(platform)
     resolved = {}
     for key, net in sorted(network.items()):
         interface = net.interface
@@ -147,7 +143,7 @@ def _dry_network(network, platform, bound_values):
                  if ref.target in bound_values), None)
         resolved[key] = {
             "attachment": net.attachment, "interface": interface,
-            "model": model,
+            "model": net.model or _resolve_nic_model(platform),
         }
     return resolved
 
@@ -244,17 +240,18 @@ def _requirements(machine, namespace):
             modes.append(item.materialize)
     network_attachments = sorted(
         {net.attachment for net in machine.network.values()})
-    network_models = (
-        (_resolve_nic_model(machine.platform),) if machine.network else ())
+    network_models = sorted({
+        net.model or _resolve_nic_model(machine.platform)
+        for net in machine.network.values()})
     return backends.Requirements(
         control_planes=tuple(planes), media=tuple(media),
         controllers=tuple(controllers), materialize=tuple(modes),
         pointing_device=_resolve_pointing_device(machine),
         network_attachments=tuple(network_attachments),
-        network_models=network_models)
+        network_models=tuple(network_models))
 
 
-def _blueprint_digest(resolved, drives):
+def _blueprint_digest(resolved, devices):
     """Hash the resolved blueprint into the digest `apply` compares
     against.
 
@@ -267,10 +264,10 @@ def _blueprint_digest(resolved, drives):
     """
     observed = {"path", "launch-size"}
     snapshot = dict(resolved)
-    snapshot["drives"] = {
+    snapshot["devices"] = {
         key: {name: value for name, value in entry.items()
               if name not in observed}
-        for key, entry in drives.items()
+        for key, entry in devices.items()
     }
     canonical = json.dumps(
         snapshot, sort_keys=True, separators=(",", ":"))
@@ -431,6 +428,9 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         resolved_drives[key] = _materialize_drive(
             key, drive, adapter, disks_root, namespace, context,
             properties, events)
+    resolved_network = _resolve_network(machine.network, machine.platform,
+                                        properties or {})
+    resolved_devices = {**resolved_drives, **resolved_network}
 
     memory = machine.memory
     if memory is None:
@@ -445,8 +445,6 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         "description": machine.description,
         "control-planes": control_planes,
         "pointing-device": _resolve_pointing_device(machine),
-        "network": _resolve_network(machine.network, machine.platform,
-                                    properties or {}),
         "backend-settings": {
             name: dict(section)
             for name, section in machine.backend_settings.items()},
@@ -459,9 +457,9 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         "phase": "ready",
         "generation": 0,
         "backend-id": f"reliquary-{machine_id}",
-        "blueprint-digest": _blueprint_digest(resolved, resolved_drives),
+        "blueprint-digest": _blueprint_digest(resolved, resolved_devices),
         **resolved,
-        "drives": resolved_drives,
+        "devices": resolved_devices,
     }
     if source is not None:
         state["blueprint-source"] = os.path.abspath(os.fspath(source))
@@ -766,6 +764,10 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
                    bound.values, entries)
         for key, drive in sorted(machine.drives.items()) if drive.enabled]
     _refuse_missing(entries)
+    network = [
+        {**entry, "key": key} for key, entry in sorted(
+            _dry_network(machine.network, machine.platform,
+                        bound.values).items())]
     memory = machine.memory
     if memory is None:
         memory = _PLATFORM_MEMORY.get(machine.platform, 16)
@@ -784,9 +786,7 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         "boot": list(machine.boot),
         "control-planes": _resolve_control_planes(machine),
         "pointing-device": _resolve_pointing_device(machine),
-        "network": _dry_network(machine.network, machine.platform,
-                                bound.values),
-        "drives": drives,
+        "devices": drives + network,
         "media": entries,
         "properties": dict(bound.sources),
     }
@@ -797,9 +797,9 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
                   plan=plan)
 
 
-def _network_line(key, entry):
+def _network_line(entry):
     """One NIC's line in the report: its attachment, model, and interface."""
-    line = f"  {key} ({entry['attachment']}, {entry['model']})"
+    line = f"  {entry['key']} ({entry['attachment']}, {entry['model']})"
     if entry["attachment"] == "bridged":
         line += f": {entry['interface'] or '(qemu default / backend default)'}"
     return line
@@ -851,13 +851,14 @@ def _dry_report(plan):
         lines.append("boot: " + ", ".join(plan["boot"]))
     lines.append("control planes: " + ", ".join(plan["control-planes"]))
     lines.append(f"pointing device: {plan['pointing-device']}")
-    if plan["network"]:
+    drives = [d for d in plan["devices"] if "medium" in d]
+    network = [d for d in plan["devices"] if "attachment" in d]
+    if network:
         lines.append("network:")
-        lines.extend(_network_line(key, entry)
-                     for key, entry in sorted(plan["network"].items()))
-    if plan["drives"]:
+        lines.extend(_network_line(entry) for entry in network)
+    if drives:
         lines.append("drives:")
-        lines.extend(_drive_line(drive) for drive in plan["drives"])
+        lines.extend(_drive_line(drive) for drive in drives)
     if plan["media"]:
         lines.append("media:")
         lines.extend(_media_line(entry) for entry in plan["media"])
@@ -1099,9 +1100,15 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             parsed, namespace, explicit=properties,
             properties_file=properties_file, context=context)
         disks_root = machine_disks_dir(machine_id, context)
+        old_devices = state.get("devices", {})
+        old_drives = {key: entry for key, entry in old_devices.items()
+                     if "medium" in entry}
         new_drives = _reconcile_drives(
-            parsed, namespace, state.get("drives", {}), adapter, disks_root,
+            parsed, namespace, old_drives, adapter, disks_root,
             context, bound, events)
+        new_network = _resolve_network(parsed.network, parsed.platform,
+                                       bound)
+        new_devices = {**new_drives, **new_network}
 
         memory = parsed.memory
         if memory is None:
@@ -1116,15 +1123,13 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             "description": parsed.description,
             "control-planes": control_planes,
             "pointing-device": _resolve_pointing_device(parsed),
-            "network": _resolve_network(parsed.network, parsed.platform,
-                                        bound),
             "backend-settings": {
                 name: dict(section)
                 for name, section in parsed.backend_settings.items()},
         }
         state.update(resolved)
-        state["drives"] = new_drives
-        state["blueprint-digest"] = _blueprint_digest(resolved, new_drives)
+        state["devices"] = new_devices
+        state["blueprint-digest"] = _blueprint_digest(resolved, new_devices)
         if path is not None:
             state["blueprint-source"] = os.path.abspath(path)
         state["generation"] = state.get("generation", 0) + 1
@@ -1275,9 +1280,10 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
             f"machine {machine_id} cannot start "
             f"(phase: {phase})", rule_id="machine.phase-cannot-start")
 
-    drives = state.get("drives", {})
+    devices = state.get("devices", {})
+    drives = [entry for entry in devices.values() if "medium" in entry]
     namespace = load_namespace(context)
-    for drive in drives.values():
+    for drive in drives:
         media_name = drive.get("media")
         # Re-resolve attached (`use`) payloads and re-verify their
         # hashes; per-machine images (new/difference/copy) keep their
@@ -1290,10 +1296,10 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
     # medium is attached at launch, so record it: a later live
     # swap must match, and this is the only moment the fact is
     # knowable.
-    for drive in drives.values():
+    for drive in drives:
         if drive.get("medium") == "floppy":
             drive["launch-size"] = _medium_size(drive.get("path"))
-    state["drives"] = drives
+    state["devices"] = devices
     # A machine variable belongs to one boot: a script `set` it
     # while the guest ran, so the next start starts empty.
     state.pop("variables", None)
@@ -1407,7 +1413,7 @@ _REMOVABLE_MEDIA = {"floppy", "cdrom"}
 
 def _removable_drive(state, slot):
     """Return the mutable state entry for a removable drive slot."""
-    drive = state.get("drives", {}).get(slot)
+    drive = state.get("devices", {}).get(slot)
     if drive is None:
         raise PreflightError(
             f"machine {state['id']} declares no "
@@ -1530,7 +1536,7 @@ def insert_media(machine_id, slot, media=None, *, file=None, context=None,
         path = (_anonymous_local(file) if file is not None
                 else _fetch(media, context, events=events,
                             cancelled=cancelled))
-        drive = state["drives"][slot]
+        drive = state["devices"][slot]
         if state.get("phase") == "running":
             _check_live_geometry(state, slot, drive, path)
             _change_media_live(machine_id, slot, path, context)
@@ -1555,7 +1561,7 @@ def eject_media(machine_id, slot, *, context=None):
         _removable_drive(state, slot)
         if state.get("phase") == "running":
             _change_media_live(machine_id, slot, None, context)
-        drive = state["drives"][slot]
+        drive = state["devices"][slot]
         drive["media"] = None
         drive["materialize"] = None
         drive["path"] = None
@@ -1581,7 +1587,8 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
                 f"machine {machine_id} must be stopped "
                 f"to change boot order (phase: {phase})",
                 rule_id="machine.must-be-stopped")
-        drives = state.get("drives", {})
+        drives = {key: entry for key, entry in state.get("devices", {}).items()
+                 if "medium" in entry}
         if not isinstance(boot_keys, (list, tuple)) or not boot_keys:
             raise StaticError("boot order requires at least one drive key",
                 rule_id="drive.boot-empty")

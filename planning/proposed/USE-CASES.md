@@ -513,7 +513,7 @@ has an equivalent CLI command (U9).
        "scripts": {
          "ready": "driver-ready"
        },
-       "drives": {
+       "devices": {
          "hdd0": {
            "type": "media",
            "name": "dos-base",

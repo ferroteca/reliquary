@@ -10,7 +10,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > [the composed blueprint model](spec/blueprint-model.md).
 
 > **Status:** examples using the implemented subset (`platform`,
-> `memory`, `drives` naming media, `boot`, `description`, `scripts`,
+> `memory`, `devices` naming media and NICs, `boot`, `description`, `scripts`,
 > and the `media` components they name) are parsed, validated,
 > resolved, and materialized. The remaining fields may still change
 > before first release.
@@ -46,7 +46,7 @@ drive:
   "type": "machine",
   "name": "msdos622",
   "platform": "dos",
-  "drives": {
+  "devices": {
     "floppy": "msdos622-boot"
   }
 }
@@ -69,7 +69,7 @@ The state after `create` on a host where QEMU was selected:
   "backend-id": "reliquary-msdos-0",
   "memory": 16,
   "cpus": 1,
-  "drives": {
+  "devices": {
     "floppy0": {
       "medium": "floppy",
       "slot": 0,
@@ -112,7 +112,7 @@ memory avoids the FreeDOS LiveCD's low-RAM warning:
     "name": "freedos-install",
     "platform": "dos",
     "memory": "32M",
-    "drives": {
+    "devices": {
       "hdd": "blank-20m",
       "cdrom": null
     },
@@ -172,7 +172,7 @@ an already-installed DOS image:
     "type": "machine",
     "name": "dos-rig",
     "platform": "dos",
-    "drives": {
+    "devices": {
       "hdd": "dos622-installed"
     }
   },
@@ -220,7 +220,7 @@ converting to the backend's preferred format if it needs to:
     "type": "machine",
     "name": "nt4-rig",
     "platform": "winnt",
-    "drives": {
+    "devices": {
       "hdd": "nt4-installed"
     }
   },
@@ -255,7 +255,7 @@ they live under `backend-settings.qemu`:
     "name": "dos-486",
     "platform": "dos",
     "backend": "qemu",
-    "drives": {
+    "devices": {
       "hdd": "blank-100m"
     },
     "backend-settings": {
@@ -311,7 +311,7 @@ default:
     "name": "win98",
     "platform": "win9x",
     "memory": "128M",
-    "drives": {
+    "devices": {
       "hdd": "blank-2g",
       "cdrom": "win98se"
     },
@@ -351,7 +351,7 @@ two mounted ISOs:
   "type": "machine",
   "name": "many-slots",
   "platform": "dos",
-  "drives": {
+  "devices": {
     "floppy0": "boot-floppy",
     "floppy1": "driver-floppy",
     "cdrom0": "apps-cd",
@@ -381,7 +381,7 @@ installer CD on IDE:
     "type": "machine",
     "name": "nt4",
     "platform": "winnt",
-    "drives": {
+    "devices": {
       "hdd": {
         "media": "nt4-blank-4g",
         "controller": "scsi"
@@ -432,7 +432,7 @@ them.
     "type": "machine",
     "name": "win98",
     "platform": "win9x",
-    "drives": {
+    "devices": {
       "hdd": "blank-2g",
       "cdrom": null
     },
@@ -474,6 +474,6 @@ Both of these are value seams — you're only changing a value the
 blueprint already exposes. Installing the *German* edition instead
 would be a
 [composition seam](blueprint-guide.md#customization-seams): you'd
-point the seeded blueprint's `drives` media reference and `scripts`
+point the seeded blueprint's `devices` media reference and `scripts`
 map at a different, localized media/script pair, since each install
 script only works against the specific installer it was written for.

@@ -10,6 +10,6 @@
     cpus: +1,
     memory: 0x10,
     /* the empty removable slot a script fills */
-    drives: { cdrom0: null, },
+    devices: { cdrom0: null, },
   },
 ]

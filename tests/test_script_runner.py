@@ -1688,7 +1688,7 @@ class _Preflight:
             "phase": phase,
             "backend": backend,
             "control-planes": list(planes),
-            "drives": drives if drives is not None else {
+            "devices": drives if drives is not None else {
                 "hdd0": {"medium": "hdd", "slot": 0, "size": "20M",
                          "path": "blank.qcow2"},
             },
@@ -1755,7 +1755,7 @@ def test_a_property_media_reference_is_not_preflighted(preflight):
         _HEAD + "machine stopped\nproperty media disk\n"
         "insert cdrom0 $disk\n")
     state = {"id": preflight.machine_id, "phase": "ready",
-             "drives": {"cdrom0": {"medium": "cdrom", "slot": 0}}}
+             "devices": {"cdrom0": {"medium": "cdrom", "slot": 0}}}
     _preflight_machine_rules(script, state, "<script>", preflight.home)
 
 
@@ -1974,7 +1974,7 @@ def test_a_property_font_reference_is_not_preflighted(preflight):
     script = parse_script(
         _HEAD + "machine stopped\nproperty media chosen\n"
         "font $chosen\n")
-    state = {"id": preflight.machine_id, "phase": "ready", "drives": {}}
+    state = {"id": preflight.machine_id, "phase": "ready", "devices": {}}
     _preflight_machine_rules(script, state, "<script>", preflight.home)
 
 
@@ -2031,7 +2031,7 @@ def test_a_stopped_script_starts_the_machine_itself(preflight):
             contextlib.redirect_stdout(io.StringIO()):
         machines.load_machine_state.return_value = {
             "id": preflight.machine_id, "phase": "ready",
-            "drives": {"cdrom0": {"medium": "cdrom", "slot": 0}},
+            "devices": {"cdrom0": {"medium": "cdrom", "slot": 0}},
         }
         preflight.execute(
             _HEAD + "machine stopped\ninsert cdrom0 @freedos-livecd\n")
@@ -2093,7 +2093,7 @@ def test_the_previous_handler_is_restored():
 _SCOPED_MACHINE = {
     "phase": "ready",
     "boot": ["hdd0", "cdrom0"],
-    "drives": {"hdd0": {"medium": "hdd"},
+    "devices": {"hdd0": {"medium": "hdd"},
                "cdrom0": {"medium": "cdrom", "media": None, "path": None}},
 }
 
@@ -2122,11 +2122,11 @@ class _ScopedRun:
         return state
 
     def insert(self, _machine, slot, media=None, *, file=None, **_kwargs):
-        self.state["drives"][slot].update(
+        self.state["devices"][slot].update(
             {"media": media, "path": file or f"/cache/media/{media}.iso"})
 
     def eject(self, _machine, slot, **_kwargs):
-        self.state["drives"][slot].update({"media": None, "path": None})
+        self.state["devices"][slot].update({"media": None, "path": None})
 
     @property
     def boot_orders(self):
@@ -2322,7 +2322,7 @@ def test_a_media_restore_needs_no_stopped_machine():
 def test_a_media_restore_reinstates_the_medium_it_found():
     occupied = json.loads(json.dumps(_SCOPED_MACHINE))
     occupied["phase"] = "running"
-    occupied["drives"]["cdrom0"].update(
+    occupied["devices"]["cdrom0"].update(
         {"media": "tools", "path": "/cache/media/tools.iso"})
     with _scoped("platform dos\nentry a\n"
                  "with eject cdrom0 {\n    phase a {\n"
@@ -2354,7 +2354,7 @@ def test_a_scoped_head_answers_to_the_same_preflight_rules():
         "platform dos\nmachine stopped\nentry a\nwith boot cdrom7 {\n"
         "    phase a {\n        finish\n    }\n}\n")
     with pytest.raises(ScriptPreflightError) as caught:
-        _preflight_machine_rules(script, {"drives": {"hdd0": {}}}, "s.rlqs")
+        _preflight_machine_rules(script, {"devices": {"hdd0": {}}}, "s.rlqs")
     assert "the machine declares no drive cdrom7" in str(caught.value)
     assert caught.value.rule_id == "machine.slot-not-declared"
 
@@ -2364,5 +2364,5 @@ def test_a_scoped_insert_head_must_name_a_removable_slot():
         "platform dos\nwith insert hdd0 @livecd {\n    start\n}\n")
     with pytest.raises(ScriptPreflightError) as caught:
         _preflight_machine_rules(
-            script, {"drives": {"hdd0": {"medium": "hdd"}}}, "s.rlqs")
+            script, {"devices": {"hdd0": {"medium": "hdd"}}}, "s.rlqs")
     assert caught.value.rule_id == "machine.slot-not-removable"

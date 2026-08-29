@@ -272,7 +272,7 @@ def materialized_state(tmp_path):
     root.mkdir()
     (root / "state-bp.rlqb").write_text(
         '[{"type": "machine", "name": "state-bp", "platform": "dos", '
-        '"drives": {"cdrom0": null}}]', encoding="utf-8")
+        '"devices": {"cdrom0": null}}]', encoding="utf-8")
     context = Context(home_dir=str(tmp_path / "home"),
                       blueprints_dir=str(root), scripts_dir=str(root))
     with fake_backend.installed():

@@ -68,7 +68,7 @@ def test_every_declared_mode_parses(mode):
 def test_root_array_of_specs():
     doc = _parse([
         {"type": "machine", "name": "rig", "platform": "dos",
-         "drives": {"hdd0": "blank", "cdrom0": None}},
+         "devices": {"hdd0": "blank", "cdrom0": None}},
         {"type": "media", "name": "blank", "materialize": "new",
          "size": "20M"}])
     assert set(doc.machines) == {"rig"}
@@ -177,7 +177,7 @@ def test_names_collide_case_insensitively():
 
 def test_the_blank_is_in_no_namespace():
     doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
-                   "drives": {"hdd0": {"size": "20M"}}}])
+                   "devices": {"hdd0": {"size": "20M"}}}])
     assert doc.media == {}
     drive = doc.machines["rig"].drives["hdd0"]
     assert drive.media is None
@@ -189,8 +189,8 @@ def test_the_blank_is_in_no_namespace():
 
 def test_a_named_inline_media_joins_the_catalog():
     doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
-                   "drives": {"cdrom0": {"type": "media", "name": "cd",
-                                         "location": "cd.iso"}}}])
+                   "devices": {"cdrom0": {"type": "media", "name": "cd",
+                                          "location": "cd.iso"}}}])
     assert "cd" in doc.media
     assert doc.machines["rig"].drives["cdrom0"].media == "cd"
 
@@ -302,8 +302,8 @@ def test_only_local_rungs_anchor_in_a_mirror_list(root):
 def test_an_inline_drive_media_anchors(root):
     doc = _load_file(root, [{
         "type": "machine", "name": "rig", "platform": "dos",
-        "drives": {"cdrom0": {"type": "media", "name": "cd",
-                              "location": "cd.iso"}}}])
+        "devices": {"cdrom0": {"type": "media", "name": "cd",
+                               "location": "cd.iso"}}}])
     anchored = os.path.join(root, "cd.iso")
     assert doc.media["cd"].location[0].local == anchored
     inline = doc.machines["rig"].drives["cdrom0"].inline
@@ -403,7 +403,7 @@ def test_state_only_field_rejected():
 def test_hdd_null_rejected():
     with pytest.raises(StaticError):
         parse_document([{"type": "machine", "name": "rig",
-                         "platform": "dos", "drives": {"hdd0": None}}])
+                         "platform": "dos", "devices": {"hdd0": None}}])
 
 
 # A blueprint diagnostic cites a line and column (D70).
@@ -428,9 +428,9 @@ def test_an_unknown_field_is_located_at_the_field(root):
         root,
         '[\n'
         '  { "type": "machine", "name": "b", "platform": "dos",\n'
-        '    "drives": { "hdd0": { "media": "d", "bogus": 1 } } }\n'
+        '    "devices": { "hdd0": { "media": "d", "bogus": 1 } } }\n'
         ']\n')
-    assert (error.line, error.column) == (3, 41)
+    assert (error.line, error.column) == (3, 42)
     assert error.rule_id == "field.unknown"
 
 
@@ -469,7 +469,7 @@ def test_an_array_element_is_located_at_the_element(root):
         root,
         '[\n'
         '  { "type": "machine", "name": "b", "platform": "dos",\n'
-        '    "drives": { "hdd0": "d" },\n'
+        '    "devices": { "hdd0": "d" },\n'
         '    "boot": ["hdd0",\n'
         '             "cdrom0"] }\n'
         ']\n')
@@ -502,7 +502,7 @@ def test_the_breadcrumb_is_unchanged_by_locating(root):
 
 def _machine_with_network(network):
     return _parse([{"type": "machine", "name": "rig", "platform": "dos",
-                    "network": network}]).machines["rig"]
+                    "devices": network}]).machines["rig"]
 
 
 def test_a_bare_attachment_name_is_shorthand():
@@ -529,6 +529,34 @@ def test_an_interface_may_be_a_property_reference():
     interface = machine.network["net0"].interface
     assert isinstance(interface, document.Deferred)
     assert interface.references[0].target == "host-nic"
+
+
+# The NIC model override (D122): omitted, it's platform-resolved
+# (never authored); named, it's a closed vocabulary checked the same
+# way the attachment is.
+
+def test_a_model_may_be_named_explicitly():
+    machine = _machine_with_network(
+        {"net0": {"attachment": "nat", "model": "ne2k"}})
+    assert machine.network["net0"].model == "ne2k"
+
+
+def test_a_model_is_optional():
+    machine = _machine_with_network({"net0": "nat"})
+    assert machine.network["net0"].model is None
+
+
+def test_a_model_is_valid_on_either_attachment():
+    machine = _machine_with_network(
+        {"net0": {"attachment": "bridged", "model": "pcnet"}})
+    assert machine.network["net0"].model == "pcnet"
+
+
+def test_an_unknown_model_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_network({"net0": {"attachment": "nat",
+                                        "model": "e1000"}})
+    assert caught.value.rule_id == "value.not-in-vocabulary"
 
 
 def test_an_interface_on_nat_is_refused():
@@ -561,15 +589,31 @@ def test_net_slots_run_zero_to_three():
     assert machine.network["net3"].attachment == "nat"
     with pytest.raises(StaticError) as caught:
         _machine_with_network({"net4": "nat"})
-    assert caught.value.rule_id == "network.slot-out-of-range"
+    assert caught.value.rule_id == "device.slot-out-of-range"
 
 
 def test_an_invalid_network_key_is_refused():
     with pytest.raises(StaticError) as caught:
         _machine_with_network({"eth0": "nat"})
-    assert caught.value.rule_id == "network.key-invalid"
+    assert caught.value.rule_id == "device.key-invalid"
 
 
 def test_a_machine_with_no_network_declares_none():
     machine = _machine_with_network({})
     assert machine.network == {}
+
+
+def test_drives_and_nics_share_one_devices_map():
+    doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                   "devices": {"hdd0": "blank", "net0": "nat"}}])
+    machine = doc.machines["rig"]
+    assert set(machine.devices) == {"hdd0", "net0"}
+    assert set(machine.drives) == {"hdd0"}
+    assert set(machine.network) == {"net0"}
+
+
+def test_boot_refuses_a_network_slot():
+    with pytest.raises(StaticError) as caught:
+        _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                 "devices": {"net0": "nat"}, "boot": ["net0"]}])
+    assert caught.value.rule_id == "drive.boot-undeclared"

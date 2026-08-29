@@ -124,12 +124,105 @@ pressure worth re-examining once the surrounding area firms up.
 
 ## Decided
 
+- D122 — A `net` DEVICE MAY NAME ITS CHIPSET EXPLICITLY (`model`),
+  OVERRIDING THE PLATFORM DEFAULT, CHECKED PER BACKEND THE SAME WAY
+  `controller`'S `nvme`/`virtio` ALREADY ARE — DECIDED (owner,
+  2026-08-29) and delivered the same day, reopening the half of D120
+  that refused to let a blueprint name a chipset at all. Supports
+  U28; P25.
+
+  THE RULE: D120 concluded the chipset should never be authored,
+  full stop — resolved per platform, with no override, because
+  "which card is used stays owned by the platform table and the
+  backends, not the blueprint." That conclusion turned out to be
+  wrong for a case D120 didn't consider: DOS-era networking software
+  — packet drivers above all — is often written against one specific
+  NIC chipset, not "a network card" in the abstract, and the platform
+  default (`pcnet`) is a fine default precisely because it's *not*
+  what every packet driver expects. Refusing an override entirely
+  would leave no way to reach that software at all.
+
+  So `net0`'s object form gains an optional `model` key, checked the
+  same way D121's own decision text already worked out for
+  `controller`: P25's bar is whether the chipset is real, general
+  hardware, not whether every backend already emulates it. `pcnet`
+  (AMD Am79C970A) is real hardware both QEMU and VirtualBox emulate.
+  `ne2k` (Novell/Eagle NE2000) is real hardware too, but only QEMU's
+  adapter emulates it — admitted anyway, and refused by capability
+  check on any other backend, exactly the way `controller`'s
+  `nvme`/`virtio` already are. Omitting `model` still resolves to the
+  platform default (`_PLATFORM_NIC`); naming it overrides that
+  default for that one slot. Attachment (`nat`/`bridged`) and chipset
+  stay two separate, independent facts — D120's actual point, that
+  reachability and driver compatibility are different questions, is
+  unaffected; only "the second question can never be answered by the
+  blueprint" turned out to be one step too far.
+
+- D121 — `drives` IS RENAMED `devices`, AND `net` KEYS JOIN IT AS A
+  SIBLING MEDIUM SHARING THE SAME SLOT-KEYED MAP AND KEY-CLASH CHECK
+  — DECIDED (owner, 2026-08-29) and delivered the same day, extending
+  D120 the same day it landed. Supports U28; P25.
+
+  THE RULE: `devices` is the one authored field for everything
+  attached to a machine — drives (`floppy`/`hdd`/`cdrom`) and NICs
+  (`net`) — discriminated by the key's own medium prefix, never by a
+  separate `type` tag. A `hdd0` and a `net0` in the same `devices`
+  map are unrelated concepts sharing nothing but the map and the
+  slot-key grammar; declaring the same slot twice, in any spelling,
+  across either kind, is one clash check, not two.
+
+  This is a naming and shape change, not a new capability: nothing
+  about what a drive or a NIC *is* changed, and P25's bar (a portable
+  field's vocabulary applies generally, not that every value is
+  honored everywhere — see D120) is unaffected either way. What
+  changed is that the earlier two-field shape (`drives` and, freshly
+  landed the same day, a separate `network` field) never actually
+  matched what was being asked for: the owner's model for this was
+  always one merged device inventory, the way `docs/spec/
+  blueprint-model.md`'s own "topology" framing already implied before
+  either field existed. Landing `network` as its own field first,
+  then merging it into `devices` hours later, means D120's own text
+  should be read as superseded on this one point — its `nat`/`bridged`
+  vocabulary and the "no chipset named" rule it argued for are both
+  still exactly correct and unchanged; only the container they live
+  in changed shape.
+
+  **What stays "drive"-worded on purpose, because the concept
+  genuinely doesn't reach a NIC:** the `MachineDrive` dataclass; the
+  CLI's `insert-media`/`eject-media`/`set-boot-order` commands and
+  the script language's `with boot`/`insert`/`eject` verbs (a NIC
+  can't be inserted, ejected, or booted); `RESERVED_DRIVE_PROPERTIES`
+  and QEMU's own literal `-drive`/`-set drive.<slot>.<property>`
+  syntax (D118); `drive_args()`; boot-order resolution and the
+  `controller` field. `Machine.drives` and `Machine.network` stay as
+  read-only computed views over `Machine.devices`, filtered by type —
+  most of the engine only ever wants one kind or the other
+  (materialization only touches drives; a capability check wants
+  both, separately), and a view keeps that filter in one place
+  instead of an `isinstance` check at every call site. State
+  (`machine.json`) merges the same way: `drives`/`network` become one
+  `devices` map, so `insert_media`/`eject_media`/`set_boot_order` and
+  the script runner's preflight now filter that map by shape (a drive
+  entry carries `medium`, a NIC entry carries `attachment`) rather
+  than getting storage-only behavior for free from a separate map —
+  each of those functions is genuinely drive-only, and now says so by
+  checking rather than by construction.
+
 - D120 — `network` NAMES AN ATTACHMENT (`nat`/`bridged`), NEVER A NIC
   MODEL; THE CHIPSET IS RESOLVED PER PLATFORM, ORTHOGONAL TO
   ATTACHMENT — DECIDED (owner, 2026-08-29) and delivered the same
   day, reopening the network item in
   [proposed/design/device-growth.md](proposed/design/device-growth.md)
   now that real demand exists (U28). Supports U28; P10, P11, P25.
+
+  **Superseded in part, hours later, by D121 and D122**: `network`
+  as a separate top-level field was folded into `devices` alongside
+  `drives` (D121), and "the chipset is never named" was narrowed to
+  "never named unless the blueprint author actually needs to" (D122)
+  — a `model` key overrides the platform default, checked per backend
+  the same way `controller`'s `nvme`/`virtio` are. Everything else
+  below — the `nat`/`bridged` vocabulary and QEMU's bridge handling —
+  is still exactly correct.
 
   THE RULE: whether a guest can reach anything at all (`nat` vs.
   `bridged`) and which chipset drives that connection are two

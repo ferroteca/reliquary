@@ -10,7 +10,7 @@
     "platform": "dos",
     "memory": "32M",
     "description": "Plain FreeDOS 1.4 system installed from the LiveCD",
-    "drives": {
+    "devices": {
       // The blank the installer partitions and formats. Written in
       // place and unnamed: nothing else refers to it, and it is
       // materialized fresh into every machine.

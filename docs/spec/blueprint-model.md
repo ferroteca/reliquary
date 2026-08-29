@@ -64,7 +64,7 @@ defaults to `media` everywhere (below). A blueprint whose lone
 machine forgets `"type": "machine"` therefore fails in the media
 branch — and that branch's unknown-field error carries a
 **did-you-mean** hint when machine vocabulary (`platform`,
-`drives`, `boot`, `scripts`, …) appears, so the diagnosis is one
+`devices`, `boot`, `scripts`, …) appears, so the diagnosis is one
 line rather than a puzzle.
 
 A root array element that is a **bare string** is a media
@@ -99,11 +99,13 @@ required type is an error.
 
 Topology only — no content lives here. `platform` (required,
 never inferred — P10), `backend`, `memory`, `cpus`, `boot`,
-`control-planes`, `pointing-device`, `network`, `backend-settings`,
+`control-planes`, `pointing-device`, `devices`, `backend-settings`,
 `description`, `scripts`, `parameters`, and `name`.
 
-`drives` maps a slot key (`hdd0`, `cdrom0`, `floppy0`, …) to one
-of:
+`devices` maps a slot key (`hdd0`, `cdrom0`, `floppy0`, `net0`, …)
+to a drive or a NIC — the two kinds share one map and one key-clash
+check, discriminated by the key's own medium (D121). A drive value
+is one of:
 
 - a **media name** (string) — the catalog reference;
 - **`null`** — a declared but empty removable slot a script
@@ -116,7 +118,8 @@ of:
 The first round's four-way content selector (`size` / `base` /
 `media` / `hostdir`) is gone. A media name is the machine's one
 cross-boundary reference: **to change how a drive materializes,
-change the media, or point the drive at a different one.**
+change the media, or point the drive at a different one.** A NIC
+value is described below, under `net` keys.
 
 #### What the topology fields mean
 
@@ -137,24 +140,32 @@ cannot carry.
   rounded. Omitted, it takes the platform's default — dos 16,
   openbsd 512, win9x 64, winnt 256.
 - **`cpus`** defaults to 1.
-- **drive keys** name a medium and a slot (`floppy` 0–1, `hdd`
-  0–3, `cdrom` 0–3). The **bare medium is an alias for slot 0**
-  (`hdd` ≡ `hdd0`); the state always records the indexed form.
-  Declaring both spellings of one slot is a **clash** and fails
-  validation, as does a slot outside its medium's range.
+- **device keys** name a medium and a slot (`floppy` 0–1, `hdd`
+  0–3, `cdrom` 0–3, `net` 0–3), all sharing one keyspace and one
+  clash check (D121) — declaring `hdd0` and `net0` in the same
+  `devices` map is fine, but naming one slot twice, in either
+  spelling, is a **clash** and fails validation, as does a slot
+  outside its medium's range. Only drive keys (`floppy`/`hdd`/
+  `cdrom`) get the **bare-medium-is-an-alias-for-slot-0** shorthand
+  (`hdd` ≡ `hdd0`); a NIC is always named by its full slot key. The
+  state always records the indexed form.
 - **`controller`** is valid on `hdd` and `cdrom` only — a floppy
   attaches to the floppy controller implicitly and **rejects the
   key**. Omitted, it resolves to `ide`, recorded into the state at
   creation.
-- **`network`** (D120) maps a slot key (`net0`, `net1`, …, 0–3, the
-  same range `hdd` and `cdrom` use) to a NIC's **attachment**: either
+- **`net` keys** (D120) name a NIC's **attachment**: either
   an attachment name (string) — `nat` or `bridged` — or an object
-  carrying `attachment` plus, for `bridged` only, `interface`. The
-  attachment is the only thing a blueprint states; which chipset is
-  emulated is never named here — it's resolved per platform at
-  materialization, the same way a controller default is, because the
-  choice of `nat` vs. `bridged` is orthogonal to platform while the
-  chipset isn't a choice a blueprint author needs to make at all.
+  carrying `attachment` plus optional `interface` (`bridged` only)
+  and `model`. The choice of `nat` vs. `bridged` is orthogonal to
+  platform, so it's always author-stated; which chipset is emulated
+  is resolved per platform when `model` is omitted, the same way a
+  controller default is — but naming `model` explicitly overrides
+  that default (D122), the same test `controller`'s `nvme`/`virtio`
+  values already pass (above): a name only needs to be real,
+  general hardware, not honored by every backend today. `pcnet`
+  (AMD's Am79C970A, "PCnet-II") runs on both QEMU and VirtualBox;
+  `ne2k` (Novell/Eagle NE2000) only exists on QEMU today, checked and
+  refused by name on any other backend at materialization.
   `interface` names the host network interface to bridge onto,
   taking a plain string or a `${key}` reference bound the same way a
   media `location` is — a host interface name is exactly the kind of
@@ -170,14 +181,14 @@ cannot carry.
   materialization, failing closed and naming both (P11) — what isn't
   checked is whether a *named* interface or the default bridge
   actually exists on this host, which stays the backend's own error
-  to raise. An omitted `network` section means the machine has no NIC
+  to raise. No `net` keys in `devices` means the machine has no NIC
   at all.
 
-  This field names an attachment, never a chipset — see D120 for why
-  that split doesn't need P25's cross-backend bar argued twice: a
-  card model choosing a driver is a different question from whether
-  the guest can reach anything at all, and only the latter is
-  authored here.
+  Attachment and chipset are two different questions — whether the
+  guest can reach anything at all, versus which driver it needs —
+  and D120 kept the first one always-authored while D122 made the
+  second one authorable only when it actually matters, defaulting
+  otherwise.
 - **`boot`** entries must each name a drive the machine
   **declares and has not disabled**, and are unique by slot: the
   same slot twice, in either spelling, fails validation. An empty
@@ -241,7 +252,7 @@ cannot carry.
   silently ignored (P11). An adapter that reads no settings
   defines no keys, and therefore refuses every one. Second, **a
   section may not touch what Reliquary already owns** through
-  first-class fields (memory, drives, boot order, CPU count) or
+  first-class fields (memory, devices, boot order, CPU count) or
   through the recorded VM identity — the adapter refuses that
   overlap in its own configuration language, because
   `backend-settings` exists to carry backend-specific
@@ -896,7 +907,7 @@ here because the model depends on it.
 
   { "type": "machine", "name": "freedos-1.4", "platform": "dos",
     "memory": "16M",
-    "drives": { "hdd0": "blank-20m", "cdrom0": null, "floppy0": null },
+    "devices": { "hdd0": "blank-20m", "cdrom0": null, "floppy0": null },
     "boot": ["cdrom0", "hdd0"] }
 ]
 ```
@@ -918,7 +929,7 @@ the codex's own built-in entries stay generic (D21).
     "location": "${media:golden}" },
 
   { "type": "machine", "name": "rig", "platform": "dos", "memory": "64M",
-    "drives": { "hdd0": "scratch" }, "boot": ["hdd0"] }
+    "devices": { "hdd0": "scratch" }, "boot": ["hdd0"] }
 ]
 ```
 

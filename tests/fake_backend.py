@@ -101,7 +101,7 @@ class FakeAdapter(BackendAdapter):
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
             pointing_devices=("tablet", "mouse"),
-            network_models=("pcnet",),
+            network_models=("pcnet", "ne2k"),
             network_attachments=("nat", "bridged"),
         )
         self.images = []

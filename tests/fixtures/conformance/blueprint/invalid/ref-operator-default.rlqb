@@ -4,5 +4,5 @@
 // id: ref.qualifier-unknown
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "memory": "${mem:-512M}", "drives": { "cdrom0": null } }
+    "memory": "${mem:-512M}", "devices": { "cdrom0": null } }
 ]

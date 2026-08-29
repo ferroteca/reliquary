@@ -127,7 +127,7 @@ extension is the blueprint's one and only name):
     "install": "freedos-install",
     "verify": "freedos-verify"
   },
-  "drives": {
+  "devices": {
     "hdd": "blank-20m",
     "cdrom": null
   },
@@ -176,7 +176,7 @@ Writes `blueprints/test-rig.rlqb`:
 ```json
 {
   "machines": [
-    {"name": "test-rig", "platform": "dos", "drives": {"hdd": "blank-20m"}}
+    {"name": "test-rig", "platform": "dos", "devices": {"hdd": "blank-20m"}}
   ],
   "media": [
     {"name": "blank-20m", "materialize": "new", "size": "20M"}
@@ -201,7 +201,7 @@ script will fill (`"cdrom": null`). Resulting shape:
       "name": "freedos",
       "platform": "dos",
       "memory": "32M",
-      "drives": {"hdd": "blank-20m", "cdrom": null},
+      "devices": {"hdd": "blank-20m", "cdrom": null},
       "boot": ["cdrom", "hdd"]
     }
   ],
@@ -593,8 +593,9 @@ rlq apply-blueprint (--blueprint <name> | --machine <id>)
 Applies the current blueprint's changes to a stopped machine. Any
 change the machine can absorb without regenerating a drive — memory,
 boot order, drives enabled or disabled, a media name changed to
-point elsewhere, a `use` media re-fetched, drives added — is applied,
-and the machine's baseline digest is updated to match:
+point elsewhere, a `use` media re-fetched, drives added, a NIC's
+attachment or interface changed — is applied, and the machine's
+baseline digest is updated to match:
 
 ```powershell
 # Edit freedos.rlqb: disable the CD, boot from hard disk

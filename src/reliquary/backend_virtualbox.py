@@ -374,7 +374,7 @@ def drive_attachments(state):
     partition` — and nothing in the blueprint says to order them that
     way.
     """
-    drives = state.get("drives") or {}
+    drives = state.get("devices") or {}
     attachments = {}
     floppies = []
     hdds = []
@@ -412,9 +412,12 @@ def configure_vm(state, vm_name):
     """
     memory = state.get("memory") or 16
     cpus = state.get("cpus") if state.get("cpus") is not None else 1
-    drives = state.get("drives") or {}
+    devices = state.get("devices") or {}
+    drives = {key: entry for key, entry in devices.items()
+             if "medium" in entry}
+    network = {key: entry for key, entry in devices.items()
+              if "attachment" in entry}
     boot = _boot_order(state.get("boot"), drives)
-    network = state.get("network") or {}
     nic_args = []
     for index in range(_NIC_SLOTS):
         entry = network.get(f"net{index}")

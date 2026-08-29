@@ -3,5 +3,5 @@
 // spec: Identity and the catalog
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "drives": { "hdd0": { "size": "20M" } }, "boot": ["hdd0"] }
+    "devices": { "hdd0": { "size": "20M" } }, "boot": ["hdd0"] }
 ]

@@ -35,6 +35,7 @@ _PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
 _BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
 _CONTROLLERS = {"ide", "sata", "scsi", "nvme", "virtio"}
 _ATTACHMENTS = {"nat", "bridged"}
+_NIC_MODELS = {"pcnet", "ne2k"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
 _POINTING_DEVICES = {"tablet", "mouse"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
@@ -45,10 +46,9 @@ _SPEC_TYPES = {"machine", "media"}
 _RETIRED_TYPES = {"source", "archive"}
 _RETIRED_SECTIONS = {"machines", "media", "sources", "archives"}
 
-_DRIVE_KEY = re.compile(r"(floppy|hdd|cdrom)(\d+)?")
-_SLOT_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4}
-_NET_KEY = re.compile(r"net(\d+)")
-_NET_SLOT_LIMIT = 4
+_DEVICE_KEY = re.compile(r"(floppy|hdd|cdrom|net)(\d+)?")
+_SLOT_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4, "net": 4}
+_DRIVE_MEDIA = {"floppy", "hdd", "cdrom"}
 _SIZE = re.compile(r"([1-9][0-9]*)([KMGTkmgt])")
 _SHA256 = re.compile(r"[0-9a-fA-F]{64}")
 _MIB = 1024 * 1024
@@ -318,31 +318,57 @@ class MachineDrive:
 
 @dataclass(frozen=True)
 class MachineNetwork:
-    """One NIC slot: an attachment, and an optional interface to name it.
+    """One NIC slot: an attachment, and optional hardware attributes.
 
     ``interface`` only ever matters for ``bridged`` — ``nat`` needs
-    nothing host-specific. The NIC chipset itself never appears here:
-    it's resolved per platform at materialization (D120), orthogonal
-    to attachment.
+    nothing host-specific. ``model`` overrides the platform-resolved
+    chipset (D122) — omitted, it resolves per platform at
+    materialization (D120), orthogonal to attachment, the same way a
+    drive's ``controller`` defaults to ``ide`` without being named.
     """
 
     key: str
     slot: int
     attachment: str
     interface: Optional[Union[str, Deferred]] = None
+    model: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class Machine:
-    """Machine topology. Drives name media; content lives on the media."""
+    """Machine topology. A device names a medium (a drive) or an
+    attachment (a NIC); content lives on the media a drive names.
+
+    ``devices`` is the one authoritative field, matching the
+    blueprint's own merged shape (D121) — a slot-keyed map of
+    :class:`MachineDrive` and :class:`MachineNetwork` values sharing
+    one keyspace. ``drives`` and ``network`` are read-only computed
+    views over it, filtered by type: most of the engine only ever
+    wants one kind or the other (materialization only touches
+    drives; requirements-gathering wants both, separately), and a
+    view keeps that filter in one place instead of repeated inline
+    ``isinstance`` checks at every call site.
+    """
 
     name: str
     platform: str
     backend: Optional[str] = None
     memory: Optional[Union[int, Deferred]] = None
     cpus: Optional[Union[int, Deferred]] = None
-    drives: Mapping[str, MachineDrive] = field(default_factory=dict)
-    network: Mapping[str, MachineNetwork] = field(default_factory=dict)
+    devices: Mapping[str, Union[MachineDrive, MachineNetwork]] = \
+        field(default_factory=dict)
+
+    @property
+    def drives(self):
+        return types.MappingProxyType({
+            key: device for key, device in self.devices.items()
+            if isinstance(device, MachineDrive)})
+
+    @property
+    def network(self):
+        return types.MappingProxyType({
+            key: device for key, device in self.devices.items()
+            if isinstance(device, MachineNetwork)})
     boot: Tuple[str, ...] = ()
     description: Optional[Union[str, Deferred]] = None
     scripts: Mapping[str, str] = field(default_factory=dict)
@@ -845,7 +871,7 @@ def _location(value, where, register):
 _MEDIA_FIELDS = {"type", "name", "materialize", "size", "location", "sha256",
                  "read-only", "extension", "description", "notes", "children"}
 _CHILD_FIELDS = (_MEDIA_FIELDS - {"location"}) | {"path"}
-_MACHINE_VOCABULARY = {"platform", "backend", "memory", "cpus", "drives",
+_MACHINE_VOCABULARY = {"platform", "backend", "memory", "cpus", "devices",
                        "boot", "scripts", "control-planes",
                        "pointing-device", "backend-settings", "parameters"}
 
@@ -1008,42 +1034,46 @@ def _check_type_echo(value, expected, where):
 # --- machine ---------------------------------------------------------
 
 _MACHINE_FIELDS = {
-    "type", "name", "platform", "backend", "memory", "cpus", "drives",
-    "network", "boot", "description", "scripts", "control-planes",
+    "type", "name", "platform", "backend", "memory", "cpus", "devices",
+    "boot", "description", "scripts", "control-planes",
     "pointing-device", "backend-settings", "parameters",
 }
 _STATE_ONLY = {"id", "backend-id", "blueprint-digest", "blueprint-source"}
 _DRIVE_FIELDS = {"media", "controller", "enabled"}
+_NETWORK_FIELDS = {"attachment", "interface", "model"}
 
 
-def _drive_key(value, where):
+def _device_key(value, where):
+    """Parse one authored device key: any medium sharing the keyspace
+    (D121) — floppy/hdd/cdrom (a drive) or net (a NIC)."""
     if not isinstance(value, str):
-        raise where.error(f"drive keys must be strings, got: {value!r}",
+        raise where.error(f"device keys must be strings, got: {value!r}",
             rule_id="value.not-a-string")
     if "${" in value:
         raise where.error(
-            f"drive key {value!r} takes no reference: an object key is "
+            f"device key {value!r} takes no reference: an object key is "
             "authored graph, and the graph stays static",
             rule_id="ref.not-allowed-here")
-    match = _DRIVE_KEY.fullmatch(value)
+    match = _DEVICE_KEY.fullmatch(value)
     if not match:
         raise where.error(
-            f"invalid drive key {value!r}: expected floppy[0..1], "
-            "hdd[0..3], or cdrom[0..3]", rule_id="drive.key-invalid")
+            f"invalid device key {value!r}: expected floppy[0..1], "
+            "hdd[0..3], cdrom[0..3], or net[0..3]",
+            rule_id="device.key-invalid")
     medium = match.group(1)
     slot = int(match.group(2) or 0)
     if slot >= _SLOT_LIMITS[medium]:
         raise where.error(
-            f"invalid drive key {value!r}: {medium} slots run from "
+            f"invalid device key {value!r}: {medium} slots run from "
             f"0 to {_SLOT_LIMITS[medium] - 1}",
-            rule_id="drive.slot-out-of-range")
+            rule_id="device.slot-out-of-range")
     return medium, slot, f"{medium}{slot}"
 
 
 def _controller(value, key, medium, where):
     if medium == "floppy":
         raise where.error(
-            f"drives.{key}.controller is invalid: floppies take no "
+            f"devices.{key}.controller is invalid: floppies take no "
             "controller key", rule_id="drive.controller-on-floppy")
     return _text(value, where, closed=True, allowed=_CONTROLLERS)
 
@@ -1052,7 +1082,7 @@ def _drive(value, key, medium, slot, register, where):
     if value is None:
         if medium == "hdd":
             raise where.error(
-                f"drives.{key} cannot be null: only removable drives "
+                f"devices.{key} cannot be null: only removable drives "
                 "(floppy, cdrom) may be declared empty",
                 rule_id="drive.null-not-removable")
         return MachineDrive(key=key, medium=medium, slot=slot)
@@ -1061,7 +1091,7 @@ def _drive(value, key, medium, slot, register, where):
                             media=_media_name(value, where))
     if not isinstance(value, collections.abc.Mapping):
         raise where.error(
-            f"drives.{key} must be a media name, null, a drive object, or "
+            f"devices.{key} must be a media name, null, a drive object, or "
             "an inline media", rule_id="value.not-a-drive")
     if set(value) - _DRIVE_FIELDS:
         # This object has fields _DRIVE_FIELDS doesn't recognize, so
@@ -1072,63 +1102,19 @@ def _drive(value, key, medium, slot, register, where):
                             media=inline.name, inline=inline)
     if "media" not in value:
         raise where.error(
-            f"drives.{key} must name a media (or be null for an empty "
+            f"devices.{key} must name a media (or be null for an empty "
             "removable slot)", rule_id="drive.without-media")
     controller = (_controller(
         value["controller"], key, medium,
-        where.at(value, "controller", f"drives.{key}.controller"))
+        where.at(value, "controller", f"devices.{key}.controller"))
         if "controller" in value else None)
     return MachineDrive(
         key=key, medium=medium, slot=slot,
         media=_media_name(value["media"],
-                          where.at(value, "media", f"drives.{key}.media")),
+                          where.at(value, "media", f"devices.{key}.media")),
         controller=controller,
         enabled=_flag(value.get("enabled", True),
-                      where.at(value, "enabled", f"drives.{key}.enabled")))
-
-
-def _drives(value, register, where):
-    if not isinstance(value, collections.abc.Mapping):
-        raise where.error("drives must be an object",
-            rule_id="value.not-an-object")
-    normalized, claimed = {}, {}
-    for authored_key, declaration in value.items():
-        site = where.at(value, authored_key, f"drives.{authored_key}")
-        medium, slot, key = _drive_key(authored_key, site)
-        if key in claimed:
-            raise site.error(
-                f"drive key clash: {claimed[key]!r} and {authored_key!r} "
-                f"both mean {key}", rule_id="drive.key-clash")
-        claimed[key] = authored_key
-        normalized[key] = _drive(declaration, key, medium, slot, register,
-                                 where.at(value, authored_key,
-                                          f"drives.{key}"))
-    return types.MappingProxyType(normalized)
-
-
-_NETWORK_FIELDS = {"attachment", "interface"}
-
-
-def _network_key(value, where):
-    if not isinstance(value, str):
-        raise where.error(f"network keys must be strings, got: {value!r}",
-            rule_id="value.not-a-string")
-    if "${" in value:
-        raise where.error(
-            f"network key {value!r} takes no reference: an object key is "
-            "authored graph, and the graph stays static",
-            rule_id="ref.not-allowed-here")
-    match = _NET_KEY.fullmatch(value)
-    if not match:
-        raise where.error(
-            f"invalid network key {value!r}: expected net0..net"
-            f"{_NET_SLOT_LIMIT - 1}", rule_id="network.key-invalid")
-    slot = int(match.group(1))
-    if slot >= _NET_SLOT_LIMIT:
-        raise where.error(
-            f"invalid network key {value!r}: net slots run from 0 to "
-            f"{_NET_SLOT_LIMIT - 1}", rule_id="network.slot-out-of-range")
-    return slot, f"net{slot}"
+                      where.at(value, "enabled", f"devices.{key}.enabled")))
 
 
 def _interface(value, attachment, where):
@@ -1147,41 +1133,54 @@ def _network_device(value, key, slot, where):
                              allowed=_ATTACHMENTS))
     if not isinstance(value, collections.abc.Mapping):
         raise where.error(
-            f"network.{key} must be an attachment name or an object "
-            "carrying attachment/interface", rule_id="value.not-a-network")
+            f"devices.{key} must be an attachment name or an object "
+            "carrying attachment/interface/model",
+            rule_id="value.not-a-network")
     if set(value) - _NETWORK_FIELDS:
         raise where.error(
-            f"network.{key} carries unknown keys; expected attachment, "
-            "interface", rule_id="field.unknown")
+            f"devices.{key} carries unknown keys; expected attachment, "
+            "interface, model", rule_id="field.unknown")
     if "attachment" not in value:
-        raise where.error(f"network.{key} must name an attachment",
+        raise where.error(f"devices.{key} must name an attachment",
             rule_id="network.without-attachment")
     attachment = _text(value["attachment"],
                        where.at(value, "attachment",
-                                f"network.{key}.attachment"),
+                                f"devices.{key}.attachment"),
                        closed=True, allowed=_ATTACHMENTS)
     interface = (_interface(
         value["interface"], attachment,
-        where.at(value, "interface", f"network.{key}.interface"))
+        where.at(value, "interface", f"devices.{key}.interface"))
         if "interface" in value else None)
+    model = (_text(value["model"],
+                   where.at(value, "model", f"devices.{key}.model"),
+                   closed=True, allowed=_NIC_MODELS)
+            if "model" in value else None)
     return MachineNetwork(key=key, slot=slot, attachment=attachment,
-                          interface=interface)
+                          interface=interface, model=model)
 
 
-def _network(value, where):
+def _devices(value, register, where):
+    """Parse the merged ``devices`` map: drives and NICs share one
+    keyspace and one key-clash check (D121), dispatched by medium
+    once the key itself is parsed."""
     if not isinstance(value, collections.abc.Mapping):
-        raise where.error("network must be an object",
+        raise where.error("devices must be an object",
             rule_id="value.not-an-object")
     normalized, claimed = {}, {}
     for authored_key, declaration in value.items():
-        site = where.at(value, authored_key, f"network.{authored_key}")
-        slot, key = _network_key(authored_key, site)
+        site = where.at(value, authored_key, f"devices.{authored_key}")
+        medium, slot, key = _device_key(authored_key, site)
         if key in claimed:
             raise site.error(
-                f"network key clash: {claimed[key]!r} and {authored_key!r} "
-                f"both mean {key}", rule_id="network.key-clash")
+                f"device key clash: {claimed[key]!r} and {authored_key!r} "
+                f"both mean {key}", rule_id="device.key-clash")
         claimed[key] = authored_key
-        normalized[key] = _network_device(declaration, key, slot, site)
+        site = where.at(value, authored_key, f"devices.{key}")
+        if medium == "net":
+            normalized[key] = _network_device(declaration, key, slot, site)
+        else:
+            normalized[key] = _drive(declaration, key, medium, slot,
+                                     register, site)
     return types.MappingProxyType(normalized)
 
 
@@ -1197,18 +1196,23 @@ def _default_boot(drives):
     return ()
 
 
-def _boot(value, drives, where):
+def _boot(value, devices, where):
+    """Validate ``boot`` against the drive-shaped subset of ``devices``
+    — a NIC is never bootable, so ``net0`` is refused here exactly
+    like a genuinely undeclared key (D121)."""
+    drives = {key: device for key, device in devices.items()
+             if isinstance(device, MachineDrive)}
     if not isinstance(value, list):
         raise where.error("boot must be an array of drive keys",
             rule_id="value.not-an-array")
     normalized, seen = [], set()
     for index, authored_key in enumerate(value):
         site = where.at(value, index, f"boot[{index}]")
-        _, _, key = _drive_key(authored_key, site)
+        _, _, key = _device_key(authored_key, site)
         if key not in drives:
             raise site.error(
-                f"boot[{index}] references undeclared drive {key}",
-                rule_id="drive.boot-undeclared")
+                f"boot[{index}] references {key}, which is not a "
+                "declared, bootable drive", rule_id="drive.boot-undeclared")
         if not drives[key].enabled:
             raise site.error(f"boot[{index}] references disabled drive {key}",
                 rule_id="drive.boot-disabled")
@@ -1330,8 +1334,10 @@ def _machine(value, register, *, where=_MACHINE):
     if "name" not in value:
         raise where.error(f"{where} requires a name", rule_id="field.required")
     name = _machine_name(value["name"], at("name"))
-    drives = _drives(value["drives"], register, at("drives")) \
-        if "drives" in value else types.MappingProxyType({})
+    devices = _devices(value["devices"], register, at("devices")) \
+        if "devices" in value else types.MappingProxyType({})
+    device_drives = {key: device for key, device in devices.items()
+                     if isinstance(device, MachineDrive)}
     empty = types.MappingProxyType({})
     register("machine", name, Machine(
         name=name,
@@ -1341,11 +1347,9 @@ def _machine(value, register, *, where=_MACHINE):
         memory=_memory(value["memory"], at("memory"))
         if "memory" in value else None,
         cpus=_cpus(value["cpus"], at("cpus")) if "cpus" in value else None,
-        drives=drives,
-        network=_network(value["network"], at("network"))
-        if "network" in value else empty,
-        boot=_boot(value["boot"], drives, at("boot")) if "boot" in value
-        else _default_boot(drives),
+        devices=devices,
+        boot=_boot(value["boot"], devices, at("boot")) if "boot" in value
+        else _default_boot(device_drives),
         description=_text(value["description"], at("description"))
         if "description" in value else None,
         scripts=_scripts(value["scripts"], at("scripts"))
@@ -1523,13 +1527,15 @@ def _anchored_document(doc, base):
 
 def _anchored_machine(machine, base):
     """The machine with its drives' inline media anchored."""
-    if not any(drive.inline is not None
-               for drive in machine.drives.values()):
+    if not any(isinstance(device, MachineDrive) and device.inline is not None
+               for device in machine.devices.values()):
         return machine
-    drives = {key: (replace(drive, inline=_anchored_media(drive.inline, base))
-                    if drive.inline is not None else drive)
-              for key, drive in machine.drives.items()}
-    return replace(machine, drives=types.MappingProxyType(drives))
+    devices = {
+        key: (replace(device, inline=_anchored_media(device.inline, base))
+              if isinstance(device, MachineDrive) and device.inline is not None
+              else device)
+        for key, device in machine.devices.items()}
+    return replace(machine, devices=types.MappingProxyType(devices))
 
 
 def _anchored_media(media, base):

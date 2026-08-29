@@ -4,5 +4,5 @@
 // id: ref.not-allowed-here
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "pointing-device": "${device}", "drives": { "cdrom0": null } }
+    "pointing-device": "${device}", "devices": { "cdrom0": null } }
 ]

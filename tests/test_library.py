@@ -158,7 +158,7 @@ def test_it_reports_nothing_of_yours(home):
         json.dump([{"type": "machine", "name": "custom-rig",
                     "platform": "dos",
                     "description": "bespoke widget rig",
-                    "drives": {"cdrom0": None}}], handle)
+                    "devices": {"cdrom0": None}}], handle)
     names = [row["name"] for row in list_codex()]
     assert "custom-rig" not in names
     assert BLUEPRINT in names

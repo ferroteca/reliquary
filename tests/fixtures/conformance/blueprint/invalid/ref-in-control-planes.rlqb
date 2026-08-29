@@ -4,5 +4,5 @@
 // id: ref.not-allowed-here
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "control-planes": ["${plane}"], "drives": { "cdrom0": null } }
+    "control-planes": ["${plane}"], "devices": { "cdrom0": null } }
 ]

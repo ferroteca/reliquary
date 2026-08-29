@@ -2,6 +2,6 @@
 // spec: The file
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "drives": { "hdd0": "blank", "cdrom0": null }, "boot": ["hdd0"] },
+    "devices": { "hdd0": "blank", "cdrom0": null }, "boot": ["hdd0"] },
   { "type": "media", "name": "blank", "materialize": "new", "size": "20M" }
 ]

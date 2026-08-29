@@ -3,5 +3,5 @@
 // schema: rejects
 // id: field.required
 [
-  { "type": "machine", "name": "rig", "drives": { "cdrom0": null } }
+  { "type": "machine", "name": "rig", "devices": { "cdrom0": null } }
 ]

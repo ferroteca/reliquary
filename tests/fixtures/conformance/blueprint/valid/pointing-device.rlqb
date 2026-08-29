@@ -3,5 +3,5 @@
 // spec: Machine topology
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "pointing-device": "tablet", "drives": { "cdrom0": null } }
+    "pointing-device": "tablet", "devices": { "cdrom0": null } }
 ]

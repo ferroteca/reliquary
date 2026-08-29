@@ -4,6 +4,6 @@
 // id: ref.not-allowed-here
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "drives": { "hdd0": { "media": "blank", "controller": "${bus}" } } },
+    "devices": { "hdd0": { "media": "blank", "controller": "${bus}" } } },
   { "type": "media", "name": "blank", "materialize": "new", "size": "20M" }
 ]

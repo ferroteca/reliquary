@@ -38,7 +38,7 @@ def _write_plain_blueprint(blueprints, scripts_map=None):
               encoding="utf-8") as handle:
         json.dump([
             {"type": "machine", "name": "plain", "platform": "dos",
-             "drives": {"hdd0": "blank-20m"},
+             "devices": {"hdd0": "blank-20m"},
              "scripts": scripts_map},
             {"type": "media", "name": "blank-20m",
              "materialize": "new", "size": "20M"},

@@ -3,4 +3,4 @@
 // spec: Spec types
 // schema: rejects
 // id: field.unknown
-{ "name": "rig", "platform": "dos", "drives": { "cdrom0": null } }
+{ "name": "rig", "platform": "dos", "devices": { "cdrom0": null } }

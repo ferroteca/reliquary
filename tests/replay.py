@@ -199,7 +199,7 @@ class MachineLayer:
             "id": machine_id,
             "phase": phase,
             "boot": list(boot),
-            "drives": {key: {} for key in drives},
+            "devices": {key: {} for key in drives},
         }
         #: Every lifecycle call the run made, in order, for a test that
         #: wants to assert on the shape of a run rather than only that
@@ -241,13 +241,13 @@ class MachineLayer:
     def insert_media(self, machine_id, slot, media=None, file=None,
                      context=None, events=None, cancelled=None):
         self.calls.append(("insert", (slot, media or file)))
-        self.state["drives"].setdefault(slot, {})
-        self.state["drives"][slot] = (
+        self.state["devices"].setdefault(slot, {})
+        self.state["devices"][slot] = (
             {"media": media} if media else {"path": file})
 
     def eject_media(self, machine_id, slot, context=None):
         self.calls.append(("eject", (slot,)))
-        self.state["drives"][slot] = {}
+        self.state["devices"][slot] = {}
 
     def set_boot_order(self, machine_id, boot_keys, context=None):
         if self.state["phase"] != "ready":
