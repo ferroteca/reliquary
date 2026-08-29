@@ -284,12 +284,16 @@ Decide first:
   type, not new fields — each item was checked against P25's two
   gates (is there real demand, and does it apply across multiple
   backends), and each rejection has its own written reason.
-  Network: whether the host can reach the guest keeps being worked
-  out from the script's `http` block, generalized to work per
-  backend, with the NIC model chosen as a default per platform. A
-  first-class network field waits until there is demand shaped
-  like a real machine need, and when it is added, it should
-  describe how the NIC attaches, not specific card model names.
+  Network: **delivered in part** (D120, 2026-08-29). `network`
+  (`net0`, `net1`, …) is now a first-class machine field naming an
+  attachment (`nat`/`bridged`) — the chipset stays unauthored,
+  resolved per platform, exactly as this round originally called
+  for. `http`'s own reachability path is unaffected, and still keeps
+  being worked out from the script's `http` block, generalized to
+  work per backend. Detecting a usable bridge interface for QEMU
+  automatically is tracked separately (T32); no automatic bridge
+  *creation* is planned at all (D120), since that mutates host
+  network configuration.
   Firmware: `bios`/`uefi` support is fully designed (covering
   platform defaults and where the NVRAM variable store lives), but
   will not be added until the first platform that actually needs

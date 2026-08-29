@@ -937,13 +937,22 @@ first-class blueprint vocabulary (P25).
 One more is a rule about how the model itself is allowed to grow.
 The convention of naming drives by medium, slot, and format carries
 over into machine blueprints and cached materializations. New kinds
-of media, controllers, and USB devices must extend that same naming
-convention with a new medium name — they may not appear as opaque
-raw arguments passed straight to a backend. Admitting a new one
-follows P25's bar: a `backend-settings` key that shows up
-repeatedly across blueprints is evidence that demand exists for a
-first-class name, but demand by itself is never enough to admit
-one.
+of media, controllers, USB devices, and network devices must extend
+that same naming convention with a new medium name — they may not
+appear as opaque raw arguments passed straight to a backend.
+Admitting a new one follows P25's bar: a `backend-settings` key that
+shows up repeatedly across blueprints is evidence that demand exists
+for a first-class name, but demand by itself is never enough to
+admit one. P25's bar is about the device or adapter concept being
+general, not about every backend honoring every value in a portable
+field's vocabulary today — `controller`'s `nvme` and `virtio` are
+portable while only one backend actually claims them, and are
+refused by capability check wherever they aren't. `network` (D120)
+sidesteps the question entirely for its own field: it names an
+attachment (`nat`/`bridged`), never a chipset, so nothing
+single-backend is ever authored there in the first place — the
+chipset is resolved per platform, the same way a drive's `controller`
+default is.
 
 Where a guest supports both control planes, the same test suites
 should validate agentless and guest-agent operation and expect

@@ -81,7 +81,8 @@ workflow:
     productions decide — and references are refused in identity positions, in the dependency graph, and in
     fields with a closed set of allowed values. `document.py` validates the full set of machine fields:
     `platform`, `backend`, `memory`, `cpus`, `drives` (a media name, `null`, `{media, controller, enabled}`, or
-    an inline media definition, including an anonymous blank one), `boot`, `name` (the id-safe identity, not a
+    an inline media definition, including an anonymous blank one), `network` (an attachment name — `nat` or
+    `bridged` — or `{attachment, interface}`, D120), `boot`, `name` (the id-safe identity, not a
     display label), `description`, `scripts`, `control-planes`, `pointing-device` (F66), `backend-settings`, and
     `parameters`.
   - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,
@@ -236,8 +237,9 @@ workflow:
     This interface is deliberately not itself one of Reliquary's application surfaces. It includes: the
     `BackendAdapter` contract (discovery, a capability report, image materialization, start/stop, and the
     carrier session); the `Availability` / `Capabilities` / `Requirements` types shared between what a backend
-    reports and what a blueprint demands (`pointing_devices` / `pointing_device` is the newest field here, F66,
-    checked in `unmet()` the same way `drives` is checked); `capture_format(plane)` and its sibling
+    reports and what a blueprint demands (`pointing_devices` / `pointing_device`, F66; `network_models` /
+    `network_attachments`, the newest fields here, D120, checked in `unmet()` the same way `drives` is checked);
+    `capture_format(plane)` and its sibling
     `pointer_capable(plane)`, two separate per-plane capabilities (F66 — a display plane can capture a
     framebuffer without being able to deliver a pointer event to it, which is true of VirtualBox today), each
     defaulting honestly to "nothing" (`None` / `False`) when unknown; the `backend-settings` contract

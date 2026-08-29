@@ -386,6 +386,45 @@ def test_a_removable_drive_carries_its_key_as_the_launch_id(root):
     assert "id=floppy0" in values[0]
 
 
+# Network devices (D120): attachment and interface in, QEMU
+# netdev/device arguments out. The chipset is always the
+# platform-resolved model the caller already put in the state entry
+# — network_args never chooses one itself.
+
+def test_network_nat_renders_a_user_mode_netdev():
+    network = {"net0": {"attachment": "nat", "interface": None,
+                        "model": "pcnet"}}
+    args = qemu_module.network_args(network)
+    assert args == ["-netdev", "user,id=net0",
+                    "-device", "pcnet,netdev=net0,id=net0"]
+
+
+def test_network_bridged_with_an_interface_names_it():
+    network = {"net0": {"attachment": "bridged", "interface": "eth0",
+                        "model": "pcnet"}}
+    args = qemu_module.network_args(network)
+    assert args[1] == "bridge,id=net0,br=eth0"
+
+
+def test_network_bridged_without_an_interface_omits_br():
+    # QEMU's own default (the conventional bridge name br0) applies;
+    # Reliquary does not probe the host for one (D120, T32).
+    network = {"net0": {"attachment": "bridged", "interface": None,
+                        "model": "pcnet"}}
+    args = qemu_module.network_args(network)
+    assert args[1] == "bridge,id=net0"
+
+
+def test_network_devices_render_in_slot_order():
+    network = {
+        "net1": {"attachment": "nat", "interface": None, "model": "pcnet"},
+        "net0": {"attachment": "nat", "interface": None, "model": "pcnet"},
+    }
+    args = qemu_module.network_args(network)
+    ids = [a for a in args if a.startswith("user,id=")]
+    assert ids == ["user,id=net0", "user,id=net1"]
+
+
 def test_the_boot_order_becomes_firmware_letters():
     drives = {"hdd0": {"medium": "hdd", "slot": 0, "path": None},
               "cdrom0": {"medium": "cdrom", "slot": 0, "path": None}}
@@ -683,6 +722,12 @@ def test_pointer_events_are_refused_off_the_vnc_plane():
 def test_the_qemu_adapter_reports_the_pointing_devices_it_renders():
     report = qemu_module.QemuAdapter().capabilities()
     assert report.pointing_devices == ("tablet", "mouse")
+
+
+def test_the_qemu_adapter_reports_the_network_devices_it_renders():
+    report = qemu_module.QemuAdapter().capabilities()
+    assert report.network_models == ("pcnet",)
+    assert report.network_attachments == ("nat", "bridged")
 
 
 def test_the_qemu_adapter_can_deliver_a_pointer_event_on_either_plane():

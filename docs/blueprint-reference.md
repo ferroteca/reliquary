@@ -24,8 +24,10 @@ SPDX-License-Identifier: GPL-3.0-only
 > **Status:** every field in this reference is validated at parse
 > time — `platform`, `backend`, `memory`, `cpus`, `drives` (a media
 > name, `null`, or an object with `controller`/`enabled`/`media`),
-> `boot`, `name`, `description`, `scripts`, `control-planes`,
-> `backend-settings`, and `parameters` — along with accepting JSON5
+> `network` (an attachment name, or an object with
+> `attachment`/`interface`), `boot`, `name`, `description`,
+> `scripts`, `control-planes`, `backend-settings`, and `parameters`
+> — along with accepting JSON5
 > syntax and resolving media names. When a machine is materialized,
 > each drive's media is realized per its `materialize` mode
 > (`new`/`difference`/`copy`/`use`), defaults are resolved into the
@@ -668,6 +670,87 @@ error naming both.
 
 ---
 
+## `network`
+
+**blueprint (optional) · object**
+
+The machine's NIC inventory (D120). Each key names a slot; each
+value names the **attachment** — whether the NIC reaches the host
+(`nat`) or the wider network (`bridged`). The chipset that actually
+drives the connection is never named here: it's resolved per
+platform at materialization, the same way a drive's `controller`
+defaults to `ide` without being stated. An omitted `network` section
+means the machine has no NIC at all.
+
+### Keys: slots
+
+| kind      | slots | keys                |
+|-----------|-------|---------------------|
+| `network` | 0–3   | `net0` ... `net3`   |
+
+Unlike `drives`, there's no bare-name shorthand for slot 0 — every
+NIC is named by its full slot key.
+
+### Values
+
+A network entry is either a bare attachment name, or an object
+carrying `attachment` plus, for `bridged` only, `interface`:
+
+```json
+{"network": {"net0": "nat"}}
+```
+
+```json
+{"network": {"net0": {"attachment": "bridged", "interface": "eth0"}}}
+```
+
+#### `attachment` — required · string
+
+| value      | reaches                                    |
+|------------|---------------------------------------------|
+| `nat`      | the host only, the same path an install server (docs/spec/http-serve.md) already uses |
+| `bridged`  | the wider network, as a peer of the host's own interface |
+
+Checked against the assigned backend the same way every other
+capability is (P11): an attachment the backend can't provide is a
+capability error naming both.
+
+#### `interface` — optional · string
+
+The host network interface to bridge onto. Valid only when
+`attachment` is `bridged`; naming it on `nat` fails validation. Takes
+a plain string or a `${key}` property reference, bound the same way
+a media `location` ([media spec](spec/media-spec.md)) already is —
+a host interface name is exactly the kind of host-specific fact that
+shouldn't be hardcoded into a blueprint meant to be shared:
+
+```json
+{"network": {"net0": {"attachment": "bridged", "interface": "${host-nic}"}}}
+```
+
+Omitted, each backend does whatever it does with no interface named.
+VirtualBox picks its own sensible default. QEMU's bridged networking
+attaches to an existing **Linux bridge device**, not a physical
+interface directly, and has no host-discovery mechanism — omitting
+`interface` there falls back to QEMU's own conventional bridge name,
+`br0`. Reliquary does not probe the host to find or create a bridge:
+a host with no `br0` fails at QEMU's own launch, not at a Reliquary
+preflight check. Detecting a usable bridge automatically is tracked
+separately (planning/TASKS.md, T32); Reliquary will not create one
+automatically even then, since that would mutate host network
+configuration.
+
+### What the blueprint deliberately leaves unsaid
+
+- **Which chipset drives the connection.** This is a fact about the
+  guest's own drivers, resolved per platform, never a choice the
+  blueprint makes — the same way it never names a `controller`'s
+  exact silicon.
+- **Any interface name at all, for `nat`.** A NAT attachment needs
+  nothing host-specific, which is exactly why it needs no override.
+
+---
+
 ## `boot`
 
 **blueprint (optional) · array of drive keys**
@@ -958,6 +1041,9 @@ Format checks reject the document outright when they find:
   media / source / archive rule in
   [the media spec](spec/media-spec.md));
 - a `cdrom` drive naming a media that isn't read-only `use`;
+- an unknown network key, a network slot out of range, a network
+  entry missing `attachment`, or an `interface` named on a `nat`
+  attachment;
 - a `parameters` value that's neither a string nor a
   `{"property": "<key>"}` object, or one with an invalid key or
   property name.
@@ -975,6 +1061,8 @@ when it asks for:
 - a directory-source media the backend can't serve;
 - an image format the backend can't attach;
 - a control plane the backend can't offer;
+- a network attachment the backend can't provide (`bridged` on a
+  backend that hasn't built it);
 - a boot order the backend can't honor;
 - a `backend-settings` key the assigned backend doesn't define, or
   one of its arguments that restates a field Reliquary already

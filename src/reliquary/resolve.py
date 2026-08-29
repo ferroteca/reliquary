@@ -171,6 +171,17 @@ def _render_deferred(deferred, properties, where):
     return text
 
 
+def render_text(deferred, properties, where):
+    """Substitute a deferred string's references with bound values.
+
+    The same substitution `_hash_of`/`_rung_plan` already apply to
+    media fields, exposed for a Deferred-carrying field that doesn't
+    go through a media plan at all — a network device's `interface`
+    (D120).
+    """
+    return _render_deferred(deferred, properties, where)
+
+
 def _chaining_failure(where, key, value):
     return PreflightError(
         f"{where}: the property ${{{key}}} resolved to {value!r}, which is "

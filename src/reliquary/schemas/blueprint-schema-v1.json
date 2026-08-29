@@ -78,6 +78,14 @@
           "description": "The pointer input device (F66). Omitted, it resolves to the platform's default (mouse, today). Never supplied by a reference.",
           "enum": ["tablet", "mouse"]
         },
+        "network": {
+          "description": "NIC slots (D120): attachment only, never a chipset. Slot keys are fixed and never take a reference: an object key is authored graph.",
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^net[0-3]$"
+          },
+          "additionalProperties": {"$ref": "#/$defs/networkDevice"}
+        },
         "backend-settings": {
           "type": "object",
           "propertyNames": {"enum": ["qemu", "virtualbox", "vmware", "hyperv"]},
@@ -107,6 +115,31 @@
           "additionalProperties": false
         },
         {"$ref": "#/$defs/media"}
+      ]
+    },
+
+    "networkDevice": {
+      "description": "An attachment name, or an object carrying attachment plus, for bridged only, interface (D120).",
+      "oneOf": [
+        {
+          "description": "A closed vocabulary: never widened to admit a reference pattern.",
+          "enum": ["nat", "bridged"]
+        },
+        {
+          "type": "object",
+          "required": ["attachment"],
+          "properties": {
+            "attachment": {
+              "description": "A closed vocabulary: never widened to admit a reference pattern.",
+              "enum": ["nat", "bridged"]
+            },
+            "interface": {
+              "description": "The host bridge interface to attach to. Valid only when attachment is bridged. A plain string, or a reference supplying one.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
       ]
     },
 

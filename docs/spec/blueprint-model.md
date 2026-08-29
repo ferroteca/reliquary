@@ -99,7 +99,7 @@ required type is an error.
 
 Topology only — no content lives here. `platform` (required,
 never inferred — P10), `backend`, `memory`, `cpus`, `boot`,
-`control-planes`, `pointing-device`, `backend-settings`,
+`control-planes`, `pointing-device`, `network`, `backend-settings`,
 `description`, `scripts`, `parameters`, and `name`.
 
 `drives` maps a slot key (`hdd0`, `cdrom0`, `floppy0`, …) to one
@@ -146,6 +146,38 @@ cannot carry.
   attaches to the floppy controller implicitly and **rejects the
   key**. Omitted, it resolves to `ide`, recorded into the state at
   creation.
+- **`network`** (D120) maps a slot key (`net0`, `net1`, …, 0–3, the
+  same range `hdd` and `cdrom` use) to a NIC's **attachment**: either
+  an attachment name (string) — `nat` or `bridged` — or an object
+  carrying `attachment` plus, for `bridged` only, `interface`. The
+  attachment is the only thing a blueprint states; which chipset is
+  emulated is never named here — it's resolved per platform at
+  materialization, the same way a controller default is, because the
+  choice of `nat` vs. `bridged` is orthogonal to platform while the
+  chipset isn't a choice a blueprint author needs to make at all.
+  `interface` names the host network interface to bridge onto,
+  taking a plain string or a `${key}` reference bound the same way a
+  media `location` is — a host interface name is exactly the kind of
+  host-specific fact a shared blueprint shouldn't hardcode (U21).
+  Omitted, `bridged` uses whatever the backend does with no interface
+  named: on VirtualBox this is that adapter's own default; on QEMU,
+  which attaches to an existing Linux bridge device rather than a
+  physical interface directly, this means the conventional bridge
+  name `br0` — Reliquary does not probe the host for one, so a host
+  with no `br0` fails at QEMU's own launch, not at a Reliquary
+  preflight (T32 tracks adding host detection later). Each attachment
+  is still capability-checked against the assigned backend at
+  materialization, failing closed and naming both (P11) — what isn't
+  checked is whether a *named* interface or the default bridge
+  actually exists on this host, which stays the backend's own error
+  to raise. An omitted `network` section means the machine has no NIC
+  at all.
+
+  This field names an attachment, never a chipset — see D120 for why
+  that split doesn't need P25's cross-backend bar argued twice: a
+  card model choosing a driver is a different question from whether
+  the guest can reach anything at all, and only the latter is
+  authored here.
 - **`boot`** entries must each name a drive the machine
   **declares and has not disabled**, and are unique by slot: the
   same slot twice, in either spelling, fails validation. An empty

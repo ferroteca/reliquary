@@ -84,6 +84,11 @@
       "description": "The resolved pointer input device (F66).",
       "enum": ["tablet", "mouse"]
     },
+    "network": {
+      "description": "The resolved NIC slots keyed by slot key (D120). Each entry carries its declared attachment, the resolved interface (null when none was named), and the platform-resolved chipset.",
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/networkState"}
+    },
     "backend-settings": {
       "description": "The blueprint's per-backend settings sections, carried through verbatim.",
       "type": "object"
@@ -140,6 +145,17 @@
         "geometry": {"$ref": "#/$defs/driveGeometry"}
       },
       "required": ["medium", "slot"],
+      "additionalProperties": false
+    },
+    "networkState": {
+      "description": "One resolved NIC slot (D120). attachment and model are always present; interface is present, and null when none was named or resolved.",
+      "type": "object",
+      "properties": {
+        "attachment": {"enum": ["nat", "bridged"]},
+        "interface": {"type": ["string", "null"]},
+        "model": {"enum": ["pcnet"]}
+      },
+      "required": ["attachment", "interface", "model"],
       "additionalProperties": false
     },
     "driveGeometry": {

@@ -38,6 +38,15 @@ _FLOPPY = "reliquary-floppy"
 #: ``VBoxManage --bootN`` values for Reliquary media kinds.
 _BOOT_KIND = {"floppy": "floppy", "hdd": "disk", "cdrom": "dvd"}
 
+#: The blueprint's NIC model names (D120) this adapter can render,
+#: mapped to the ``--nictypeN`` value that renders them. ``ne2k`` has
+#: no entry: VirtualBox never emulated NE2000, which is exactly why
+#: it isn't in this adapter's ``network_models`` capability.
+_VBOX_NIC_TYPES = {"pcnet": "Am79C970A"}
+#: How many ``--nicN``/``--nictypeN`` slots this adapter manages,
+#: matching the model's own ``net0``..``net3`` range.
+_NIC_SLOTS = 4
+
 
 def _program_files():
     return [
@@ -405,11 +414,24 @@ def configure_vm(state, vm_name):
     cpus = state.get("cpus") if state.get("cpus") is not None else 1
     drives = state.get("drives") or {}
     boot = _boot_order(state.get("boot"), drives)
+    network = state.get("network") or {}
+    nic_args = []
+    for index in range(_NIC_SLOTS):
+        entry = network.get(f"net{index}")
+        slot = index + 1
+        if entry is None:
+            nic_args += [f"--nic{slot}=none"]
+            continue
+        nic_args += [f"--nic{slot}={entry['attachment']}",
+                     f"--nictype{slot}={_VBOX_NIC_TYPES[entry['model']]}"]
+        if entry["attachment"] == "bridged" and entry.get("interface"):
+            nic_args += [f"--bridgeadapter{slot}={entry['interface']}"]
     run_vbox(
         ["modifyvm", vm_name,
          f"--memory={memory}", f"--cpus={cpus}",
          f"--boot1={boot[0]}", f"--boot2={boot[1]}",
-         f"--boot3={boot[2]}", f"--boot4={boot[3]}"],
+         f"--boot3={boot[2]}", f"--boot4={boot[3]}",
+         *nic_args],
         action="configuring", target=vm_name)
 
     # Remove the controllers Reliquary created and rebuild them from
@@ -774,6 +796,8 @@ class VirtualBoxAdapter(BackendAdapter):
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
             vvfat=False,
+            network_models=("pcnet",),
+            network_attachments=("nat", "bridged"),
         )
 
     def capture_format(self, plane):

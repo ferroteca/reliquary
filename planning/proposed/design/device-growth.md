@@ -31,6 +31,20 @@ different arguments.
 
 ## Network: real demand exists, but it isn't a machine-shape question
 
+> **Superseded in part (D120, 2026-08-29).** Real demand for a
+> first-class network field showed up (owner, U28) — for choosing
+> whether a NIC is host-only or reaches the wider network, not for
+> naming a chipset. `network` (`net0`, `net1`, …) is now first-class
+> vocabulary, closed to the attachment `nat`/`bridged`, exactly the
+> shape this section originally called for ("its cross-backend
+> vocabulary should describe *attachment* ... never specific card
+> names") — that conclusion held throughout and is what shipped. What
+> changed is only the "not right now" half: the field existed as a
+> design, not code, until real demand actually showed up. The NIC
+> chipset still never appears in the blueprint, exactly as this
+> section said — it's resolved per platform, the same table platform
+> memory defaults already live in.
+
 This is the one item here with demand that's already been delivered.
 The script's `http` block (docs/spec/http-serve.md) declares that the
 guest needs to reach the host, and today QEMU satisfies that with

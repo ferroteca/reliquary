@@ -377,3 +377,32 @@ names the number it superseded.
      the host's fonts are tried after it.
   3. **Run the install.** `rlq run-script install --blueprint
      <name>`.
+
+- **U28 — Give a machine a real network path, and say whether it
+  faces the host or the LAN.** A machine that needs network access —
+  to reach an installer's own file server (docs/spec/http-serve.md),
+  to join a game's IPX/TCP session, to be reachable from another
+  machine on the LAN — needs a NIC declared, not just implied by
+  whatever a backend happens to default to today. Whether that NIC
+  should be host-only (`nat`, the same path the install server
+  already uses) or visible to the wider network (`bridged`) is a
+  fact about what the machine is *for*, so the blueprint states it
+  directly; which chipset actually drives the connection is not —
+  that's resolved per platform, the same way a drive's `controller`
+  defaults to `ide` without being named (P10), because it depends on
+  what the guest's own driver expects, not on anything the blueprint
+  author is choosing between.
+
+  Precondition: the blueprint copied out of the library —
+  `rlq seed-blueprint <name>` (U11).
+
+  1. **Declare the attachment.** In the blueprint's `network`
+     section, name how the NIC reaches the world:
+     `"network": {"net0": "nat"}`, or `{"net0": "bridged"}` to put
+     it on the host's own network — naming a specific host interface
+     with `{"net0": {"attachment": "bridged", "interface":
+     "${host-nic}"}}` when the default isn't the right one.
+  2. **Run it.** `rlq create-machine --blueprint <name>` or
+     `rlq run-script install --blueprint <name>`. An attachment the
+     assigned backend can't provide fails closed at materialization,
+     naming both (P11).

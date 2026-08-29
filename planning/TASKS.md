@@ -146,3 +146,18 @@ its own. A group with nothing in it isn't shown at all — an empty
 heading would just be a record of finished work, and this file
 doesn't keep those.
 
+### Backends
+
+- **T32 — Detect a usable bridge interface for QEMU's `bridged`
+  network attachment.** `network`'s `bridged` attachment (D120) works
+  today by naming an `interface` explicitly, or by falling back to
+  QEMU's own default (the conventional bridge name `br0`), which
+  fails closed if the host hasn't set one up. This task adds
+  detection: read the host's default-route interface and use it only
+  if it's already a member of a bridge, failing closed by name
+  (naming the interface and telling the user what to bridge) when
+  it isn't. No automatic bridge creation — that mutates host network
+  configuration and stays out of scope entirely (D120). VirtualBox
+  and VMware aren't affected: both already pick a sensible default
+  bridge target on their own when `interface` is omitted.
+

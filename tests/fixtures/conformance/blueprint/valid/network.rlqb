@@ -1,0 +1,11 @@
+// valid: network is a slot-keyed attachment map, bare string or an
+//        object adding interface for bridged only (D120)
+// spec: Machine topology
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "network": {
+      "net0": "nat",
+      "net1": { "attachment": "bridged", "interface": "eth0" }
+    },
+    "drives": { "cdrom0": null } }
+]

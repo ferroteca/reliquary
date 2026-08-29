@@ -155,6 +155,74 @@ def test_a_declared_pointing_device_is_resolved_into_state(rig):
     assert rig.state(machine_id)["pointing-device"] == "tablet"
 
 
+# Network devices (D120): attachment resolves into state; the chipset
+# is always the platform default, never authored.
+
+def test_a_nat_network_is_resolved_into_state(rig):
+    machine_id = rig.create(
+        "nat-rig", {"platform": "dos", "network": {"net0": "nat"}})
+    assert rig.state(machine_id)["network"] == {
+        "net0": {"attachment": "nat", "interface": None, "model": "pcnet"}}
+
+
+def test_a_bridged_network_with_an_explicit_interface_is_resolved(rig):
+    machine_id = rig.create(
+        "bridge-rig", {"platform": "dos", "network": {
+            "net0": {"attachment": "bridged", "interface": "eth0"}}})
+    assert rig.state(machine_id)["network"]["net0"] == {
+        "attachment": "bridged", "interface": "eth0", "model": "pcnet"}
+
+
+def test_a_machine_with_no_network_declares_none(rig):
+    machine_id = rig.create("no-net-rig", {"platform": "dos"})
+    assert rig.state(machine_id)["network"] == {}
+
+
+def test_a_bridged_interface_property_from_an_explicit_value(rig):
+    rig.write("prop-net", {"platform": "dos", "network": {
+        "net0": {"attachment": "bridged", "interface": "${host-nic}"}}})
+    machine_id = create_machine(
+        "prop-net", context=rig.home, properties={"host-nic": "eth0"})
+    entry = rig.state(machine_id)["network"]["net0"]
+    assert entry["interface"] == "eth0"
+    # The recorded interface is concrete: no ${...} survives.
+    assert "${" not in json.dumps(entry)
+
+
+def test_an_unbound_bridged_interface_property_is_asked(rig):
+    rig.write("needy-net", {"platform": "dos", "network": {
+        "net0": {"attachment": "bridged", "interface": "${host-nic}"}}})
+    asker = mock.Mock(return_value="eth0")
+    with mock.patch("reliquary.binding.console_asker", return_value=asker):
+        create_machine("needy-net", context=rig.home)
+    asker.assert_called_once_with("host-nic", "host-nic", False)
+    entry = rig.state("needy-net-0")["network"]["net0"]
+    assert entry["interface"] == "eth0"
+
+
+def test_a_network_attachment_the_backend_cant_provide_is_refused(tmp_path):
+    report = Capabilities(
+        backend="qemu", control_planes=("agentless-display",),
+        media=("floppy", "hdd", "cdrom"), controllers=("ide",),
+        materialize=("new", "difference", "copy", "use"),
+        network_models=("pcnet",), network_attachments=("nat",))
+    with fake_backend.installed(capabilities=report) as backend:
+        rig = _Rig(str(tmp_path), backend)
+        with pytest.raises(PreflightError) as caught:
+            rig.create("no-bridge", {"platform": "dos", "network": {
+                "net0": "bridged"}})
+        assert "network attachment 'bridged'" in str(caught.value)
+
+
+def test_apply_resolves_a_newly_declared_network(rig):
+    machine_id = rig.create("net-apply", {"platform": "dos"})
+    assert rig.state(machine_id)["network"] == {}
+    rig.write("net-apply", {"platform": "dos",
+                            "network": {"net0": "nat"}})
+    apply_blueprint(machine=machine_id, context=rig.home)
+    assert rig.state(machine_id)["network"]["net0"]["attachment"] == "nat"
+
+
 def test_optional_fields_absent(rig):
     machine_id = rig.create("minimal", {"platform": "dos"})
     state = rig.state(machine_id)

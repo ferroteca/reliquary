@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from . import acquire
 from . import backends
 from . import binding
+from . import document
 from . import events as _events
 from .acquire import fetch_media as _acquire_fetch
 from .errors import (InternalError, PreflightError, ReliquaryError,
@@ -43,7 +44,7 @@ from .machine_state import (allocate_machine_id, backend_dir,
                             read_vm_state, resolve_machine,
                             split_machine_id, write_state)
 from .resolve import (load_namespace, location_property_keys,
-                      resolve_media, resolve_media_plan)
+                      render_text, resolve_media, resolve_media_plan)
 
 
 def _drive_media(drive, namespace):
@@ -89,6 +90,66 @@ _PLATFORM_MEMORY = {
     "win9x": 64,
     "winnt": 256,
 }
+
+#: The NIC chipset each platform gets by default (D120). Every
+#: current platform gets `pcnet`, since it's the one chipset both
+#: built backends actually emulate — the same reasoning that makes
+#: `ide` the universal `controller` default. There is no author
+#: override: which chipset drives a connection is a fact about the
+#: guest's own drivers, not a choice a blueprint makes (P10) — only
+#: the attachment (`nat`/`bridged`) is authored.
+_PLATFORM_NIC = {
+    "dos": "pcnet",
+    "openbsd": "pcnet",
+    "win9x": "pcnet",
+    "winnt": "pcnet",
+}
+
+
+def _resolve_nic_model(platform):
+    return _PLATFORM_NIC.get(platform, "pcnet")
+
+
+def _resolve_network(network, platform, bound_values):
+    """This machine's ``network`` slots, resolved into state entries.
+
+    The chipset is the platform default (D120) — never authored, so
+    never something to reconcile per slot. ``interface`` is
+    substituted from ``bound_values`` when it's a property reference;
+    a plain string or an omitted interface passes through unchanged.
+    """
+    model = _resolve_nic_model(platform)
+    resolved = {}
+    for key, net in sorted(network.items()):
+        interface = net.interface
+        if isinstance(interface, document.Deferred):
+            interface = render_text(
+                interface, bound_values, f"network.{key}.interface")
+        resolved[key] = {
+            "attachment": net.attachment, "interface": interface,
+            "model": model,
+        }
+    return resolved
+
+
+def _dry_network(network, platform, bound_values):
+    """Mirrors :func:`_resolve_network`, but never raises on an unbound
+    interface — a dry run must never fail on a key nothing answered,
+    the same leniency :func:`_dry_payload` already gives a location.
+    """
+    model = _resolve_nic_model(platform)
+    resolved = {}
+    for key, net in sorted(network.items()):
+        interface = net.interface
+        if isinstance(interface, document.Deferred):
+            interface = next(
+                (bound_values[ref.target] for ref in interface.references
+                 if ref.target in bound_values), None)
+        resolved[key] = {
+            "attachment": net.attachment, "interface": interface,
+            "model": model,
+        }
+    return resolved
 
 
 def _default_control_planes(platform):
@@ -181,10 +242,16 @@ def _requirements(machine, namespace):
         item = _drive_media(drive, namespace)
         if item is not None and item.materialize not in modes:
             modes.append(item.materialize)
+    network_attachments = sorted(
+        {net.attachment for net in machine.network.values()})
+    network_models = (
+        (_resolve_nic_model(machine.platform),) if machine.network else ())
     return backends.Requirements(
         control_planes=tuple(planes), media=tuple(media),
         controllers=tuple(controllers), materialize=tuple(modes),
-        pointing_device=_resolve_pointing_device(machine))
+        pointing_device=_resolve_pointing_device(machine),
+        network_attachments=tuple(network_attachments),
+        network_models=network_models)
 
 
 def _blueprint_digest(resolved, drives):
@@ -378,6 +445,8 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         "description": machine.description,
         "control-planes": control_planes,
         "pointing-device": _resolve_pointing_device(machine),
+        "network": _resolve_network(machine.network, machine.platform,
+                                    properties or {}),
         "backend-settings": {
             name: dict(section)
             for name, section in machine.backend_settings.items()},
@@ -401,17 +470,33 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
     return machine_id
 
 
+def _network_interface_keys(machine):
+    """Every property key a machine's ``network`` slots reference (D120).
+
+    A bridged interface name is exactly the kind of host-specific
+    fact a media ``location`` already keeps out of the blueprint
+    (U21), bound the same way.
+    """
+    keys = set()
+    for net in machine.network.values():
+        if isinstance(net.interface, document.Deferred):
+            keys.update(ref.target for ref in net.interface.references)
+    return keys
+
+
 def _bind_location_properties(machine, namespace, *, parameters=None,
                               explicit=None, properties_file=None,
                               context=None):
-    """Bind every ``${key}`` a machine's media locations reference.
+    """Bind every ``${key}`` a machine's media locations and network
+    interfaces reference.
 
-    Collected across all of the machine's drives, and bound through
-    the usual property-source order at create/apply time, so that a
-    media located by ``${license-iso}`` gets materialized using
-    whichever value a parameter, the environment, the properties
-    file, or an interactive prompt supplies. Returns ``{key: value}``
-    (empty when no location references any property).
+    Collected across all of the machine's drives and network slots,
+    and bound through the usual property-source order at create/apply
+    time, so that a media located by ``${license-iso}`` — or a
+    bridged NIC's ``${host-nic}`` — gets materialized using whichever
+    value a parameter, the environment, the properties file, or an
+    interactive prompt supplies. Returns ``{key: value}`` (empty when
+    nothing references a property).
     """
     keys = set()
     for drive in machine.drives.values():
@@ -420,6 +505,7 @@ def _bind_location_properties(machine, namespace, *, parameters=None,
         media = namespace.media.get(drive.media)
         if media is not None:
             keys.update(location_property_keys(media, namespace))
+    keys.update(_network_interface_keys(machine))
     if not keys:
         return {}
     return binding.bind_keys(
@@ -518,6 +604,7 @@ def _describe_location_properties(machine, namespace, *, explicit=None,
         media = namespace.media.get(drive.media)
         if media is not None:
             keys.update(location_property_keys(media, namespace))
+    keys.update(_network_interface_keys(machine))
     if not keys:
         return binding.BoundProperties({}, {})
     return binding.describe_keys(
@@ -697,6 +784,8 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         "boot": list(machine.boot),
         "control-planes": _resolve_control_planes(machine),
         "pointing-device": _resolve_pointing_device(machine),
+        "network": _dry_network(machine.network, machine.platform,
+                                bound.values),
         "drives": drives,
         "media": entries,
         "properties": dict(bound.sources),
@@ -706,6 +795,14 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         plan["backend-detail"] = verdict.detail
     return DryRun(operation="create-machine", report=_dry_report(plan),
                   plan=plan)
+
+
+def _network_line(key, entry):
+    """One NIC's line in the report: its attachment, model, and interface."""
+    line = f"  {key} ({entry['attachment']}, {entry['model']})"
+    if entry["attachment"] == "bridged":
+        line += f": {entry['interface'] or '(qemu default / backend default)'}"
+    return line
 
 
 def _drive_line(drive):
@@ -754,6 +851,10 @@ def _dry_report(plan):
         lines.append("boot: " + ", ".join(plan["boot"]))
     lines.append("control planes: " + ", ".join(plan["control-planes"]))
     lines.append(f"pointing device: {plan['pointing-device']}")
+    if plan["network"]:
+        lines.append("network:")
+        lines.extend(_network_line(key, entry)
+                     for key, entry in sorted(plan["network"].items()))
     if plan["drives"]:
         lines.append("drives:")
         lines.extend(_drive_line(drive) for drive in plan["drives"])
@@ -1015,6 +1116,8 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             "description": parsed.description,
             "control-planes": control_planes,
             "pointing-device": _resolve_pointing_device(parsed),
+            "network": _resolve_network(parsed.network, parsed.platform,
+                                        bound),
             "backend-settings": {
                 name: dict(section)
                 for name, section in parsed.backend_settings.items()},

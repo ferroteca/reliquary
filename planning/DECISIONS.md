@@ -124,6 +124,69 @@ pressure worth re-examining once the surrounding area firms up.
 
 ## Decided
 
+- D120 — `network` NAMES AN ATTACHMENT (`nat`/`bridged`), NEVER A NIC
+  MODEL; THE CHIPSET IS RESOLVED PER PLATFORM, ORTHOGONAL TO
+  ATTACHMENT — DECIDED (owner, 2026-08-29) and delivered the same
+  day, reopening the network item in
+  [proposed/design/device-growth.md](proposed/design/device-growth.md)
+  now that real demand exists (U28). Supports U28; P10, P11, P25.
+
+  THE RULE: whether a guest can reach anything at all (`nat` vs.
+  `bridged`) and which chipset drives that connection are two
+  different questions, and only the first is something a blueprint
+  author actually wants to state — the second is exactly the kind of
+  fact Reliquary already resolves per platform rather than asking for
+  (P10), the same way a drive's `controller` defaults to `ide`
+  without being named. `network` is a slot-keyed map (`net0`, `net1`,
+  …, following the same `<medium><slot>`-shaped key convention
+  `drives` already uses), whose value is either a bare attachment
+  name or an object adding `interface` (only meaningful for
+  `bridged`, refused on `nat`). The NIC chipset itself never appears
+  in the blueprint at all — it's chosen by a per-platform table the
+  same shape `_PLATFORM_MEMORY` already is, so this needed no
+  argument against P25 in either direction: nothing single-backend is
+  ever named in the portable field, because nothing about a specific
+  chipset is named there at all.
+
+  An earlier version of this decision considered making the chipset
+  itself portable vocabulary (`net0: pcnet`/`ne2k`), reasoning by
+  analogy to `controller`'s `nvme`/`virtio` values (portable despite
+  being single-backend today, since the concept is general hardware
+  even where one adapter's capability report is incomplete). That
+  reasoning was sound but the wrong question: the owner's actual
+  interest was in choosing `nat` vs. `bridged`, never in choosing a
+  chipset by name, so the field was reshaped before anything shipped.
+  The `controller`-precedent argument stays on record here because
+  it's still correct and may be needed again — a future field that
+  does need to name single-backend-only hardware shouldn't have to
+  re-derive it.
+
+  `bridged` needs a host network interface to mean anything, and the
+  two built backends aren't symmetric about supplying one: VirtualBox
+  attaches straight to a physical host NIC and has its own sensible
+  default when none is named; QEMU's bridged networking attaches to
+  an existing **Linux bridge device**, not a physical interface
+  directly, and has no host-discovery mechanism — omitting
+  `interface` there falls back to QEMU's own conventional bridge name
+  `br0`. Reliquary does not probe the host to find or verify a bridge
+  itself (weighed and declined for now: detecting the host's default
+  egress interface is easy, but automatically enslaving it into a new
+  bridge mutates host network configuration and needs per-OS,
+  privileged implementation — out of scope here entirely); a host
+  with no `br0` fails at QEMU's own launch, not at a Reliquary
+  preflight. Read-only detection — use the egress interface only if
+  it's already bridged, refuse by name otherwise — is tracked
+  separately as **T32**. `interface` is a plain string or a `${key}`
+  property reference, bound the same way a media `location` already
+  is (U21) — a host interface name is exactly the kind of fact that
+  shouldn't be hardcoded into a blueprint meant to be shared.
+
+  The standing constraints in ARCHITECTURE.md ("new kinds of media,
+  controllers, and USB devices must extend that same naming
+  convention") now also name network devices, since this is that same
+  slot-keyed convention applied to a new device kind, not a new one
+  invented.
+
 - D119 — CLI.MD, API.MD, AND THE COMMAND MANIFEST EACH GOVERN A
   DIFFERENT PART, AND WHOEVER DEFINES SOMETHING WINS ON THAT PART —
   DECIDED (owner, 2026-08-22), closing the "two norms for one

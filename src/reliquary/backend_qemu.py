@@ -141,7 +141,15 @@ RESERVED_ARGUMENTS = {
     "vnc": "the machine's `control-planes` policy",
     "display": "the display choice a start is given",
     "nographic": "the display choice a start is given",
+    "netdev": "the machine's `network`",
+    "net": "the machine's `network`",
 }
+
+#: The NIC chipset name each platform resolves to (`machines._PLATFORM_NIC`,
+#: D120), mapped to the QEMU device model that renders it. Only
+#: `pcnet` is reachable today, since nothing in the blueprint
+#: authors a chipset directly.
+_NIC_QEMU_MODELS = {"pcnet": "pcnet"}
 
 #: The `-drive` properties Reliquary already renders for every drive.
 #: These are refused through ``-set drive.<slot>.<property>`` for the
@@ -1106,6 +1114,8 @@ class QemuAdapter(BackendAdapter):
             materialize=("new", "difference", "copy", "use"),
             vvfat=True,
             pointing_devices=("tablet", "mouse"),
+            network_models=("pcnet",),
+            network_attachments=("nat", "bridged"),
         )
 
     def capture_format(self, plane):
@@ -1172,10 +1182,10 @@ class QemuAdapter(BackendAdapter):
               current=None):
         """Render the machine's state into a QEMU command line and launch.
 
-        Turns Reliquary's own drive vocabulary into QEMU configuration:
-        memory, drive arguments, and the firmware boot order are all
-        rendered here, so no caller ever has to build a backend
-        argument by hand.
+        Turns Reliquary's own drive and network vocabulary into QEMU
+        configuration: memory, drive arguments, NIC arguments, and the
+        firmware boot order are all rendered here, so no caller ever
+        has to build a backend argument by hand.
 
         This machine's own ``backend-settings.qemu`` section is
         rendered **last**, after everything Reliquary itself sets: the
@@ -1192,6 +1202,7 @@ class QemuAdapter(BackendAdapter):
         args = [find_qemu(state.get("platform")), "-name", vm_name,
                 "-m", str(memory)]
         args += drive_args(state.get("drives", {}))
+        args += network_args(state.get("network", {}))
         boot = _boot_order(state.get("boot", []), state.get("drives", {}))
         if boot is not None:
             args += ["-boot", f"order={boot}"]
@@ -1484,4 +1495,30 @@ def drive_args(drives):
                      f"file={path},{inferred}media=cdrom,if=ide,"
                      f"index={index},id={key}"]
 
+    return args
+
+
+def network_args(network):
+    """Build QEMU ``-netdev``/``-device`` arguments from a machine's NICs.
+
+    Each slot gets a netdev matching its declared attachment and a
+    device of the platform-resolved model (D120), both addressed by
+    the slot's own key — ``id=net0`` — the same addressing convention
+    every drive already uses. A ``bridged`` slot with no ``interface``
+    omits ``br=`` entirely, which is QEMU's own default (the
+    conventional bridge name ``br0``) — Reliquary does not probe the
+    host for one (T32 tracks adding that detection later).
+    """
+    args = []
+    for key, entry in sorted(network.items()):
+        if entry["attachment"] == "bridged":
+            interface = entry.get("interface")
+            netdev = f"bridge,id={key}"
+            if interface:
+                netdev += f",br={interface}"
+        else:
+            netdev = f"user,id={key}"
+        model = _NIC_QEMU_MODELS[entry["model"]]
+        args += ["-netdev", netdev,
+                 "-device", f"{model},netdev={key},id={key}"]
     return args

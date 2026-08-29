@@ -95,6 +95,14 @@ class Capabilities:
     #: or ``mouse``, the blueprint's own terms. Defaults to empty, so
     #: an adapter that hasn't set this claims no pointing devices.
     pointing_devices: Tuple[str, ...] = ()
+    #: The NIC models this backend can attach (D120): ``pcnet`` or
+    #: ``ne2k``, the blueprint's own terms. Defaults to empty, the
+    #: same way ``controllers`` does — an adapter that hasn't set
+    #: this claims no network devices.
+    network_models: Tuple[str, ...] = ()
+    #: The network attachments this backend can provide (D120): ``nat``
+    #: or ``bridged``, the blueprint's own terms. Defaults to empty.
+    network_attachments: Tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -136,6 +144,13 @@ class Requirements:
     #: this is a single value, since a machine can declare at most
     #: one pointing device.
     pointing_device: Optional[str] = None
+    #: The distinct NIC models this machine's ``network`` slots need
+    #: (D120): the platform-resolved chipset, never authored directly
+    #: — the same shape ``controllers`` already uses.
+    network_models: Tuple[str, ...] = ()
+    #: The distinct attachments this machine's ``network`` slots
+    #: declare (D120): ``nat`` and/or ``bridged``.
+    network_attachments: Tuple[str, ...] = ()
 
 
 class BackendAdapter:
@@ -250,6 +265,12 @@ class BackendAdapter:
         if (requirements.pointing_device and
                 requirements.pointing_device not in report.pointing_devices):
             missing.append(f"pointing device {requirements.pointing_device!r}")
+        for model in requirements.network_models:
+            if model not in report.network_models:
+                missing.append(f"network device {model!r}")
+        for attachment in requirements.network_attachments:
+            if attachment not in report.network_attachments:
+                missing.append(f"network attachment {attachment!r}")
         return tuple(missing)
 
     def validate_settings(self, settings):

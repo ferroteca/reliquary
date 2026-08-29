@@ -34,6 +34,7 @@ from .errors import PreflightError, StaticError
 _PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
 _BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
 _CONTROLLERS = {"ide", "sata", "scsi", "nvme", "virtio"}
+_ATTACHMENTS = {"nat", "bridged"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
 _POINTING_DEVICES = {"tablet", "mouse"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
@@ -46,6 +47,8 @@ _RETIRED_SECTIONS = {"machines", "media", "sources", "archives"}
 
 _DRIVE_KEY = re.compile(r"(floppy|hdd|cdrom)(\d+)?")
 _SLOT_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4}
+_NET_KEY = re.compile(r"net(\d+)")
+_NET_SLOT_LIMIT = 4
 _SIZE = re.compile(r"([1-9][0-9]*)([KMGTkmgt])")
 _SHA256 = re.compile(r"[0-9a-fA-F]{64}")
 _MIB = 1024 * 1024
@@ -314,6 +317,22 @@ class MachineDrive:
 
 
 @dataclass(frozen=True)
+class MachineNetwork:
+    """One NIC slot: an attachment, and an optional interface to name it.
+
+    ``interface`` only ever matters for ``bridged`` — ``nat`` needs
+    nothing host-specific. The NIC chipset itself never appears here:
+    it's resolved per platform at materialization (D120), orthogonal
+    to attachment.
+    """
+
+    key: str
+    slot: int
+    attachment: str
+    interface: Optional[Union[str, Deferred]] = None
+
+
+@dataclass(frozen=True)
 class Machine:
     """Machine topology. Drives name media; content lives on the media."""
 
@@ -323,6 +342,7 @@ class Machine:
     memory: Optional[Union[int, Deferred]] = None
     cpus: Optional[Union[int, Deferred]] = None
     drives: Mapping[str, MachineDrive] = field(default_factory=dict)
+    network: Mapping[str, MachineNetwork] = field(default_factory=dict)
     boot: Tuple[str, ...] = ()
     description: Optional[Union[str, Deferred]] = None
     scripts: Mapping[str, str] = field(default_factory=dict)
@@ -988,9 +1008,9 @@ def _check_type_echo(value, expected, where):
 # --- machine ---------------------------------------------------------
 
 _MACHINE_FIELDS = {
-    "type", "name", "platform", "backend", "memory", "cpus", "drives", "boot",
-    "description", "scripts", "control-planes", "pointing-device",
-    "backend-settings", "parameters",
+    "type", "name", "platform", "backend", "memory", "cpus", "drives",
+    "network", "boot", "description", "scripts", "control-planes",
+    "pointing-device", "backend-settings", "parameters",
 }
 _STATE_ONLY = {"id", "backend-id", "blueprint-digest", "blueprint-source"}
 _DRIVE_FIELDS = {"media", "controller", "enabled"}
@@ -1083,6 +1103,85 @@ def _drives(value, register, where):
         normalized[key] = _drive(declaration, key, medium, slot, register,
                                  where.at(value, authored_key,
                                           f"drives.{key}"))
+    return types.MappingProxyType(normalized)
+
+
+_NETWORK_FIELDS = {"attachment", "interface"}
+
+
+def _network_key(value, where):
+    if not isinstance(value, str):
+        raise where.error(f"network keys must be strings, got: {value!r}",
+            rule_id="value.not-a-string")
+    if "${" in value:
+        raise where.error(
+            f"network key {value!r} takes no reference: an object key is "
+            "authored graph, and the graph stays static",
+            rule_id="ref.not-allowed-here")
+    match = _NET_KEY.fullmatch(value)
+    if not match:
+        raise where.error(
+            f"invalid network key {value!r}: expected net0..net"
+            f"{_NET_SLOT_LIMIT - 1}", rule_id="network.key-invalid")
+    slot = int(match.group(1))
+    if slot >= _NET_SLOT_LIMIT:
+        raise where.error(
+            f"invalid network key {value!r}: net slots run from 0 to "
+            f"{_NET_SLOT_LIMIT - 1}", rule_id="network.slot-out-of-range")
+    return slot, f"net{slot}"
+
+
+def _interface(value, attachment, where):
+    if attachment != "bridged":
+        raise where.error(
+            f"{where} is invalid: only a bridged attachment takes an "
+            "interface", rule_id="network.interface-on-nat")
+    return _text(value, where)
+
+
+def _network_device(value, key, slot, where):
+    if isinstance(value, str):
+        return MachineNetwork(
+            key=key, slot=slot,
+            attachment=_text(value, where, closed=True,
+                             allowed=_ATTACHMENTS))
+    if not isinstance(value, collections.abc.Mapping):
+        raise where.error(
+            f"network.{key} must be an attachment name or an object "
+            "carrying attachment/interface", rule_id="value.not-a-network")
+    if set(value) - _NETWORK_FIELDS:
+        raise where.error(
+            f"network.{key} carries unknown keys; expected attachment, "
+            "interface", rule_id="field.unknown")
+    if "attachment" not in value:
+        raise where.error(f"network.{key} must name an attachment",
+            rule_id="network.without-attachment")
+    attachment = _text(value["attachment"],
+                       where.at(value, "attachment",
+                                f"network.{key}.attachment"),
+                       closed=True, allowed=_ATTACHMENTS)
+    interface = (_interface(
+        value["interface"], attachment,
+        where.at(value, "interface", f"network.{key}.interface"))
+        if "interface" in value else None)
+    return MachineNetwork(key=key, slot=slot, attachment=attachment,
+                          interface=interface)
+
+
+def _network(value, where):
+    if not isinstance(value, collections.abc.Mapping):
+        raise where.error("network must be an object",
+            rule_id="value.not-an-object")
+    normalized, claimed = {}, {}
+    for authored_key, declaration in value.items():
+        site = where.at(value, authored_key, f"network.{authored_key}")
+        slot, key = _network_key(authored_key, site)
+        if key in claimed:
+            raise site.error(
+                f"network key clash: {claimed[key]!r} and {authored_key!r} "
+                f"both mean {key}", rule_id="network.key-clash")
+        claimed[key] = authored_key
+        normalized[key] = _network_device(declaration, key, slot, site)
     return types.MappingProxyType(normalized)
 
 
@@ -1243,6 +1342,8 @@ def _machine(value, register, *, where=_MACHINE):
         if "memory" in value else None,
         cpus=_cpus(value["cpus"], at("cpus")) if "cpus" in value else None,
         drives=drives,
+        network=_network(value["network"], at("network"))
+        if "network" in value else empty,
         boot=_boot(value["boot"], drives, at("boot")) if "boot" in value
         else _default_boot(drives),
         description=_text(value["description"], at("description"))

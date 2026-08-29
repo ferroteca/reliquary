@@ -495,3 +495,81 @@ def test_the_breadcrumb_is_unchanged_by_locating(root):
         '  { "name": "m", "location": "${mem:-512M}" }\n'
         ']\n')
     assert "spec.location: unknown reference qualifier 'mem'" in str(error)
+
+
+# Network devices (D120): an attachment (nat/bridged), never a
+# chipset. Shorthand desugars the same way a bare drive medium does.
+
+def _machine_with_network(network):
+    return _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                    "network": network}]).machines["rig"]
+
+
+def test_a_bare_attachment_name_is_shorthand():
+    machine = _machine_with_network({"net0": "nat"})
+    net0 = machine.network["net0"]
+    assert (net0.attachment, net0.interface) == ("nat", None)
+
+
+def test_bridged_desugars_the_same_way():
+    machine = _machine_with_network({"net0": "bridged"})
+    assert machine.network["net0"].attachment == "bridged"
+
+
+def test_the_object_form_carries_an_explicit_interface():
+    machine = _machine_with_network(
+        {"net0": {"attachment": "bridged", "interface": "eth0"}})
+    net0 = machine.network["net0"]
+    assert (net0.attachment, net0.interface) == ("bridged", "eth0")
+
+
+def test_an_interface_may_be_a_property_reference():
+    machine = _machine_with_network(
+        {"net0": {"attachment": "bridged", "interface": "${host-nic}"}})
+    interface = machine.network["net0"].interface
+    assert isinstance(interface, document.Deferred)
+    assert interface.references[0].target == "host-nic"
+
+
+def test_an_interface_on_nat_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_network(
+            {"net0": {"attachment": "nat", "interface": "eth0"}})
+    assert caught.value.rule_id == "network.interface-on-nat"
+
+
+def test_an_unknown_attachment_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_network({"net0": "dhcp"})
+    assert caught.value.rule_id == "value.not-in-vocabulary"
+
+
+def test_a_network_object_with_unknown_keys_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_network({"net0": {"attachment": "nat", "bogus": 1}})
+    assert caught.value.rule_id == "field.unknown"
+
+
+def test_a_network_object_without_attachment_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_network({"net0": {"interface": "eth0"}})
+    assert caught.value.rule_id == "network.without-attachment"
+
+
+def test_net_slots_run_zero_to_three():
+    machine = _machine_with_network({"net3": "nat"})
+    assert machine.network["net3"].attachment == "nat"
+    with pytest.raises(StaticError) as caught:
+        _machine_with_network({"net4": "nat"})
+    assert caught.value.rule_id == "network.slot-out-of-range"
+
+
+def test_an_invalid_network_key_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_network({"eth0": "nat"})
+    assert caught.value.rule_id == "network.key-invalid"
+
+
+def test_a_machine_with_no_network_declares_none():
+    machine = _machine_with_network({})
+    assert machine.network == {}

@@ -83,6 +83,26 @@ def test_no_declared_pointing_device_asks_nothing():
     assert adapter.unmet(_requirements()) == ()
 
 
+def test_a_network_model_the_backend_lacks_is_named():
+    report = Capabilities(backend="hyperv", network_models=("pcnet",))
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(_requirements(network_models=("ne2k",))) == (
+        "network device 'ne2k'",)
+
+
+def test_a_network_attachment_the_backend_lacks_is_named():
+    report = Capabilities(backend="hyperv", network_attachments=("nat",))
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(_requirements(network_attachments=("bridged",))) == (
+        "network attachment 'bridged'",)
+
+
+def test_no_declared_network_asks_nothing():
+    report = Capabilities(backend="hyperv")
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(_requirements()) == ()
+
+
 def test_pointer_capable_defaults_to_false():
     # The honest default, matching `capture_format`'s default of
     # `None`: until a backend is actually built, it claims no

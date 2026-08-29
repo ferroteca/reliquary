@@ -40,7 +40,7 @@ always wins, and no number is ever reissued.
 
 ## The marks
 
-- **The next D-number to issue is D120** — used for decisions,
+- **The next D-number to issue is D121** — used for decisions,
   recorded in [DECISIONS.md](DECISIONS.md).
 - **The next F-number to issue is F68** — used for features,
   drafted in [proposed/FEATURES.md](proposed/FEATURES.md), or,
@@ -58,7 +58,7 @@ always wins, and no number is ever reissued.
 - **The next S-number to issue is S9** — used for application
   surfaces, listed in root [ARCHITECTURE.md](../ARCHITECTURE.md)
   under "The application surfaces."
-- **The next T-number to issue is T32** — used for tasks, entered
+- **The next T-number to issue is T33** — used for tasks, entered
   into [TASKS.md](TASKS.md); entering a task is the same act as
   pledging it (D43). This sequence started counting from T8, not
   T0, because T0 through T7 were already used by an earlier
@@ -67,7 +67,7 @@ always wins, and no number is ever reissued.
   [DECISIONS.md](DECISIONS.md), in the entries that adopted them.
   Starting the new sequence at T8 avoids any T-number meaning two
   different things.
-- **The next U-number to issue is U28** — used for use cases. One
+- **The next U-number to issue is U29** — used for use cases. One
   shared numbering sequence covers proposed, pledged, and the root
   list.
 - **The next V-number to issue is V18** — used for the scripting

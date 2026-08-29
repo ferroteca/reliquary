@@ -51,7 +51,7 @@ _CORPUS = os.path.join(_HERE, "fixtures", "conformance", "blueprint")
 
 _ID = re.compile(r"^// id: (\S+)", re.M)
 
-VALID = corpus.fixtures(_CORPUS, "valid", ".rlqb", count=24)
+VALID = corpus.fixtures(_CORPUS, "valid", ".rlqb", count=25)
 INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqb", count=48)
 AT_RESOLUTION = corpus.fixtures(
     _CORPUS, "invalid-at-resolution", ".rlqb", count=2)

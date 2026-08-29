@@ -234,6 +234,69 @@ def test_removing_a_controller_passes_the_name_as_two_tokens():
     assert "--name=reliquary-ide" not in removal
 
 
+# Network devices (D120): attachment and interface in, VBoxManage
+# --nicN/--nictypeN/--bridgeadapterN arguments out.
+
+def _configure(network):
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        if command[1] == "showvminfo":
+            return _completed(stdout="")
+        return _completed()
+
+    with mock.patch.object(vbox, "find_vboxmanage",
+                           return_value="VBoxManage"), \
+            mock.patch("subprocess.run", side_effect=run):
+        vbox.configure_vm({"network": network}, "reliquary-plain-0")
+    return next(c for c in calls if c[1] == "modifyvm")
+
+
+def test_nat_network_renders_the_chipset_that_was_resolved():
+    modify = _configure(
+        {"net0": {"attachment": "nat", "interface": None, "model": "pcnet"}})
+    assert "--nic1=nat" in modify
+    assert "--nictype1=Am79C970A" in modify
+
+
+def test_bridged_network_with_an_interface_names_the_bridge_adapter():
+    modify = _configure({"net0": {"attachment": "bridged",
+                                  "interface": "eth0", "model": "pcnet"}})
+    assert "--nic1=bridged" in modify
+    assert "--bridgeadapter1=eth0" in modify
+
+
+def test_bridged_network_without_an_interface_names_none():
+    # VirtualBox's own default applies; Reliquary names nothing (D120).
+    modify = _configure({"net0": {"attachment": "bridged",
+                                  "interface": None, "model": "pcnet"}})
+    assert "--nic1=bridged" in modify
+    assert not any(a.startswith("--bridgeadapter1=") for a in modify)
+
+
+def test_declared_nic_slots_land_on_their_own_slot_number():
+    modify = _configure(
+        {"net1": {"attachment": "nat", "interface": None, "model": "pcnet"}})
+    assert "--nic1=none" in modify
+    assert "--nic2=nat" in modify
+
+
+def test_undeclared_nic_slots_are_explicitly_disabled():
+    # Removing a NIC from the blueprint must actually disable it on
+    # apply, the same way a removed drive's controller is rebuilt
+    # from scratch rather than left stale.
+    modify = _configure({})
+    for slot in range(1, 5):
+        assert f"--nic{slot}=none" in modify
+
+
+def test_the_virtualbox_adapter_reports_the_network_devices_it_renders():
+    report = vbox.VirtualBoxAdapter().capabilities()
+    assert report.network_models == ("pcnet",)
+    assert report.network_attachments == ("nat", "bridged")
+
+
 def test_hard_disks_take_the_ide_slots_before_cdroms():
     """The boot disk must be the primary master, not the slave.
 
