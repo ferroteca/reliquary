@@ -1,0 +1,68 @@
+// ReactOS, installed from its own live/install ISO — the GUI-era
+// codex citizen: its second-stage setup wizard is a real Win32 GUI
+// application, which is what makes it a genuine target for
+// pointer-input testing (F66) rather than a text-mode installer like
+// FreeDOS's.
+//
+// The codex is a launching point, not a version library: this entry is
+// named for the system, and the version lives below as the location and
+// its hash — the two knobs a version bump turns.
+[
+  {
+    "type": "machine",
+    "name": "reactos",
+    "platform": "winnt",
+    "memory": "512M",
+    "pointing-device": "tablet",
+    "control-planes": ["vnc"],
+    "description": "ReactOS 0.4.15-x86 installed from its own ISO",
+    "drives": {
+      // The blank the installer partitions and formats.
+      "hdd0": { "type": "media", "size": "2G" },
+      // Declared but empty — the install script inserts the ISO.
+      "cdrom0": null
+    },
+    // Hard disk first, permanently. The blank image the machine
+    // starts with has no boot signature, so the first boot falls
+    // through to the install CD on its own — and after text-mode
+    // setup copies the system and reboots, the now-bootable disk
+    // carries the guest straight into its GUI second stage. Cdrom
+    // first breaks that reboot: the CD starts Setup over, which
+    // finds the half-installed disk and stops at its upgrade/repair
+    // screen (measured 2026-08-26; its own "detects the in-progress
+    // install and continues" behavior proved timing-dependent, not
+    // dependable). A `with boot` scope is not an option here even
+    // though freedos.rlqb uses one: this machine's install script
+    // deliberately leaves the machine running, and a boot restore
+    // on a running machine is refused (D104).
+    "boot": ["hdd0", "cdrom0"],
+    "scripts": {
+      "install": "reactos-install"
+    }
+  },
+
+  {
+    // The download, and the ISO read out of it. One remote rung, one
+    // hash; the child names its path inside the container. The
+    // SourceForge "download" link resolves through ordinary HTTP
+    // redirects to a direct binary payload (no JavaScript involved
+    // for a non-browser client), so it needs no special handling —
+    // only the `extension` override, since the URL's own path ends
+    // in ".../download" rather than ".zip".
+    "type": "media",
+    "name": "reactos-iso-zip",
+    "location": "https://sourceforge.net/projects/reactos/files/ReactOS/0.4.15/ReactOS-0.4.15-x86-iso.zip/download",
+    "extension": "zip",
+    "sha256": "db9f80e7eabecabfe0b2ff890502d8d67b8d4aed0fc967ef957dee3c9e5e0682",
+    "children": [
+      {
+        "type": "media",
+        "path": "ReactOS-0.4.15-x86.iso",
+        "name": "reactos-iso",
+        "description": "The ReactOS 0.4.15-x86 install ISO",
+        "read-only": true,
+        "sha256": "206a4746c37e792dda5996a449d820eb36f5771b399f498185af81d89718f785"
+      }
+    ]
+  }
+]

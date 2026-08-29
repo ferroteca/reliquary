@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Paul Galbraith
+# SPDX-License-Identifier: GPL-3.0-only
+
+description "Insert the ReactOS install ISO and start the machine"
+platform    winnt
+machine     stopped
+timeout     30s
+
+# Deliberately this thin. ReactOS's text-mode setup paints its own
+# font, which the shared recognizer's font-bank library does not
+# cover the way it covers FreeDOS's (docs/spec's own "the guest's own
+# font is an authored asset" story, D109) -- a `wait "..."` here would
+# be a text condition over a screen the recognizer cannot actually
+# read, which is a named capability gap rather than a script bug.
+# Driving the rest is a caller's job, over the same raw-pixel carrier
+# `click`'s own search already reads (`session.framebuffer()`) rather
+# than the recognizer.
+insert cdrom0 @reactos-iso
+start

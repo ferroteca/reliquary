@@ -187,25 +187,37 @@ def _location_from_value(value, where):
     return location
 
 
-def _container_format(plan, parent):
-    """The parent's container format, or fail naming what was asked."""
-    if isinstance(plan, Download):
-        source = plan.url
-    elif isinstance(plan, LocalFile):
-        source = plan.path
-    elif isinstance(plan, Extract):
-        source = plan.member
-    elif isinstance(plan, Alternatives):
-        return _container_format(plan.options[0], parent)
-    else:
-        source = ""
-    extension = os.path.splitext(source)[1].lstrip(".").lower()
+def _container_format(plan, parent_media):
+    """The parent's container format, or fail naming what was asked.
+
+    The parent's own declared ``extension`` wins, exactly as it does
+    for the cached payload's name (``acquire.payload_extension``): a
+    URL whose own path does not spell the format — a redirect
+    endpoint, a signed download link with no trailing extension — is
+    still readable as a container through the field that exists
+    precisely for this, rather than only through what the address
+    happens to end in.
+    """
+    extension = (parent_media.extension or "").lower()
+    if not extension:
+        if isinstance(plan, Download):
+            source = plan.url.split("#", 1)[0].split("?", 1)[0]
+        elif isinstance(plan, LocalFile):
+            source = plan.path
+        elif isinstance(plan, Extract):
+            source = plan.member
+        elif isinstance(plan, Alternatives):
+            return _container_format(plan.options[0], parent_media)
+        else:
+            source = ""
+        extension = os.path.splitext(source)[1].lstrip(".").lower()
     if extension not in _CONTAINER_FORMATS:
         supported = ", ".join(sorted(_CONTAINER_FORMATS))
         raise PreflightError(
-            f"media {parent!r} is read as a container but its format "
-            f"{extension or 'unknown'!r} is not supported (supported: "
-            f"{supported})", rule_id="media.container-unsupported")
+            f"media {parent_media.name!r} is read as a container but its "
+            f"format {extension or 'unknown'!r} is not supported "
+            f"(supported: {supported})",
+            rule_id="media.container-unsupported")
     return extension
 
 
@@ -254,7 +266,7 @@ def _parent_plan(rung, media, namespace, seen, properties):
         # A bare ${media:X}: the parent's own bytes, which is how a
         # difference overlay names what it sits on.
         return inner
-    _container_format(inner, name)
+    _container_format(inner, parent)
     # Each plan node carries the hash of the file *it* produces: this
     # one yields the child, and the parent's own hash rode down with
     # ``inner``.
