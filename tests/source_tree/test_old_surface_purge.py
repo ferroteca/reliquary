@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The old script surface and superseded CLI names do not survive.
+"""The old script syntax and retired CLI names do not survive anywhere live.
 
-Milestone 4 task 11: a whole-tree sweep. Historical records
-(released CHANGELOG, DECISIONS, completed milestone notes) and
-intentional negative / regression fixtures may still spell the old
-forms; live code, tests, user docs, and shipped scripts must not.
+Milestone 4 task 11: a sweep of the whole tree. Historical records
+(released CHANGELOG entries, DECISIONS, completed milestone notes) and
+fixtures that deliberately test the old forms are allowed to still spell
+them. Live code, tests, user docs, and shipped scripts are not.
 """
 
 import io
@@ -26,25 +26,26 @@ from reliquary.script_parser import parse_script
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 
-# Superseded CLI command words (exact argv tokens).
+# Retired CLI command words (exact argv tokens).
 _OLD_CLI_COMMANDS = frozenset({
     "script", "keys", "menu", "text", "create", "destroy",
     "start", "stop", "list", "check-script",
-    # The search family, retired when the noun became the set: a
-    # listing per noun, and filtering left to the shell and to --json
-    # (D88). `search-scripts` and `search-media` never shipped and
-    # are retired unbuilt, so neither is planned under either name.
+    # The search family. Retired when each noun became a single
+    # listing command instead: one listing per noun, with filtering
+    # left to the shell and to --json (D88). `search-scripts` and
+    # `search-media` never actually shipped, and are retired without
+    # ever having been built — neither name is planned.
     "search-blueprints", "search-scripts", "search-media",
-    # The drive report and the in-band file family, retired when a
-    # machine's file content left reliquary's purview (D108).
-    # Reliquary declares a machine's drives and moves their media;
-    # what is inside a volume is the caller's, so there is nothing
-    # to report a letter for and nothing to address.
+    # The drive report and the in-band file-transfer commands. Retired
+    # once a machine's file content stopped being reliquary's concern
+    # (D108). Reliquary declares a machine's drives and swaps their
+    # media; what's inside a volume belongs to the caller, so there's
+    # no drive letter to report and no file path to address.
     "describe-drives", "refresh-drives",
     "put-file", "get-file", "put-files", "get-files", "list-files",
 })
 
-# Superseded public API names.
+# Retired public API names.
 _OLD_API_NAMES = (
     "create_from_blueprint",
     "start_cached_machine",
@@ -53,21 +54,23 @@ _OLD_API_NAMES = (
     "ExpectBranch",
     "State",
     "EmbeddedMedia",
-    # The check family, retired when `--dry-run` became the one
-    # spelling of "evaluate without doing" (F25). `check_key` went
-    # with them: a public predicate on a string with no CLI twin was
-    # a standing P6 residue, and privacy closed it.
+    # The check family. Retired once `--dry-run` became the one way
+    # to say "evaluate without doing" (F25). `check_key` went with
+    # them: a public function that only checked a string, with no CLI
+    # command of its own, was a leftover that violated P6, and this
+    # cleanup removed it.
     "check_script",
     "ScriptCheck",
     "check_key",
-    # The two-directory model and the asset-root knob, retired when
-    # all six working directories became placeable. `set_home` and
-    # `set_cache` are the old spellings of `set_home_dir` /
-    # `set_cache_dir`; `set_assets` / `HOME_ASSETS` answered
-    # placement and hermeticity with one word, and the placement half
-    # is now the directory flags. The hermeticity half became
-    # `autoseed`, which D88 deleted outright rather than defaulting:
-    # nothing resolves out of the codex, so there is no axis to set.
+    # The old two-directory model and the asset-root setting. Retired
+    # once all six working directories became independently placeable.
+    # `set_home` and `set_cache` are the old names for `set_home_dir`
+    # and `set_cache_dir`. `set_assets` / `HOME_ASSETS` used to answer
+    # two questions at once — where to put things, and whether to stay
+    # hermetic — and the "where" half is now just the directory flags.
+    # The "hermetic" half became `autoseed`, which D88 removed outright
+    # rather than giving it a default: nothing resolves outside the
+    # codex any more, so there's no longer a setting to have.
     "set_home",
     "set_cache",
     "set_assets",
@@ -76,21 +79,24 @@ _OLD_API_NAMES = (
     "machines_cache_dir",
     "set_autoseed",
     "autoseed",
-    # The search family's API half, and the codex-mode listing the
-    # `--builtin` flag reached (D88). `search_blueprints` spanned two
-    # sets in one verb; `list_builtin_media` enumerated components
-    # that cannot be seeded on their own.
+    # The search family's API half, plus the codex-only listing that
+    # the `--builtin` flag used to reach (D88). `search_blueprints`
+    # covered two different sets of results through one function;
+    # `list_builtin_media` listed components that can't be seeded on
+    # their own anyway.
     "search_blueprints",
     "list_builtin_media",
-    # The module-level carrier, retired when the session became the
-    # only door (P26). The directory globals' setters, the
-    # environment adoption and the assignment probe are deleted
-    # outright; the resolvers, the directory vocabulary, the
-    # Documents lookup and the non-twin engine doors left the
-    # package root (every session-method twin's root spelling is
-    # policed mechanically by test_command_manifest.py — a root
-    # twin would be an unclassified public name — so the twins
-    # are not repeated here).
+    # The old module-level state. Retired once the session object
+    # became the only way to talk to reliquary (P26). The directory
+    # globals' setter functions, the environment-variable adoption,
+    # and the "is this assigned" check are gone outright. The
+    # resolvers, the directory-name vocabulary, the Documents lookup,
+    # and the engine functions that had no session-method equivalent
+    # also left the package root. (Every session method that does have
+    # a same-named function at the package root is already checked
+    # mechanically by test_command_manifest.py — a stray root-level
+    # copy would show up there as an unclassified public name — so
+    # those are not repeated in this list.)
     "set_home_dir",
     "set_blueprints_dir",
     "set_scripts_dir",
@@ -119,7 +125,7 @@ _OLD_API_NAMES = (
     "has_credential",
 )
 
-# Live-tree paths scanned for superseded spellings.
+# Live-tree paths scanned for retired spellings.
 _SWEEP_ROOTS = (
     os.path.join("src", "reliquary"),
     "tests",
@@ -130,33 +136,35 @@ _SWEEP_ROOTS = (
     "USE-CASES.md",
 )
 
-# Files that may quote the old surface deliberately.
+# Files allowed to quote the old surface on purpose.
 _ALLOW_PATH_SUFFIXES = (
-    # Negative tests: old spellings must fail to parse.
+    # Negative tests: they check that the old spellings fail to parse.
     os.path.join("tests", "test_script_parser.py"),
     os.path.join("tests", "test_script_validation.py"),
-    # Same rationale: it asserts the retired `check-script` command
-    # is gone, which it cannot do without naming it.
+    # Same reason: it checks that the retired `check-script` command
+    # is gone, and it can't do that without naming it.
     os.path.join("tests", "test_dry_run.py"),
-    # And the same again for D88's retirements. Each of these asserts
-    # a deleted spelling stays deleted — `--builtin` refused by the
-    # parser, `set_autoseed` absent from `home`, the docs-coverage
-    # check's own record of commands once specified and absent — none
-    # of which can be written without naming what is gone.
+    # Same reason again, for D88's retirements. Each of these files
+    # checks that a removed spelling stays removed — `--builtin`
+    # rejected by the parser, `set_autoseed` absent from `home`, the
+    # docs-coverage check's own record of commands that used to be
+    # documented and no longer are — none of which can be written
+    # without naming the thing that's gone.
     os.path.join("tests", "test_cli.py"),
     os.path.join("tests", "test_home.py"),
     os.path.join("tests", "test_library.py"),
-    # This module names the forbidden spellings.
+    # This module itself names the forbidden spellings.
     os.path.join("tests", "source_tree", "test_old_surface_purge.py"),
     # The API spec's realignment section records a completed rename
-    # and names the spellings it replaced. Historical prose, not a
-    # surface anyone can reach: the names it quotes are exactly the
-    # ones this module forbids, which is the point of quoting them.
+    # and names the old spellings it replaced. That's historical
+    # prose, not a surface anyone can actually reach: the names it
+    # quotes are exactly the ones this module forbids, which is the
+    # whole point of quoting them there.
     os.path.join("docs", "spec", "api.md"),
 )
 
-# Patterns that would be live old-surface / superseded-command use.
-# Each is (name, compiled regex).
+# Patterns that would mean live use of the old surface or a retired
+# command. Each entry is (label, compiled regex).
 _FORBIDDEN = (
     ("create_from_blueprint",
      re.compile(r"\bcreate_from_blueprint\b")),
@@ -184,8 +192,9 @@ _FORBIDDEN = (
      re.compile(r"(?<!_)\bcheck_key\b")),
     ("rlq check-script",
      re.compile(r"\bcheck-script\b")),
-    # D88's retirements. The word "autoseeding" survives in prose that
-    # records the deletion; the flag and the function may not.
+    # D88's retirements. The word "autoseeding" is still allowed in
+    # prose that records the deletion; the flag and the function are
+    # not allowed anywhere live.
     ("--autoseed flag",
      re.compile(r"--(?:no-)?autoseed\b")),
     ("set_autoseed",
@@ -220,17 +229,18 @@ _FORBIDDEN = (
      re.compile(r"(?m)^\s*boot\s+[a-zA-Z_]")),
     ("old key token",
      re.compile(r"<enter>|<esc>|<ret>|<tab>|<space>")),
-    # The pre-F22 directory surface. Each pattern excludes the new
-    # spelling that contains it, so `--home-dir` and `set_home_dir`
-    # read clean while `--home` and `set_home` do not.
+    # The pre-F22 directory flags and functions. Each pattern is
+    # written to exclude the new spelling that contains it as a
+    # substring, so `--home-dir` and `set_home_dir` pass while
+    # `--home` and `set_home` do not.
     ("old --home flag", re.compile(r"--home(?!-dir)\b")),
     ("old --cache flag", re.compile(r"--cache(?!-dir)\b")),
     ("retired --assets flag", re.compile(r"--assets\b")),
     ("old set_home", re.compile(r"\bset_home(?!_dir)\b")),
     ("old set_cache", re.compile(r"\bset_cache(?!_dir)\b")),
-    # P26's retirements: the module-level carrier's spellings. The
-    # `--*-dir` flags and the Context keywords survive; the setter
-    # functions and the environment adoption do not.
+    # P26's retirements: the old module-level state's spellings. The
+    # `--*-dir` flags and the Context keywords are still allowed; the
+    # setter functions and the environment-variable adoption are not.
     ("retired set_*_dir setter",
      re.compile(r"\bset_(?:home|blueprints|scripts|cache|media"
                 r"|machines)_dir\b")),
@@ -249,11 +259,13 @@ def _allowed(path):
                for suffix in _ALLOW_PATH_SUFFIXES)
 
 
-# Patterns that match a *script statement* by anchoring to the start
-# of a line. In markdown they must be applied only inside fenced code
-# blocks: prose wraps, and a sentence continuing onto a line that
-# happens to begin "boot order with the listed drive keys" is not the
-# retired `boot` verb. Identifier patterns stay whole-file.
+# Labels for patterns that match a *script statement* by anchoring to
+# the start of a line. In markdown, these must only be checked inside
+# fenced code blocks: prose text wraps across lines, and a sentence
+# that happens to continue onto a new line starting with "boot order
+# with the listed drive keys" is not actually the retired `boot` verb.
+# The identifier patterns (not listed here) are still checked against
+# the whole file, fenced or not.
 _SCRIPT_STATEMENT_LABELS = frozenset({
     "old state keyword",
     "old arrow goto",
@@ -281,11 +293,11 @@ def _iter_sweep_files():
     for root in _SWEEP_ROOTS:
         path = os.path.join(_REPO_ROOT, root)
         if not os.path.exists(path):
-            # `os.walk` on a missing directory yields nothing, so a
-            # root that stopped existing would shrink the sweep and
-            # still report success. This module runs from the
-            # repository alone (`tests/source_tree`), where every
-            # root below is present.
+            # `os.walk` on a missing directory just yields nothing, so
+            # a root that stopped existing would silently shrink the
+            # sweep and still report success. This module only ever
+            # runs from the repository itself (`tests/source_tree`),
+            # where every root listed above is present.
             raise AssertionError(
                 "sweep root %s does not exist; this module runs from "
                 "the repository only" % root)
@@ -296,8 +308,8 @@ def _iter_sweep_files():
             dirnames[:] = [name for name in dirnames
                            if name not in {".venv", "__pycache__",
                                            "codex"}]
-            # Ship the package's codex scripts too — walk them
-            # explicitly below.
+            # The package's codex scripts are shipped too — they're
+            # walked explicitly below.
             for name in filenames:
                 if name.endswith((
                         ".py", ".md", ".rlqs", ".lark", ".json")):
@@ -310,14 +322,16 @@ def _iter_sweep_files():
                     yield os.path.join(dirpath, name)
 
 
-# The `.rlqm` media-definition file kind is retired tree-wide.
+# The `.rlqm` media-definition file kind is retired everywhere in the
+# tree.
 #
-# Media folded into the composed `.rlqb` blueprint (the 2026-07-23
-# media/composition round); no `.rlqm` file survives anywhere in the
-# package, the shipped codex, the examples, or the fixtures. The
-# string may still appear in historical records (CHANGELOG, DECISIONS,
-# completed milestone notes) and design prose that names the retired
-# format — this guards the *files*, not the spelling.
+# Media was folded into the composed `.rlqb` blueprint format in the
+# 2026-07-23 media/composition round, so no `.rlqm` file should survive
+# anywhere — not in the package, the shipped codex, the examples, or
+# the fixtures. The word "rlqm" can still appear in historical records
+# (CHANGELOG, DECISIONS, completed milestone notes) and in design prose
+# that names the retired format by name — this check only guards
+# against the actual *files* surviving, not the word.
 
 _SKIP_DIRS = {".venv", ".git", "__pycache__", "build", "dist"}
 
@@ -337,14 +351,15 @@ def test_no_rlqm_files_survive():
 
 
 def test_no_authored_document_uses_the_retired_shape():
-    """The first-round four-component model leaves no authored file.
+    """No authored file still uses the original four-component model.
 
-    The plural root sections and the `source` / `archive` spec
-    types were superseded by D22 before any of them shipped in an
-    authored document. Every `.rlqb` the repository carries — the
-    codex, the examples, the conformance corpus — speaks the
-    revised model, and the parser is what proves it: a survivor
-    would fail to parse rather than quietly mean something else.
+    The plural root sections and the `source` / `archive` spec types
+    were superseded by D22 before any of them ever shipped in an
+    authored document. Every `.rlqb` file the repository carries —
+    in the codex, the examples, the conformance corpus — follows the
+    revised model, and the parser is what proves it: a leftover file
+    using the old shape would fail to parse instead of silently being
+    read as something else.
     """
     stale = []
     for dirpath, dirnames, filenames in os.walk(_REPO_ROOT):
@@ -369,7 +384,7 @@ def test_no_authored_document_uses_the_retired_shape():
         "four-component shape:\n" + "\n".join(stale))
 
 
-# Superseded package exports are gone, not aliased.
+# Retired package exports are gone entirely, not kept as aliases.
 
 def test_old_api_names_absent():
     for name in _OLD_API_NAMES:
@@ -378,7 +393,7 @@ def test_old_api_names_absent():
         assert name not in reliquary.__all__
 
 
-# Superseded CLI command words are not registered.
+# Retired CLI command words are not registered.
 
 def _registered_commands():
     stdout = io.StringIO()
@@ -401,15 +416,16 @@ def test_old_cli_commands_absent():
 
 
 def test_the_record_management_family_is_absent():
-    # D36: persistence went to the asynchronous-runs backlog, and
-    # the verbs that managed it went with it. No shims.
+    # D36: persistence moved to the asynchronous-runs backlog, and
+    # the commands that managed it were removed along with it. There
+    # is no compatibility shim for them.
     backlogged = {"list-runs", "run", "begin-run", "end-run"}
     survivors = sorted(backlogged & _registered_commands())
     assert survivors == [], (
         f"backlogged record commands still registered: {survivors}")
 
 
-# The run returns its output and stores nothing (D36).
+# A run returns its output directly and stores nothing on disk (D36).
 
 def test_the_run_directory_helpers_are_gone():
     from reliquary import script_runner
@@ -425,8 +441,10 @@ def test_the_run_result_carries_no_stored_location():
     assert "events" in fields
 
 
-# Old-surface documents fail closed — no bridge. One node per
-# spelling, so a sample that stops being refused names itself.
+# Scripts written in the old syntax are rejected outright — there is
+# no compatibility bridge. Each old spelling gets its own test node,
+# so if one of them stopped being rejected, the failing node would
+# name exactly which one.
 
 @pytest.mark.parametrize("source", [
     "platform dos\nstate ready {\n done\n}\n",
@@ -444,7 +462,7 @@ def test_an_old_surface_sample_does_not_parse(source):
         parse_script(source)
 
 
-# No live path keeps a superseded spelling.
+# No live file keeps a retired spelling.
 
 def test_live_tree_has_no_superseded_spellings():
     hits = []
@@ -456,9 +474,10 @@ def test_live_tree_has_no_superseded_spellings():
                 text = handle.read()
         except UnicodeDecodeError:
             continue
-        # Skip Python string/comment bodies that only appear in
-        # AST-string form inside allowlisted negative tests —
-        # already handled by path allowlist.
+        # Python string and comment bodies that only appear as source
+        # text inside the allowlisted negative tests are already
+        # handled by the path allowlist above, so they aren't
+        # special-cased again here.
         relative = os.path.relpath(path, _REPO_ROOT)
         fenced = _fenced_only(text) if path.endswith(".md") else text
         for label, pattern in _FORBIDDEN:

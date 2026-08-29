@@ -5,20 +5,24 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # The conformance corpus
 
-The shared valid/invalid corpus for the **composed blueprint model** —
-[docs/spec/blueprint-model.md](../../../../docs/spec/blueprint-model.md),
-which is normative for every fixture here.
+The shared valid/invalid corpus for the **composed blueprint model**,
+specified in
+[docs/spec/blueprint-model.md](../../../../docs/spec/blueprint-model.md).
+Every fixture here follows that spec.
 
-Written at milestone 7's **second stage**, before the parser, so that
-the third had an executable acceptance test from its first line rather
-than after it.
-That ordering paid immediately: run against the first parser written to
-the spec, the corpus found the spec **contradicting itself** about
-whether a containment path lives inside the braces or after them —
-D22/D24 said after, D26/D27 said inside, and blueprint-model.md had
-inherited both. Settled inside by D32. A corpus written from a spec and
-run against an implementation of the same spec is a differential test
-*of the spec*.
+This corpus was written during milestone 7's **second stage**, before
+the parser existed. That way the parser, built in the third stage, had
+a working acceptance test from its first line instead of getting one
+added afterward.
+
+That order paid off immediately. Run against the first parser written
+to the spec, the corpus found that the spec **contradicted itself**: it
+was unclear whether a containment path belongs inside the braces or
+after them. D22 and D24 said after; D26 and D27 said inside;
+blueprint-model.md still had both versions in it. D32 settled it:
+inside. A corpus written from a spec, then run against code that
+implements the same spec, ends up testing the spec itself, not just the
+code.
 
 ## The buckets
 
@@ -28,42 +32,49 @@ run against an implementation of the same spec is a differential test
 | `invalid/` | rejected **at parse**, by parser and schema alike |
 | `invalid-at-resolution/` | parses clean; rejected when resolved |
 
-The third bucket exists because two-phase validation is real: shape at
-parse, value at resolution. A fixture whose rule needs a resolved
-value — or a binding to a spec that may live in another file — would
-fail a parse-time assertion for the wrong reason, so it is separated
-rather than quietly weakened. It needs the resolve harness, not the
-parse harness, and the published schema cannot judge it at all.
+The third bucket exists because validation genuinely happens in two
+phases: shape is checked at parse time, values are checked at
+resolution time. A fixture whose rule needs a resolved value — or a
+binding to a spec that might live in a different file — would fail a
+parse-time check for the wrong reason if it were mixed into the
+`invalid/` bucket. So it gets its own bucket instead of being tested
+with a weaker check. It needs the resolve harness, not the parse
+harness, and the published schema can't judge it at all.
 
 ## One fixture, one node
 
-Every fixture is a collected pytest node **named for its file**, in
-each check that judges it —
-`test_a_valid_fixture_parses[children-batch.rlqb]`,
+Every fixture is its own pytest node, named after its file, in every
+check that runs against it — for example
+`test_a_valid_fixture_parses[children-batch.rlqb]` or
 `test_the_schema_rejects_exactly_what_the_fixture_declares[ref-in-platform.rlqb]`.
-So a fixture is run on its own while it is being fixed, in every check
-at once:
+That means you can run one fixture on its own, in every check at once,
+while you're fixing it:
 
 ```powershell
 uv run pytest tests/test_conformance_corpus.py -k children-batch
 ```
 
-That naming is not presentation. This corpus once ran against the
-parser and **not** the schema while claiming the two cannot drift,
-because a loop of fixtures inside one `subTest` test reports the same
-single pass whether it checked all of them or half ([D106](../../../../planning/DECISIONS.md)).
-A node per fixture per check is what makes the count the assertion.
+This naming choice isn't just for readability — it once caught a real
+bug. This corpus used to run only against the parser, not the schema,
+while claiming the two could not drift apart. Nobody noticed, because a
+loop of fixtures inside one `subTest` test reports a single pass
+whether it checked all of the fixtures or only half of them
+([D106](../../../../planning/DECISIONS.md)). Giving each fixture its
+own node in each check means the node *count* is itself part of what
+gets checked — a check that silently covers fewer fixtures now shows up
+as fewer nodes, not as a still-green run.
 
-The bucket counts are pinned where the fixtures are gathered
-(`tests/corpus.py`, the helper both corpora read through) — 23, 47 and
-2 — so a bucket that stops loading is a collection error rather than a
-green run over nothing. Adding or retiring a fixture updates the pin
-and the tallies in this README together.
+The count for each bucket is pinned in `tests/corpus.py` — the helper
+both this corpus and the script corpus use to gather their fixtures —
+at 23, 47, and 2. If a bucket stops loading fixtures, that pin makes
+the run fail with a collection error, instead of quietly passing with
+nothing left to check. When you add or retire a fixture, update both
+the pin and the counts in this README.
 
 ## Fixture headers
 
-Every fixture opens with comment lines naming what it exercises and
-where the rule lives:
+Every fixture opens with comment lines naming what it tests and which
+spec section the rule comes from:
 
 ```json5
 // invalid: P14's acceptance test: this passes the character class and
@@ -72,60 +83,72 @@ where the rule lives:
 // id: ref.qualifier-unknown
 ```
 
-A `// warns:` line marks a fixture that is **valid but must emit a
-warning** — currently the one name-repair case. It is asserted in both
-directions by one check over the whole bucket: a fixture declaring it
-must warn, and every other valid fixture must parse silently. What the
-warning *says* is still the header's record rather than an assertion.
+A `// warns:` line marks a fixture that is **valid but must produce a
+warning** — currently there is one such fixture, for name repair. One
+check covers the whole `valid/` bucket in both directions: a fixture
+that declares `// warns:` must actually warn, and every other valid
+fixture must parse silently. What the warning message *says* is still
+just recorded in the header, not checked.
 
-**The headers are assertions now.** They were documentation, and this
-README said so, because an invalid fixture failing for the *wrong*
-reason is a false pass and only a reviewer could catch it. Blueprint
-diagnostics carry stable ids since 2026-07-27, so a `// id:` line
-names the diagnostic that must reject each fixture and the harness
-compares it against the raised `rule_id`. All 47 carry one; none reads
-`none`. That marker is asserted in both directions, so a fixture
-claiming `none` whose diagnostic has since gained an id fails until
-its header catches up — the marker cannot outlive the gap it records.
+**The headers used to be documentation only; this README used to say
+so. Now they are assertions.** The reason for the change: an invalid
+fixture that fails for the *wrong* reason is a false pass, and only a
+human reviewer could catch that. Blueprint diagnostics have carried
+stable ids since 2026-07-27, so a `// id:` line now names the
+diagnostic that must reject the fixture, and the harness checks it
+against the `rule_id` the parser actually raised. All 47 fixtures in
+`invalid/` carry an id; none of them says `none`. The `none` marker is
+checked in both directions: if a fixture still says `none` after its
+diagnostic gains a real id, the check fails until the header is
+updated. The marker can't go stale without the test suite catching it.
 
-This is the assertion the script corpus was built with and called the
-stronger pattern, naming this corpus's inability to make it as the
-cost. That cost is paid off; what remains different is that corpus's
-`# rule:` line, which it can have because the script rules are
-V-numbered and these are not — so an id here cannot be checked against
-the rule it is *meant* to serve, only against the one that fired.
+This is the same assertion the script corpus was built with. When the
+script corpus's README called this the stronger pattern, it named this
+corpus's inability to make the same assertion as the cost of not having
+it. That cost is gone now. What's still different is the script
+corpus's `# rule:` line: script rules are numbered (`V7`, `V8`, and so
+on), so the script corpus can check that an id serves the specific rule
+it's meant to. This corpus's rules aren't numbered, so an id here can
+only be checked against the diagnostic that actually fired — not
+against which rule it was written to test.
 
-`// spec:` stays what it was: the section a reader goes to, not
-something the harness checks.
+`// spec:` is unchanged: it still just points a reader to the right
+section of the spec, and the harness does not check it.
 
-One id is deliberately coarse. `ref.not-allowed-here` rejects nine
-fixtures — a reference in `backend`, `control-planes`, `controller`,
-`materialize`, `platform`, `type`, a name, a drive key and a children
-path — from three raise sites, because those are one rule (D26/D27:
-references are refused in identity and graph positions and in closed
-vocabularies) and the message names the field. A consumer switching on
-the id learns the rule; a person reading the message learns the place.
-Three more ids cover two fixtures each and `name.machine-charter`
-covers three, for the same reason.
+One id is deliberately shared across many fixtures.
+`ref.not-allowed-here` rejects nine fixtures — a reference used in
+`backend`, `control-planes`, `controller`, `materialize`, `platform`,
+`type`, a name, a drive key, and a children path — raised from three
+different places in the code. They share one id because they are all
+the same rule (D26/D27: references are refused in identity and graph
+positions, and in closed vocabularies), and the error message itself
+names which field is the problem. Code that switches on the id learns
+the rule; a person reading the message learns the exact spot. Three
+more ids each cover two fixtures, and `name.machine-charter` covers
+three fixtures, for the same reason.
 
 ## What this corpus deliberately does not cover
 
-Single-document parse fixtures cannot reach these. They need unit tests
-at that stage, and their absence here is not coverage:
+A fixture that is a single parsed document can't test any of these.
+They need unit tests instead, and their absence from this corpus is not
+a coverage gap:
 
-- **Cross-file identity** — dedup of canonically identical specs,
-  collision of differing ones, and the origin-naming in both messages.
-  Every fixture is one document; `duplicate-in-file` and
-  `case-collision` cover only the in-file half.
-- **Resolution-time checks** — the `sha256`-required-once-remote rule
-  (a `${key}` rung may resolve to a URL, so parse cannot know) and
-  coercion at non-string positions.
-- **The container-format roster** — zip accepted, anything else failing
-  closed by name, which needs a real container.
-- **Medium compatibility** — a directory on a cdrom, an ISO into an
-  `hdd` slot, a `new` size onto a cdrom.
-- **Property binding**, which lands at milestone 8. Until then a
-  `${key}` reference must parse and then fail closed naming
-  *properties* — never naming a milestone number. `name-no-stem` and
-  `location-object-forms` carry property references for the parse half
-  only.
+- **Cross-file identity** — deduplicating specs that are identical once
+  canonicalized, flagging a collision between specs that differ, and
+  naming the origin of each in the error message. Every fixture here is
+  one document; `duplicate-in-file` and `case-collision` cover only the
+  in-file half of this.
+- **Resolution-time checks** — the rule that `sha256` is required
+  exactly once a spec is remote (a `${key}` reference might resolve to
+  a URL, which parsing can't know yet), and coercion at non-string
+  positions.
+- **The list of accepted container formats** — zip is accepted,
+  anything else is rejected by name, which needs a real container file
+  to test.
+- **Medium compatibility** — a directory used on a cdrom, an ISO
+  inserted into an `hdd` slot, a `new` size specified for a cdrom.
+- **Property binding**, which lands at milestone 8. Until then, a
+  `${key}` reference must parse and then fail closed, naming
+  *properties* as the reason — never citing a milestone number.
+  `name-no-stem` and `location-object-forms` carry property references
+  only for the parse half of this; they don't test binding.

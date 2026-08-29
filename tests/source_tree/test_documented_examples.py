@@ -2,28 +2,31 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Every blueprint example in the docs parses and validates.
 
-Prose drifts from the format silently — a stale example is read as
-instruction and copied, and nothing fails until a user tries it. So
-the examples are executed: every fenced JSON block in the documents
-that teach the blueprint format is run through the real parser, and
-through the published schema where it applies.
+Docs can drift out of sync with the format without anyone noticing —
+a reader copies a stale example as if it were still correct, and
+nothing fails until they actually try it. So this module runs the
+examples for real: every fenced JSON block in the documents that teach
+the blueprint format goes through the real parser, and through the
+published schema wherever the schema applies.
 
-**Every example is a collected node named for its document and
-position** — `README.md#0` — so a block that stops being checked is a
-missing node rather than a loop nobody counts, and a failing one is
-selected by name (F60).
+**Every example becomes its own collected test node, named for its
+document and position** — for example `README.md#0` — so a block that
+stops being checked shows up as a missing node instead of vanishing
+into an uncounted loop, and a failing block can be selected by name
+(F60).
 
-Machine-state documents (`machine.json`) appear in the same prose and
-are a different document type with their own schema; they are
+Machine-state documents (`machine.json`) show up in the same prose but
+are a different document type with their own schema. They're
 identified by their state-only fields and skipped here.
 
-**Landmark declarations get the same treatment** (F65), from their
-own document and against their own schema and parser: `.rlql` is a
-second authored JSON5 kind and its spec teaches it by example, so an
-example that rots there rots in exactly the way this module exists to
-catch. Its parser needs a rendering beside the declaration, so one is
-synthesized at the declared size — the example is being checked for
-what it *says*, and a PNG in prose would say nothing.
+**Landmark declarations get the same treatment** (F65): checked from
+their own document, against their own schema and parser. `.rlql` is a
+second authored JSON5 format, and its spec teaches it by example, so an
+example that goes stale there is exactly the kind of thing this module
+exists to catch. Its parser needs an image to go with the declaration,
+so one is generated at the declared size — the example is being
+checked for what it *says*, and a real screenshot in the prose
+wouldn't test that.
 """
 
 import glob
@@ -44,9 +47,10 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 
 # The documents that teach the authored blueprint format. README.md
-# joined them when it grew worked examples: it is the document most
-# likely to be read first and copied from, so an example rotting
-# there costs more than anywhere else, not less.
+# was added to this list once it grew worked examples of its own: it's
+# the document most likely to be read first and copied from, so a
+# stale example there does more damage than a stale example anywhere
+# else.
 _DOCUMENTS = (
     "README.md",
     "docs/blueprint-guide.md",
@@ -56,20 +60,20 @@ _DOCUMENTS = (
     "docs/spec/media-spec.md",
 )
 
-# Prose carries fragments as well as documents — one field in
-# isolation, or a whole document with its hashes elided to keep the
-# point visible. A fragment is not wrong, it is just not a document,
-# and running it through a document parser would only teach the test
-# to expect the wrong thing. A block counts as a document when the
-# format says so: an array of specs, or an object declaring its type.
+# Prose contains fragments as well as full documents — one field shown
+# in isolation, or a whole document with its hashes cut out to keep the
+# point visible. A fragment isn't wrong, it's just not a document, and
+# running it through the document parser would only teach this test to
+# expect the wrong thing. A block counts as a document when its shape
+# says so: an array of specs, or an object that declares its type.
 _ELISION = ("…", "...")
 
-# A machine-state document, not a blueprint.
+# The fields that identify a machine-state document, not a blueprint.
 _STATE_FIELDS = {"id", "phase", "blueprint-digest", "blueprint-source",
                  "backend-id", "created"}
 
-# Blueprint fences are JSON5; ``json`` / legacy ``jsonc`` tags remain
-# accepted so older prose still runs through the same gate.
+# Blueprint fences are JSON5; the ``json`` and legacy ``jsonc`` tags are
+# still accepted too, so older prose keeps running through this check.
 _FENCE = re.compile(r"```(?:json5|jsonc?)\n(.*?)```", re.S)
 
 
@@ -83,8 +87,8 @@ def _blocks(path):
         try:
             value = json5reader.loads(block)
         except StaticError:
-            # Prose fences carrying an elided fragment (…) are
-            # illustrations, not documents.
+            # A fenced block containing an elided fragment (…) is an
+            # illustration, not a real document.
             continue
         if isinstance(value, dict) and set(value) & _STATE_FIELDS:
             continue
@@ -102,12 +106,12 @@ def _schema(name):
     return json.loads(text)
 
 
-#: The document that teaches the `.rlql` landmark declaration.
+#: The document that teaches the `.rlql` landmark declaration format.
 _LANDMARK_DOCUMENT = "docs/spec/landmarks.md"
 
 
 def _landmark_blocks(path):
-    """Every fenced JSON5 block in the landmark spec, in order."""
+    """Every fenced JSON5 block in the landmark spec, in file order."""
     full = os.path.join(_REPO_ROOT, path)
     if not os.path.isfile(full):
         return
@@ -123,7 +127,7 @@ def _landmark_blocks(path):
         yield f"{path}#{index}", block, value
 
 
-#: Every example the documents carry, gathered at collection.
+#: Every example found across the documents, gathered at test collection.
 EXAMPLES = [(label, value)
             for path in _DOCUMENTS
             for label, value in _blocks(path)]
@@ -135,10 +139,10 @@ LANDMARK_SCHEMA = _schema("landmark-schema-v1.json")
 LANDMARK_EXAMPLES = list(_landmark_blocks(_LANDMARK_DOCUMENT))
 
 
-# No guard anywhere below: this module ships nowhere
-# (`tests/source_tree`), so every document is present wherever it can
-# run, and a missing one is the failure it is rather than a
-# configuration to tolerate.
+# No guard is needed below: this module ships nowhere
+# (`tests/source_tree`), so every document listed here is present
+# wherever this test can even run, and a missing document is a real
+# failure, not something to work around.
 
 @pytest.mark.parametrize("path", _DOCUMENTS)
 def test_a_listed_document_is_present(path):
@@ -147,7 +151,7 @@ def test_a_listed_document_is_present(path):
 
 
 def test_the_docs_carry_real_examples():
-    """The pin behind the parametrisations: an empty sweep passes."""
+    """Guard for the parametrized tests below: an empty sweep would pass."""
     assert len(EXAMPLES) > 10, "expected the docs to carry real examples"
 
 
@@ -166,7 +170,7 @@ def test_an_example_validates_against_the_schema(value):
 
 
 def test_the_landmark_spec_carries_a_real_example():
-    """The pin behind the parametrisations below."""
+    """Guard for the parametrized tests below: an empty list would pass."""
     assert LANDMARK_EXAMPLES, (
         f"{_LANDMARK_DOCUMENT} teaches the .rlql format and carries no "
         "declaration to check")
@@ -193,18 +197,20 @@ def test_a_landmark_example_parses(block, value, tmp_path):
 
 # Every open script example parses.
 #
-# No guard, for the reason above: the catalogue is maintainer
-# governance and ships nowhere, and neither does this module, so the
-# two are only ever present together.
+# No guard needed, for the same reason as above: this catalogue is
+# maintainer-only material and ships nowhere, and neither does this
+# module, so the two are always present together or not at all.
 #
-# The catalogue holds *unresolved* design problems, demonstrated in
-# real script text; lines that are deliberately illegal are commented
-# out and marked. So an example that will not parse is drift, not
-# intent — and drift is what happened: the five resolved examples were
-# deleted in 2026-07-26 partly because one had rotted into syntax the
-# language no longer accepts with nobody noticing, the README
-# concluding that "a note that cannot fail is not a guard". This is
-# that guard. Without it the catalogue is prose claiming to be code.
+# The catalogue holds *unresolved* design problems, shown as real
+# script text; lines that are deliberately illegal are commented out
+# and marked as such. So an example that fails to parse means the
+# catalogue has drifted, not that the drift was intended — and that's
+# exactly what happened once: five examples for problems that had
+# since been resolved were deleted on 2026-07-26, partly because one of
+# them had quietly rotted into syntax the language no longer accepts.
+# The catalogue's own README concluded that "a note that cannot fail is
+# not a guard." This test is that guard. Without it, the catalogue is
+# just prose pretending to be code.
 
 def test_the_catalogue_holds_examples():
     assert SCRIPT_EXAMPLES, (
@@ -220,15 +226,16 @@ def test_a_script_example_parses(path):
     script_parser.parse_script(text)
 
 
-# The retired four-component shape leaves no live instruction.
+# No live document still teaches the retired four-component shape.
 #
-# Historical records keep their spellings — DECISIONS entries and
-# released CHANGELOG sections are the record of their own moment.
-# Everything a reader might act on speaks the revised model.
+# Historical records keep their old spellings as-is — DECISIONS entries
+# and released CHANGELOG sections are the record of what happened at
+# the time. Everything a reader might actually act on now describes the
+# current, revised model instead.
 
-# The JSON keys only. Prose naming `.rlqm` as *retired* is correct,
-# and the file kind's absence is guarded separately
-# (test_old_surface_purge).
+# The JSON keys only. It's fine for prose to describe `.rlqm` as
+# *retired* — that's accurate. The file kind's actual absence is
+# checked separately, in test_old_surface_purge.
 RETIRED = ('"sources"', '"archives"', '"members"')
 EXEMPT = {"planning/DECISIONS.md", "CHANGELOG.md",
           "planning/USE-CASE-PROPOSALS.md",

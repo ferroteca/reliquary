@@ -9,24 +9,29 @@ The corpus for the **interpretation layer** — `control_display`,
 `interaction_agentless`, and the runner's dispatch and clocks. Design:
 [planning/design/screen-transcripts.md](../../../../planning/design/screen-transcripts.md).
 Harness: [test_transcript_corpus.py](../../../test_transcript_corpus.py),
-over [tests/replay.py](../../../replay.py).
+built on [tests/replay.py](../../../replay.py).
 
-**The third corpus, and the one whose fixtures nobody can author.**
-The blueprint and script corpora are written: a fixture states a
-document and what must happen to it. This layer is heuristic over
-real-world text — what a DOS prompt looks like, where a command's echo
-ends, whether a screen has stopped moving — and a fabricated screen
-encodes the same belief the heuristic does, so the parser passes on
-your own assumption. Only a captured screen carries the weird spacing,
-the stray CR, the half-drawn menu, the prompt that arrived mid-scroll.
+**This is the third corpus, and the one whose fixtures nobody can just
+write by hand.** The blueprint and script corpora are authored: a
+fixture states a document, and what should happen when it's processed.
+This layer is different — it's heuristics applied to real-world text:
+what a DOS prompt looks like, where a command's echo ends, whether a
+screen has stopped changing. A hand-written fake screen would just
+encode the same assumptions the heuristic makes, so a fixture built
+that way would only ever confirm the code agrees with itself. Only a
+screen actually captured from a real machine carries the odd spacing,
+the stray carriage return, the half-drawn menu, the prompt that arrived
+mid-scroll — the things a fixture needs to actually test the heuristic
+against.
 
 ## The fixtures
 
-**Two kinds, because the layer has two front doors.** A `.rlqs` run
-drives the phase graph, the cursor menus and the stability gates; a
-`exec` command drives prompt detection and command-echo scanning,
-which a script run never touches. A fixture declares which it is by
-carrying a `script` or a `command` in its header.
+**There are two kinds of fixture, because the layer has two entry
+points.** A `.rlqs` run drives the phase graph, the cursor menus, and
+the stability gates. An `exec` command drives prompt detection and
+command-echo scanning, which a script run never touches. A fixture
+declares which kind it is by carrying a `script` or a `command` field
+in its header.
 
 ### The working paths
 
@@ -38,74 +43,81 @@ carrying a `script` or a `command` in its header.
 
 ### The pathological screens
 
-Each is a screen a real FreeDOS draws for an ordinary command —
-nothing here is malformed or staged. What the layer *makes* of each
-is what the fixture pins. None is wrong today: three were when
-they were first taken, and each closed against its own capture
-(#7, #8, #9; D111, D112) — two of the five now pin a stated limit
-rather than a defect.
+Each of these is a screen a real FreeDOS draws for an ordinary command
+— nothing here is malformed or staged. What the layer *makes* of each
+screen is what the fixture pins down. None of the five is wrong today:
+three of them were wrong when they were first captured, and each one
+was closed against its own capture (issues #7, #8, #9; D111, D112).
+Two of the five now pin a documented limit rather than a bug.
 
 | fixture | the screen | what the layer does |
 |---|---|---|
 | `freedos-exec-wrapped-echo.rlqt` | an 85-column command, whose echo wraps across two rows | correct — the echo is found across the rows it spans, and the command's output below it comes back |
 | `freedos-exec-echo-lookalike.rlqt` | a file whose last line reads `C:\>TYPE C:\ECHOLIKE.TXT`, printed by that very command | correct — the echo is the row the command was typed at, and the lookalike below it is the file's own last line, returned with the other two |
-| `freedos-exec-scrolling-output.rlqt` | `DIR /S` over a thousand files: pages of scroll, then a prompt | correct — the visible tail, which is the documented limit |
-| `freedos-exec-custom-prompt.rlqt` | `PROMPT [$P]$G` itself, changing the prompt from `C:\>` to `[C:\]>` | **expires** — `screen.no-match`, the stated limit: neither the standard shape nor the prompt the guest was at comes back, and the expiry says so |
-| `freedos-exec-at-custom-prompt.rlqt` | `VER` at that `[C:\]>` prompt | correct — the prompt the guest was at is completion evidence in its own right |
+| `freedos-exec-scrolling-output.rlqt` | `DIR /S` over a thousand files: pages of scroll, then a prompt | correct — the visible tail comes back, which is the documented limit |
+| `freedos-exec-custom-prompt.rlqt` | `PROMPT [$P]$G` itself, changing the prompt from `C:\>` to `[C:\]>` | **expires** — `screen.no-match`, the documented limit: neither the standard prompt shape nor the prompt the guest was actually at comes back, and the expiry error says so |
+| `freedos-exec-at-custom-prompt.rlqt` | `VER` at that `[C:\]>` prompt | correct — the prompt the guest was already at counts as evidence the command finished |
 
-All eight are taken against real QEMU on the opt-in integration tier and
-**reconstruct with no hypervisor present**, so they run in the default
-suite, in about a second between them: the layer's waiting is real
-time and a replay has none of it. A failing capture is a defect to
-fix, not a skip to tolerate.
+All eight fixtures are captured against real QEMU on the opt-in
+integration tier, but **replay them with no hypervisor present at
+all**, so they run in the default suite, taking about a second total:
+the layer's waiting is real time in the capture, and replaying it costs
+none of that time. A failing capture is a bug to fix, not a flaky test
+to tolerate.
 
 ## What a fixture asserts
 
-**That it is replayable.** `ReplaySession` stands at the carrier seam
-the capture was taken at, so the shipped interpretation layer runs
-unmodified above it, and a call the transcript does not cover is an
-error naming what was asked (P11). A regression in prompt detection or
-echo scanning changes what the layer asks the carrier for, and the
-transcript is the record of what it asked last time. Nothing is
-restated in a sidecar that could drift from the capture.
+**That it can be replayed.** `ReplaySession` stands in for the real
+carrier at the same seam the capture was taken from, so the shipped
+interpretation layer runs completely unmodified above it. A call the
+transcript doesn't cover comes back as an error naming what was asked
+for (P11). A regression in prompt detection or echo scanning changes
+what the layer asks the carrier for, and the transcript is a record of
+exactly what it asked for last time. Nothing here is duplicated in a
+side file that could drift out of sync with the capture.
 
-Two claims sit beside that, because "the replay finished" is weaker
-than it looks:
+Two more claims sit alongside "the replay finished," because that
+claim alone is weaker than it sounds:
 
-- **Every recorded call was made.** A run that ends early replays
-  without error — it simply stops asking, and an unread transcript is
-  silent. `remaining_calls()` is the difference, and the harness
-  asserts it is zero.
-- **The script has not moved since.** The header carries the script's
-  name and the sha256 of its text; a capture taken against an edited
-  script is named as stale rather than reported as a divergence
-  eleven minutes into a replay.
-- **The run reached the conclusion it reached.** Two runs over the
-  same screens — one returning the right rows, one returning somebody
-  else's — make the same carrier calls, so the file is the same file.
-  The capture states its conclusion as a trailer, and the replay is
-  held to it: the rows a command returned, the phase a script
-  finished in, or the rule id either refused with.
+- **Every recorded call actually got made.** A run that ends early
+  still replays without raising any error — it just stops asking
+  questions, and a transcript that goes unread produces no error
+  either. `remaining_calls()` is what catches this: the harness checks
+  that it comes back zero.
+- **The script hasn't changed since the capture was taken.** The
+  transcript header carries the script's name and the sha256 of its
+  text, so a capture taken against an older version of a script is
+  flagged as stale, rather than reported as some mysterious divergence
+  eleven minutes into the replay.
+- **The run reached the same conclusion it originally reached.** Two
+  runs over the same screens — one returning the right rows, one
+  returning the wrong ones — would make identical calls to the carrier,
+  so on their own the calls can't tell those two runs apart. The
+  capture also records its conclusion, in a trailer: the rows a command
+  returned, the phase a script finished in, or the rule id it was
+  refused with. The replay is checked against that trailer too.
 
-**Which is what lets a capture of a failing run be a fixture.**
-Three of the pathological captures recorded a refusal or a wrong
-answer and asserted it, and each did its job: the day its gap
-closed, the fixture failed saying so and was re-recorded. The
-custom-prompt capture still records a refusal — a stated limit now
-rather than a gap — and asserts that. A green test over behaviour
-nobody believes in is the thing this avoids.
+**That's what makes it possible for the capture of a failing run to be
+a fixture at all.** Three of the pathological captures recorded a
+refusal or a wrong answer, and asserted it — and each one did its job:
+the day the underlying bug was fixed, the fixture failed, said so, and
+was re-recorded. The custom-prompt capture still records a refusal —
+now a documented limit rather than a bug — and still asserts it. The
+whole point is to avoid a green test that no longer reflects real
+behavior.
 
-A codex label resolves to the shipped script rather than to a copy —
-the codex is the live, tested one — and any other name resolves to a
-`.rlqs` beside the fixture, which is how a script written to provoke
-one misbehaviour would carry its own.
+A codex label in a fixture's header resolves to the actual shipped
+script, not to a copy of it — the codex script is the live, tested one.
+Any other name resolves to a `.rlqs` file kept beside the fixture,
+which is how a script written specifically to provoke one kind of
+misbehavior gets to carry its own copy.
 
 ## Re-recording
 
-Captures are taken by the integration tier and promoted by hand. No
-test writes into this directory: the run records into the integration
-home, and a maintainer looks at what came out before it becomes an
-assertion.
+Captures are taken by the integration tier and then promoted by hand.
+No test writes into this directory automatically: a run records into
+the integration home directory, and a maintainer looks over what came
+out before it becomes an actual assertion.
 
 ```powershell
 $env:RELIQUARY_INTEGRATION_HOME = "C:\Temp\reliquary-integration"
@@ -113,27 +125,29 @@ uv run pytest tests/test_freedos_install_integration.py --integration
 copy C:\Temp\reliquary-integration\captures\*.rlqt tests\fixtures\conformance\transcript\
 ```
 
-The tier leaves a machine behind on success, and a `freedos-0` holding
-FreeDOS already boots its disk rather than the LiveCD — so
-`destroy-machine --machine freedos-0` first, or the install run waits
-out its deadline on a welcome screen that never comes.
+The integration tier leaves a machine running behind after a successful
+run, and a `freedos-0` machine that already has FreeDOS installed will
+boot straight to its disk rather than the LiveCD — so run
+`destroy-machine --machine freedos-0` first, or the install run will
+sit waiting out its deadline on a welcome screen that never appears.
 
-**The lookalike fixture is staged by the guest itself**, with
-`COPY CON` typed at the prompt. Reliquary places no file on a
-machine's drives (D108), and DOS redirection cannot emit the `>` that
-file's third line turns on — there is no escape for it in any DOS
-shell — so the guest has to write it. That is why the plant happens
-after the readiness script hands over a running machine rather than
-while the machine is down.
+**The lookalike fixture is staged by the guest itself**, using `COPY
+CON` typed at the prompt. Reliquary never places a file on a machine's
+drives on its own (D108), and DOS's own redirection can't produce the
+`>` character that fixture's third line needs — no DOS shell has an
+escape for it — so the guest has to write that file itself. That's why
+the file gets planted after the readiness script hands over a running
+machine, rather than while the machine is still powered off.
 
 ## One fixture, one node
 
-Every fixture is a collected pytest node named for its file, in each
-check that judges it, and the bucket count is pinned in the harness
-(`tests/corpus.py`) so a corpus that stops loading is a collection
-error rather than a green run over nothing — the D106 defect, which is
-the reason all three corpora read through one helper. Adding or
-retiring a fixture updates the pin and the table above together.
+Every fixture is its own collected pytest node, named after its file,
+in every check that runs against it, and the bucket count is pinned in
+the harness (`tests/corpus.py`) so a corpus that stops loading fixtures
+fails with a collection error instead of quietly passing with nothing
+to check — the same D106 issue described above, and the reason all
+three corpora share one helper. When you add or retire a fixture,
+update both the pin and the table above.
 
 ```powershell
 uv run pytest tests/test_transcript_corpus.py -k freedos-verify
@@ -141,137 +155,163 @@ uv run pytest tests/test_transcript_corpus.py -k freedos-verify
 
 ## What the first captures measured
 
-The corpus paid for itself before it had a fixture in it: **taking the
-first real capture found six defects, and every one of them was in the
-recorder rather than in the layer under test.** Three were found by the
-first attempt and three by this one.
+This corpus paid for itself before it had a single fixture in it:
+**taking the first real capture turned up six bugs, and every one of
+them was in the recorder, not in the layer the corpus was meant to
+test.** Three were found on the first attempt, and three more on the
+next one.
 
-- **The recorder was never installed.** `Machine` is a frozen
-  dataclass and the engine assigned the wrapper after construction, so
-  every `--record` run died at its first screen read. The flag had
-  never worked on a real run: F42's own tests build the recording
-  session directly.
-- **The delta test was inverted.** A changed row took the keyframe
-  branch and deltas fired only on identical rows, so no transcript
-  ever carried a row change and every re-recording rewrote every line
-   — the reviewability the format was chosen for.
-- **A collapsed frame counted one sample.** Repeat reads were dropped
-  rather than absorbed, so "this screen held two seconds across forty
-  samples" and "it held two seconds with nobody looking" wrote the
-  same entry.
-- **The `screenshot` verb bypassed the recorder**, building its own
-  machine handle. Both codex scripts take a screenshot, so it was
-  every capture — and a replay then meets a call the transcript
-  cannot answer.
-- **The machine going away was not recorded.** Identity is verified
-  while a session is being opened, so a guest that powered itself off
-  refuses the session *before* the recording wrapper exists, and the
-  seam cannot record its own disappearance. Both codex scripts end on
-  `wait machine=stopped`, which is answered by exactly that refusal:
-  captures without it replayed up to the shutdown and no further.
-- **The record pace did nothing.** The poll intervals took the
-  *larger* of the production interval and the pace, so a recorded run
-  kept its two-second idle poll — the two-second hole through most of
-  a boot that the pace exists to close. The first install capture held
-  536 samples across five and a half minutes; the fixture holds 2673.
+- **The recorder had never actually been wired in.** `Machine` is a
+  frozen dataclass, and the code was assigning the recording wrapper
+  *after* construction, so every `--record` run died on its first
+  screen read. The `--record` flag had never worked on a real run: F42's
+  own tests build the recording session directly, bypassing the path
+  that was broken.
+- **The delta-encoding test was backwards.** A row that had changed was
+  taking the keyframe branch, and deltas only fired for rows that
+  hadn't changed — so no transcript ever actually recorded a row
+  change, and every re-recording rewrote every single line. That
+  defeated the whole reason the format used deltas: to make diffs
+  reviewable.
+- **A collapsed frame counted as one sample, no matter how long it
+  lasted.** Repeated identical reads were being dropped instead of
+  merged with a duration, so "this screen held for two seconds across
+  forty samples" and "it held for two seconds with only one sample
+  taken" produced the exact same recorded entry.
+- **The `screenshot` verb skipped the recorder entirely**, building its
+  own separate machine handle. Both codex scripts take a screenshot at
+  some point, so this affected every single capture — and a replay
+  would then hit a call the transcript had no record of.
+- **A machine going away wasn't being recorded.** The machine's identity
+  is checked while a session is being opened, so a guest that had
+  powered itself off would cause the session to refuse *before* the
+  recording wrapper even existed — so the wrapper could never record its
+  own machine disappearing. Both codex scripts end on
+  `wait machine=stopped`, which relies on exactly that refusal to work.
+  Captures taken before this was fixed replayed right up to the
+  shutdown and then stopped.
+- **The recording pace setting did nothing.** The poll-interval code
+  was taking the *larger* of the production interval and the recording
+  pace, so a recorded run kept its normal two-second idle poll — the
+  exact two-second gap through most of the boot that the pace setting
+  exists to close. The first install capture, made before this was
+  fixed, held 536 samples across five and a half minutes; the current
+  fixture holds 2,673.
 
-**A capture is a test of the recorder before it is a fixture**, which
-is the general form of all six: nothing above the seam could have
-found any of them, and no unit test of the recorder did.
+**A capture is a test of the recorder before it's a fixture of
+anything else** — that's the pattern behind all six bugs above. Nothing
+above the recording seam could have caught any of them, and no unit
+test of the recorder had caught them either.
 
-## And two the replay found, which are the same lesson
+## And two more the replay found, which are really the same lesson
 
-Neither is a recorder defect. Both are about what it takes to put a
-run back *exactly*, which is what an assertion of this kind needs.
+Neither of these is a recorder bug. Both are about what it actually
+takes to put a run back together *exactly* as it happened, which is
+what this kind of assertion needs.
 
-- **A read that stepped over a recorded call was silent.** The
-  reconstruction skipped call entries while looking for the next
-  frame, so a run that read once more than the capture did swallowed
-  the keypress the capture had made there — and every keystroke after
-  that was compared against the wrong one. The mismatch surfaced
-  eighteen seconds later, against a screen neither run was looking at.
-  It is now an error where it happens
-  (`transcript.read-before-call`), and that is what made the second
-  one findable at all.
-- **A frame's sample *count* cannot reconstruct its cadence.** A
-  collapsed frame recorded how many reads it absorbed, and the replay
-  spread them evenly across the gap. Even spacing is a guess, and the
-  layer's measures are windows over wall-clock: the menu machinery
-  read one extra time before its first keypress, chose a different
-  key, and the install could not be replayed at all. The format now
-  records **when** each absorbed read happened, and with the guess
-  removed the whole install replays keystroke for keystroke.
+- **A read that skipped past a recorded call failed silently.** The
+  code reconstructing a run would skip over call entries while looking
+  for the next frame, so a run that read the screen one extra time
+  compared to the capture would silently consume the keypress the
+  capture had recorded there — and every keystroke after that point got
+  compared against the wrong recorded value. The mismatch didn't show
+  up until eighteen seconds later, against a screen neither run was
+  even looking at. This is now an error raised at the point it
+  happens (`transcript.read-before-call`), and that's what made the
+  next bug (below) findable at all.
+- **A frame's sample *count* alone can't reconstruct its timing.** A
+  collapsed frame recorded how many reads it had absorbed, and replay
+  spread those reads evenly across the time gap as a guess. But even
+  spacing is only a guess, and the layer's own timing measurements are
+  based on wall-clock windows: in one case, the cursor-menu code read
+  the screen one extra time before its first keypress, chose a
+  different key than it originally had, and the whole install couldn't
+  be replayed at all. The format now records **when** each absorbed
+  read actually happened, and once that guess was removed, the entire
+  install replays keystroke for keystroke.
 
-The general form: **the transcript has to carry the moments, not
+The general lesson: **the transcript has to record the moments, not
 just the screens.** A guest's screen is only half of what the layer
-above sees; the other half is when somebody looked at it.
+above it sees; the other half is when someone actually looked at it.
 
-## And three the pathological captures found in the layer itself
+## And three more the pathological captures found in the layer itself
 
-The first five findings were about capturing faithfully. These are
-what the faithful captures then showed, and they are **not** in the
-recorder — they are what `exec` does with three ordinary screens.
+The first five bugs above were about capturing faithfully. These three
+are what the faithful captures then revealed, and they are **not**
+recorder bugs — they're about what `exec` itself does with three very
+ordinary screens.
 
-- **A command over 80 columns could not be run.** Its echo wrapped, no
-  row *ended* with the command, and `_echo_at` found nothing; the
-  command ran fine on the guest and `exec` refused to tell you what it
-  said (`screen.no-echo`). **Closed** (issue #8): the scan now
-  reconstructs the line the guest broke, the width taken off the
-  attribute rows, and the fixture was re-recorded over the fixed layer
-  — the capture of the refusal did exactly what it was kept for.
-- **A line of output that looks like the echo silently wins.** The
-  scan runs backwards from the bottom for a row ending with the
-  command and carrying a `>`, and a file whose last line is
-  `C:\>TYPE C:\ECHOLIKE.TXT` is exactly that row. Everything above it
-  — the file's real content — was discarded and `exec` returned an
-  **empty** result with no error. This one was a **spec violation**,
-  not an unstated limit: `docs/spec/cli.md` promises "the command's
-  own output or a failure — never text it cannot attribute", and an
-  empty tuple attributed to a command that printed three lines is
-  neither. **Closed** (issue #7; D111): the echo is identified by
-  where it sits — the row the command was typed at, with the rows
-  that were above the prompt still above it — and a row that merely
-  spells the same text is the command's own output. The one screen
-  that rule cannot tell apart, stated rather than hidden: output
-  longer than a screenful whose *first visible row* is such a
-  lookalike, nothing being left above it to contradict it.
-- **A customized prompt is never recognized.** `_PROMPT_RE` is
-  `^[A-Z]:(\\[^>]*)?>$`, so a guest whose `AUTOEXEC.BAT` sets
-  `PROMPT [$P]$G` — or `$T$G`, or anything with a suffix — makes
-  every `exec` wait out its full timeout. Nothing in the spec said
-  which prompts were supported. **Closed** (issue #9; D112): the
-  prompt the guest was at is completion evidence beside the standard
-  shape, so a customized guest is usable from its first command with
-  nothing declared. What remains is stated rather than open: a
-  command that changes a customized prompt returns to text `exec`
-  has no evidence for, the expiry names both shapes it waited for,
-  and the capture of `PROMPT [$P]$G` now pins that limit.
+- **A command longer than 80 columns couldn't be run at all.** Its echo
+  wrapped across two rows, so no single row *ended* with the full
+  command, and `_echo_at` found nothing. The command ran fine on the
+  guest, but `exec` had no way to tell the caller what it had printed
+  (`screen.no-echo`). **Closed** (issue #8): the scanner now
+  reconstructs the line the way the guest actually wrapped it, working
+  from the screen width taken off the attribute rows, and the fixture
+  was re-recorded against the fixed layer — the capture of the original
+  bug did exactly the job it was kept around for.
+- **A line of output that happens to look like the echo could silently
+  win.** The scanner searches backward from the bottom of the screen for
+  a row that ends with the command and contains a `>`, and a file whose
+  last line is `C:\>TYPE C:\ECHOLIKE.TXT` matches that exactly.
+  Everything above it — the file's actual content — was being thrown
+  away, and `exec` returned an **empty** result with no error at all.
+  This one wasn't just an undocumented limit, it was a **violation of
+  the spec**: `docs/spec/cli.md` promises "the command's own output or
+  a failure — never text it cannot attribute," and an empty result
+  attributed to a command that had printed three lines is neither of
+  those. **Closed** (issue #7; D111): the echo is now identified by its
+  *position* — the row the command was typed at — with everything that
+  was above the prompt still kept above it. A row that merely happens
+  to spell the same text as the command is treated as the command's
+  own output. There's still one screen this rule genuinely can't tell
+  apart from the real echo, and that limit is now documented rather
+  than hidden: output longer than a full screen, whose *first visible
+  row* happens to be a lookalike, with nothing left above it to prove
+  otherwise.
+- **A customized prompt was never recognized.** `_PROMPT_RE` is
+  `^[A-Z]:(\\[^>]*)?>$`, so a guest whose `AUTOEXEC.BAT` sets `PROMPT
+  [$P]$G` — or `$T$G`, or anything with a suffix — made every `exec`
+  call wait out its full timeout. Nothing in the spec said which
+  prompts were even supported. **Closed** (issue #9; D112): the
+  prompt the guest is already sitting at now counts as completion
+  evidence, alongside the standard prompt shape, so a guest with a
+  customized prompt works from its very first command with nothing
+  extra needing to be declared. What's left is now stated rather than
+  left open: a command that itself changes to a customized prompt
+  returns text `exec` has no evidence for; the timeout error now names
+  both prompt shapes it was waiting for; and the capture of `PROMPT
+  [$P]$G` pins down that remaining limit.
 
-None of the three is a gap any more, and the corpus is why they
-closed honestly: what counts as a DOS prompt, or as an echo, was a
-design question with a decision to make (D111, D112) rather than a
-test fixture's to settle, and the fixtures pinned the old behaviour
-so that settling it could not happen silently. Each re-recording is
-the record that it did not.
+None of these three is still an open gap. The corpus is why they closed
+honestly: what counts as a DOS prompt, or as a command's echo, was a
+real design question with a decision to make (D111, D112), not
+something a test fixture should have been left to quietly settle on
+its own. The fixtures pinned down the old, wrong behavior specifically
+so that it couldn't be changed silently. Each re-recording is the
+record that it wasn't.
 
 ## What this corpus deliberately does not cover
 
 - **The machine layer.** A live `insert` or `eject` changes the medium
-  over the machine layer's own session, not the run's, so it is
-  absent from a capture — the fake lifecycle in `tests/replay.py`
-  answers it instead. What the corpus covers is what the *guest
-  screen* drove.
-- **Timing as it happened.** A replay runs on the capture's own
-  timeline rather than a clock of its own: every moment the layer
-  measures against is the one the recording holds, and the waiting
-  between them costs nothing. A capture is minutes long because a
-  guest is slow, not because the layer is.
-- **`--check`.** The ERRORLEVEL probe is a second command at the
-  prompt, read back through the same echo discipline, so a capture of
-  it would pin the probe rather than the reading. Nothing here runs
-  one.
-- **The other backend.** These are QEMU captures, which scrape text
-  memory. VirtualBox reaches the same seam through the fixed-font
-  recognizer, and a capture taken there would exercise that path
-  instead; the format is backend-neutral by construction, so it needs
-  a run rather than a change.
+  through the machine layer's own session, not through the run being
+  captured, so it can't show up in a capture at all — the fake
+  lifecycle in `tests/replay.py` covers that case instead. What this
+  corpus covers is only what the *guest's own screen* drove.
+- **Timing as it actually happened in real time.** A replay runs on the
+  capture's own recorded timeline, not against a real clock: every
+  moment the layer measures against is the one the recording holds, and
+  none of the original waiting costs anything to replay. A capture
+  takes minutes because a real guest is slow, not because the layer
+  itself is slow.
+- **`--check`.** The ERRORLEVEL probe is a second command sent to the
+  prompt, read back through the same echo logic, so a capture of it
+  would only test the probe, not the reading logic. Nothing here
+  exercises it.
+- **The other backend.** These are all QEMU captures, which read text
+  straight out of memory. VirtualBox reaches the same interpretation
+  layer through the fixed-font recognizer instead, and a capture taken
+  there would exercise that different path. The transcript format
+  itself doesn't depend on which backend produced it, but testing the
+  VirtualBox path needs an actual VirtualBox run, not a change to this
+  corpus.
