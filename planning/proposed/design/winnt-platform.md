@@ -9,7 +9,10 @@ SPDX-License-Identifier: GPL-3.0-only
 > (`planning/proposed/FEATURES.md` — "Win9x/WinNT platform
 > workflows: GUI installer scripting for the setup GUIs text
 > scraping cannot reach, keyboard-first where NT-era setup allows
-> it"), narrowed to its WinNT half. **Nothing here is pledged.**
+> it"), narrowed to its WinNT half — **pledged as F67 and
+> delivered, 2026-08-26** (owner), the number retired the way
+> F63/F65/F66 each retired on their cut from F5. The Win9x half
+> stays unpledged in F5's entry.
 > Unlike this document's siblings
 > ([device-growth.md](device-growth.md),
 > [hyperv-screen.md](hyperv-screen.md)), the work below is not a
@@ -296,11 +299,11 @@ locally above instead, per this round's call).
    entry, `reactos.rlqb`, `reactos-install.rlqs`, and
    `test_reactos_click_integration.py`, with this session's driver,
    boot-order, and retry-scope fixes folded in.
-3. Cut a fresh F-number for this slice and pledge it, exactly as
-   F63, F65, and F66 were each cut from F5 and pledged the same day
-   their piece was ready (D110 for the pattern) — the owner's call,
-   per D43's standing rule that entry to `pledged/` is authority the
-   owner alone holds today.
+3. ~~Cut a fresh F-number for this slice and pledge it~~ —
+   **done** (owner, 2026-08-26): pledged and delivered as **F67**,
+   the number retired, exactly as F63, F65, and F66 were each cut
+   from F5 and pledged the same day their piece was ready (D110
+   for the pattern).
 
 **Done when** (F5's own criterion, narrowed to this slice): the
 `reactos` codex recipe installs unattended end to end, and

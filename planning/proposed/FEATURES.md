@@ -165,7 +165,15 @@ passes byte-for-byte.
 > **delivered**, its number retired and its surface normative at
 > [docs/spec/script-spec.md](../../docs/spec/script-spec.md#click),
 > [docs/spec/blueprint-model.md](../../docs/spec/blueprint-model.md)
-> and [docs/spec/landmarks.md](../../docs/spec/landmarks.md). Every
+> and [docs/spec/landmarks.md](../../docs/spec/landmarks.md). **The
+> fourth cut left it 2026-08-26**: **F67**, the WinNT half of the
+> platform-workflows deliverable — the ReactOS codex recipe and
+> F66's real-GUI proof — pledged and **delivered**, its number
+> retired. It ships no new normative surface (a codex recipe is
+> content under [docs/spec/codex.md](../../docs/spec/codex.md));
+> its record is
+> [design/winnt-platform.md](design/winnt-platform.md) and the
+> shipped recipe itself. Every
 > deliverable below now stands on pledged
 > demand and stays here until pledged — a pledged use case makes
 > a feature pledgeable and pledges nothing itself (D65).
@@ -307,7 +315,15 @@ Deliverables:
    `click` verb composed on the pointer primitive.
 4. Win9x/WinNT platform workflows: GUI installer scripting for
    the setup GUIs text scraping cannot reach, keyboard-first
-   where NT-era setup allows it.
+   where NT-era setup allows it. **The WinNT half is delivered**
+   (F67, 2026-08-26 —
+   [design/winnt-platform.md](design/winnt-platform.md)): the
+   ReactOS codex recipe, keyboard-first through its text-mode
+   setup exactly as this entry's era note predicted, landmarks and
+   `click` through its Win32 Setup Wizard. What stays here: the
+   Win9x half, a different install flow with no demand yet
+   distinguishing it (the design's scope call), and any richer
+   pointer vocabulary a future guest demands.
 5. The VMware Workstation adapter.
 6. The Hyper-V adapter, last, on the screen strategy
    [design/hyperv-screen.md](design/hyperv-screen.md) decides —

@@ -63,10 +63,15 @@ surface normative at
 **F66** (owner, 2026-08-25) and is **delivered**, its number
 retired and its surface normative at
 [../../docs/spec/script-spec.md](../../docs/spec/script-spec.md#click);
+the fourth — the WinNT platform workflow, the ReactOS codex
+recipe driving a real Win32 setup GUI through those landmarks and
+that pointer — was pledged as **F67** (owner, 2026-08-26) and is
+**delivered**, its number retired, its record
+[proposed/design/winnt-platform.md](../proposed/design/winnt-platform.md);
 and the
-platform workflows stand alone in
+Win9x remainder stands in
 [proposed/FEATURES.md](../proposed/FEATURES.md) (F5) on this
-pledge, still moving by their own decision (D65). Text
+pledge, still moving by its own decision (D65). Text
 verbatim as reshaped by D64:
 
 > - **U5 — Custom installation.** A user wants the German
