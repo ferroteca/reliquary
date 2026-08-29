@@ -26,9 +26,9 @@ from .machine_handle import (Machine, cursor_menu_select, screen_text,
                       screenshot, send_keys, send_text, wait_text)
 from .home import (Context, DIRECTORIES, default_home_dir,
                    environment_variable)
-# The codex family and the locate seam are the CLI's own (D87): no
-# session veneer exists for them, so they take the invocation's
-# Context directly.
+# The codex functions and locate_script belong to the CLI alone
+# (D87): there is no Session method wrapping them, so they take the
+# invocation's Context directly instead of going through a Session.
 from .library import (list_codex, locate_script, seed_blueprint,
                       seed_script)
 from . import backends
@@ -76,24 +76,27 @@ _FLAG_ARITY = {
 
 
 def _reorder_argv(argv):
-    """Move leading flags to after the command word.
+    """Move any flags before the command word to after it.
 
-    Flags are declared once on each subparser; this rewrite makes
-    position carry no meaning so the parent-parser SUPPRESS twin is
-    unnecessary.
+    Each flag is declared once, on its subcommand's own parser, not
+    on a shared parent parser. This function moves flags around so
+    that their position on the command line doesn't matter — a flag
+    written before the command word still reaches the right parser.
 
-    An *unknown* leading flag has no arity to skip by, so its value
-    (if it takes one) is an ordinary bare word. Stopping there would
-    hand argparse the value as the command word and produce
-    ``invalid choice: 'foo'`` — blaming the value and never naming
-    the flag that is actually wrong. Once an unknown flag has been
-    seen the scan therefore keeps looking for a real command word,
-    so the reorder still happens and the subparser reports
-    ``unrecognized arguments: --qemu foo``. The invocation is an
-    error either way; this only decides which error it gets, and
-    naming the unknown flag is the useful one. A bare word before
-    any unknown flag still stops the scan, so a plain misspelled
-    command is still reported as the invalid choice it is.
+    An unknown flag before the command word has no known arity, so we
+    don't know whether to skip a following value for it — its value
+    (if it has one) just looks like an ordinary word. If we stopped
+    scanning there, argparse would treat that value as the command
+    word and report ``invalid choice: 'foo'``, blaming the value
+    instead of naming the flag that's actually wrong. So once an
+    unknown flag is seen, the scan keeps looking past it for the real
+    command word; the reorder still happens, and the subparser then
+    reports ``unrecognized arguments: --qemu foo`` instead, naming the
+    flag. Either way the command is invalid — this only changes which
+    error message the user sees, and naming the bad flag is the more
+    useful one. A plain word seen before any unknown flag still stops
+    the scan immediately, so a genuinely misspelled command name is
+    still reported as an invalid choice, as it should be.
     """
     if not argv:
         return argv
@@ -129,12 +132,12 @@ def _reorder_argv(argv):
 
 
 def _require_machine_selector(arguments, session):
-    """Return a resolved machine id from selectors.
+    """Resolve --blueprint/--machine to a machine id, or raise.
 
-    Resolution runs through the invocation's session — the record
-    built from the ``--*-dir`` flags, the environment, and the
-    default home in main() — never through the process globals,
-    which the CLI no longer drives (P26).
+    Resolution goes through ``session`` — built in main() from the
+    ``--*-dir`` flags, the environment, and the default home — never
+    through any process-global state. The CLI doesn't use
+    process-global state for this anymore (P26).
     """
     if not getattr(arguments, "blueprint", None) and not getattr(
             arguments, "machine", None):
@@ -148,12 +151,13 @@ def _require_machine_selector(arguments, session):
 
 
 def _interaction_target(arguments, session):
-    """Resolve the machine directory a guest-console command drives.
+    """Resolve the machine directory a guest-console command should use.
 
-    The directory is the whole address: it is where the machine's
-    recorded VM identity lives, and the adapter named there supplies
-    the endpoint and verifies it. There is no port to pass — that is
-    QEMU's own detail, on the far side of the adapter seam.
+    That directory is all the addressing info needed: it's where the
+    machine's recorded VM identity lives, and the backend adapter
+    named in that state supplies and verifies the actual connection
+    endpoint. There's no port number to pass around here — that's a
+    QEMU implementation detail handled inside the adapter.
     """
     machine_id = _require_machine_selector(arguments, session)
     state = session.load_machine_state(machine_id)
@@ -171,10 +175,11 @@ def _interaction_target(arguments, session):
     return machine_home
 
 
-# Every command takes the six directory flags, mirroring the API's
-# shared keywords. Each names one working directory; the ones left
-# unnamed derive (home.py), so `--home-dir` alone still places all
-# six and a bare invocation places them under the default home.
+# Every command accepts the same six directory flags, matching the
+# API's shared keyword arguments. Each flag names one working
+# directory; any left unnamed are derived from the others (see
+# home.py), so passing just `--home-dir` still places all six, and
+# running with no flags at all places them under the default home.
 _DIRECTORY_HELP = {
     "home": "reliquary home directory "
             "(default: Documents/reliquary)",
@@ -196,7 +201,7 @@ def _add_home(parser):
 
 
 def _add_json(parser):
-    """Add the result-document switch to a command parser."""
+    """Add the --json flag to a command parser."""
     parser.add_argument(
         "--json", action="store_true",
         help="print the command's result as one JSON document")
@@ -206,30 +211,33 @@ def _add_json(parser):
 def _invocation_context(arguments):
     """Build the one Context this invocation opens its session on.
 
-    The order is the precedence: flags, then the environment for what
-    no flag named, then the default home for what neither did. That
-    last step is what makes the fail-closed error unreachable at the
-    keyboard — one home assignment reaches all six through derivation
-    — and it happens whenever the home is still unnamed, not only
-    when nothing at all was given, so ``rlq --cache-dir D:\\c
-    list-machines`` keeps working with an explicit cache over a
-    defaulted home.
+    Flags take priority; for anything a flag didn't set, the
+    environment variable is checked next; anything still unset falls
+    back to the default home directory. That last fallback is what
+    makes the "no home assigned" error unreachable from the command
+    line: it fires whenever home is still unset at that point, not
+    just when the user passed nothing at all, so
+    ``rlq --cache-dir D:\\c list-machines`` still works, combining an
+    explicit cache directory with a defaulted home.
 
-    Honouring the environment is the CLI's private construction step,
-    never the library's: a program embedding Reliquary gets none of
-    it unless it asks (home.py). The selected properties file rides
-    in the same record (P26's cargo): ``--properties``, else
-    ``RELIQUARY_PROPERTIES``, else the home's file by way of an
-    empty slot.
+    Reading environment variables happens only here, in the CLI —
+    never inside the library itself: a program embedding reliquary as
+    a library gets none of this unless it explicitly asks for it (see
+    home.py). The selected properties file travels in the same
+    Context record, alongside the six directories (P26): it comes
+    from ``--properties``, then ``RELIQUARY_PROPERTIES``, then falls
+    through to the home directory's own properties file if neither is
+    set.
     """
     slots = {}
     for name in DIRECTORIES:
         value = getattr(arguments, "%s_dir" % name, None)
         if not value:
             value = os.environ.get(environment_variable(name))
-        # ``RELIQUARY_HOME`` is the documented spelling. Accept the
-        # former mechanical spelling for existing CLI users only when
-        # the primary spelling is absent.
+        # RELIQUARY_HOME is the documented, current name for this
+        # variable. Also accept the older name, RELIQUARY_HOME_DIR,
+        # for users who still have it set, but only when RELIQUARY_HOME
+        # itself isn't set.
         if not value and name == "home":
             value = os.environ.get("RELIQUARY_HOME_DIR")
         if value:
@@ -246,7 +254,7 @@ def _invocation_context(arguments):
 
 
 def _add_properties_file(parser):
-    """The properties file a command maintains, replacing the home's."""
+    """Add --properties, letting a command use a file other than the home's."""
     parser.add_argument(
         "--properties", default=None, metavar="PATH",
         help="properties file to use instead of the home's "
@@ -255,7 +263,7 @@ def _add_properties_file(parser):
 
 
 def _add_property_inputs(parser):
-    """Property binding inputs for a run: --property and --properties."""
+    """Add the property-binding flags for a run: --property and --properties."""
     parser.add_argument(
         "--property", action="append", default=None, metavar="KEY=VALUE",
         dest="property", help="bind a declared property (repeatable); "
@@ -265,7 +273,7 @@ def _add_property_inputs(parser):
 
 
 def _explicit_properties(arguments):
-    """Parse repeated --property KEY=VALUE into a mapping, or None."""
+    """Parse the repeated --property KEY=VALUE flags into a dict, or None."""
     pairs = getattr(arguments, "property", None)
     if not pairs:
         return None
@@ -286,11 +294,11 @@ def _explicit_properties(arguments):
 
 
 def _expectations(arguments):
-    """Parse repeated --expect KEY=VALUE into a mapping, or None.
+    """Parse the repeated --expect KEY=VALUE flags into a dict, or None.
 
-    The same spelling as ``--property``, deliberately: one shape for
-    "a key and a value on the command line" rather than a second
-    mini-format for a reader to learn.
+    Uses the same KEY=VALUE syntax as --property, deliberately: one
+    format for "a key and a value on the command line" is easier to
+    learn than a second, slightly different one.
     """
     pairs = getattr(arguments, "expect", None)
     if not pairs:
@@ -312,17 +320,19 @@ def _expectations(arguments):
 
 
 def _emit(arguments, value, render):
-    """Render a command result as JSON or human text.
+    """Print a command's result as JSON or as human-readable text.
 
-    Under ``--json`` the twin's return ``value`` is printed as one
-    JSON document on stdout (a void twin passes ``{}``); otherwise
-    ``render()`` prints the human form. Returns exit code 0.
+    Under ``--json``, ``value`` (the underlying Session method's
+    return value) is printed as one JSON document on stdout — a
+    command with no real return value passes ``{}``. Otherwise,
+    ``render()`` is called to print the human-readable form. Always
+    returns exit code 0.
 
-    The output discipline (docs/spec/cli.md): a result-bearing
-    command's pretty stdout is exactly the human rendering of what
-    its twin returns — the same value ``--json`` serializes — so it
-    pipes clean with no flags. Narration around it, and every line of
-    a void twin, belongs on stderr.
+    Per the output rules in docs/spec/cli.md: a command's normal
+    stdout output is exactly the human-readable rendering of the same
+    value that ``--json`` would print, so it can be piped without any
+    extra flags. Anything else — narration, or every line printed by
+    a command with no real return value — goes to stderr instead.
     """
     if getattr(arguments, "json", False):
         print(json.dumps(value, default=str))
@@ -337,7 +347,7 @@ def _narrate(message):
 
 
 def _reject_stream_json(arguments, command):
-    """Stream-bearing commands reject ``--json`` (they are event streams)."""
+    """Raise if --json was passed to a command whose output is an event stream."""
     if getattr(arguments, "json", False):
         raise StaticError(
             f"{command} is a stream, not a document; use "
@@ -346,7 +356,7 @@ def _reject_stream_json(arguments, command):
 
 
 def _add_progress(parser):
-    """The rendering selector on a stream-bearing command."""
+    """Add --progress to a command whose output is a live event stream."""
     parser.add_argument(
         "--progress", choices=_PROGRESS_MODES, default="auto",
         help="live rendering: auto (tty detection), pretty, plain, or "
@@ -369,11 +379,11 @@ _PROG_NAMES = ("rlq", "reliquary")
 
 
 def _prog_name():
-    """The invoked console-script name, falling back to ``rlq``.
+    """Return the console-script name the user actually typed, or "rlq".
 
-    Both ``rlq`` and ``reliquary`` are registered entry points for
-    the same command; help/usage text should reflect whichever the
-    user actually typed rather than always naming one of them.
+    ``rlq`` and ``reliquary`` are both registered as entry points for
+    this same command, so help and usage text should show whichever
+    one the user actually ran, instead of always naming one of them.
     """
     stem = os.path.splitext(os.path.basename(sys.argv[0]))[0]
     return stem if stem in _PROG_NAMES else "rlq"
@@ -782,21 +792,21 @@ def _add_console_commands(subcommands):
 
 
 def _build_parser():
-    """The whole CLI: the root parser, and the commands it registers.
+    """Build the whole CLI: the root parser, and every command it registers.
 
-    Returns ``(parser, commands)`` — the parser to drive an
-    invocation with, and the set of command words it knows. **The
-    command set is read off the parser rather than restated**, which
-    is what keeps `_COMMANDS` from being a second list to maintain
-    beside the registrations.
+    Returns ``(parser, commands)`` — the parser to run an invocation
+    with, and the set of command-word strings it recognizes. The
+    command set is read directly off the built parser rather than
+    typed out again by hand, so `_COMMANDS` below never has to be kept
+    in sync with the actual registrations manually.
 
-    **Call order is `--help` order.** The families below are
-    registered in the sequence a reader meets them in the help
-    output, so moving a call moves the listing; the groups follow the
-    blocks this module has always carried rather than a fresh
-    taxonomy, which is why `fetch-media` sits alone between the
-    script and the authoring families and `add-media` sits with cache
-    reclamation.
+    The order the `_add_*_commands` functions are called in below is
+    the order commands appear in `--help` output, so reordering a call
+    reorders the listing. The groupings follow how this module has
+    always been organized rather than some new category scheme, which
+    is why `fetch-media` sits alone between the script and authoring
+    groups, and `add-media` sits with cache reclamation instead of
+    with the other media commands.
     """
     parser = argparse.ArgumentParser(
         prog=_prog_name(),
@@ -819,13 +829,14 @@ def _build_parser():
     return parser, frozenset(subcommands.choices)
 
 
-# Command words recognised when rewriting leading flags so that
-# ``rlq --home-dir X list-machines`` and ``rlq list-machines --home-dir X``
-# are identical without a parent-parser SUPPRESS twin. **Derived, not
-# declared**: a throwaway parser is built once at import so this set
-# cannot drift from what is actually registered. `main()` builds its
-# own, so `_prog_name()` still reads `sys.argv[0]` when the command
-# runs rather than when the module loads.
+# The set of command words _reorder_argv() looks for when rewriting
+# leading flags, so that ``rlq --home-dir X list-machines`` and
+# ``rlq list-machines --home-dir X`` behave identically. This set is
+# computed by building a throwaway parser once at import time rather
+# than typed out by hand, so it can never drift out of sync with the
+# commands actually registered. main() builds its own separate parser
+# for the real run, so _prog_name() still reads sys.argv[0] when the
+# command actually runs, not when this module is first imported.
 _COMMANDS = _build_parser()[1]
 
 
@@ -842,42 +853,50 @@ def main(argv=None):
         try:
             return _dispatch(arguments, session, context)
         except ConnectionError as error:
-            # An unreachable management endpoint is a machine rule, not
-            # a fault: the command is legal and the VM is not there.
-            # Converted rather than reported here, so the exit code
-            # comes from the taxonomy like every other one.
+            # An unreachable management endpoint means the command was
+            # legal but the VM isn't actually there — that's a
+            # PreflightError, not an internal fault. Converting it to
+            # a PreflightError here, rather than reporting the raw
+            # ConnectionError, is what makes the exit code come from
+            # the normal error-class-to-exit-code mapping like every
+            # other error.
             raise PreflightError(
                 f"cannot reach the machine's backend: {error}\n"
                 "  is the VM running? "
                 "(rlq start-machine --blueprint NAME)",
                 rule_id="machine.qmp-unreachable") from error
     except ReliquaryError as error:
-        # The taxonomy is the exit codes: STATIC ERROR 2, PREFLIGHT
-        # ERROR 3, RUN FAILURE 4, cancelled 5, an InternalError 1
-        # (reliquary/errors.py). A run's own failure report already
-        # reached the stream, so only the one-line diagnostic is
-        # repeated here.
+        # See reliquary/errors.py for the exit codes: StaticError is
+        # 2, PreflightError is 3, RunFailure is 4, cancelled is 5, and
+        # InternalError is 1. A run's own failure is already reported
+        # in the event stream, so only this one-line summary is
+        # printed here, not the full report again.
         print(f"rlq: {error}", file=sys.stderr)
         return exit_code(error)
     except KeyboardInterrupt:
         print("rlq: interrupted", file=sys.stderr)
         return 5
     except OSError as error:
-        # The host refused something reliquary asked for correctly — a
-        # permission, a full disk, a path that vanished under it. Not a
-        # mistake the caller can restate and not an invariant of ours,
-        # so it exits 1 wearing the host's own words.
+        # The host refused to do something reliquary correctly asked
+        # for — a permission error, a full disk, a path that vanished
+        # underneath it. This isn't a mistake the caller can fix by
+        # rephrasing the command, and it isn't a bug in reliquary
+        # either, so it exits 1, printing the host's own error message.
         print(f"rlq: {error}", file=sys.stderr)
         return UNEXPECTED
     except Exception:
-        # Exit 1 is contracted for a fault, so main() stays total and
-        # returns it rather than letting the exception escape. What
-        # changed is the *report*: the old clause named seven builtins
-        # and printed one tidy line, which is how an ordinary mistake
-        # raised as a `ValueError` came to look like a crash. Those are
-        # all classes in the hierarchy now (D58), so anything reaching
-        # here is a genuine bug and gets a traceback — a miss is meant
-        # to be loud, not absorbed.
+        # Exit code 1 is reserved for reliquary's own faults, so
+        # main() catches everything here rather than letting an
+        # exception crash the process, and still returns 1. What
+        # changed from an earlier version of this code: it used to
+        # list specific built-in exception types (like ValueError) and
+        # print just one tidy line for them, which made an ordinary
+        # user mistake that happened to raise a plain ValueError look
+        # like an internal crash. Those cases are now all proper
+        # reliquary error classes (D58), so anything that still
+        # reaches this bare except really is an unexpected bug, and
+        # gets a full traceback printed — a bug here should be loud,
+        # not hidden behind a tidy one-liner.
         traceback.print_exc()
         return UNEXPECTED
 
@@ -895,9 +914,9 @@ def _create(arguments, session):
         backend=getattr(arguments, "backend", None),
         properties=_explicit_properties(arguments))
     if dry_run:
-        # The twin returns a DryRun, so that is what --json prints;
-        # the pretty form is its own report, which is the same
-        # document rendered for a person.
+        # session.create_machine() returns a DryRun object here, so
+        # that's what --json prints (as a dict); result.report is the
+        # same information rendered as text for a person to read.
         return _emit(arguments, dataclasses.asdict(result),
                      lambda: print(result.report, end=""))
     return _emit(arguments, result, lambda: print(result))
@@ -926,25 +945,28 @@ def _apply_blueprint(arguments, session):
 
 
 def _script(arguments, session):
-    """Run a script live and exit by outcome, or report a dry run.
+    """Run a script live and exit with its outcome, or report a dry run.
 
-    Stream-bearing: the run's output is the event stream, which
-    ``--progress`` has already rendered — under ``jsonl`` onto stdout,
-    terminal event last; under the human modes onto stderr, leaving
-    stdout empty. Nothing is written to disk (D36), and nothing more
-    is printed here: the outcome travels by exit code.
+    A live run's output is the event stream, and ``--progress`` has
+    already rendered it: under ``jsonl`` it goes to stdout, with the
+    terminal event printed last; under the human modes it goes to
+    stderr, leaving stdout empty. Nothing is written to disk (D36),
+    and nothing extra is printed here — the outcome is reported only
+    through the exit code.
 
-    ``--dry-run`` makes it the other thing entirely — a document
-    rather than a stream — so the selector, the ``--json`` refusal
-    and the printed result all change with it.
+    ``--dry-run`` makes this something else entirely: instead of a
+    live event stream, it produces one document. That changes which
+    selector is required, whether ``--json`` is allowed, and what
+    gets printed.
     """
     blueprint_name = getattr(arguments, "blueprint", None)
     machine_selector = getattr(arguments, "machine", None)
     dry_run = getattr(arguments, "dry_run", False)
     if not dry_run:
-        # A run needs a machine to run against; a dry run does not,
-        # and its selector chooses the tier instead (script-spec.md's
-        # two checkable tiers, preserved by the respelling).
+        # A live run needs a machine to run against; a dry run does
+        # not, since its selector just picks which of the two checks
+        # (blueprint or machine) to run instead (the two checkable
+        # tiers from script-spec.md).
         _reject_stream_json(arguments, "run-script")
         if not blueprint_name and not machine_selector:
             raise StaticError(
@@ -962,29 +984,34 @@ def _script(arguments, session):
         record=getattr(arguments, "record", None),
     )
     if dry_run:
-        # Under --dry-run the twin returns a document, so --json is
-        # legal here and prints exactly that -- the same rule that
-        # makes it illegal on a live run's event stream.
+        # Under --dry-run, session.run_script() returns a document
+        # rather than a stream, so --json is allowed here and prints
+        # exactly that document -- the same rule that makes --json
+        # rejected on a live run's event stream.
         return _emit(arguments, dataclasses.asdict(result),
                      lambda: print(result.report, end=""))
     return 0
 
 
 def _table_box(encoding):
-    """Choose borders the console's declared encoding can represent."""
+    """Choose table border characters the console's encoding can display."""
     normalized = (encoding or "").lower().replace("_", "").replace("-", "")
     return box.ROUNDED if normalized.startswith("utf") else box.ASCII
 
 
 def _print_table(columns, rows):
-    """Render a compact, colorful, wrapping table.
+    """Print a compact, colorful table that wraps long cells.
 
-    Rich measures terminal cells rather than Python characters, and folds
-    values that do not fit — including a long description in its own cell.
-    When stdout is not a tty (piped, captured, or under the suite), pin
-    the width at 80 rather than reading the controlling terminal — that
-    size is not the stream we are writing to, and letting it leak made
-    pipe output and unit assertions depend on whoever's window ran them.
+    Rich measures column widths in terminal cells, not Python
+    characters, and wraps any value that doesn't fit — including a
+    long description, inside its own cell. When stdout isn't a
+    terminal (piped, captured, or running under the test suite), the
+    width is fixed at 80 instead of reading the actual terminal's
+    width, because that width belongs to whatever terminal happens to
+    be running the command, not to the stdout stream we're writing
+    to — reading it would make piped output and test assertions
+    depend on the size of whoever's terminal window happened to run
+    them.
     """
     force_width = None if sys.stdout.isatty() else 80
     console = Console(file=sys.stdout, highlight=False,
@@ -1042,10 +1069,10 @@ def _list_blueprints(arguments, session):
 
 
 def _list_codex(arguments):
-    """The library's own listing — names to a person, records to --json.
+    """List the built-in library's blueprints: names for a person, records for --json.
 
-    A description shares the row with its blueprint, wrapping as the
-    terminal needs.
+    Each blueprint's description is shown in the same row, wrapping
+    to fit the terminal as needed.
     """
     rows = list_codex()
 
@@ -1068,7 +1095,7 @@ def _print_names(names, empty):
 
 
 def _list_backends(arguments):
-    """The host's discovered backend installations, and no candidates."""
+    """List the backends discovered on this host; excludes any not available."""
     rows = [
         {"backend": probe.backend, "home": probe.home}
         for probe in backends.discover()
@@ -1114,11 +1141,12 @@ def _render_machines(machines, filter_blueprint):
 
 
 def _description(script):
-    """A script's description as one line of listing text."""
+    """Return a script's description as one line of listing text."""
     if script.description is None:
         return ""
-    # A listing binds no properties, so any reference is shown as
-    # the author wrote it.
+    # Listing a script doesn't bind any properties, so any
+    # ${property} reference in the description is shown exactly as
+    # the author wrote it, not with a value filled in.
     return script.description.spelling
 
 
@@ -1130,7 +1158,7 @@ def _script_description(script_path):
 
 
 def _script_description_by_stem(stem, context):
-    """A script's one-line description, resolved through the seam."""
+    """Return a script's one-line description, resolved by its filename stem."""
     try:
         return _script_description(locate_script(stem, context))
     except FileNotFoundError as error:
@@ -1180,7 +1208,7 @@ def _list_scripts(arguments, session, context):
 
 
 def _fetch_media(arguments, session):
-    """Fetch a media live; the transfer events are the output."""
+    """Fetch one media item; the transfer events printed live are the output."""
     _reject_stream_json(arguments, "fetch-media")
     session.fetch_media(arguments.name, progress=arguments.progress)
     return 0
@@ -1219,17 +1247,19 @@ def _delete_script(arguments, session):
 
 
 def _property_text(value):
-    """Render one property value for a human. Secrets show their kind."""
+    """Render one property value for a human; a secret shows as "@secret"."""
     return "@secret" if is_secret(value) else value
 
 
 def _warn_missing_credentials(session, keys):
-    """Warn on stderr for secrets whose credential is absent.
+    """Print a stderr warning for each secret whose credential is missing.
 
-    The *result* is the properties projection — a secret is its
-    marker, on stdout, identical under ``--json``. Whether the host
-    store actually holds the value is a diagnostic about the host,
-    so it goes to stderr as a warning and never changes the result.
+    The command's actual result is the properties list — a secret
+    always shows up as its marker on stdout, whether or not
+    ``--json`` is used. Whether the host's credential store actually
+    holds the value is a separate fact about the host, so it's
+    reported as a warning on stderr and never changes the result
+    itself.
     """
     try:
         missing = [key for key in keys
@@ -1244,13 +1274,14 @@ def _warn_missing_credentials(session, keys):
 
 
 def _read_secret_value(key):
-    """Read a secret from the entry channel the context provides.
+    """Read a secret value, prompting on a terminal or reading stdin otherwise.
 
-    On a terminal, a no-echo prompt; otherwise stdin to EOF with one
-    trailing newline stripped, so a program can pipe the value in and
-    the CLI stays a complete binding. There is deliberately no
-    command-line argument: argv reaches process listings and shell
-    history, which are not credential stores.
+    On a terminal, this shows a prompt that doesn't echo what's
+    typed. Otherwise, it reads all of stdin until EOF and strips one
+    trailing newline, so a program can pipe the value in. There is
+    deliberately no way to pass the secret as a command-line argument:
+    command-line arguments show up in process listings and shell
+    history, neither of which is a safe place to store a credential.
     """
     if sys.stdin.isatty() and sys.stderr.isatty():
         value = getpass.getpass(f"value for {key}: ", stream=sys.stderr)
@@ -1361,16 +1392,19 @@ def _get_machine_var(arguments, session):
 
 
 def _wait_machine_var(arguments, session):
-    """Wait for a variable another actor sets, and print it.
+    """Wait for a variable another actor sets, then print it.
 
-    No special handling for an expired wait: the twin raises
-    ``WaitExpired``, which is a ``RunFailure``, so the ordinary
-    taxonomy arm reports it as exit 4 — the work asked for did not
-    happen. A bare builtin here would have exited 1 and claimed
-    reliquary's own fault (D90).
+    No special handling is needed if the wait times out: the
+    underlying call raises ``WaitExpired``, which is a
+    ``RunFailure``, so it's reported through the normal error
+    handling as exit code 4 — the work that was asked for didn't
+    happen. Raising a plain built-in exception here instead would
+    have exited with code 1, wrongly claiming it was reliquary's own
+    fault rather than an ordinary timeout (D90).
 
-    Only the flags the caller actually gave are forwarded, so the
-    twin's defaults stay the twin's and are documented in one place.
+    Only the flags the caller actually passed are forwarded to
+    session.wait_machine_var(), so its own default values stay in one
+    place — its own signature — instead of being duplicated here.
     """
     keywords = {}
     if getattr(arguments, "timeout", None) is not None:
@@ -1386,22 +1420,27 @@ def _wait_machine_var(arguments, session):
 
 
 def _wait_condition(text):
-    """One `wait` condition, parsed by the language's own parser.
+    """Parse one `wait` condition using the script language's own parser.
 
-    The CLI owns no condition grammar (S1): the argument is handed to
-    :func:`parse_script` as the one-statement script ``wait <text>``,
-    so the spellings are the language's by construction (D116). The
-    shell consumes the language's outer quotes, so bare text is the
-    literal spelling and is re-quoted here — its backslashes and
-    quotes escaped as the language escapes them, a ``${key}`` left
-    to mean what the language says it means — while text that
-    still carries its quotes, a ``/regex/`` and ``machine=stopped``
-    go through as written.
+    The CLI defines no condition grammar of its own (S1): ``text`` is
+    handed to :func:`parse_script` as the one-statement script
+    ``wait <text>``, so its accepted spellings are exactly the script
+    language's, by construction (D116). The shell has already
+    stripped the script language's own quotes from a plain word, so
+    plain text (with no leading quote, slash, or ``machine=``) is
+    treated as a literal string and re-quoted here before parsing —
+    its backslashes and quote characters escaped the way the script
+    language escapes them, with a ``${key}`` reference left alone to
+    mean whatever the script language says it means. Text that
+    already carries its own quotes, a ``/regex/``, or
+    ``machine=stopped`` is passed through to the parser exactly as
+    written.
 
-    Returns ``(channel, pattern)``: ``("machine", None)`` for the
-    machine channel, else ``("screen", regex)`` — a literal lowered
-    to its normalized text, escaped, which is the spec's own
-    equivalence (a normalized substring of a normalized row).
+    Returns a ``(channel, pattern)`` tuple: ``("machine", None)`` for
+    the machine channel, or ``("screen", regex)`` otherwise — where a
+    literal string condition is converted to its normalized,
+    regex-escaped text (matching the spec's rule that a literal
+    matches as a normalized substring of a normalized screen row).
     """
     spelled = text
     if not (text.startswith('"') or text.startswith("/")
@@ -1429,13 +1468,14 @@ def _wait_condition(text):
 
 
 def _wait(arguments, session, timeout):
-    """The `wait` verb on the CLI: one condition, either channel.
+    """Implement the CLI's `wait` command: one condition, either channel.
 
-    The machine channel answers on a machine that is already stopped
-    — the wait a shell starts a moment late is satisfied, not
-    refused — and after the handle observes the VM gone, the
-    lifecycle reconciles the phase, as the script runtime does after
-    the same observation (D116).
+    The machine channel succeeds even if the machine has already
+    stopped by the time the command runs — a `wait` started a moment
+    too late by the shell is treated as satisfied, not refused. After
+    confirming the VM is gone, this also updates the machine's
+    recorded phase to match, the same way the script runtime does
+    after making the same observation (D116).
     """
     channel, pattern = _wait_condition(arguments.condition)
     if channel == "machine":
@@ -1450,8 +1490,9 @@ def _wait(arguments, session, timeout):
     try:
         wait_text(pattern, timeout, home=machine_home)
     except WaitExpired as expired:
-        # The handle names the regex it searched for; the caller typed
-        # a condition, and the expiry should name that.
+        # wait_text() names the regex pattern it searched for in its
+        # error message, but the user typed a condition string, not a
+        # regex, so the error message should name what they typed.
         raise WaitExpired(
             str(expired).replace(pattern, arguments.condition, 1),
             rule_id=expired.rule_id) from expired
@@ -1459,13 +1500,16 @@ def _wait(arguments, session, timeout):
 
 
 def _wait_ready(arguments, session):
-    """Wait the boot out.
+    """Wait until the guest finishes booting and is ready for commands.
 
-    A void twin: the prompt the guest reached is narration on stderr
-    (the adapter says it), as `wait`'s "matched" is, and `--json`
-    prints `{}`. An expired wait is the twin's ``WaitExpired``, exit
-    4 through the ordinary arm (D90). Only the flags the caller gave
-    are forwarded, so the twin's defaults stay the twin's.
+    This command has no real return value: which prompt the guest
+    reached is reported as narration on stderr (printed by the
+    adapter), the same way `wait`'s "matched" message is, and
+    `--json` just prints `{}`. If the wait times out,
+    session.wait_ready() raises ``WaitExpired``, reported as the usual
+    exit code 4 (D90). Only the flags the caller actually passed are
+    forwarded, so session.wait_ready()'s own defaults stay in one
+    place.
     """
     keywords = {}
     if getattr(arguments, "timeout", None) is not None:
@@ -1497,11 +1541,12 @@ def _set_boot_order(arguments, session):
 
 
 def _dispatch(arguments, session, context):
-    """Route one parsed invocation onto the session it opened.
+    """Route one parsed command-line invocation to the right handler function.
 
-    ``session`` carries the ambient state (P26); ``context`` is the
-    same record, handed directly to the codex family and the locate
-    seam — the CLI-only capabilities no veneer covers (D87).
+    ``session`` carries the resolved working directories (P26).
+    ``context`` is that same underlying record, passed directly to
+    the codex functions and to locate_script — the CLI-only
+    capabilities that have no Session method wrapping them (D87).
     """
     timeout = getattr(arguments, "timeout", None)
 
@@ -1596,9 +1641,11 @@ def _dispatch(arguments, session, context):
         return _get_machine_dir(arguments, session)
 
     if arguments.command == "wait":
-        # Resolves its own target: the machine channel must answer on
-        # a machine that has already stopped, which the interaction
-        # target's running check would refuse.
+        # _wait() resolves its own machine target rather than using
+        # _interaction_target() below, because the machine channel
+        # needs to succeed on a machine that has already stopped, and
+        # _interaction_target()'s running-machine check would reject
+        # that.
         return _wait(arguments, session, timeout or 60)
     machine_home = _interaction_target(arguments, session)
     if arguments.command == "type":
@@ -1614,8 +1661,9 @@ def _dispatch(arguments, session, context):
     if arguments.command == "wait-ready":
         return _wait_ready(arguments, session)
     if arguments.command == "exec":
-        # The twin resolves the selector, the platform, and the VM
-        # identity itself, and returns the command's output.
+        # session.exec() resolves the machine selector, the guest
+        # platform, and the VM identity itself, and returns the
+        # command's output.
         rows = session.exec(
             arguments.dos_command,
             machine=getattr(arguments, "machine", None),
@@ -1639,12 +1687,14 @@ def _dispatch(arguments, session, context):
         with Machine(machine_home).qmp() as qmp:
             output = qmp.hmp(arguments.line)
         return _emit(arguments, output, lambda: print(output))
-    # A registered command with no arm above lands here. Returning 0
-    # reported success for work that never happened, which is the one
-    # failure shape in this file that produces a wrong answer rather
-    # than an inconvenient one. The command list is kept in three
-    # places and only one of them is pinned to the manifest, so the
-    # gap this closes is a real one until it is (T17).
+    # A command that's registered with argparse but has no matching
+    # `if` branch above ends up here. Just returning 0 in that case
+    # would report success for work that was never actually done,
+    # which is the one bug in this file that would give a wrong
+    # answer instead of just being inconvenient. The list of commands
+    # is currently kept in three separate places, and only one of
+    # them is checked against the argparse registrations
+    # automatically, so this gap is real until that's fixed (T17).
     raise InternalError(
         f"the CLI registers {arguments.command!r} and routes it "
         "nowhere: a registered command with no dispatch arm would "

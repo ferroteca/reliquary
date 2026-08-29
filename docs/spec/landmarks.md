@@ -3,72 +3,78 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: GPL-3.0-only
 -->
 
-# Landmarks: the `.rlql` authored kind and the image match
+# Landmarks: the `.rlql` file format and image matching
 
-> **Status:** normative for the delivered surface — the `.rlql`
-> declaration, the pixel-equal matcher, the `@name` screen
-> condition (F65), and the `click` verb with the spot lookup and
-> cursor-parking contract it delivers (F66). It arrived here from
-> `planning/pledged/design/` on delivery, which is the one-way move
-> every shipped surface makes ([planning/README.md](../../planning/README.md)).
+> **Status:** normative for the shipped feature — the `.rlql`
+> declaration format, the pixel-equal matcher, the `@name` screen
+> condition (F65), and the `click` verb with its spot lookup and
+> cursor-parking rules (F66). This document moved here from
+> `planning/pledged/design/` when the feature shipped. Every shipped
+> feature's spec moves the same way, and that move only happens once
+> ([planning/README.md](../../planning/README.md)).
 >
-> The authored `.rlql` document's norm is **split**, like the
-> blueprint's: the published schema
-> (`src/reliquary/schemas/landmark-schema-v1.json`) is normative for
-> structure, and this document for everything a schema cannot
-> express. Changes follow the surface-change rule
+> Two documents together define what an `.rlql` file must contain,
+> the same split used for blueprints: the published schema
+> (`src/reliquary/schemas/landmark-schema-v1.json`) defines the
+> structure, and this document covers everything the schema cannot
+> express. Changes to either follow the surface-change rule
 > ([SURFACES.md](../../planning/SURFACES.md)).
 
-A **landmark** is the image-match asset for screens that text cannot
-describe — a GUI installer's pages, a graphical boot menu, a splash a
-recognizer reads as noise. A script watches one by name, exactly
-where it would watch for a string:
+A **landmark** is an image to match against the screen, for screens
+that have no text to read — a GUI installer's pages, a graphical boot
+menu, a splash screen that a text recognizer would only see as noise.
+A script watches for a landmark by name, the same way it watches for
+a string:
 
 ```rlqs
 wait @setup-page timeout=2m
 ```
 
-## One declaration, N renderings
+## One declaration, many renderings
 
-A landmark is a single declaration owning its **geometry** — the
-pinned screen dimensions, the region list and the named spot set —
-plus one or more **variants**: alternative renderings of the same
-screen (palette, font or shading differences). Variants share the
-declaration's dimensions, regions and spots by construction, which
-makes those invariants structural rather than checked.
+One declaration holds the fixed facts about a screen — its **screen
+dimensions**, its **region list**, and its named **spot set** — plus
+one or more **variants**: different renderings of the same screen
+(palette, font, or shading differences). Every variant shares the
+declaration's dimensions, regions, and spots automatically, because
+they all come from the one declaration; there is nothing to check,
+because there is nothing that could disagree.
 
 **A screen whose layout changed is a different landmark, not a
-variant.** Variants exist for the same screen painted differently;
-a moved button is a new landmark.
+variant.** Variants are for the same screen painted differently. If
+a button moves, that's a new landmark.
 
 ## Catalog form
 
-The declaration is `<name>.rlql`, a JSON5 authored document — the
-third authored extension beside `.rlqb` and `.rlqs`, resolved under
-exactly the rules in [asset-resolution.md](asset-resolution.md).
-Landmarks read from the `landmarks` directory, a fixed leaf under the
-home (`<home>/landmarks`) and not one of the six placeable working
-directories, on the same terms as `fonts`.
+A landmark is written as `<name>.rlql`, a JSON5 file — the third
+authored file extension alongside `.rlqb` and `.rlqs` — resolved
+under the same rules as any other asset
+([asset-resolution.md](asset-resolution.md)). Landmark files live in
+the `landmarks` directory: a fixed location under the home
+(`<home>/landmarks`), not one of the six directories a user can
+place elsewhere, on the same footing as `fonts`.
 
-Variant renderings are **plain PNGs attached by stem-and-number
-adjacency** — `<name>.<n>.png` beside the declaration — so refreshing
-an asset is strictly file *creation*, never file rewriting, and
-capture provenance lives in PNG text chunks rather than in a sidecar
-file.
+Variant renderings are **plain PNG files, matched to their
+declaration by filename** — `<name>.<n>.png` sits beside
+`<name>.rlql`. Adding a new variant is always creating a new file,
+never rewriting an existing one, and the PNG's own text chunks (not
+a separate sidecar file) record how it was captured.
 
-**Landmark names share the one collision-checked `@` pool** with
-media and font names
+**Landmark names, media names, and font names share one namespace,
+and Reliquary checks it for collisions**
 ([authored-binary-assets.md](../../planning/design/authored-binary-assets.md)).
-Any duplicate visible to one script — `.rlql` against `.rlql`, or
-against a media or a font — is an error naming both locations.
+If a script can see two names that collide — an `.rlql` against
+another `.rlql`, or against a media or font name — that is an error,
+and the error names both files.
 
-**Declarations are files, never script content.** A script
-references landmarks and never carries them: there is no embedded
-`landmark` block, as there is no embedded `media` block. A script is
-UTF-8 text, so an embedded rendering would have to be base64 —
-thousands of lines of payload around a hundred lines of procedure,
-and a permanent freeze on the asset format, since anything embedded
-in a text script can never become non-text.
+**A landmark is always a separate file; a script never contains
+one.** A script references a landmark by name and never embeds it —
+there is no way to write a landmark inline in a script, the same as
+there is no way to embed a media file inline. A script is UTF-8
+text, so an embedded image would have to be written as base64:
+thousands of lines of encoded data around a hundred lines of actual
+script, and once that were allowed, the image format could never
+change to something non-text-based.
 
 ## The declaration
 
@@ -90,28 +96,31 @@ in a text script can never become non-text.
 }
 ```
 
-A landmark is **stem-identified**, like a script and a font: it
-carries no `name` field, because the variant renderings attach by
-stem adjacency and a name diverging from the stem would break the
-adjacency that attaches them. Keys are kebab-case, the document is
-read through the shared JSON5 reader, and a diagnostic carries path,
-line, column and rule id.
+A landmark is **identified by its filename**, like a script or a
+font: the declaration has no `name` field. Variant PNGs are matched
+to their declaration by filename, so if the declaration's name could
+differ from its filename, that matching would break. Keys are
+kebab-case. The document is read with the same JSON5 reader used
+elsewhere, and any error reports a path, line, column, and rule id.
 
-`regions` and `spots` are both optional: a bare landmark is the
-whole-screen exact match, and a spotless one is watchable but not
-clickable.
+`regions` and `spots` are both optional. A landmark with no regions
+must match the whole screen exactly. A landmark with no spots can be
+watched for, but nothing on it can be clicked.
 
-**The schema pins dimensions only; there is deliberately no `mode`
-field.** RFB reports dimensions, and the guest's video mode — bit
-depth, mode number — is observable over no control plane: the
-framebuffer arrives forced to 32bpp. A field nothing can verify is a
-declaration Reliquary would have to take on faith, and the PNG itself
-carries the rendering.
+**The schema only records screen dimensions; it deliberately has no
+`mode` field.** RFB (the remote framebuffer protocol) reports
+dimensions, but no control plane can report the guest's video mode —
+its bit depth or mode number — because the framebuffer always
+arrives already converted to 32 bits per pixel. Reliquary won't
+record a field it has no way to verify; the rendering itself,
+captured in the PNG, is the only source of truth for what the screen
+looks like.
 
 ### The static refusals
 
-Every one of these is decided from the declaration and the files
-beside it, so all of them land **before a machine starts**:
+Reliquary can check every one of these rules just by reading the
+declaration and the files next to it, so all of them are caught
+**before a machine starts**:
 
 | rule id | what it refuses |
 |---|---|
@@ -130,51 +139,60 @@ beside it, so all of them land **before a machine starts**:
 | `landmark.unreadable-variant` | a variant that cannot be decoded as an image |
 | `landmark.variant-dimensions` | a variant whose decoded dimensions differ from the pinned ones |
 
-`similarity` is a percent literal with its unit spelled, as durations
-spell theirs; there is no implicit default. The range is exclusive
-because `0%` is an `ignore` region in a second spelling and `100%` is
-the region's absence, and the language admits no second way to say
-either.
+`similarity` is written as a percentage with its `%` sign, the same
+way durations spell out their unit, and there is no default value.
+The allowed range excludes both endpoints: `0%` would just be
+another way of writing an `ignore` region, and `100%` would just be
+leaving the region out entirely, and the language does not allow two
+ways to say the same thing.
 
-**Variants are numbered from 1 and ordered numerically, with no
-contiguity demanded** — deleting a stale rendering stays a file
-deletion. Diagnostics name a variant by its filename. **Decode
-normalization is conversion to RGB**, so a tool exporting opaque RGBA
-does not fail its author.
+**Variants are numbered starting from 1, in numeric order, and the
+numbers don't need to be consecutive.** Deleting an outdated variant
+is just deleting its file — nothing else needs renumbering. Error
+messages identify a variant by its filename. **When Reliquary
+decodes a PNG, it converts it to RGB**, so a tool that exports
+opaque RGBA still works.
 
 ## The match
 
-**A bare landmark matches the entire screen exactly** — every pixel
-equal after decode normalization. Declared regions soften or void
-areas, and every pixel of a capture is in exactly one regime:
+**A landmark with no declared regions must match every pixel of the
+screen exactly**, after both images are decoded to RGB. Declared
+regions relax or exclude parts of the screen from that check. Every
+pixel of a captured screen falls into exactly one of these:
 
-- an **`ignore`** region excludes its pixels outright, and **ignore
-  wins where regions overlap**;
-- a **`fuzzy`** region judges its own surviving pixels against its
-  own declared percentage — matched fraction ≥ the literal;
-- the **residual** — everything no region covers — requires 100%,
-  which is the bare landmark's rule applied uniformly.
+- An **`ignore`** region is excluded from matching entirely, and
+  where an `ignore` region and a `fuzzy` region overlap, `ignore`
+  wins.
+- A **`fuzzy`** region is judged against its own declared
+  percentage: the fraction of its pixels that match must be at
+  least that percentage.
+- The **residual** — every pixel not covered by any region — must
+  match 100%. That's the same rule a bare landmark applies to the
+  whole screen, applied here to whatever regions leave uncovered.
 
-A **variant** matches when its residual is clean and every fuzzy
-region clears its own bar. The **landmark** matches when any variant
-does.
+A **variant** matches when its residual matches 100% and every
+fuzzy region meets its own percentage. The **landmark** matches when
+at least one of its variants matches.
 
-The metric is **pixel-equal fraction**, and it is judged
-**per region, independently**. A single pooled screen score would let
-a small failing region drown in a large matching screen's average —
-the unsafe direction — and would lose the geography a failure report
-needs. The asymmetry is deliberate: anti-aliasing and palette drift
-fail toward a visible timeout, never toward the wrong screen, and
-palette drift is what variants are for.
+Each region's match is measured on its own, as a fraction of
+matching pixels, and never averaged into one screen-wide score.
+Averaging would let a small failing region get lost inside a large
+screen that otherwise matches — the wrong kind of mistake to allow —
+and it would throw away the information a failure report needs about
+where the mismatch actually is. This is deliberately asymmetric:
+anti-aliasing and palette drift should make a wait fail visibly, as
+a timeout, never make it match the wrong screen — and palette drift
+is exactly what variants exist to handle.
 
-A capture whose size is not the pinned size matches nothing, and the
-report says so rather than reporting a miss on every pixel.
+If a captured screen is not the same size as the landmark's declared
+dimensions, nothing can match, and the failure report says exactly
+that — it does not report every pixel as a mismatch.
 
 ### The nearest miss
 
 When no variant matches, the failure report names the **closest
-variant** — the one with the fewest failing pixels — with its failing
-regions and the percentage each achieved:
+variant** — the one with the fewest failing pixels — lists which of
+its regions failed, and gives the percentage each one achieved:
 
 ```text
   landmark miss: @setup-page came closest on setup-page.2.png
@@ -183,24 +201,27 @@ regions and the percentage each achieved:
 
 ### The capture format
 
-A control plane **states the pixel format its screen carrier captures
-in**, and the *reference* rendering is normalized through that format
-before the comparison. A deterministic round trip therefore keeps "97
-of every 100 pixels identical" meaning the same thing on every plane,
-so an asset captured on one plane still matches on another whose
-capture quantizes. Every plane that captures a framebuffer today
-states `rgb`, so the normalization is the identity.
+Each control plane declares the pixel format its screen carrier
+captures in, and the landmark's *reference* rendering is converted
+to that same format before comparison. That conversion is
+deterministic in both directions, so "97 of every 100 pixels match"
+means the same thing regardless of which plane captured the
+reference image — an asset captured on one plane still matches
+correctly on another plane whose captures are quantized differently.
+Every plane that captures a framebuffer today declares `rgb`, so
+today this conversion is a no-op.
 
-A plane that states **no** format captures no framebuffer, and a
-landmark condition against a machine driving it is refused by name —
-see [capability](#capability) below.
+A plane that declares **no** capture format captures no framebuffer
+at all. A landmark condition used against a machine running on that
+plane is refused, by name — see [capability](#capability) below.
 
 ## The `@name` screen condition
 
-**`@name` stands wherever a screen condition stands**: a single-form
-`wait`, an `on` arm of a branching wait, and an `always` handler of a
-reactive phase. It carries `stable=` and `timeout` like any screen
-condition, and one condition per observation, unchanged:
+**`@name` can appear anywhere a screen condition can appear**: in a
+plain `wait`, in an `on` branch of a branching wait, and in an
+`always` handler inside a reactive phase. It takes `stable=` and
+`timeout` like any other screen condition, and the existing rule of
+one condition per observation still applies:
 
 ```rlqs
 wait @setup-page stable=500ms timeout=2m
@@ -216,50 +237,52 @@ phase installing {
 }
 ```
 
-A GUI installer's error dialogs are exactly the `always` case, which
-is why handlers are in from the first cut rather than carved out of
-it.
+A GUI installer's error dialogs are a typical use of the `always`
+case. That's why `always` handlers were included from the start,
+rather than added later.
 
-This is the growth rule doing what it was written for
-([script-spec.md](script-spec.md), "How the vocabulary grows"): a new
-matcher over an existing channel arrives as a **new value spelling**,
-not new syntax. The screen stays the unprefixed default channel, and
-there is no negation form — the language has none, and none arrives
-here.
+This follows the vocabulary-growth rule described in
+[script-spec.md](script-spec.md) ("How the vocabulary grows"): a new
+way to match the same channel is written as a **new kind of value**,
+not as new syntax. The screen stays the default, unprefixed channel.
+There is no way to negate a condition — the language has no
+negation anywhere, and landmarks don't add one.
 
 ### Kind, checked at binding
 
-The `@` pool is one namespace across media, fonts and landmarks, so
-**the use decides which kind is meant** and the reference is checked
-against it when the pool is read:
+Media, fonts, and landmarks share one `@name` namespace, so **where
+a name is used decides which kind it must be**. That check happens
+when the name is looked up:
 
-- a `@name` in condition position naming no landmark is
-  `landmark.unknown`, with a did-you-mean over the landmark names the
-  source holds;
-- a `@name` in condition position that resolves to a **media or a
-  font** is `landmark.wrong-kind`, naming the use and the kind it
-  actually hit — exactly as a landmark name in `insert` position is
-  refused in the other direction.
+- A `@name` used as a condition that names no landmark is an error,
+  `landmark.unknown`, and the error suggests the closest matching
+  landmark name the source actually has.
+- A `@name` used as a condition that does resolve, but to a media
+  item or a font rather than a landmark, is `landmark.wrong-kind`.
+  The error names the use and which kind it actually found — the
+  same check applies in reverse: a landmark name used where `insert`
+  expects a media or font is refused too.
 
-Both are PREFLIGHT ERRORS: they are settled by the world the authored
-script is run against — which assets the source holds — rather than
-by the script text alone.
+Both are PREFLIGHT ERRORS: they can only be checked against the
+actual assets available when the script runs, not from the script
+text alone.
 
 ### Capability
 
-A landmark condition requires **framebuffer capture**, and the
-capability is preflighted at the **condition's granularity** rather
-than the script's: a script that watches no landmark asks the plane
-for nothing and runs on a plane that captures nothing, exactly as it
-always did.
+A landmark condition requires the control plane to capture the
+framebuffer. Reliquary checks this per condition, not once for the
+whole script: a script that never watches for a landmark makes no
+such demand on the plane, and runs fine on a plane that captures no
+framebuffer at all — exactly as it did before landmarks existed.
 
-The machine's first declared control plane drives its session, and
-that is the plane asked. If it states no capture format, the run is
-refused before any guest input, naming the plane and the condition
+The machine's session is driven by its first declared control plane,
+and that is the plane Reliquary checks. If that plane declares no
+capture format, the run is refused before any input reaches the
+guest, and the error names both the plane and the condition
 (`machine.plane-no-framebuffer`).
 
-What decides is what a plane's **screen carrier** is, not which
-hypervisor is behind it:
+What matters is what a plane's **screen carrier** actually is, not
+which hypervisor is behind it:
 
 | plane | screen carrier | landmarks |
 |---|---|---|
@@ -268,59 +291,74 @@ hypervisor is behind it:
 | VirtualBox, `agentless-display` | a guest-display screenshot | `rgb` |
 
 The diagnostic `screenshot` verb and the automatic failure capture
-are a different carrier on a different clock, and they keep working
-on every plane; a plane that captures a diagnostic image does not
-thereby offer a screen a landmark can be matched against.
+use a different carrier, on a different schedule, and they keep
+working on every plane regardless. A plane that can capture a
+diagnostic image does not necessarily offer a screen that a landmark
+can be matched against.
 
 ### The settled-frame rule
 
-A landmark, like text, is only ever judged on a frame the guest has
-stopped drawing. The quiescence gate's contract generalizes from
-cells to pixels for a landmark compare — the proportion of *pixels*
-that held still over the same window, at the same default. This is
-host-side behaviour rather than script surface: `stability=` is
-written and read exactly as it is for a text condition.
+A landmark, like text, is only ever checked against a frame the
+guest has stopped drawing. The same stability check used for text
+applies here too, measured in pixels instead of character cells: the
+proportion of *pixels* that stayed the same over the same time
+window, using the same default. This is something Reliquary does
+internally, not something the script controls differently:
+`stability=` is written and behaves exactly as it does for a text
+condition.
 
 ## The cursor
 
-Captures and matching are cursor-free by construction, and every
-pointer verb keeps them so (F66).
+Captures and matching never include the cursor, and every pointer
+verb keeps it that way (F66).
 
-**Before `click`, and still true for a keyboard-only run**: nothing
-moves the guest's cursor, so it stays where the guest drew it —
-which is where the author's capture shows it — and capture and run
-agree without any mechanism at all. An author who wants a screen
-whose cursor may sit anywhere still declares an `ignore` region, like
-any other furniture.
+**Before the first `click`, and for the whole run if the script
+never clicks**: nothing moves the guest's cursor. It stays wherever
+the guest itself drew it, which is also where it was when the author
+captured the landmark — so the capture and the running screen agree
+with no extra work needed. If an author wants to allow the cursor to
+sit anywhere on a screen, they still declare an `ignore` region for
+it, the same as for anything else that might vary.
 
-**Every pointer verb ends by parking the cursor** at a fixed
-position for the screen it just acted on — scaled to that landmark's
-own pinned dimensions rather than a single global pixel, since
-different landmarks pin different screen sizes — and the park zone
-is a **built-in `ignore` region**, unioned with a landmark's declared
-ones at every match, never written into the `.rlql` file itself.
-This is host-side masking, not a cursor-free capture: nothing here
-negotiates an RFB pseudo-encoding to suppress the cursor from the
-framebuffer, so an author composing a capture by hand still sees
-whatever the guest actually drew, including a cursor a prior `click`
-parked into frame.
+**Every pointer verb ends by moving the cursor to a fixed parking
+position** on the screen it just acted on. That position is scaled
+to that landmark's own declared dimensions, not to one fixed pixel
+position, because different landmarks declare different screen
+sizes. This parking spot is treated as a **built-in `ignore`
+region**: Reliquary adds it to a landmark's declared regions at
+match time, but it is never written into the `.rlql` file. Reliquary
+does this by masking the parking spot on the host side, not by
+hiding the cursor from the capture itself — it does not negotiate an
+RFB pseudo-encoding to suppress the cursor from the framebuffer. So
+an author capturing a screen by hand still sees whatever the guest
+actually drew, including a cursor that a previous `click` parked
+into the frame.
 
-Diagnostics capture reality either way: an explicit `screenshot` and
-an automatic failure capture never inject a park move, because it
-could dismiss the hover state or menu that explains a failure.
+Diagnostic captures always show reality as it is: an explicit
+`screenshot` and an automatic failure capture never trigger a park
+move first, because that move could dismiss the hover state or menu
+that would have explained the failure.
 
 ## What a landmark is not
 
-- **There is no selecting region.** os-autoinst-style regions that
-  confine matching to declared rectangles are deferred as additive
-  growth; today a region softens or voids, and the rest of the screen
-  is always judged.
-- **There is no drag, chord, or paced-pointer surface.** `click` is
-  left-single-click only (F66); `button=`, `count=`, and a drag verb
-  are additive sibling growth with no named demand yet — the carrier
-  seam already carries any mask and any sequence, so growth here
-  never touches an adapter.
-- **A landmark is not recordable.** A screen transcript holds
-  character rows and attribute tokens, so a run watching a landmark
-  can be recorded but its landmark waits cannot be replayed: the
-  replay says so by name rather than improvising a screen.
+- **There is no "selecting" region kind.** Some other tools (in the
+  os-autoinst style) let a region confine matching to just that
+  rectangle and ignore the rest of the screen. Reliquary does not do
+  that today — a region can only soften (`fuzzy`) or exclude
+  (`ignore`) part of the screen, and everything else is always
+  checked. This could be added later.
+- **There is no drag, multi-button click, or timed pointer
+  sequence.** `click` only does a single left click today (F66).
+  Adding `button=` for other mouse buttons, `count=` for
+  double-clicks, or a separate drag verb is possible later, but
+  nobody has asked for it yet. The underlying `pointer_event` call
+  already accepts a button mask and can already be called
+  repeatedly in sequence, so adding these to the script language
+  would only mean new syntax — it would not require any change to
+  the backend code.
+- **A landmark cannot be replayed from a recording.** A recorded
+  screen transcript stores character rows and their attributes, not
+  images. So a run that watches a landmark can still be recorded,
+  but replaying that recording cannot re-create the landmark match —
+  the replay says so explicitly instead of guessing what the screen
+  looked like.

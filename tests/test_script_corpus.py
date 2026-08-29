@@ -2,45 +2,46 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The conformance corpus for the `.rlqs` scripting language.
 
-P24's second conformance corpus, and the answer to the question
-the defect actually asked — whether the blueprint corpus's pattern
-generalizes. It does, to another document format, and it arrived
-**stronger** than its parent: the script language had stable rule
-ids, so an invalid fixture could assert *why* it was rejected
-rather than only *that* it was, which the blueprint corpus could
-not — its own README named the cost, a fixture failing for the
-wrong reason being a false pass only a reviewer could catch.
+P24's second conformance corpus. It answers the question the
+defect actually raised: whether the blueprint corpus's approach
+generalizes to another document format. It does, and it went
+further than the blueprint corpus could: the script language has
+stable rule ids, so an invalid fixture can assert why it was
+rejected, not just that it was. The blueprint corpus's own README
+named the cost of not doing this — a fixture failing for the wrong
+reason is a false pass that only a human reviewer would catch.
 
-**The parent has caught up** (2026-07-27). Blueprint diagnostics
-carry ids now, so that corpus asserts its `// id:` line the same
-way and the harness catches the false pass there too. What remains
-different is the `# rule:` line: the script rules are V-numbered,
-so an id here can be checked against the rule it is *meant* to
-serve rather than only the one that fired. That is the assertion
-the blueprint corpus still cannot make, and the reason is its
-rules have no numbering to check against.
+The blueprint corpus has since caught up (2026-07-27): its
+diagnostics carry ids now too, so it asserts its `// id:` line the
+same way and catches the same false pass. What is still different
+is the `# rule:` line. Script rules are V-numbered, so an id here
+can be checked against the specific rule it is meant to serve, not
+just whichever rule happened to fire. The blueprint corpus still
+cannot make that check, because its rules have no numbering to
+check against.
 
-The ids are the dotted scheme D55 required and the static rules
-now carry: a fixture names the diagnostic that must reject it —
-`obs.two-channels`, the spec's own example — and the harness
-compares it against the raised `rule_id`. It began as the
-V-numbers, which was weaker in a way worth recording: a V-number
-names a *rule* and several diagnostics live under each, so
-asserting one could not tell six different failures apart.
+The ids follow the dotted naming scheme D55 required, which the
+static rules now carry: a fixture names the specific diagnostic
+that must reject it — `obs.two-channels`, the spec's own example —
+and the harness compares that against the raised `rule_id`. Before
+this, fixtures asserted against V-numbers instead, which was
+weaker: a V-number names a rule, and several diagnostics can live
+under one rule, so asserting the V-number alone could not tell six
+different failures under it apart.
 
-Writing the corpus measured how far the ids reach, and drove them
-further: it opened with four fixtures carrying `# id: none` and
-now has none — every one of the 46 names the diagnostic that
-rejects it. The preflight tier followed once D58 gave those
-diagnostics a class worth naming a rule for, so
-`invalid-at-preflight/` asserts a reason too rather than only
-"parses clean" — which is what the bucket was always for.
+Writing the corpus measured how many diagnostics had ids, and
+pushed that further: it opened with four fixtures carrying `# id:
+none` and now has none — all 46 name the diagnostic that rejects
+them. The preflight tier followed the same pattern once D58 gave
+those diagnostics rule ids worth naming, so `invalid-at-preflight/`
+now asserts a reason too, instead of only "parses clean" — which is
+what the bucket was always meant to check.
 
 One fixture carries `# caught-by:` instead. `v8-branching-with-a-
-condition` exercises V8 and is rejected by the *grammar*, so its
-id is `syn.unexpected-token` and the V8 arm in validation is
-unreachable. That is a defect the corpus found and now asserts
-rather than describes.
+condition` exercises V8, but is rejected by the grammar, so its id
+is `syn.unexpected-token` and the V8 arm in validation is
+unreachable. This is a real defect the corpus found, and now
+asserts rather than just describes.
 
 Every marker is asserted in **both** directions. A fixture naming
 an id must be rejected by exactly that id; one saying `none` must
@@ -50,12 +51,13 @@ gap closes, this suite fails until the marker goes. An exemption
 cannot outlive what it records, which is the difference between
 naming a gap and quietly keeping one.
 
-**Every fixture is a collected node**, through `tests/corpus.py` —
-the helper the blueprint corpus reads through, because the
-guarantee belongs to the harness rather than to a document format
-(D106). A node carries its file's name, so a failing fixture is
-run alone with `-k v7-two-channels.rlqs`, and the bucket counts
-are pinned where the fixtures are gathered.
+Every fixture is collected as its own pytest node, through
+`tests/corpus.py` — the same helper the blueprint corpus reads
+through, because this guarantee belongs to the harness rather than
+to any one document format (D106). A node carries its file's name,
+so a failing fixture can be run alone with `-k
+v7-two-channels.rlqs`, and the bucket counts are pinned where the
+fixtures are gathered.
 """
 
 import collections
@@ -136,13 +138,13 @@ def test_an_invalid_fixture_declares_the_rule_and_id_it_exercises(fixture):
 
 @corpus.parametrize(INVALID)
 def test_a_rejection_carries_the_id_the_fixture_declares(fixture):
-    """The assertion the blueprint corpus could not make.
+    """Check the id a rejected fixture declares against the id actually raised.
 
     `# id: none` is how a fixture records a diagnostic with no
-    identifier yet, and it is asserted in the same breath as
-    its opposite: a fixture claiming `none` whose diagnostic
-    has since gained an id fails here until its header is
-    updated. The marker cannot outlive the gap it records.
+    identifier yet, and both directions are checked here: a fixture
+    claiming `none` whose diagnostic has since gained an id fails
+    until its header is updated. The marker cannot outlive the gap
+    it records.
     """
     declared = _ID.search(_header(fixture)).group(1)
     with pytest.raises(ScriptParseError) as caught:
@@ -193,14 +195,14 @@ def test_the_id_serves_the_rule_the_fixture_exercises(fixture):
 
 @corpus.parametrize(INVALID)
 def test_an_exercised_rule_is_one_the_code_enforces(fixture):
-    """The reverse: a fixture may not exercise a phantom rule.
+    """The reverse: a fixture may not exercise a rule nothing enforces.
 
-    A `# rule:` naming a V-number nothing serves is either a
-    typo or a rule whose enforcement was deleted; `# caught-by:`
-    is the one sanctioned exception, and it is the exception
-    *inside* this assertion rather than a fixture filtered out of
-    it — a check nothing collects reports nothing. What that
-    marker means is asserted in both directions above.
+    A `# rule:` naming a V-number that nothing serves is either a
+    typo, or a rule whose enforcement was deleted. `# caught-by:` is
+    the one allowed exception, and it is handled inside this
+    assertion rather than by filtering that fixture out beforehand —
+    a fixture excluded from the check could never fail it. What
+    `# caught-by:` means is asserted in both directions above.
     """
     text = _header(fixture)
     rule = _RULE.search(text).group(1)
@@ -212,13 +214,14 @@ def test_an_exercised_rule_is_one_the_code_enforces(fixture):
 def test_every_enforced_rule_has_a_fixture_exercising_it():
     """Rule coverage, measured from the corpus rather than the spec.
 
-    `RULE_OF`'s range is the static tier's rule universe: every
-    V-number some diagnostic enforces. A rule with no invalid
-    fixture is enforcement nothing exercises — the V13 class,
-    which reached the guest loop as an untyped fault because
-    nothing had ever driven the rule it violated. (Whether the
-    code enforces every rule the *prose spec* states is R3's
-    audit, planning/RECURRING.md.)
+    `RULE_OF`'s range is the static tier's whole rule universe:
+    every V-number some diagnostic enforces. A rule with no invalid
+    fixture is enforcement that nothing exercises in tests — this is
+    exactly what happened with the V13 class, which reached the
+    guest loop as an untyped fault because nothing had ever tested
+    the rule it violated. (Whether the code enforces every rule the
+    prose spec states is a separate audit, R3, tracked in
+    planning/RECURRING.md.)
     """
     exercised = {_RULE.search(_header(path)).group(1) for path in INVALID}
     served = {rule for rule in RULE_OF.values() if rule}
@@ -232,12 +235,13 @@ def test_every_enforced_rule_has_a_fixture_exercising_it():
 #: Each of these is one rule raised from more than one module, with
 #: the number of sites the id must still cover.
 SHARED_IDS = {
-    # V17 put a *static* site on the machine layer's own rule rather
-    # than inventing a second name for it, which is the pattern this
-    # check exists to hold: one condition, one answer, whichever
-    # layer noticed. `destroy_machine` stopped being a fifth site
-    # when destroy started stopping a running machine itself instead
-    # of refusing it.
+    # When V17 added a static-tier check for a rule that already
+    # belonged to the machine layer, it reused the machine layer's
+    # existing id instead of inventing a second one. That is the
+    # pattern this check exists to hold: one condition, one id,
+    # whichever layer notices it. `destroy_machine` used to be a
+    # fifth site raising this id, until `destroy` started stopping a
+    # running machine itself instead of refusing to.
     "machine.must-be-stopped": 4,
     "machine.not-running": 3,
     "machine.no-selector": 3,
@@ -250,13 +254,13 @@ SHARED_IDS = {
 
 @pytest.mark.parametrize("rule_id,least", sorted(SHARED_IDS.items()))
 def test_one_rule_keeps_one_id_across_surfaces(rule_id, least):
-    """The subject rule's payoff, asserted rather than described.
+    """Each shared rule keeps exactly one id across every module that raises it.
 
     Each of these is one rule raised from more than one module, and
-    the id is the rule's rather than the site's. If a future change
-    gives any of them a second id, a consumer switching on it starts
-    having to know which layer noticed — which is exactly what the id
-    was for.
+    the id belongs to the rule, not to the site that raised it. If a
+    future change gives any of them a second id, code that switches
+    on the id would have to start knowing which layer noticed —
+    which is exactly what having one shared id was meant to prevent.
     """
     counts = _package_ids()
     assert counts[rule_id] >= least, (
@@ -266,22 +270,23 @@ def test_one_rule_keeps_one_id_across_surfaces(rule_id, least):
 
 
 def test_rule_of_holds_exactly_the_ids_the_static_tier_raises():
-    """The id-to-rule map is neither short nor imaginary.
+    """`RULE_OF` is complete, and every entry in it is real.
 
-    `RULE_OF` is what a consumer switching on an id reads, and
-    what the unit tests assert through. An id raised but
-    unmapped would report no rule; a mapped id nothing raises
-    is an entry naming a diagnostic that cannot occur.
+    `RULE_OF` is what code switching on an id reads, and what the
+    unit tests assert through. An id that is raised but has no entry
+    in `RULE_OF` would report no rule — a gap. An entry with no id
+    that ever raises it would be naming a diagnostic that cannot
+    happen.
 
-    The three modules scanned are the **static tier**, and that
-    is the whole map by construction: `RULE_OF` maps an id to
-    the V-numbered restriction it enforces, and V-numbers name
-    syntactic restrictions only. A preflight or runtime id —
+    The three modules scanned here are the static tier, and that is
+    the whole map by construction: `RULE_OF` maps an id to the
+    V-numbered restriction it enforces, and V-numbers name only
+    syntactic restrictions. A preflight or runtime id —
     `machine.slot-not-declared`, `media.unknown` — enforces a
-    machine rule or the dynamic semantics, which have no
-    V-number to map to. Absent from `RULE_OF` is therefore
-    correct for them rather than a gap, and widening this scan
-    would demand entries that could only be invented.
+    machine rule or the dynamic semantics instead, and those have no
+    V-number to map to. So their absence from `RULE_OF` is correct,
+    not a gap, and widening this scan would mean inventing entries
+    for them that could not correspond to anything real.
     """
     raised = set()
     package = os.path.dirname(os.path.abspath(reliquary.__file__))
@@ -294,11 +299,11 @@ def test_rule_of_holds_exactly_the_ids_the_static_tier_raises():
 
 
 def test_the_unidentified_count_is_what_the_readme_records():
-    """The measurement is the point; a silent drift in it is not.
+    """This count is tracked evidence, not a number that can silently drift.
 
-    D55 is open against the missing identifier scheme and this
-    number is the evidence under it. It moves down as ids land;
-    moving up means a diagnostic lost one.
+    D55 is open against the missing identifier scheme, and this
+    count is the evidence tracked under it. It moves down as ids are
+    added; if it moves up, a diagnostic lost its id.
     """
     unidentified = sorted(
         os.path.basename(path) for path in INVALID
@@ -309,17 +314,19 @@ def test_the_unidentified_count_is_what_the_readme_records():
         "README states it as evidence for D55.")
 
 
-# The preflight bucket. These parse clean and are rejected later, with
-# more in scope — exactly the blueprint corpus's third bucket, for
-# exactly its reason: a fixture whose rule needs a machine, a namespace
-# or an invocation would fail a parse-time assertion for the wrong
-# reason, and separating it is honester than weakening it.
+# The preflight bucket. These fixtures parse clean and are rejected
+# later, once more context is available — exactly the blueprint
+# corpus's third bucket, for the same reason: a fixture whose rule
+# needs a machine, a namespace, or an invocation to check would fail
+# a parse-time assertion for the wrong reason, so it is kept
+# separate instead of weakening the parse-time check.
 #
-# It used to assert only that a fixture *parses* — all it could, while
-# preflight diagnostics carried no ids. They do now, so it asserts the
-# reason as well, which is the whole point of the bucket: a fixture
-# that parses clean and is then rejected for the wrong reason was
-# previously indistinguishable from one rejected for the right one.
+# This bucket used to assert only that a fixture parses — all it
+# could check while preflight diagnostics carried no ids. Now that
+# they do, it also asserts the specific reason for rejection, which
+# is the whole point of the bucket: a fixture that parsed clean and
+# was rejected for the wrong reason used to be indistinguishable
+# from one rejected for the right reason.
 
 
 def _preflight(path, empty):
@@ -357,11 +364,11 @@ def test_a_preflight_fixture_names_its_id(fixture):
 
 @corpus.parametrize(AT_PREFLIGHT)
 def test_a_preflight_rejection_carries_the_declared_id(fixture, tmp_path):
-    """The assertion this bucket could not make until D58.
+    """Check the id a preflight-rejected fixture declares — this bucket could not do that until D58.
 
-    Asserted in both directions, like the parse bucket's: a
-    fixture claiming `none` whose diagnostic has since gained an
-    id fails here until its header catches up.
+    Checked in both directions, like the parse bucket's: a fixture
+    claiming `none` whose diagnostic has since gained an id fails
+    here until its header catches up.
     """
     declared = _ID.search(_header(fixture)).group(1)
     raised = _preflight(fixture, str(tmp_path))

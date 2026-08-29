@@ -5,697 +5,805 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # Proposed features
 
-Large unbuilt capabilities — each a milestone's worth of work,
-**design settled and intact**, waiting on the demand that schedules
-it. Nothing here is worked ([README.md](../README.md)); the move to
-[pledged/FEATURES.md](../pledged/FEATURES.md) is the pledge,
-and the commit that makes it is the record. An entry here takes
-its F-number from the sequence ledger
-([SEQUENCES.md](../SEQUENCES.md)) — issue from there and advance
-the mark in the same edit.
+This file lists large unbuilt capabilities. Each one is roughly a
+milestone's worth of work, with its **design settled and finished**,
+waiting on demand before it gets scheduled. Nothing listed here is
+being worked on yet ([README.md](../README.md)). Moving an entry to
+[pledged/FEATURES.md](../pledged/FEATURES.md) is what makes it a
+pledge, and the commit that makes that move is the record of the
+pledge. An entry here gets its F-number from the sequence ledger
+([SEQUENCES.md](../SEQUENCES.md)) — take the next number from there
+and update the ledger in the same edit.
 
 A feature that is pledged but not yet built moves to
-[pledged/FEATURES.md](../pledged/FEATURES.md) and carries its work
-breakdown with it. Small work that is not a feature at all goes
-straight to [TASKS.md](../TASKS.md).
+[pledged/FEATURES.md](../pledged/FEATURES.md) and takes its list of
+work with it. Small work that isn't a feature at all goes straight
+to [TASKS.md](../TASKS.md).
 
 Each feature carries an **F-number** (D42; the rules are in
-[README.md](../README.md)). **Size is no bar to sitting here** — the
-sprint bound bites at pledge, so every entry below is many
-sprints of work, and the "milestone's worth of work" above describes
-what these entries *are* rather than a size any may be pledged at.
-Cutting one into implementable pieces is part of pledging it.
+[README.md](../README.md)). **There is no size limit for sitting
+here** — the one-sprint limit only applies once a feature is
+pledged, so every entry below is many sprints of work. "A
+milestone's worth of work" above describes the size these entries
+actually are, not a size limit for pledging one. Splitting an entry
+into pieces that can actually be built is part of pledging it.
 
 ## F1 — The U6 authoring recorder
 
 > **Withdrawn from [pledged/FEATURES.md](../pledged/FEATURES.md)**
-> (owner, 2026-07-27; D61), with **U6** — the use case it delivers
-> — in the same round. What is withdrawn is the promise, not the
-> design, which stands as written; D61 records how the pledge
-> arrived without anyone making it.
+> (owner, 2026-07-27; D61), together with **U6** — the use case it
+> delivers — in the same round. What got withdrawn was the promise
+> to build it, not the design, which still stands as written. D61
+> records how this got pledged without anyone actually deciding to
+> pledge it.
 >
 > Serves **U6** ([USE-CASES.md](USE-CASES.md)); design in
-> [design/recorder.md](design/recorder.md). The one capability the
-> numbered arc deliberately did not deliver — it ended at milestone
-> 9 with the recorder unbuilt.
+> [design/recorder.md](design/recorder.md). This is the one
+> capability the numbered milestones deliberately did not deliver —
+> that work ended at milestone 9 with the recorder still unbuilt.
 
-**THE WHOLE OF IT RIDES VNC**, which is the ground the withdrawal
-was decided on. Recording requires Reliquary to *be* the console:
-input typed into a backend's own display window never passes
-through Reliquary and cannot be followed, so the Reliquary-owned
-viewer over the `vnc` control plane is the recording prerequisite
-on **every** backend, QEMU included
-([design/recorder.md](design/recorder.md)). That plane's screen-and-keyboard
-half is delivered on QEMU (F63) — and the viewer additionally needs
-pointer input — delivered as **F66** — and interactive display
-still with the GUI era (**F5**). This entry's former sequencing note claimed a
-text-mode half depending on nothing unpledged, and **that was wrong
-against its own design** — what text mode avoids is the landmark
-and click work, which is F5's GUI asset spec and pointer input,
-never the viewer.
+**THIS ENTIRE FEATURE DEPENDS ON VNC** — that's the reason it was
+withdrawn. Recording requires Reliquary itself to be the console:
+if someone types into a backend's own display window instead, that
+input never passes through Reliquary and can't be recorded. So a
+Reliquary-owned viewer, built on the `vnc` control plane, is
+required for recording on **every** backend, including QEMU
+([design/recorder.md](design/recorder.md)). The screen-and-keyboard
+half of that control plane is already delivered on QEMU (F63). The
+viewer also needs pointer input, delivered as **F66**, and needs
+interactive display, which is still part of the GUI era (**F5**).
+An earlier note on this entry claimed a text-mode recorder could be
+built depending on nothing else unpledged. **That was wrong, even by
+this entry's own design** — what text mode skips is the landmark
+and click work (F5's GUI asset spec and pointer input), not the
+viewer, which text mode still needs.
 
 Decide first:
 
-- **The cut.** The deliverables below are at least seven features
-  on the sprint this project runs, and D42 requires the split at
-  pledge — retiring F1's number for a fresh one per piece. The
-  viewer is the natural first cut line; the text-mode recorder is
-  what follows it, needing no new language surface.
+- **How to split this up.** The deliverables below add up to at
+  least seven features' worth of work for the sprint size this
+  project uses, and D42 requires splitting it at pledge time —
+  retiring F1's number and giving each resulting piece its own new
+  number. The viewer is the natural first piece to cut out; the
+  text-mode recorder follows it and needs no new language surface.
 
 Deliverables:
 
-1. Reliquary-owned console viewer over the `vnc` control plane —
-   the recording prerequisite, backend display-window input being
-   invisible to Reliquary.
-2. The text-mode recorder: waits from VGA scrapes, type/press
-   actions, generated-comment uncertainty flags. No new language
-   surface.
-3. Runner run-to-point / breakpoint / human-takeover machinery,
-   which is also the failure report's "take over from here"
-   suggested next command.
-4. Round-trip: fragment emission anchored by playback position,
-   with opt-in surgical apply at the anchor — never regenerating,
-   never text-merging.
-5. The landmark catalog shape, already decided (DECISIONS.md, the
-   wrinkle round) and now **delivered**
-   ([docs/spec/landmarks.md](../../docs/spec/landmarks.md)) — what
-   the recorder owes is emitting into it.
-6. Run-events handover kinds (script/human control passing), so a
-   capture session is one run record with mixed drivers. Milestone
-   9 reserved these in the spec and no constant exists in the
-   implementation.
-7. CLI `record` command family and API twins, landing together
-   under parity.
+1. A Reliquary-owned console viewer built on the `vnc` control
+   plane. This is required for recording, since Reliquary can't see
+   input typed into a backend's own display window.
+2. The text-mode recorder: it generates `wait` steps from VGA
+   screen scrapes, and `type`/`press` steps from keystrokes, and
+   flags anything it's unsure about with a generated comment. It
+   needs no new language surface.
+3. Runner support for running to a point, setting a breakpoint, and
+   handing control to a human — the same mechanism the failure
+   report's "take over from here" suggested next command needs.
+4. Round-trip editing: the recorder emits script fragments anchored
+   to the playback position, and a user can opt in to apply them
+   surgically at that anchor point. It never regenerates the whole
+   script and never does a text merge.
+5. The landmark catalog's shape. This was already decided
+   (DECISIONS.md, the wrinkle round) and is now **delivered**
+   ([docs/spec/landmarks.md](../../docs/spec/landmarks.md)). What
+   the recorder still owes is emitting landmarks into that catalog.
+6. Run-event kinds for handing control back and forth between a
+   script and a human, so a capture session is one run record even
+   when control passed between different drivers. Milestone 9
+   reserved these in the spec, but no constant for them exists in
+   the implementation yet.
+7. The CLI `record` command family and its matching API calls,
+   shipped together to keep CLI and API in parity.
 
 ## F4 — Guest agent communication
 
-> **Dropped from the numbered arc to the backlog** (owner,
-> 2026-07-23): the former Milestone 12 — numbered 13 until the
-> same-day renumber that followed machine mobility's demotion —
-> not yet scheduled. No use case demands it: the first-class
-> demands (granular results, selective re-run) are met by
-> milestones 8–9, and the guest-agent plane was only ever a
-> *preference* stated by U3, not a requirement — U3 has since
-> retired (D51) and **U14, which supersedes it, states no such
-> preference at all**, so the argument is stronger than when it
-> was written. What carries the preference now is **P3**, a
-> principle rather than a demand. Its loop runs
-> agentlessly on QEMU/DOS today. P3 governs how a native agent
-> is consumed if this lands; it does not demand that it land.
+> **Dropped from the numbered milestones to the backlog** (owner,
+> 2026-07-23): this was Milestone 12 (numbered 13 until the
+> same-day renumbering that followed machine mobility being
+> dropped down the list), and it is not yet scheduled. No use case
+> currently demands it: the requirements that were first-class here
+> (granular results, selective re-run) are already met by
+> milestones 8-9, and the guest-agent control plane was only ever a
+> *preference* stated by U3, not a requirement. U3 has since been
+> retired (D51), and **U14, which replaces it, states no such
+> preference at all** — so the case for dropping this is even
+> stronger now than when it was written. The preference is now
+> carried by **P3**, a principle rather than a requirement. The
+> loop P3 talks about runs agentlessly on QEMU/DOS today. P3
+> governs how a native agent gets used if this feature is built; it
+> does not require that it be built.
 
-Native guest agents as control planes, per
+Use native guest agents as control planes, following
 [design/guest-communication.md](../design/guest-communication.md):
-Reliquary consumes the agents guests already have
-— QGA first — and never builds its own (ARCHITECTURE.md
-P3, the control-plane arc). This milestone must not weaken the
-permanent agentless DOS path; guests without a native agent
-(DOS-era systems included) remain agentless, and where a guest
-holds both planes the same suites validate agentless and
-guest-agent control planes with equivalent results.
+Reliquary uses the agents guests already have — QGA (QEMU Guest
+Agent) first — and never builds its own (ARCHITECTURE.md P3, the
+control-plane section). This work must not weaken the existing
+agentless DOS path: guests without a native agent (including
+DOS-era systems) keep working agentlessly, and for a guest that
+supports both, the same test suites must validate the agentless and
+guest-agent control planes and get equivalent results from both.
 
 Decide first:
 
-- The exact initial `guest-exec` subset, including argument and
-  environment support, capture modes, output limits, and
-  timeouts.
-- Which bounded `guest-file-*` operations follow execution,
-  including file consistency and atomic replacement semantics.
-- Whether a separate plain serial-console control plane earns
-  its keep alongside the native guest agents and the agentless
-  planes.
+- Exactly which `guest-exec` calls to support at first, including
+  which arguments and environment variables are supported, which
+  ways of capturing output, and what output-size and timeout limits
+  to enforce.
+- Which limited `guest-file-*` operations to support after
+  execution lands, including how they keep files consistent and
+  how atomic file replacement should work.
+- Whether it's worth adding a separate, plain serial-console
+  control plane alongside the native guest agents and the existing
+  agentless planes.
 
 Deliverables:
 
-1. The host QGA client module: framing, `guest-sync-delimited`,
-   `guest-ping`/`guest-info`, `guest-exec`/`guest-exec-status` —
-   depending on QEMU's published guest-agent protocol, never on
-   one particular guest implementation.
-2. The extended `GuestExec` interface: request and result types
-   covering deadlines, completion, output, and exit status,
-   without exposing transport objects.
-3. The configured readiness waterfall with conservative fallback:
-   selection before first dispatch only, ambiguous failures never
-   retried on another control plane.
+1. A host-side QGA client module: it handles QGA's message framing,
+   and the `guest-sync-delimited`, `guest-ping`/`guest-info`, and
+   `guest-exec`/`guest-exec-status` calls. It depends only on
+   QEMU's published guest-agent protocol, never on any one guest's
+   particular implementation of it.
+2. An extended `GuestExec` interface: request and result types that
+   cover deadlines, completion, output, and exit status, without
+   exposing any transport-layer objects.
+3. A configured order of control planes to try, with a
+   conservative fallback: Reliquary picks a control plane once,
+   before the first command is sent, and never retries an
+   ambiguous failure on a different control plane.
 
-Done when: a guest command runs through QGA on QEMU with
-truthful capability reporting, and the agentless suite still
-passes byte-for-byte.
+Done when: a guest command runs successfully through QGA on QEMU,
+Reliquary reports its capabilities accurately, and the agentless
+test suite still passes byte-for-byte.
 
 ## F5 — The GUI era: VNC, GUI scripting, and the last backends
 
-> **Dropped from the numbered arc to the backlog** (owner,
-> 2026-07-23): the former Milestone 13, not yet scheduled —
-> sequenced alongside the Horizon items below when its turn comes.
+> **Dropped from the numbered milestones to the backlog** (owner,
+> 2026-07-23): this was Milestone 13, and it is not yet scheduled —
+> it will be sequenced alongside the Horizon items below when its
+> turn comes.
 >
-> **The demand adjudication closed 2026-08-21** (D110): **U5**'s
-> customized-installation remainder is pledged
-> ([../pledged/USE-CASES.md](../pledged/USE-CASES.md)) and
-> underwrites the GUI half — the plane, pointer input, landmarks,
-> the platform workflows — while **U7** already reached the last
-> two adapters (D65). In the same act the first cut left this
-> entry: **F63**, the VNC control plane on QEMU, screen and
-> keyboard — since **delivered** — this entry keeping its number
-> and the remainder under D110's cut ruling. **The second cut
-> left it 2026-08-24**: **F65**, watch-only landmarks — pledged
-> and **delivered** the same day, its number retired and its
-> surface normative at
-> [docs/spec/landmarks.md](../../docs/spec/landmarks.md). **The
-> third cut left it 2026-08-25**: **F66**, pointer input —
-> `pointer_event`, `pointing-device`, and `click` — pledged and
-> **delivered**, its number retired and its surface normative at
+> **The decision on demand for this closed 2026-08-21** (D110): the
+> rest of **U5**'s customized-installation work is pledged
+> ([../pledged/USE-CASES.md](../pledged/USE-CASES.md)) and provides
+> the justification for the GUI half of this feature — the VNC
+> control plane, pointer input, landmarks, and the platform
+> workflows — while **U7** already covers the last two adapters
+> (D65). That same decision cut a piece out of this entry: **F63**,
+> the VNC control plane on QEMU (screen and keyboard), which has
+> since been **delivered**. F63 kept its own number; this entry
+> (F5) kept the rest, under D110's ruling. **A second piece was cut
+> out on 2026-08-24**: **F65**, watch-only landmarks — pledged and
+> **delivered** the same day. F65's number was retired, and its
+> behavior is now the normative spec at
+> [docs/spec/landmarks.md](../../docs/spec/landmarks.md). **A third
+> piece was cut out on 2026-08-25**: **F66**, pointer input — the
+> `pointer_event` call, the `pointing-device` field, and the
+> `click` verb — pledged and **delivered**. F66's number was
+> retired, and its behavior is now normative at
 > [docs/spec/script-spec.md](../../docs/spec/script-spec.md#click),
-> [docs/spec/blueprint-model.md](../../docs/spec/blueprint-model.md)
-> and [docs/spec/landmarks.md](../../docs/spec/landmarks.md). **The
-> fourth cut left it 2026-08-26**: **F67**, the WinNT half of the
-> platform-workflows deliverable — the ReactOS codex recipe and
-> F66's real-GUI proof — pledged and **delivered**, its number
-> retired. It ships no new normative surface (a codex recipe is
-> content under [docs/spec/codex.md](../../docs/spec/codex.md));
-> its record is
+> [docs/spec/blueprint-model.md](../../docs/spec/blueprint-model.md),
+> and [docs/spec/landmarks.md](../../docs/spec/landmarks.md). **A
+> fourth piece was cut out on 2026-08-26**: **F67**, the WinNT half
+> of the platform-workflows deliverable — the ReactOS codex recipe,
+> and proof that F66 works against a real GUI — pledged and
+> **delivered**. F67's number was retired. It added no new
+> normative spec (a codex recipe is just content, covered by
+> [docs/spec/codex.md](../../docs/spec/codex.md)); its record is
 > [design/winnt-platform.md](design/winnt-platform.md) and the
-> shipped recipe itself. Every
-> deliverable below now stands on pledged
-> demand and stays here until pledged — a pledged use case makes
-> a feature pledgeable and pledges nothing itself (D65).
+> shipped recipe itself. Every deliverable still listed below now
+> has pledged demand behind it and stays in this file until it too
+> is pledged — a pledged use case makes a feature eligible to be
+> pledged, but does not pledge it by itself (D65).
 >
-> **The Hyper-V wire is not missing, only different** (prior-art
-> research, 2026-07-28; not adjudicated). The body below drew the
-> capability-not-one-wire conclusion from an absence. The
-> conclusion holds and sharpens; the premise does not. Hyper-V's
-> VM console is reachable over RDP to the *host* on port 2179,
-> the VM's GUID carried as an `MS-RDPEPS` preconnection blob —
-> host-side, no RDP server in the guest, and serving the console
-> before any OS is installed. So GUI automation on Hyper-V is a
-> **second display carrier** rather than a hole, which is a
-> stronger illustration of the doctrine than an absence was: a
-> capability satisfied two ways is the case the seam exists to
-> serve. The cost is the open part: RFB hands a client a
-> framebuffer, where RDP output is bitmap updates, drawing
-> orders, and codecs, so the realistic path is a vendored native
-> stack (FreeRDP is Apache-2.0 and implements the blob; no usable
-> Python binding exists, and it ships no official Windows
-> binary). **This changes no demand** — a newly available wire is
-> not a use case, and GUI automation still cites nothing. A
-> finding on the same terms as the note above.
+> **Hyper-V does have a console wire — it's just a different one
+> than expected** (prior-art research, 2026-07-28; not yet
+> adjudicated). The text below originally concluded that GUI
+> automation must work through capabilities rather than one
+> specific wire protocol, reasoning from the fact that Hyper-V
+> seemed to have no console access at all. That conclusion still
+> holds, and is now better supported — but the reasoning behind it
+> was wrong. Hyper-V's VM console is actually reachable over RDP,
+> connecting to the *host* (not the guest) on port 2179, with the
+> VM identified by a GUID carried in an `MS-RDPEPS` preconnection
+> blob. This works host-side, needs no RDP server in the guest, and
+> serves the console even before any OS is installed. So GUI
+> automation on Hyper-V has a **second way to reach the display**,
+> rather than no way at all — which is actually a stronger example
+> of the underlying point than "no way at all" was: a capability
+> that can be satisfied two different ways is exactly the case this
+> design exists to handle. The catch is the cost of building it:
+> RFB hands a client a framebuffer, but RDP output is bitmap
+> updates, drawing orders, and codecs — so the realistic way to
+> support it is to vendor a native library (FreeRDP, which is
+> Apache-2.0 licensed and implements this blob; there is no usable
+> Python binding for it, and it ships no official Windows binary).
+> **This does not change what's pledged** — a newly available
+> protocol is not a use case by itself, and nothing currently
+> pledged asks for GUI automation on Hyper-V. This finding applies
+> on the same terms as the note above.
 
-The arc's endpoint: GUI installer automation, carried by the
-VNC/RFB control plane where backends provide it — QEMU natively,
-VirtualBox with the extension pack, VMware Workstation — and the
-two remaining adapters: VMware Workstation, then Hyper-V,
-deliberately last. Hyper-V has no VNC — a capability failure,
-never an emulation — which is what makes it the proof that GUI
-automation rides capabilities and not one wire: its console
-answers on a different carrier entirely (the note above), so the
-capability has to be reachable by more than one.
+This is the last piece of work in the plan: GUI installer
+automation, carried over the VNC/RFB control plane wherever a
+backend provides it — natively on QEMU, on VirtualBox with the
+extension pack installed, and on VMware Workstation. Two adapters
+are still missing: VMware Workstation, then Hyper-V, deliberately
+built last. Hyper-V has no VNC support — Reliquary must report that
+capability as missing rather than fake it — which is exactly what
+makes Hyper-V the proof that GUI automation works through
+capabilities rather than through one specific protocol: its console
+answers over a completely different carrier (see the note above),
+so the capability needs to be reachable more than one way.
 
 Decide first:
 
-- The GUI asset spec: **delivered** (F65, 2026-08-24 —
-  [docs/spec/landmarks.md](../../docs/spec/landmarks.md)): the
-  `.rlql` JSON5 schema (stem-identified, dimensions-only pinning —
-  the mode half dropped as unverifiable), the similarity metric
-  (pixel-equal fraction, per-region judgment), and reference
-  placement — `@name` in every screen-condition position; this
-  bullet used to say "landmark-block placement within a script",
-  a phrase from before D12 deleted the embedded block. It is kept
-  here only to say the question is closed, and goes with the
-  entry.
-- Pointer input end to end: **delivered** (F66, 2026-08-25 —
-  [docs/spec/script-spec.md](../../docs/spec/script-spec.md#click)):
-  the
-  seam is one carrier method in RFB's `PointerEvent` shape (the
-  entry's three primitives collapse into it, key events already
-  delivered), composition and pacing control-plane-owned above
-  it; `pointing-device` (`tablet` / `mouse`) as a first-class
-  machine field under P25's cleared gate, `click` refusing a
-  relative-only machine at preflight; and `click` as the fifth
-  guest-input verb — observation-bearing like `select`, `spot=`
-  with a lone-spot default, left-single-click as the whole first
-  cut. It is kept here only to say the question is closed, and
-  goes with the entry. **Left open**: a host-side
-  landmark-cropping convenience (a CLI subcommand, never a
-  service). Era note: DOS/9x-era setup GUIs are fixed-mode,
-  fixed-font, animation-free — asset churn should be far below
-  os-autoinst needle churn — and NT-era setup is largely keyboard-drivable, so
-  keyboard-first remains the preferred path where it works.
-  A future os-autoinst bridge belongs as an external-runner
-  adapter or export target — generate an os-autoinst test
-  distribution and invoke isotovideo out of process — not as
-  Reliquary's native machine engine.
-  Throughout, os-autoinst is a **concept reference only** — its
-  designs are studied and reimplemented, never its code (see
-  AGENTS.md prior art for the boundary, which is doctrine rather
-  than merely licensing).
-- Blueprint device growth: **designed** (owner round,
-  2026-08-24 —
-  [design/device-growth.md](design/device-growth.md)), and the
-  round's product is dispositions, not fields — P25's two gates
-  (demand necessary, multi-backend applicability) applied per
-  item, each refusal its own argument. Network: host-reachability
-  stays derived from the script's `http` block, generalized per
-  backend, the NIC model a per-platform default — a first-class
-  field waits for machine-shaped demand, and then carries
-  attachment vocabulary, never card names. Firmware:
-  `bios`/`uefi` designed in full (platform defaults, NVRAM
-  varstore residency), admission deferred to the first platform
-  needing `uefi`. Display adapter: refused on applicability,
-  permanently behind `backend-settings`. Audio: refused on
-  demand. USB: a controller is always implied by the device that
-  needs it, never a field. Controller defaults go
-  per-(platform, medium) by the arrival rule; slot ranges widen
-  per controller type at that type's admission (additive, as
-  this entry already held); Hyper-V generation is derived —
-  `bios` → Gen1, `uefi` → Gen2 — never a pin.
-  **A second controller type leaves no declared first disk.**
-  Slot order is authoritative only within a type; across types the
-  guest's firmware decides how the controllers themselves
-  enumerate. That was a live constraint while Reliquary mapped
-  drives to guest letters, and **D108 retired the mapping**, so
-  what remains is narrower and still real: any future answer about
-  which disk a guest sees first is a fact no declaration supplies,
-  and P10 forbids guessing at one. Boot order is the exception
-  that already works, being stated to the firmware rather than
-  read back from it.
-- The Hyper-V agentless screen strategy: **designed as a bet
-  with its refutation stated** (owner round, 2026-08-24 —
-  [design/hyperv-screen.md](design/hyperv-screen.md)). Input is
-  proven prior art (Packer drives `Msvm_Keyboard` host-side —
-  blind, which is the half Reliquary cannot accept); the screen
-  is the open half, and the strategy is the WMI thumbnail
-  composition **if its spike proves native-res unscaled
-  capture** — RGB565 is survivable, the recognizer binarizes and
-  the landmark matcher normalizes the reference through the
-  plane's stated pixel format — else a reported capability
-  absence (P11), the RDP carrier weighed then as its own
-  proposal and the serial/agent planes declined as this
-  question's answer (P3's arc). The spike precedes the pledge,
-  F64's precedent.
+- The GUI asset spec is **delivered** (F65, 2026-08-24 —
+  [docs/spec/landmarks.md](../../docs/spec/landmarks.md)). It
+  covers: the `.rlql` JSON5 schema, identified by filename stem and
+  pinned only by image dimensions (pinning by color mode was
+  dropped because it couldn't be verified); the similarity metric,
+  which is the fraction of matching pixels judged per region; and
+  where references can be placed — `@name` can appear anywhere a
+  screen condition can. (This bullet used to say "landmark-block
+  placement within a script", which referred to the embedded
+  landmark block that D12 removed before this was written. It's
+  kept here only to note that the question is already settled; it
+  goes away with the rest of this entry.)
+- Pointer input, end to end, is **delivered** (F66, 2026-08-25 —
+  [docs/spec/script-spec.md](../../docs/spec/script-spec.md#click)).
+  It works like this: there is one carrier method, matching RFB's
+  `PointerEvent` shape (the three input primitives this entry
+  originally planned all collapse into that one call; key events
+  were already delivered separately), and composing and pacing
+  pointer movements is owned by the control plane above it.
+  `pointing-device` (`tablet` or `mouse`) is a first-class machine
+  field, now allowed under P25's gate; `click` refuses to run, at
+  preflight, on a machine configured with a relative-only pointing
+  device. `click` is the fifth guest-input verb — like `select`, it
+  can make observations — and takes a `spot=` argument that
+  defaults to a single spot, with a plain left click as the entire
+  first version. This is kept here only to note the question is
+  already settled; it goes away with the rest of this entry.
+  **Left open**: a convenience for cropping landmark images on the
+  host (as a CLI subcommand, never a background service). Era
+  note: DOS- and Windows-9x-era setup GUIs use a fixed screen mode,
+  fixed font, and no animation, so landmark images should need far
+  fewer updates than os-autoinst's "needle" images typically do;
+  NT-era setup can mostly be driven by keyboard alone, so
+  keyboard-first stays the preferred approach wherever it works. A
+  future bridge to os-autoinst should be built as an
+  external-runner adapter or export target — generating an
+  os-autoinst test distribution and invoking `isotovideo` as a
+  separate process — not folded into Reliquary's own machine
+  engine. Throughout this project, os-autoinst is a **reference for
+  ideas only**: its designs are studied and reimplemented, never
+  its code (see AGENTS.md's prior-art section for that boundary,
+  which is a project rule, not just a licensing requirement).
+- Growing the blueprint's device model is **designed** (owner
+  round, 2026-08-24 — [design/device-growth.md](design/device-growth.md)).
+  What that design round produced is a decision for each device
+  type, not new fields — each item was checked against P25's two
+  gates (is there real demand, and does it apply across multiple
+  backends), and each rejection has its own written reason.
+  Network: whether the host can reach the guest keeps being worked
+  out from the script's `http` block, generalized to work per
+  backend, with the NIC model chosen as a default per platform. A
+  first-class network field waits until there is demand shaped
+  like a real machine need, and when it is added, it should
+  describe how the NIC attaches, not specific card model names.
+  Firmware: `bios`/`uefi` support is fully designed (covering
+  platform defaults and where the NVRAM variable store lives), but
+  will not be added until the first platform that actually needs
+  `uefi`. Display adapter: rejected as not broadly applicable,
+  staying permanently something you configure through
+  `backend-settings` instead. Audio: rejected for lack of demand.
+  USB: a USB controller is always implied by whatever device needs
+  it — it is never its own field. Controller defaults are chosen
+  per platform and per medium type, following the existing arrival
+  rule; slot ranges widen for a controller type only once that
+  type is added (this stays additive, as this entry already
+  required); a Hyper-V VM's generation is derived from the
+  firmware choice — `bios` gives Gen1, `uefi` gives Gen2 — never
+  set directly. **Adding a second controller type means there is
+  no single declared "first disk."** Slot order only determines
+  order within one controller type; across different types, it is
+  the guest's firmware that decides how the controllers themselves
+  get enumerated. This used to matter while Reliquary mapped disks
+  to guest drive letters, but **D108 removed that mapping**, so
+  what is left is narrower but still real: any future answer about
+  which disk a guest sees first is a fact that no declaration in
+  the blueprint can supply, and P10 forbids guessing at one. Boot
+  order is the one exception that already works cleanly, because
+  it is stated to the firmware directly rather than read back from
+  it.
+- The strategy for reading the Hyper-V screen without a guest
+  agent is **designed as a bet, with the condition that would
+  prove it wrong written down** (owner round, 2026-08-24 —
+  [design/hyperv-screen.md](design/hyperv-screen.md)). Sending
+  input is proven by prior art — Packer already drives
+  `Msvm_Keyboard` from the host — but that is a blind approach with
+  no screen feedback, which Reliquary cannot accept. Reading the
+  screen is the open question. The plan is to use WMI thumbnail
+  composition, **provided a spike proves it can capture at native
+  resolution, unscaled** — RGB565 color is good enough to work
+  with, since the recognizer converts images to black-and-white and
+  the landmark matcher normalizes its reference images to match
+  whatever pixel format the plane reports. If the spike fails,
+  Reliquary reports the capability as absent (P11); the RDP carrier
+  would then be weighed as its own separate proposal, and a
+  serial-console or guest-agent plane is rejected as an answer to
+  this specific question (per P3's control-plane rules). The spike
+  has to run before this gets pledged, following the same
+  precedent F64 set.
 
 Deliverables:
 
-1. The VNC control plane beyond **F63**'s delivered QEMU cut: the
-   VirtualBox (extension pack) and VMware Workstation endpoint
-   configuration behind the same plane, pointer events over the
-   in-tree RFB client (the client, framebuffer capture and key
-   events are delivered — `src/reliquary/rfb.py` and the QEMU
-   adapter's VNC carriers; the adjudicated calls are D110),
-   and the capability error naming Hyper-V where the plane cannot
-   exist.
-2. Pointer input: **delivered as F66** (owner, 2026-08-25;
+1. Extending the VNC control plane past what **F63** already
+   delivered for QEMU: configuring VirtualBox (with the extension
+   pack) and VMware Workstation endpoints on the same plane,
+   sending pointer events through the in-tree RFB client (the
+   client itself, framebuffer capture, and key events are already
+   delivered, in `src/reliquary/rfb.py` and the QEMU adapter's VNC
+   code; which calls were approved for this is recorded in D110),
+   and reporting a capability error that names Hyper-V specifically
+   where this plane cannot exist.
+2. Pointer input is **delivered, as F66** (owner, 2026-08-25;
    [docs/spec/script-spec.md](../../docs/spec/script-spec.md#click))
-   — the `pointer_event` carrier, the `pointing-device`
-   field, and `click`. What stays here: the host-side
+   — the `pointer_event` call, the `pointing-device` field, and
+   `click`. What is still owed here: the host-side
    landmark-cropping convenience, and every deliverable below that
-   composes on this one.
-3. Landmarks: **fully delivered** (F65, owner, 2026-08-24, watch-only;
-   F66, owner, 2026-08-25, clickable —
-   [docs/spec/landmarks.md](../../docs/spec/landmarks.md)) — the
-   `.rlql` kind, the matcher, the `@name` condition, the
-   cursor-parking contract, the built-in park-zone mask, and the
-   `click` verb composed on the pointer primitive.
-4. Win9x/WinNT platform workflows: GUI installer scripting for
-   the setup GUIs text scraping cannot reach, keyboard-first
-   where NT-era setup allows it. **The WinNT half is delivered**
-   (F67, 2026-08-26 —
+   builds on this one.
+3. Landmarks are **fully delivered** (F65, owner, 2026-08-24,
+   watch-only; F66, owner, 2026-08-25, clickable —
+   [docs/spec/landmarks.md](../../docs/spec/landmarks.md)): the
+   `.rlql` file kind, the image matcher, the `@name` condition, the
+   rule for where the cursor parks, the built-in mask for the park
+   zone, and the `click` verb built on top of the pointer
+   primitive.
+4. Windows 9x and Windows NT platform workflows: scripting for the
+   setup GUIs that text scraping cannot handle, staying
+   keyboard-first wherever NT-era setup allows it. **The WinNT half
+   is delivered** (F67, 2026-08-26 —
    [design/winnt-platform.md](design/winnt-platform.md)): the
-   ReactOS codex recipe, keyboard-first through its text-mode
-   setup exactly as this entry's era note predicted, landmarks and
-   `click` through its Win32 Setup Wizard. What stays here: the
-   Win9x half, a different install flow with no demand yet
-   distinguishing it (the design's scope call), and any richer
-   pointer vocabulary a future guest demands.
+   ReactOS codex recipe, which uses keyboard-only steps through its
+   text-mode setup exactly as this entry's era note predicted, then
+   landmarks and `click` through its Win32 Setup Wizard. What is
+   still owed here: the Windows 9x half, which is a different
+   install flow with no demand yet to distinguish it (a scope call
+   the design made), plus any richer pointer vocabulary that a
+   future guest turns out to need.
 5. The VMware Workstation adapter.
-6. The Hyper-V adapter, last, on the screen strategy
-   [design/hyperv-screen.md](design/hyperv-screen.md) decides —
-   its spike's outcome, not this entry, says whether that is the
-   WMI composition or a reported capability absence.
+6. The Hyper-V adapter, built last, using whichever screen strategy
+   [design/hyperv-screen.md](design/hyperv-screen.md) settles on —
+   the spike's outcome, not this entry, decides whether that ends
+   up being WMI thumbnail composition or a reported missing
+   capability.
 
-Done when: a GUI-era install script drives a setup end to end
-through landmarks on QEMU over VNC and on Hyper-V through its
-decided screen strategy. (The FreeDOS-unmodified-over-VNC
-criterion, with recognition matching the VGA scrape, went with
-F63 as its done-when.)
+Done when: a GUI-era install script can drive a setup wizard end to
+end using landmarks, both on QEMU over VNC and on Hyper-V using
+whichever screen strategy got decided. (The criterion about running
+an unmodified FreeDOS install over VNC, with recognition matching
+the VGA scrape, was already delivered as F63's own done-when.)
 
 ## F6 — Asynchronous runs
 
 > **Deferred to the backlog** (owner, 2026-07-24, D35; scope
-> extended D36): the asynchronous-run pillar leaves the numbered
-> arc — milestone 9 delivers the run, and its output, without it.
-> No in-force or pledged use case demands it: the feedback split
-> (P5) is satisfied by the run's own driver watching it live, and
-> detaching a run or following it from a process that did not
-> start it is a separable capability no case writes down. Its
-> demand is the U19 draft
-> ([proposed/USE-CASES.md](USE-CASES.md),
-> "start a long run and follow it from elsewhere"); pledging
-> U19 is scheduling this work back onto the arc, the citing item
-> the record.
+> extended D36): running scripts asynchronously is dropped from the
+> numbered milestones — milestone 9 delivers running a script and
+> getting its output, without this. No currently active or pledged
+> use case asks for it: the feedback-splitting rule (P5) is already
+> satisfied by a run's own driver watching it live, and detaching a
+> run, or following one from a process that did not start it, is a
+> separate capability that no use case currently writes down. The
+> closest thing to demand for it is the draft use case U19
+> ([proposed/USE-CASES.md](USE-CASES.md), "start a long run and
+> follow it from elsewhere"); pledging U19 is what would put this
+> work back on the schedule, and the pledge record would cite it.
 >
-> **Persistence lives here (D36).** A run another process can
-> follow must be written down, so the whole record substrate
-> belongs to this pillar and returns with it: the
-> `cache/machines/<id>/runs/<n>/` archive with machine-scoped
-> monotonic numbering, the persisted `run-events.jsonl` and
-> `transcript.txt`, retention and the `list-runs` / `run status`
-> / `run delete` verbs, the crashed-run rule (writer identity +
-> cross-process liveness), and interaction runs (`begin-run` /
-> `end-run`, the primitive-loop bracket and U6's recorder seam).
-> Milestone 9 stores nothing; this is where storage comes back.
-> The design below and that record model are settled and stand as
-> written.
+> **Storing run records lives here too (D36).** For another
+> process to follow a run, the run has to be written down
+> somewhere, so the entire storage design belongs to this feature
+> and comes back with it: the `cache/machines/<id>/runs/<n>/`
+> archive, numbered per machine with an always-increasing counter;
+> the `run-events.jsonl` and `transcript.txt` files that get saved;
+> retention rules and the `list-runs` / `run status` / `run delete`
+> commands; the rule for detecting a crashed run (checking writer
+> identity and whether that process is still alive); and
+> interaction runs (`begin-run` / `end-run`, which bracket the
+> primitive loop and are also what the U6 recorder needs). Milestone
+> 9 stores nothing at all; this is where storage comes back. The
+> design below, and this record model, are both settled and stand
+> as written.
 
-**Sync is async plus attach.** A foreground `run-script` run is
-defined as: start the run, immediately attach the live renderer.
-One semantic, one code path — and a run started in one terminal
-can be observed from another. Ctrl-C on a foreground run cancels
-the run; Ctrl-C on a later reattach merely stops tailing. (Until
-this lands, milestone 9's foreground run is the simpler shape:
-the runner lives in the invoking process and the renderer reads
-the stream that process writes, with no cross-process attach.)
+**Running a script normally is really just: start it async, then
+attach to watch it.** A foreground `run-script` run is defined as
+starting the run and immediately attaching a live renderer to it.
+That is one behavior with one code path, and it means a run started
+in one terminal can be watched from another. Pressing Ctrl-C on a
+foreground run cancels the run; pressing Ctrl-C after reattaching to
+it later only stops watching it. (Until this feature lands,
+milestone 9's foreground run works more simply: the runner lives in
+the same process that started it, and the renderer reads directly
+from the stream that process writes, with no way to attach from a
+different process.)
 
-**Detach hands off at the machine boundary.** `run-script
---detach` completes parsing, binding, and static and capability
-preflight in the foreground (G3 — those failures belong to the
-invoker's exit code, never buried in a record), then spawns the
-runner and prints the run id. The detached runner is an owned
-child exactly as QEMU is: the run record carries writer identity
-(pid plus start time), liveness checks verify identity before
-any command targets the run, and stale records fail closed — the
-vm.json doctrine applied to the runner. This is what makes a
-record's missing terminal event a detectable *crashed* run
-rather than merely an incomplete one.
+**Detaching hands control off right where the machine takes over.**
+`run-script --detach` finishes parsing the script, binding it to a
+machine, and running static and capability preflight checks in the
+foreground — those failures show up in the invoking command's exit
+code, never hidden inside a run record (G3). Only then does it spawn
+the runner as a background process and print the run's id. That
+detached runner is an owned child process, the same way Reliquary
+treats QEMU: the run record stores who is writing to it (process id
+plus start time), a liveness check confirms that identity before any
+command can act on the run, and a stale record fails closed — the
+same rule `vm.json` uses, applied here to the runner. This is what
+lets Reliquary tell a genuinely *crashed* run apart from one that is
+simply still incomplete: a crashed run's record is missing its
+terminal event.
 
-**Cancel from another terminal.** `run cancel` requests a stop;
-the runner ends at the next event boundary (input deliveries are
-atomic, host transfers abort — the execution model's
-severability), writes a `cancelled` terminal event, and leaves
-the machine as-is per the no-implicit-teardown rule;
-`--stop-machine` opts into the visible hard power-off (the flag
-mirrors `cancel(stop_machine=)` — flags mirror parameters even
-in the run family; owner, 2026-07-21). The `cancelled` outcome
-and its exit code (`5`) already exist in milestone 9 for
-foreground Ctrl-C; what defers is cancelling a run the current
+**You can cancel a run from a different terminal than the one that
+started it.** `run cancel` sends a stop request; the runner finishes
+at the next safe stopping point (input deliveries complete
+atomically, but host file transfers can be aborted mid-way — this
+follows how the execution model can be safely interrupted), writes a
+`cancelled` terminal event, and leaves the machine running, per the
+rule against implicit teardown. The `--stop-machine` flag opts into
+powering the machine off (it mirrors the `cancel(stop_machine=)`
+parameter in the API — CLI flags mirror API parameters throughout
+the run commands; owner, 2026-07-21). The `cancelled` outcome and
+its exit code (`5`) already exist in milestone 9, for a foreground
+Ctrl-C; what is deferred here is cancelling a run that the current
 process did not start.
 
-**The run family's followers.** `run tail` renders a live run's
-stream per the progress vocabulary (pretty on a tty, plain and
-jsonl for programs); `run wait`'s exit code mirrors the run's
-outcome, so unbound languages get results by waiting. Both take
-the run number as an ordinary positional argument, defaulting to
-the machine's latest run, with the machine chosen by the
-ordinary `--machine` / `--blueprint` selectors.
+**Commands for watching a run.** `run tail` displays a live run's
+output stream, following the standard progress format (a formatted
+view on a terminal, plain text or JSON Lines for scripts); `run
+wait`'s exit code matches the run's outcome, so a caller in a
+language with no Reliquary bindings can still get a result by just
+waiting on it. Both commands take the run number as an ordinary
+positional argument, defaulting to the machine's most recent run,
+with the machine itself chosen using the usual `--machine` /
+`--blueprint` options.
 
-**Two presentations — the async handle.** The embedding API's
-twin of `--detach` is `start_script()`, returning a run handle —
-`status()`, `events(follow=)` as a blocking iterator,
-`wait(timeout=)`, `cancel(stop_machine=)`;
-`attach_run(machine=, blueprint=, run=None)` reopens a handle
-from a fresh process, the run number defaulting to the machine's
-latest exactly as the CLI `run` operations do. The handle is
-pull-only: no callbacks, nothing a common binding language
-cannot express directly. `wait(timeout=)` completes exactly as
-the blocking form — same result, same raises — and expiry raises
-outside the error taxonomy (Python: the builtin `TimeoutError`):
-nothing failed, the handle stays valid, the call repeats (owner,
-2026-07-21). A handle is a follower, never the owner: dropping
-one never affects its operation — GC timing carries no semantics
-in any binding, and `cancel()` is the only cancellation. A
-caller wanting concurrency without any of this still runs the
-blocking form on its own thread — computation stays on the
-caller's side of the seam.
+**The embedding API has its own version of this: a run handle.** The
+API's equivalent of `--detach` is `start_script()`, which returns a
+run handle with `status()`, `events(follow=)` (a blocking iterator),
+`wait(timeout=)`, and `cancel(stop_machine=)`.
+`attach_run(machine=, blueprint=, run=None)` reopens a handle from a
+different process, defaulting to the machine's latest run the same
+way the CLI `run` commands do. The handle only lets you pull data —
+there are no callbacks, nothing that a typical language binding
+could not express directly. `wait(timeout=)` behaves exactly like
+the blocking version of running a script — same result, same
+exceptions — except that timing out raises something outside
+Reliquary's normal error types (in Python, the built-in
+`TimeoutError`): nothing has failed, the handle is still valid, and
+the caller can just call `wait` again (owner, 2026-07-21). A handle
+only follows a run; it never owns it — discarding a handle never
+affects the run itself. Garbage-collection timing has no effect in
+any language binding, and `cancel()` is the only way to actually
+cancel a run. A caller who wants concurrency without dealing with
+any of this can just run the blocking version of the call on their
+own thread — the actual work still happens on the caller's side of
+the boundary.
 
-**Fetch handle.** `start_fetch()` (the same parameters as
-`fetch_media()`) returns a pull-only fetch handle — `status()`,
-`events(follow=)`, `wait(timeout=)`, `cancel()` (aborts at an
-event boundary; the partial download is deleted, no pre-existing
-file touched). There is no attach-by-id and no CLI command —
-`start_fetch` is the one async starter without one (owner,
-2026-07-21): an ephemeral stream is process-local, reattachment
-is what run records provide, and a CLI driver backgrounds
-`fetch-media` itself, the process being the handle. The handle
-form is noninteractive by construction and rejects
-`on_mismatch="prompt"` — a background fetch can never hang on a
-hidden prompt.
+**Fetching media also gets a handle.** `start_fetch()` (which takes
+the same parameters as `fetch_media()`) returns a pull-only fetch
+handle, with `status()`, `events(follow=)`, `wait(timeout=)`, and
+`cancel()` (which aborts at the next safe point, deletes the partial
+download, and never touches any file that already existed). There
+is no way to attach to a fetch by id later, and no CLI command for
+it — `start_fetch` is the only async starter that does not get one
+(owner, 2026-07-21): its stream only exists within the process that
+started it, since reattaching to a run from elsewhere is what run
+records are for, and a CLI script that wants to run `fetch-media` in
+the background can just background the whole process, which then
+serves as its own handle. Because the handle form has no interactive
+prompts, it also refuses `on_mismatch="prompt"` — a background fetch
+can never get stuck waiting on a hidden prompt.
 
 ## F7 — Audit design documents against pledged demand
 
 > **Moved here from TASKS.md's legacy Proposed section** (owner,
-> 2026-07-26): argued but never approved, and a proposal belongs under
-> `proposed/`. Demanded by **P8** (surface and principle changes are
-> vetted): the audit checks that a design exists only where demand
-> does. No use case asks for it.
+> 2026-07-26): this was discussed but never approved, and a
+> proposal belongs under `proposed/`. **P8** requires it (surface
+> and principle changes must be vetted): the audit checks that a
+> design document exists only where there is demand for it. No use
+> case asks for this.
 
-**Audit design documents against pledged demand.** Raised
-unprompted during the 2026-07-24 traceability audit rather than
-requested — a suggestion, not a request — so it waits here.
+**Audit design documents against pledged demand.** This came up
+unprompted during the 2026-07-24 traceability audit — it is a
+suggestion, not something anyone requested — so it sits here.
 
-The findings that motivate it, folded in from
+The findings that motivate it were folded in from
 [TASKS.md](../TASKS.md) by the 2026-07-27 gate audit, which found
-this item pledged there and proposed here at once and kept the
-proposal:
+this same item listed as both pledged there and proposed here, and
+kept it as a proposal:
 
-- Two documents cite no U/P/G at all:
+- Two documents do not cite any U/P/G number at all:
   [backend-adapter.md](../design/backend-adapter.md) (230
   lines) and
   [blueprint-cookbook.md](../../docs/blueprint-cookbook.md) (440
-  lines, examples — arguably exempt). *The first was fixed on
-  2026-07-28 by its pillar being pledged: it named U7 and F2 and
-  travelled to `pledged/design/` with them, then back to
-  `design/` the same day when F2 delivered and left no feature for
-  it to sit with. One finding left.*
-- Beyond citation, three designs exist for pillars whose demand was
-  never pledged — `backend-adapter.md`,
-  [guest-communication.md](../design/guest-communication.md) and
-  landmarks — all demoted by D33 *for lack of use-case backing*
-  after their designs were written.
-  *Backend-adapter left this list on 2026-07-28, by the remedy the
-  traceability rule names: the demand was found and pledged (U7),
-  not the work deleted. Landmarks left it by the same remedy: U5
-  re-pledged (D110, 2026-08-21), pledged as F65 and delivered
-  (2026-08-24), its design now the normative
+  lines of examples — arguably exempt). *The first was fixed on
+  2026-07-28 when its feature was pledged: it named U7 and F2 and
+  moved to `pledged/design/` along with them, then moved back to
+  `design/` the same day once F2 was delivered and there was no
+  longer a feature for it to sit with. One finding remains.*
+- Beyond missing citations, three design documents exist for work
+  whose demand was never pledged — `backend-adapter.md`,
+  [guest-communication.md](../design/guest-communication.md), and
+  the landmarks design — all three demoted by D33 *for lacking
+  use-case backing*, after their designs were already written.
+  *`backend-adapter.md` left this list on 2026-07-28: the fix the
+  traceability rule requires is finding and pledging the demand
+  (U7), not deleting the work, and that is what happened. Landmarks
+  left the list the same way: U5 was re-pledged (D110, 2026-08-21),
+  then pledged as F65 and delivered (2026-08-24), and its design is
+  now the normative spec at
   [docs/spec/landmarks.md](../../docs/spec/landmarks.md). One
-  left.*
-  This is the retrospective pass over what predates the current
-  shelving, where a design sits with the feature it serves and is
-  swept with it.
+  remains.*
+  This is a one-time retrospective pass over designs written
+  before the current rule took hold; going forward, a design
+  document stays filed with the feature it serves and gets cleaned
+  up along with it.
 
 ## F8 — The planning traceability linter
 
 > **Moved here from TASKS.md's legacy Proposed section** (owner,
-> 2026-07-26): argued but never approved, and a proposal belongs under
-> `proposed/`. Demanded by **P8** and **P23** — it enforces
-> mechanically what those principles assert, rather than leaving them
-> to whoever happens to grep. Pairs with **F9**, its mirror. No use
-> case asks for it.
+> 2026-07-26): this was discussed but never approved, and a
+> proposal belongs under `proposed/`. **P8** and **P23** require
+> it — it enforces by machine what those principles only assert,
+> instead of leaving the checking to whoever happens to run a
+> grep. It pairs with **F9**, its mirror. No use case asks for
+> this.
 
-**A traceability linter over the planning documents.** Check the
-invariants the governance rules already assert, in the required
-checks, so they are enforced rather than remembered.
-THE ARGUMENT: the artifacts are versioned files by necessity —
-the standing lists claim every entry is true of the code *at
-this commit*, which only something travelling in the commit can
-assert, and only a diff can review (this is why architecture
-decision records converged on markdown-in-repo, and why their
-tooling is indexers over files rather than trackers). What files
-do not give is **type and query**: nothing enforces that a
-decision carries supports or that delivered work cites pledged
-demand. Today those are checked by whoever happens to grep,
-which is exactly how U9 and U12 went unnoticed through the
-milestone that delivered them.
-EACH CHECK EARNED ITS PLACE — the 2026-07-24 hand audit found a
-real violation of every one:
-* every planning section cites a U/P/G demand — *12 of 34 sections
-  in the then-current roadmap cited none; re-run by hand
-  2026-07-27 over what replaced it, **2 of 27**, and both already
-  known ([F5](#f5--the-gui-era-vnc-gui-scripting-and-the-last-backends),
+**Build a linter that checks the planning documents for
+traceability.** It would check, as one of the required checks,
+the rules the project's governance already claims to enforce — so
+they are actually enforced instead of just remembered.
+THE REASONING: these planning documents have to be plain versioned
+files, because the standing lists claim every entry is true of the
+code *at this commit*, and only something that travels inside the
+commit can make that claim, and only a diff can be reviewed for it
+(this is also why architecture decision records converged on
+markdown files kept in the repo, and why their tooling is indexers
+over files rather than separate issue trackers). What plain files
+do not give you is **type checking and querying**: nothing
+currently enforces that a decision entry lists its supporting
+reasons, or that delivered work cites demand that was actually
+pledged. Today those things only get checked by whoever happens to
+run a grep, which is exactly how U9 and U12 went unnoticed all the
+way through the milestone that delivered them.
+EACH CHECK IS HERE BECAUSE IT CAUGHT A REAL BUG — a hand audit on
+2026-07-24 found an actual violation of every one:
+* every planning section cites a U/P/G number — *12 of the 34
+  sections in the roadmap at the time cited none. Re-checked by
+  hand on 2026-07-27, after that roadmap was replaced, only **2 of
+  27** sections were missing one, and both were already known about
+  ([F5](#f5--the-gui-era-vnc-gui-scripting-and-the-last-backends),
   closed 2026-08-21 by D110, and `backend-adapter.md`, closed
-  2026-07-28). The improvement is not
-  vigilance but construction — the restructure wrote each entry
-  with its demand — which is the argument for a linter rather than
-  against one: what construction fixed once, drift returns*;
-* every DECISIONS entry carries supports — *22 lack them, and
-  D29 sat outside the range the existing task assumed*;
-* no *delivered* work cites *unpledged* demand — *U9 and U12*,
-  the sharpest defect of the set, and the one a linter would
-  have caught the day milestone 9 landed (closed by hand three
-  days later, D46 — which is the argument, not a
-  counter-argument: three days is what an unaided grep costs);
-* every design document's subject has pledged demand — *three
-  designs exist for pillars D33 demoted for lack of it*;
-* every cited identifier resolves — *U15 is cited 6 times and
-  defined nowhere*;
-* no entry appears in both a standing list and its proposals doc
-  (D23's no-stub rule).
-ONE DESIGN POINT IT RAISES. The U15 result is not simply a bug
-to fix: most of those citations are legitimate death-record
-references, and the lifecycle deliberately leaves **no stub**
-behind a retired number (D23). So a checker cannot distinguish a
-proper historical citation from a stale one without a
-machine-readable register of retired identifiers — which the
-no-stub rule currently forbids anywhere obvious. Reconcile the
-two before building: either the register lives in DECISIONS.md's
-Retired list in a parseable form, or retirement earns the one
-stub the rule otherwise refuses.
-SCOPE, deliberately narrow: mechanical invariants only. Whether
-a use case is *well argued*, whether a principle is *honored by
-the code*, whether a design is *good* — none of that is
-checkable, and a linter that pretended otherwise would licence
-exactly the box-ticking the governance rules exist to prevent.
+  2026-07-28). That improvement did not come from anyone being more
+  careful — it came from restructuring the documents so each entry
+  was written with its demand attached. That is actually the
+  argument for a linter, not against one: whatever a one-time
+  restructuring fixes, ordinary drift will eventually break again*;
+* every entry in DECISIONS.md lists its supporting reasons — *22
+  entries did not, and D29 fell outside the range an existing
+  manual task assumed it needed to check*;
+* no *delivered* work cites *unpledged* demand — *U9 and U12* were
+  the worst violation found, and it is exactly the kind of case a
+  linter would have caught the day milestone 9 shipped (it was
+  instead caught and closed by hand three days later, D46 — which
+  supports building the linter rather than arguing against it:
+  three days is the cost of relying on manual grepping instead);
+* every design document's subject has pledged demand behind it —
+  *three design documents existed for work that D33 demoted for
+  lacking it*;
+* every cited identifier actually resolves to something — *U15 was
+  cited 6 times and defined nowhere*;
+* no entry appears in both a standing list and its corresponding
+  proposals document (D23's rule against leaving stubs behind).
+ONE DESIGN QUESTION THIS RAISES. The U15 finding above is not
+simply a bug to fix: most of those 6 citations are legitimate
+references to a retired item's history, and the project's rule
+deliberately leaves **no stub** behind a retired number (D23). So a
+checker cannot tell a proper historical citation apart from a stale
+one, unless there is a machine-readable list of retired identifiers
+somewhere — and the no-stub rule currently keeps that list from
+existing anywhere obvious. This has to be reconciled before the
+linter is built: either that list lives in DECISIONS.md's Retired
+section in a format a program can parse, or a retired identifier
+gets the one stub the no-stub rule otherwise refuses to allow.
+SCOPE is deliberately narrow: only mechanical, checkable rules.
+Whether a use case is *well argued*, whether a principle is
+*actually honored by the code*, whether a design is *good* — none
+of that can be checked by a program, and a linter that pretended it
+could would invite exactly the box-ticking that these governance
+rules exist to prevent.
 
-Raised 2026-07-24 as a suggestion, not a request.
+Raised on 2026-07-24 as a suggestion, not a request.
 
 ## F9 — The vision-utility audit
 
 > **Moved here from TASKS.md's legacy Proposed section** (owner,
-> 2026-07-26): argued but never approved, and a proposal belongs under
-> `proposed/`. Demanded by **P8**. The reverse-citation half of
-> **F8**: F8 checks every *citation* resolves, this checks every
-> *definition* is cited. Shares F8's design and should be sequenced
-> with it. No use case asks for it.
+> 2026-07-26): this was discussed but never approved, and a
+> proposal belongs under `proposed/`. **P8** requires it. This is
+> the reverse-citation half of **F8**: F8 checks that every
+> *citation* resolves to something; this checks that every
+> *definition* gets cited somewhere. It shares F8's design and
+> should be scheduled alongside it. No use case asks for this.
 
-**The vision-utility audit — the reverse-citation check.**
-The traceability linter above verifies every *cited*
-identifier resolves; this is its mirror — every *defined*
-vision statement (a use case, principle, or application surface) is
-cited or codified *somewhere*, or is surfaced as suspect. A
-statement nothing leans on is suspect of no utility:
-legislated but never used.
-DISCIPLINE — a look-list, not a kill-list. Finding the orphans
-is mechanical (a grep over the numbered handles); the verdict
-is a judgment the audit must not pre-empt. Each orphan earns
-one question — *guardrail or ballast?* — since a ceiling or
-closure cited only when pressure arrives is working, not idle.
-Principles get more rope than use cases: some cannot be
-codified and are legitimately hard to cite.
-DELIVERY — greppable by hand today; a monthly CI run is the
-richer eventual form. Per P22 (no CI, at this time),
-scheduling that run is itself the argued case for turning CI on
-when its day comes, not a breach of it.
+**The vision-utility audit — checking citations in reverse.** The
+traceability linter above checks that every *cited* identifier
+resolves to something real; this is its mirror — it checks that
+every *defined* vision statement (a use case, a principle, or an
+application surface) is cited or acted on *somewhere*, and flags
+it as suspect if not. A statement nothing relies on is suspect of
+being useless: written down but never actually used.
+DISCIPLINE — this produces a list to look at, not a list of things
+to delete. Finding orphaned statements is mechanical (just grep for
+the numbered identifiers); deciding what to do about each one is a
+judgment call the audit must not make for you. Each orphan deserves
+one question — *is this a guardrail, or is it dead weight?* — since
+a limit or a closing condition that only gets cited once pressure
+actually arrives is doing its job, not sitting idle. Principles get
+more benefit of the doubt than use cases: some principles genuinely
+can't be tied to a specific citation and are legitimately hard to
+reference.
+DELIVERY — this can be run by hand with grep today; running it
+monthly in CI would be the fuller eventual version. Per P22 (no CI,
+for now), scheduling that CI run is itself the argument for turning
+CI on when that day comes — not a violation of the current rule
+against it.
 
-Raised 2026-07-25 as a suggestion, not a request.
+Raised on 2026-07-25 as a suggestion, not a request.
 
 ## F10 — Generated API reference
 
 > **Moved here from TASKS.md's legacy Proposed section** (owner,
-> 2026-07-26): argued but never approved, and a proposal belongs under
-> `proposed/`. Demand uncited. It serves the descriptive layer's
-> accuracy; **P21** (dependencies must pull their weight) is the bar
-> it has to clear, not the demand for it.
+> 2026-07-26): this was discussed but never approved, and a
+> proposal belongs under `proposed/`. No demand is cited for it. It
+> serves the accuracy of the descriptive documentation layer; the
+> bar it has to clear is **P21** (a dependency has to pull its
+> weight), not proof of demand.
 
-**Generate the API reference from docstrings** (raised
-2026-07-26, the spec/descriptive round; owner asked for it to
-be filed with its argument). Adopt a documentation generator
-(pdoc / mkdocstrings / Sphinx autodoc) to produce
-docs/api-reference.md from the binding's docstrings.
-SCOPE, and it is the whole point: **plumbing for the
-descriptive layer, never a transfer of authority.** A generated
-reference is *mechanically* faithful to the binding — the tool
-reads the signatures, so reference-disagrees-with-code becomes
-impossible by construction, which automates the apology the
-reference's banner already makes. The norm of the surface stays
-[docs/spec/api.md](../../docs/spec/api.md): code-as-norm would
-invert P8 — an unargued code change would *redefine* the
-surface rather than violate it — and the project has already
-lived the counterexample: the twin-name realignment settled
-names in the spec while the code still said
-`create_from_blueprint`, and the code was realigned to the doc.
-Parity alone cannot replace that direction: it binds shape, not
-semantics, and under twin-name identity the CLI's spellings
-derive from the API's names, so code-as-norm would put the
-guard downstream of the thing guarded. The multi-binding future
-sharpens it — two bindings mean two codes, and "the code is the
-norm" stops being well-formed; generation then rightly yields
-one descriptive reference *per binding*, all answering to the
-one spec.
-THE BAR TO CLEAR, before adopting even the plumbing: P21 binds
-infrastructure — the surface today is small enough that the
-hand-written reference is not obviously losing; without CI
-(P22) a generated document needs a local required check to
-regenerate, or it goes stale in a new way; and
-`test_documented_examples.py` executes fenced examples from the
-docs, so generated output must preserve that property or exit
-that test deliberately.
+**Generate the API reference from docstrings** (raised 2026-07-26,
+during the spec/descriptive round; the owner asked for it to be
+filed along with its reasoning). Adopt a documentation generator
+(pdoc, mkdocstrings, or Sphinx autodoc) to produce
+`docs/api-reference.md` from the Python API's docstrings.
+SCOPE, and this is the whole point: **this is plumbing for the
+descriptive documentation, never a shift in what has authority.**
+A generated reference is *mechanically* faithful to the actual API
+code, because the tool reads the real function signatures — so a
+reference disagreeing with the code becomes impossible by
+construction, which automates the apology the reference's banner
+already makes today. What still defines the API surface stays
+[docs/spec/api.md](../../docs/spec/api.md): letting the code define
+it instead would invert P8 — an unargued code change would then
+*redefine* the surface rather than merely violate the spec — and
+the project has already lived through the counterexample: the
+twin-name realignment settled the API's names in the spec while the
+code still said `create_from_blueprint`, and it was the code that
+got changed to match the doc, not the other way around. Matching
+behavior between code and spec (parity) alone can't replace the
+spec's authority here — parity only checks shape, not meaning, and
+under the twin-name rule the CLI's command names are derived from
+the API's names, so letting code define the surface would put the
+safeguard downstream of the very thing it's supposed to guard. The
+case for keeping the spec authoritative gets even stronger with
+multiple language bindings planned for later — two bindings mean
+two separate codebases, and "the code defines the surface" stops
+even making sense as a rule; generation would then correctly
+produce one descriptive reference *per binding*, each one still
+answering to the single spec.
+THE BAR TO CLEAR, before adopting even this plumbing: P21 governs
+adding infrastructure — today's API surface is small enough that
+the hand-written reference isn't obviously worse; without CI (P22),
+a generated document needs some local required check to force
+someone to regenerate it, or it will simply go stale in a new way;
+and `test_documented_examples.py` runs the code examples that
+appear in the docs, so generated output has to preserve that
+property, or someone has to deliberately turn that test off for it.
 
-Raised 2026-07-26 in the spec/descriptive round; **the owner agreed
-it needs to win this argument, not that it has** — so unlike F7–F9
-this one was asked for, and still waits on its own case.
+Raised on 2026-07-26 in the spec/descriptive round; **the owner
+agreed this needs to win the argument, not that it already has** —
+so unlike F7-F9, this one was actually requested, and it is still
+waiting on someone to make its case.
 
 ## F14 — Full guest-output capture
 
 > **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). **The strongest demand of the six,
-> and the only one that changes what a caller can do today rather
-> than how it is tested.** Demanded by **U14** (in force — granular
-> results reaching the caller) and **P11**: `exec` returns the
-> visible screen, so output longer than a screenful loses its head,
-> and loses it *silently*. A capability limit that does not name
-> itself at the point it bites is the P11 half, and it is close
-> enough to a standing-principle defect to be worth adjudicating on
-> that footing rather than this one.
+> (owner: admitted as a proposal). **This is the strongest-demand
+> item of the six entries added this way, and the only one that
+> changes what a caller can do today, rather than just how it's
+> tested.** **U14** demands it (in force — the caller needs
+> detailed results), and so does **P11**: `exec` only returns
+> whatever is currently visible on screen, so output longer than
+> one screenful gets its beginning cut off, and it gets cut off
+> *silently*. A capability limit that doesn't announce itself at
+> the moment it actually bites is a P11 violation, and it's close
+> enough to a violation of that standing principle that it's worth
+> deciding on that basis rather than needing a separate case made
+> here.
 
-The limit is documented as an honest one — agentless capture leaves
-only a long command's tail on the screen — but **honesty about a
-limit in prose is not the same as reporting it in the return.** A
-caller enumerating work inside the guest (list what a guest program
-offers, then drive each item) enumerates short whenever the listing
-outruns the screen, and nothing in what it reads back says so. That
-is the difference between in-guest enumeration being usable and not.
+This limit is already documented honestly — agentless capture only
+keeps whatever tail of a long command's output is still on screen —
+but **being honest about a limit in the documentation is not the
+same as reporting it in the actual return value.** A caller listing
+what's available inside a guest (get a listing, then act on each
+item) gets a truncated listing whenever the real listing is longer
+than one screen, and nothing in what it reads back says so. That's
+the difference between listing things inside a guest being usable
+and not.
 
-TWO SEPARABLE DELIVERABLES, and the cheap one may be the whole
-answer:
+TWO SEPARATE DELIVERABLES HERE, and the cheap one might be the whole
+fix:
 
-1. **Say so.** A read that could have lost its head reports that it
-   might have. This is the P11 minimum, it needs no new transport,
-   and it converts a silent wrong answer into a visible one.
-2. **Capture the whole of it.** Scrollback beyond the visible screen
-   — a control-plane capability question rather than a scraping one,
-   since agentless VGA text memory holds exactly one screen. It is
-   either paced reading (drive the guest's own pager and capture per
-   page) or a different plane; whatever lands, **P2** binds it — the
-   agentless path may not come to depend on guest cooperation.
+1. **Report the risk.** A read that could have lost its beginning
+   reports that it might have. This is the minimum P11 requires, it
+   needs no new transport mechanism, and it turns a silently wrong
+   answer into a visibly uncertain one.
+2. **Capture everything, not just the visible screen.** Scrolling
+   back past what's currently on screen is a question about what the
+   control plane can do, not about scraping technique — the
+   agentless approach only has one screen's worth of VGA text memory
+   to read from. The fix is either paced reading (drive the guest's
+   own pager program and capture output page by page) or using a
+   different control plane. Whichever it turns out to be, **P2**
+   constrains it: the agentless path must not end up depending on
+   the guest cooperating.
 
-DECIDE FIRST: **whether (2) is Reliquary's at all.** The competing
-answer is (1) plus the value channels that already exist — a guest
-program writing its long output to a drive the caller reads on the
-host, which Reliquary supplies without reading a byte of it (P18,
-and P16's file-content carve-out since D108). If that is the answer,
-this entry shrinks to (1) and stops being a feature; if it is not,
-the argument for why belongs here before any work starts.
+DECIDE FIRST: **whether item (2) is even Reliquary's job to solve.**
+The competing answer is: just do (1), plus the channels that already
+exist for moving data out — a guest program can write its long
+output to a drive that the caller then reads back on the host, which
+Reliquary already supports without reading a single byte of that
+file itself (P18, and the file-content exception to P16 that's
+existed since D108). If that's the right answer, this entire entry
+shrinks down to just item (1) and stops being a feature at all. If
+it's not the right answer, the argument for why needs to be made
+here before any of this gets built.
 
 ## F15 — Host-directory attachment as a first-class operation
 
 > **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). Demanded by **P16**, in force,
-> because the capability is reached today only by a caller
-> reproducing Reliquary's internal model outside it. Serves
-> **U14** and **U20**, and **D108 raised its value rather than
-> lowering it**: with the in-band file family gone, a
-> directory-source drive is one of the two routes Reliquary
-> supplies for a file to cross at all, so the arithmetic this verb
-> hides is arithmetic every consumer now does. **What it answers
-> with changed in the same act.** The guest-terms address the
-> original entry promised no longer exists — there is no letter
-> map — so the answer is the **drive key** the attachment took,
-> which is what `insert-media`, `eject-media` and `set-boot-order`
-> already speak and what a blueprint already writes. A demand for
-> the letter back is a demand for the mapping back, and is
-> argued as that.
+> (owner: admitted as a proposal). **P16** demands it, and is in
+> force, because today the only way to reach this capability is for
+> a caller to reproduce Reliquary's internal model outside of
+> Reliquary. It serves **U14** and **U20**, and **D108 made this
+> more valuable, not less**: now that the in-band file family is
+> gone, attaching a directory as a drive is one of only two ways
+> Reliquary offers to get a file across at all, so the bookkeeping
+> this new command would hide is bookkeeping every caller now has to
+> do by hand. **What this command would answer with also changed at
+> the same time.** The guest-side letter that the original version
+> of this entry promised no longer exists — there is no more
+> drive-letter mapping — so what it answers with instead is the
+> **drive key** the attachment was given, which is the same
+> vocabulary `insert-media`, `eject-media`, and `set-boot-order`
+> already use, and that a blueprint already writes. Asking for the
+> drive letter back is really asking for the old drive-letter
+> mapping back, and needs to be argued as that.
 
-A caller that needs a host directory visible to a guest **synthesizes
-a directory-source drive into the blueprint**, which forces it to
-know slot keys and slot limits — pieces of Reliquary's model
-reproduced outside Reliquary in order to reach a capability
-Reliquary supports. "Attach this host directory, and tell me the
-drive it landed on" deletes both.
+A caller that needs a host directory visible to a guest currently has
+to **write a directory-source drive into the blueprint by hand**,
+which forces it to know Reliquary's slot keys and slot limits —
+details of Reliquary's internal model, reproduced outside Reliquary,
+just to reach a capability Reliquary already supports. A command like
+"attach this host directory, and tell me which drive it landed on"
+would remove the need for both.
 
-CONSTRAINTS ALREADY SETTLED, which shape the verb rather than block
-it. QEMU snapshots a vvfat staging directory when the drive is
-attached, so a host-side change needs a stop/start cycle — this is a
-**stopped-machine** operation, and the live-iteration path stays
-U20's `insert-media` over a running machine. Slot limits and the
-directory-on-cdrom refusal stay exactly as they are: the verb hides
-the arithmetic, never the rules. What the guest calls the drive is
-the guest's business and Reliquary states nothing about it.
+CONSTRAINTS ALREADY SETTLED, which shape this command rather than
+rule it out. QEMU takes a snapshot of a vvfat staging directory when
+the drive is attached, so a change on the host side needs a
+stop/start cycle — this has to be a **stopped-machine** operation,
+and the path for changing media on a running machine stays U20's
+`insert-media`. Slot limits, and the rule against attaching a
+directory as a CD-ROM, stay exactly as they are: this command hides
+the bookkeeping, but never bends the rules. What the guest itself
+calls the drive is up to the guest, and Reliquary makes no claim
+about it.
 
 DECIDE FIRST: whether the attachment is **state or request** — a
 persisted machine-state mutation in the family of `insert_media` /
@@ -708,573 +816,681 @@ and its inverse.
 ## F16 — The public surface a caller copies today
 
 > **Entered 2026-07-27** from a consuming project's proposal
-> (owner: admitted as a proposal). Two small exposures with one
-> shared argument: each is Reliquary's own knowledge, reproduced
-> outside Reliquary because the public surface does not carry it.
-> **They are small but they are not housekeeping** — both add
-> to the embedding API, which the housekeeping boundary excludes
-> absolutely ([SURFACES.md](../SURFACES.md)). **That is not why
-> they sit here rather than in [TASKS.md](../TASKS.md)**, and this
-> entry is where that misreading began: the boundary is
-> housekeeping's alone, and a small surface change may be a task
-> (D45, which the 2026-07-27 gate audit cited this very sentence as
-> precedent for before the reading was caught). What holds them
-> here is that both are **unsettled below** — item 1
-> asks which artifact owns the answer, item 2 is probably F2's work
-> rather than its own. Serves **U14**; item 2 belongs to **F2**.
-> **A third item died with D108**: the public drive-address query,
-> which asked for `platform_dos.drive_letters` on the import
-> surface so a caller need not copy the letter rule. There is no
-> letter rule to copy any more, and nothing is owed in its place.
+> (owner: admitted as a proposal). Two small gaps with one shared
+> reason: in both cases, a caller has to reproduce knowledge
+> Reliquary already has internally, because the public API doesn't
+> expose it. **They're small, but this is not routine housekeeping**
+> — both would add to the embedding API, and housekeeping work is
+> never allowed to touch that API at all ([SURFACES.md](../SURFACES.md)).
+> **That is not the reason they're filed here instead of in
+> [TASKS.md](../TASKS.md), though** — this entry is actually where
+> that confusion started: the "housekeeping can't touch the API"
+> boundary is about housekeeping specifically, and a small API
+> change can still legitimately be a task rather than a feature
+> (D45 — the 2026-07-27 gate audit even cited this very sentence as
+> a precedent for that, before the misreading was caught). What
+> actually keeps these two items here is that both are **still
+> unsettled**, as described below — item 1 needs a decision about
+> which artifact should own the answer, and item 2 is probably F2's
+> work rather than a feature of its own. This serves **U14**; item 2
+> belongs under **F2**. **A third item here died along with D108**:
+> a proposed public query for drive letters, which would have
+> exposed `platform_dos.drive_letters` through the import surface so
+> a caller wouldn't have to copy the drive-letter rule itself. There
+> is no more drive-letter rule to copy, so nothing needs to replace
+> this item.
 
-1. **Public topology limits.** Slot counts per medium
-   (`_SLOT_LIMITS`), so a caller building a blueprint
-   programmatically stops carrying its own copied `4`. Blueprint-model
-   truth, and arguably the published schema's job rather than the
-   API's — settle which before adding a function.
-2. **A backend-agnostic availability check.** `backend_available()`
-   rather than `find_qemu()`, so a caller gating integration tests
-   never has to name an emulator to ask a backend-neutral question.
-   Lowest priority of the two, and **probably not its own work**:
-   the honest version of it is F2's autodiscovery work item, so
-   this is a note against that feature as much as a request — and
-   since F2 was pledged on 2026-07-28, that note now has somewhere
-   to be filed.
+1. **Expose the built-in slot limits publicly.** Slot counts per
+   medium type (currently the internal `_SLOT_LIMITS`), so a caller
+   building a blueprint in code doesn't have to hardcode its own
+   copy of the number `4`. This is really blueprint-model truth, and
+   arguably belongs to the published schema rather than to the API
+   — that needs to be settled before adding a function for it.
+2. **A backend-agnostic way to check availability.** A
+   `backend_available()` call, instead of `find_qemu()`, so a caller
+   that's gating integration tests never has to name a specific
+   emulator just to ask a backend-neutral question. This is the
+   lower priority of the two, and **probably isn't its own piece of
+   work**: the real fix for it is F2's autodiscovery work item, so
+   this is really a note against that feature more than a separate
+   request — and since F2 was pledged on 2026-07-28, that note now
+   has somewhere to actually be filed.
 
 ## F18 — The media authoring commands
 
 > Moved from [TASKS.md](../TASKS.md)'s Small items by the
-> 2026-07-27 gate audit. Adding a CLI command is no bar to being a
-> task (D45); what moved it is that **the shape is not settled** —
-> both entries carry their own open question, and D41 has already
-> moved the ground under them once, which is an argument to finish
-> rather than work to pick up. Serves **U4** in force
-> (a repository refers precisely to media it cannot distribute) and
-> **U13** (media fetches and verifies itself), in force since D46.
+> 2026-07-27 gate audit. Adding a CLI command doesn't by itself
+> disqualify something from being a task (D45); what got this moved
+> here is that **the shape of these commands isn't settled** — both
+> entries below carry their own open question, and D41 has already
+> changed the ground they stand on once, which is an argument that
+> this needs to be finished rather than picked up as routine work.
+> This serves **U4**, in force (a repository needs to refer
+> precisely to media it isn't allowed to distribute), and **U13**
+> (media fetches and verifies itself), in force since D46.
 
-**They are one feature because they share a scaffolder.** D41
-settled that `add-media` is the local half already — compute the
-sha256, write the declaration, copy nothing — so what is left is
-the *download* half and the *drill-down* half of one authoring
-motion, and the three should end up siblings over one writer.
+**These two commands are one feature because they share a scaffolder.**
+D41 already settled that `add-media` handles the local half —
+computing the sha256, writing the declaration, copying nothing — so
+what's left is the *download* half and the *drill-down* half of the
+same authoring workflow, and all three commands should end up as
+siblings sharing one writer.
 
-**`download-media`** (owner request, 2026-07-22; shape to
-re-derive under the revised model). `rlq download-media
-https://freedos.org/downloads/FreeDOS14.zip` downloads the file
-into `cache/media/`, computes its sha256, and scaffolds a
-standalone `.rlqb` into the home library carrying the url and
-sha256 — a media spec, with `children` left for the user to add
-when the payload is a container. A home-mode convenience: it warms
-the cache and writes the committed-source stub, so the user need
-not hand-author it and then `fetch`. Open shape: members cannot be
-inferred, so the stub stops at the container and the user adds the
-extraction tree with `extract-media`; stem-default naming from the
-URL filename; no `--local <file>` variant is needed, that being
-`add-media`; CLI+API parity, the twin returning the written
-blueprint path as `add_media` already does.
+**`download-media`** (owner request, 2026-07-22; its shape needs to
+be re-derived to match the revised model). Running `rlq
+download-media https://freedos.org/downloads/FreeDOS14.zip`
+downloads the file into `cache/media/`, computes its sha256, and
+scaffolds a standalone `.rlqb` file into the home library holding
+the url and sha256 — a media spec, leaving `children` for the user
+to fill in if the payload turns out to be a container. This is a
+home-mode convenience: it warms the cache and writes the
+committed-source stub for the user, so they don't have to hand-write
+it and then call `fetch` separately. Open questions about its shape:
+members of a container can't be inferred automatically, so the stub
+stops at the container itself and the user adds the extraction tree
+with `extract-media`; the default name comes from the URL's filename
+stem; there's no need for a `--local <file>` variant, since that's
+what `add-media` already is; and it needs CLI/API parity, with the
+API twin returning the written blueprint path the same way
+`add_media` already does.
 
-**`extract-media`** (owner request, 2026-07-23; re-derive under the
-revised model) — the incremental companion. `rlq extract-media
---parent FreeDOS14 FreeDOS14-LiveCD.zip` extracts the child from
-the named media, computes its sha256, and records it by **appending
-a child** (path + sha256) to the existing media spec's `children` —
-the leaning option — rather than writing a separate file, or as a
-flat `${media:…}`-located spec; reconcile when picked up. A child
-that is itself a container becomes another node to drill into
-(`extract` it again); a payload child is extracted to
-`cache/media/`. So a nested source is hand-authored by walking down
-it one `extract-media` at a time, the `children` tree growing in
-place. Open: new-file vs append-to-existing (lean append), and node
-shape (a container child is a node with its own `children`, else a
-leaf).
+**`extract-media`** (owner request, 2026-07-23; also needs
+re-deriving under the revised model) is the companion command for
+going one level deeper. Running `rlq extract-media --parent
+FreeDOS14 FreeDOS14-LiveCD.zip` extracts the named child from the
+named media, computes its sha256, and records it by **appending a
+child entry** (path plus sha256) to the existing media spec's
+`children` list — this is the leaning option, rather than writing a
+separate file, or writing a flat spec addressed by
+`${media:…}` — that choice still needs reconciling once this is
+picked up. A child that is itself a container becomes another node
+to drill further into (running `extract-media` on it again); a
+child that's a plain payload gets extracted straight to
+`cache/media/`. So a deeply nested archive gets hand-authored by
+walking down it one `extract-media` call at a time, growing the
+`children` tree in place as you go. Still open: whether each
+extraction writes a new file or appends to the existing one (leaning
+toward append), and the exact shape of a node (a container child is
+a node with its own `children`; anything else is a leaf).
 
 ## F19 — The home inventory report
 
 > Moved from [TASKS.md](../TASKS.md)'s Small items by the
-> 2026-07-27 gate audit. Being a new CLI command is no bar to being
-> a task (D45); what moved it is the open shape question below,
-> which decides whether this is one command at all. **No
-> use case asks for it**, said plainly. It serves **P12** by making
-> what home containment holds visible, and **P11** in the reading
-> that an orphan the tool cannot account for is a gap it should
-> name rather than pass over.
+> 2026-07-27 gate audit. Being a new CLI command doesn't by itself
+> disqualify something from being a task (D45); what got this moved
+> here is the open question about its shape, below, which decides
+> whether this even ends up being one single command. **No use case
+> asks for this**, stated plainly. It serves **P12**, by making
+> visible what's actually being held inside the home directory, and
+> **P11**, under the reading that an item the tool can't account for
+> is a gap it should name rather than silently skip.
 
-Every item in the home and cache directories itemized in one way or
-another, backend implementation files ignored — the presence of a
-machine is noticed, its `qemu/` innards are not:
+Every item in the home and cache directories gets itemized one way
+or another; backend implementation files are ignored (a machine's
+presence is noted, but what's inside its `qemu/` directory is not):
 
-- **orphaned first**, because either you really want to keep it or
-  you really should delete it: media declarations (not cached
-  payloads), and scripts
-- **blueprints**: materialized (online machines, offline machines),
-  then unmaterialized
-- **media**: referenced
-- **scripts**: orphaned, then referenced
+- **orphaned items come first**, because for each one, either you
+  really want to keep it or you really should delete it: media
+  declarations (not the cached payload files themselves), and
+  scripts
+- **blueprints**: materialized ones first (running machines, then
+  stopped machines), then unmaterialized ones
+- **media**: the ones actually referenced by something
+- **scripts**: orphaned ones, then referenced ones
 
-Open shape, and it decides whether this is one command at all:
-whether the orphans lead the whole report or only their own
-section, and whether this is a document of its own or a `--verbose`
-column on the existing `list-*` commands.
+Still open, and this decides whether the report ends up being one
+single command at all: whether orphaned items lead the whole report
+or only appear in their own section, and whether this becomes a
+report of its own or just a `--verbose` column added to the existing
+`list-*` commands.
 
 ## F20 — `version` and `help` as commands
 
 > Moved from [TASKS.md](../TASKS.md)'s Small items by the
-> 2026-07-27 gate audit. The diff is tiny and the CLI is an
-> surface, but neither fact bars it from the task queue (D45 —
-> the housekeeping boundary is housekeeping's alone). What moved it
-> is the P6 question below, which is the actual work and is
-> unsettled. Serves **P6**. No use case asks for it. Raised from
-> the CLI's own help text.
+> 2026-07-27 gate audit. The code change is tiny, and the CLI counts
+> as a public surface, but neither fact rules this out of the task
+> queue on its own (D45 — the rule keeping housekeeping work away
+> from the public surface only applies to housekeeping specifically).
+> What got this moved here is the P6 question described below, which
+> is the actual work involved and is still unsettled. This serves
+> **P6**. No use case asks for it. It was raised by looking at the
+> CLI's own help text.
 
-`version` and `help` become command words, with `--version` / `-v`
-and `-h` / `--help` surviving as undocumented aliases.
+`version` and `help` become proper command words, with `--version` /
+`-v` and `-h` / `--help` continuing to work as undocumented
+shortcuts for them.
 
-**The question is P6's, not cosmetic**, which is why this is a
-feature and not a rename. Under the twin-name identity rule a
-command *is* its API twin's name, so `version` implies a twin the
-embedding API does not have today; settling whether it gains one is
-the work, and a command word that maps to no call is exactly the
-shape the parity rule exists to catch. `help` may or may not answer
-the same way — a CLI presentation with no semantic behind it is the
-other possible reading, and naming it a named omission is a
-legitimate outcome.
-[docs/spec/cli.md](../../docs/spec/cli.md) documents neither
-spelling today, so nothing has to be unsaid first.
+**The real question here is P6's, not just a cosmetic one** — which
+is why this counts as a feature rather than a simple rename. Under
+the twin-name rule, a CLI command name *is* the name of its matching
+API call, so adding `version` as a command implies it needs a
+matching API call, which the embedding API doesn't have today.
+Deciding whether to add one is the actual work — a command word with
+no matching API call is exactly the mismatch the parity rule exists
+to catch. `help` might or might not need the same treatment — it's
+possible a CLI-only command with no equivalent API behavior is the
+right answer here, and it would be a legitimate outcome to
+deliberately leave it out of the API on purpose.
+[docs/spec/cli.md](../../docs/spec/cli.md) doesn't document either
+spelling today, so there's nothing that needs to be un-said first.
 
 ## F21 — One spelling, two phase kinds
 
-> **Entered 2026-07-27** by the spec audit against the AHK/Python
-> failure catalogs, the last of the script-language residuals. It
-> is a proposal rather than a task **because the shape is open**,
-> which is the same ground that moved F18–F20 out of the queue —
-> the argument, not the surface, being what keeps something out of
-> a queue of pre-approved work. Serves language goal **G6** (one
-> concept, one spelling) and no use case. The owner offered it a
-> task entry; it comes here because nobody has yet proposed what
-> the fix *is*.
+> **Entered 2026-07-27** by the spec audit, working against the
+> AHK/Python failure catalogs — the last of the leftover
+> script-language issues from that review. It's a proposal rather
+> than a task **because its shape is still open**, the same reason
+> F18-F20 got moved out of the task queue — it's the strength of
+> the argument, not whether it touches a public surface, that keeps
+> something out of a queue of pre-approved work. This serves
+> language goal **G6** (one concept, one spelling) and no use case.
+> The owner offered to file it as a task instead; it's here because
+> nobody has yet proposed what the actual fix should be.
 
 **A sequential phase and a reactive phase are different constructs
-sharing one keyword**, and `timeout=` on them names two different
-clocks. script-spec.md says both halves plainly:
+that share one keyword**, and the `timeout=` argument means two
+different clocks depending on which kind of phase it's attached to.
+script-spec.md says both halves plainly:
 
 > "A sequential phase is procedural, a reactive phase is
 > declarative, and **both are spelled `phase`**."
 
-and the clock table carries them as separate entries — an
-observation `timeout` starting when its observation arms, a
-**reactive interval** starting at phase entry *and again each time
-dispatch resumes after a handler action*. So a reader meeting
-`phase watchful timeout=5m {` cannot tell which clock that is
-without scanning the body for whether it holds statements or
-handlers.
+and its clock table lists them as separate entries: an observation's
+`timeout` starts counting when that observation is armed, while a
+**reactive interval** starts counting when the phase is entered, and
+*restarts again every time dispatch resumes after a handler runs*.
+So a reader who sees `phase watchful timeout=5m {` can't tell which
+of the two clocks that is without reading through the body to see
+whether it holds plain statements or event handlers.
 
-**WHAT MAKES THIS NEW EVIDENCE** rather than a re-raise of a
-settled tradeoff — the spec has already weighed the hybrid and
-kept it deliberately ("the hybrid is not hidden; it is the
-point"), so it deserves better than an opinion. Two things:
+**WHY THIS COUNTS AS NEW EVIDENCE** rather than reopening an
+already-settled tradeoff: the spec has already weighed this exact
+hybrid design and deliberately kept it ("the hybrid is not hidden;
+it is the point"), so reopening it needs more than just an opinion.
+Two things make it more than that:
 
-1. **The spec describes this defect twice, and fixes it once.**
-   The bullet immediately above the one quoted reads: *"`on` is a
-   case in a branching `wait`, `always` a standing rule in a
-   reactive phase — one shape, two named lifetimes, **which the
-   keyword split resolved**."* The project met this exact problem,
-   named it in these words, and split the keyword — for the
-   handlers, and not for the containers that give them their
-   lifetimes.
-2. **An outside study named the pattern independently.** The
-   AHK/Python failure catalogs' sharpest import was a
-   container-determined-semantics rule: *a construct's lifetime
-   should be recoverable from its own text*. It was recorded as
-   hitting the old example [04] — which is the `on`/`always` split.
-   The audit's finding is that it hits `phase` too, and that the
-   earlier weighing did not have this argument in front of it.
+1. **The spec describes this same defect twice, but only fixed it
+   once.** The bullet right above the one quoted above reads:
+   *"`on` is a case in a branching `wait`, `always` a standing rule
+   in a reactive phase — one shape, two named lifetimes, **which the
+   keyword split resolved**."* So the project already ran into this
+   exact problem, described it in almost these words, and fixed it
+   by splitting the keyword — but only for the handlers (`on` versus
+   `always`), not for the phase containers that give those handlers
+   their lifetime in the first place.
+2. **An outside study named the same pattern independently.** The
+   sharpest lesson from the AHK/Python failure catalogs was a rule
+   that a construct's lifetime should be recoverable just from
+   reading its own text, without outside context. That study
+   recorded this rule as violated by the old example labeled [04] —
+   which is exactly the `on`/`always` split described above. This
+   spec audit's finding is that `phase` violates the same rule, and
+   that the earlier decision to keep the `phase` hybrid was made
+   without this argument in front of it.
 
-**THE PRICE IS ON A CLOCK**, which is the audit's second live
-import: *a naming freeze is free before v1 and never after*. Today
-the change is nearly free — **no shipped script uses a reactive
-phase**, `always` appearing only in
+**THE COST IS TIED TO A CLOCK**, which is the spec audit's second
+relevant lesson: *renaming something is free before v1 and never
+free after*. Right now, this change costs almost nothing —
+**no shipped script uses a reactive phase yet**, `always` currently
+appears only in
 [03-timing-spellings-and-scope](design/../design/script-examples/),
-and there is no backward compatibility to honour before 1.0 (P9).
-After 1.0 it is unavailable. That asymmetry is the argument for
-settling it now rather than when someone is annoyed by it.
+and there's no backward compatibility to preserve before 1.0 (P9).
+After 1.0 ships, that option disappears. That asymmetry is the
+argument for settling this now, rather than waiting until someone
+runs into the confusion in practice.
 
-**DECIDE FIRST — the shape, which is why this is not a task.**
-Three candidates, none costed, and the third is a real answer
-rather than a placeholder:
+**DECIDE FIRST — what shape the fix takes, which is why this is a
+proposal and not a task.** There are three candidate approaches,
+none of them costed out yet, and the third is a genuine answer, not
+just a placeholder:
 
-- **A second keyword.** The direct analogue of the `on`/`always`
-  split. Costs a word in a vocabulary G6 wants small, and the
-  candidates are unexplored — `watch`, `monitor`, `rules`, none
-  yet weighed against the existing verbs or against the
-  reserved-identifier list.
-- **A marker on the phase.** Keep one keyword and make the kind
-  explicit at the head, so the text still says which clock it
-  declares without a second construct. Cheaper on vocabulary,
-  wordier at every use.
-- **Neither — improve the reporting instead.** `check-script`
-  already resolves and prints the timing plan naming each clock
-  and the scope that supplied it, which is the same remedy the
-  language accepted for its sibling problem: an observation's
-  effective bound is *also* not locally readable, and that was
-  settled as tooling's job rather than syntax's. If it was right
-  there, the burden is on showing why it is wrong here.
+- **Add a second keyword.** The direct equivalent of the
+  `on`/`always` split, applied to phases. This costs one more word
+  in a vocabulary that G6 wants kept small, and the candidate words
+  are still unexplored — `watch`, `monitor`, `rules` — none of them
+  weighed yet against the language's existing verbs or against the
+  list of reserved identifiers.
+- **Add a marker on the phase instead of a new keyword.** Keep the
+  single `phase` keyword, but make the kind explicit right at the
+  top of the phase, so the text still tells you which clock it's
+  using without introducing a second construct. Cheaper in
+  vocabulary, but wordier every time it's used.
+- **Change neither — improve the reporting instead.** `check-script`
+  already resolves and prints the full timing plan, naming each
+  clock and where its value came from. That's the same fix the
+  language already accepted for a related problem: an observation's
+  effective time limit is *also* not something you can read directly
+  off the page, and the project decided that was tooling's job to
+  surface, not syntax's job to make explicit. If that reasoning was
+  right there, it's on anyone who disagrees to explain why it
+  doesn't apply here too.
 
-The third candidate is why this needs an argument rather than a
-work item: it may be that the honest answer is no change at all,
-and the finding's value was in forcing the question while the
-answer is still free.
+That third option is exactly why this needs to be argued out rather
+than just turned into a work item: it's possible the honest answer
+here is no change at all, and the real value of this finding was
+just forcing the question to be asked while the answer is still
+free to choose.
 
 ## F64 — The OpenBSD platform workflow: readiness and `exec`, agentless
 
 > **Entered 2026-08-22** from a consuming project's proposal
-> (testaferro's F23, an OpenBSD guest binding — blocked on exactly
-> this). Demanded by **U12** (in force: an unattended install ending
-> in a *usable* machine — the codex's OpenBSD recipe ends in one no
-> verb can touch), **U14** (granular results reaching the caller,
-> which on a second platform needs `exec` at all), and **P11**
-> (today every guest verb refuses `openbsd` by rule id
-> `platform.verb-not-implemented`; that is honest, and it is also
-> the install's whole product being inert). Honours **P2**: nothing
-> below depends on guest cooperation.
+> (testaferro's F23, which needs an OpenBSD guest binding and is
+> blocked on exactly this). Demanded by **U12** (in force: an
+> unattended install must end in a *usable* machine, but the
+> codex's OpenBSD recipe currently ends in a machine no command can
+> touch), **U14** (the caller needs detailed results, which on a
+> second platform requires `exec` to work at all), and **P11**
+> (today every guest command refuses to run against `openbsd`, with
+> rule id `platform.verb-not-implemented`; that refusal is honest,
+> but it also means the entire install produces nothing usable).
+> This honors **P2**: nothing below depends on the guest cooperating.
 
-> **Spike 0 ran, 2026-08-22, and found the blocker one layer below
-> this entry: the QEMU backend launches `qemu-system-i386` for every
-> machine** (`backend_qemu.py`, `_QEMU_BIN`), so the codex's amd64
-> kernel triple-faults on load and the machine reboot-loops —
-> SeaBIOS → iPXE → CDBOOT → `boot>` about every 13 seconds, which is
-> what `openbsd-install`'s `wait "boot>"` was matching and why the
-> recipe has never completed. It is not a script defect and not a
-> console-mode one. **The same disk and ISO driven by
-> `qemu-system-x86_64` reach the installer prompt in about 75
-> seconds**, and the dmesg on the way names the fact this entry
-> bets on: `wsdisplay0 at vga1 mux 1: console (80x25, vt100
-> emulation)`. **That reading was taken off a framebuffer capture,
-> and taking it off the text plane instead reverses the conclusion**
-> (measured after the fix, below): the console is 80×25 text to the
-> *guest*, but wscons attaches `vga1` with an aperture and paints
-> through it, so reliquary's VGA **text-memory** scrape freezes at
-> the moment the kernel banner ends and never sees the installer
-> prompt at all. The same machine on `control-planes: ["vnc"]` reads
-> perfectly through the fixed-font recognizer — dmesg, prompt and
-> cursor. So **the OpenBSD dialect runs on the VNC plane**, which is
-> equally agentless (P2) and already delivered on QEMU (F63); the
-> agentless-display default is blind to this guest and the entry's
-> text-memory assumption does not survive. Two lesser findings, from
-> the same run: the recipe's
-> `boot> a` types the installer's answer at the *boot loader*, which
-> reads it as a kernel name (`cannot open cd0a:a`) and falls back —
-> the loader wants `enter` and the `(A)utoinstall` answer belongs at
-> the installer's own prompt; and the header's 30-second default
-> reaches every `wait`, including the set extraction, so the long
-> ones need their own `timeout=`. **A binary-selection defect blocks
-> this feature and is not part of it**: it belongs in the queue as
-> its own work, against the platform model AGENTS.md already states,
-> and every clause below is written as if it were fixed. Evidence:
-> a private home under this session's scratchpad, the failing
-> `.rlqt` transcripts, and the x86_64 screendump.
+> **A spike (spike 0) ran on 2026-08-22 and found the real blocker
+> one layer below this entry: the QEMU backend launches
+> `qemu-system-i386` for every machine**, regardless of platform
+> (`backend_qemu.py`, `_QEMU_BIN`), so the codex's amd64 OpenBSD
+> kernel crashes on load (a triple fault) and the machine reboot-loops
+> — SeaBIOS, then iPXE, then CDBOOT, then a `boot>` prompt, roughly
+> every 13 seconds. That's exactly what `openbsd-install`'s
+> `wait "boot>"` step was matching, which is why the recipe had never
+> actually completed. This isn't a bug in the script or in how the
+> console mode is handled. **Launching the exact same disk and ISO
+> with `qemu-system-x86_64` instead reaches the installer prompt in
+> about 75 seconds**, and along the way, the boot log (dmesg) states
+> the exact fact this entry is betting on: `wsdisplay0 at vga1 mux 1:
+> console (80x25, vt100 emulation)`. **That first reading came from a
+> framebuffer capture; reading the same moment from the text-memory
+> plane instead reverses the conclusion** (this was measured after
+> the binary fix, described below): the console is 80x25 text as far
+> as the *guest* is concerned, but OpenBSD's `wscons` display driver
+> attaches to `vga1` through a graphics aperture and draws through
+> it, so Reliquary's usual VGA **text-memory** scrape freezes at the
+> exact moment the kernel's startup banner ends, and never sees the
+> installer prompt at all. The same machine, read instead over
+> `control-planes: ["vnc"]`, reads perfectly through the fixed-font
+> recognizer — the boot log, the prompt, and the cursor all come
+> through correctly. So **the OpenBSD dialect has to run over the VNC
+> plane**, which is just as agentless as the text-memory approach
+> (satisfying P2) and is already delivered on QEMU (F63); the default
+> agentless-display approach simply can't see this guest at all, so
+> this entry's original assumption that it could read OpenBSD's
+> console from text memory does not hold up. Two smaller findings
+> from the same run: the recipe's `boot> a` step types the installer's
+> autoinstall answer at the *boot loader* prompt, which reads it as a
+> kernel filename (`cannot open cd0a:a`) and falls back to the
+> default — the loader actually just wants `enter` pressed, and the
+> `(A)utoinstall` answer belongs at the installer's own prompt
+> instead; and the script header's default 30-second timeout applies
+> to every `wait` step, including package-set extraction, so the
+> slower steps need their own explicit `timeout=`. **A separate bug
+> in how the emulator binary gets chosen is blocking this feature,
+> but is not itself part of it**: it belongs in the task queue as its
+> own fix, against the platform model AGENTS.md already describes,
+> and every clause below is written assuming that bug is already
+> fixed. Evidence for all this: a private home directory under this
+> session's scratchpad, the failing `.rlqt` transcripts, and a
+> screendump captured from the x86_64 run.
 
-**What exists, and what is unknown.** The codex holds `openbsd`
-(7.9 amd64, 512M, a 4G blank), `openbsd-installer` (the pinned
-ISO) and `openbsd-install` (autoinstall over the run-scoped HTTP
-server, answering root's password, hostname `openbsd`, ssh allowed,
-sets from `cd0`). The machine layer materializes and boots it; the
-schema admits the platform; the memory floor is recorded. The unit
-tier pins the ISO hash and the seed closure — and nothing on record
-said the install had ever completed for real, which spike 0 then
-measured rather than argued (above): it has not, and the reason is
-the backend's hardcoded i386 binary rather than anything in the
-recipe or the platform.
+**What already exists, and what was unknown.** The codex already has
+`openbsd` (7.9 amd64, 512M memory, a blank 4G disk), `openbsd-installer`
+(the pinned installer ISO), and `openbsd-install` (an unattended
+install driven over the run-scoped HTTP server, which answers root's
+password, sets the hostname to `openbsd`, allows ssh, and installs
+packages from `cd0`). The machine layer already creates and boots
+it; the schema already allows this platform; the minimum memory is
+already recorded. The unit-test tier pins the ISO's hash and the
+seed data — but nothing on record actually confirmed the install had
+ever completed for real. Spike 0 then measured that directly, rather
+than just arguing about it (see above): it had not completed, and
+the reason turned out to be the backend's hardcoded i386 binary
+choice, not anything wrong with the recipe or the platform.
 
-**Spike 0, second pass (2026-08-22, after the architecture fix): the
-install completes.** With the right system binary launching and the
-loader step corrected, the codex recipe's own answers carried a real
-autoinstall through to `CONGRATULATIONS! Your OpenBSD install has
-been successfully completed!` in about eleven minutes — served from
-the run-scoped HTTP server, read from first screen to last over
-`control-planes: ["vnc"]`. **The install is no longer the unknown.**
-What the same run overturned is the readiness route this entry had
-settled (below): the installed machine is kept as the spike's
-product (P20), so the next round starts against a real OpenBSD guest
-rather than a 700 MB download.
+**Spike 0's second pass (2026-08-22, after fixing the binary choice):
+the install actually completes.** With the correct system binary
+launching, and the boot-loader step corrected, the codex recipe's own
+answers carried a real unattended install all the way through to
+`CONGRATULATIONS! Your OpenBSD install has been successfully
+completed!` in about eleven minutes — served from the run-scoped HTTP
+server, and read from the first screen to the last over
+`control-planes: ["vnc"]`. **Whether the install itself works is no
+longer an open question.** What this same run overturned instead was
+this entry's original plan for how readiness should work (see
+below): the spike kept the now-installed machine as its output (P20),
+so the next round of work starts from a real, already-installed
+OpenBSD guest instead of from a fresh 700 MB download.
 
-**The transport is the one already built, and that is the whole
-bet.** OpenBSD amd64 booted by BIOS on QEMU's `-vga std` takes its
-console on `vga(4)` in text mode — wscons over an 80×25 VGA text
-screen — so the agentless plane applies unchanged: QMP `send-key`
-in, text memory at `0xb8000` out, `screendump` for pictures, the
-VNC plane with the fixed-font recognizer as the equally agentless
-fallback should the console ever leave text mode. P2 is honoured
-with no new carrier, and the dialect is the only thing that
-differs — **and spike 0 settled which plane carries it** (above):
-not the agentless display's text-memory scrape, which OpenBSD's
-wscons leaves frozen at the boot banner, but the **VNC plane**,
-where the fixed-font recognizer reads the console exactly as it
-reads DOS. The font-recognition stop this entry feared is not in
-play; the plane, however, is not the default one, so every clause
-below reads over `control-planes: ["vnc"]` and a machine left on the
-default plane is blind rather than merely slower.
+**The plan is to reuse the transport Reliquary already has, and
+that's the whole bet this entry makes.** OpenBSD amd64, booted by
+BIOS on QEMU's `-vga std`, puts its console on `vga(4)` in text
+mode — the `wscons` driver drawing an 80x25 VGA text screen — so
+Reliquary's existing agentless plane applies unchanged: QMP's
+`send-key` sends input, VGA text memory at address `0xb8000` reads
+output, `screendump` captures pictures, and the VNC plane with the
+fixed-font recognizer serves as an equally agentless fallback if the
+console ever leaves text mode. This honors P2 without needing any new
+transport mechanism — the only thing that differs per platform is the
+dialect. **And spike 0 settled exactly which plane actually carries
+that dialect** (see above): not the agentless display's text-memory
+scrape, which OpenBSD's `wscons` leaves frozen at the boot banner, but
+the **VNC plane**, where the fixed-font recognizer reads the console
+exactly the way it already reads DOS. The font-recognition failure
+this entry originally worried about never actually happens; but that
+VNC plane is not Reliquary's default one, so every clause below
+assumes `control-planes: ["vnc"]` is set, and a machine left on the
+default plane simply can't see this guest's console at all, not just
+more slowly.
 
-**What a platform owns is a dialect, not a transport** — the
-design is [design/platform-dialect.md](design/platform-dialect.md),
-which carries the dialect's shape, the selection rule, the OpenBSD
-clauses, the proof and the cut; what follows is the argument. Today
-`interaction_agentless.py` is DOS from its first constant
-(`_PROMPT_RE`, the `IF ERRORLEVEL` probe, the "DOS prompt"
-narration) while its loop — type, catch the echo, wait for the
-prompt to come back, settle before believing it (D111, D112,
-D115), slice the rows — is platform-neutral and is exactly what
-OpenBSD's `ksh` needs too. The seam is therefore a **platform
-dialect** behind the existing loop, not a second loop:
+**What varies per platform is the dialect, not the transport** — the
+design document is
+[design/platform-dialect.md](design/platform-dialect.md), which lays
+out the dialect's shape, the rule for selecting one, the OpenBSD
+clauses, the proof, and what got cut; what follows here is the
+reasoning behind it. Today, `interaction_agentless.py` is written for
+DOS from its very first constant (`_PROMPT_RE`, the `IF ERRORLEVEL`
+probe, the "DOS prompt" wording in its narration), but its actual
+loop — type a command, catch its echoed text, wait for the prompt to
+reappear, wait a bit longer to be sure it's really settled (D111,
+D112, D115), then slice out the relevant rows — is platform-neutral,
+and is exactly what OpenBSD's `ksh` shell needs too. So the right fix
+is to put a **platform dialect** behind the existing loop, not to
+write a second loop:
 
-- `platform_dos.py` and a new `platform_openbsd.py` each supply
-  the prompt shape, the outcome probe and its sentinel, the
-  readiness sequence, and the narration words; the loop in
-  `interaction_agentless.py` takes a dialect and says "prompt"
-  where it now says "DOS prompt".
-- `_running_guest()` selects the dialect from the machine's
-  recorded `platform` — blueprint-declared, never inferred (P10,
-  AGENTS.md "Platform selection") — through a registry of the
-  platforms with a delivered workflow; `win9x` and `winnt` keep
-  refusing by the same rule id, which is P11 doing its job.
-- The scripting language needs nothing new: a `platform openbsd`
-  script already parses, and whatever statement drives a command
-  routes through the same dispatch.
+- `platform_dos.py`, and a new `platform_openbsd.py`, would each
+  supply the shape of the prompt, the way to check a command's
+  outcome and what to look for, the readiness sequence, and the
+  wording used in narration; the loop in `interaction_agentless.py`
+  takes whichever dialect applies and says "prompt" in its messages
+  where it currently says "DOS prompt".
+- `_running_guest()` picks the dialect based on the machine's
+  recorded `platform` field — which is always declared in the
+  blueprint, never guessed (P10, see AGENTS.md's "Platform
+  selection") — by looking it up in a registry of platforms that
+  have a delivered workflow; `win9x` and `winnt` keep refusing to run
+  commands, using the same rule id as today, which is exactly what
+  P11 requires.
+- The scripting language itself needs no changes: a script that says
+  `platform openbsd` already parses correctly today, and whatever
+  statement runs a command routes through the same dispatch code
+  regardless of platform.
 
 **The OpenBSD dialect, clause by clause:**
 
-- **Prompt.** Root's default `ksh` prompt is `<hostname># `,
-  confirmed by spike 0 against the installed guest (`openbsd#`);
-  the shape is a row ending in `# ` or `$ ` after a non-blank head,
-  and D113's declared-prompt door carries over for a guest whose
-  `.profile` redrew it. The echo discipline is unchanged: the tty
-  echoes the typed line where the prompt was. **One wrinkle the VNC
-  plane adds**: the guest draws its own cursor, so the recognizer
-  reads it as a cell and the bottom row comes back `openbsd# _`. A
-  shape anchored at the end of the row misses by that one
-  character — a property of the plane rather than of this platform,
-  so it is the seam's to settle (the design, "the cursor is a
-  glyph").
-- **Outcome probe.** `test $? -ne 0 && echo RLQ-EXEC-FAILED` as
-  its own line — text reliquary composed and reads back, so G2
-  and P18 are untouched exactly as on DOS. One honest difference,
-  stated rather than hidden (P11): the shell returns 127 for a
-  command it could not find, so the mistyped-command gap the DOS
-  probe has (`COMMAND.COM` leaves ERRORLEVEL alone) does **not**
-  exist here. The rule ids are the same two.
-- **Output.** The rows between the echo and the returned prompt,
-  one screen deep, with F14's limit in force unchanged; the value
-  channels are the same too — a guest program writes to a drive
-  and the caller reads it on the host (P16's carve-out), and
-  OpenBSD mounts a vvfat hard disk as `msdos` through
-  `mount_msdos(8)`, which is what makes a directory-source media
-  usable from this guest without reliquary reading a byte.
-- **Readiness.** The one clause DOS never had. DOS boots to a
-  prompt; OpenBSD boots to `login:`, and "ready for commands"
-  means a shell. Two routes were weighed — *readiness logs in*
-  (`wait_ready` recognizes `login:`, types the user, answers
-  `Password:` from the property sources and the `credentials`
-  module, P13) and *the recipe arranges a prompt* (`/etc/ttys`'
-  `ttyC0` line running `/bin/ksh`, so the machine boots to one).
-  The design round chose the second, by the installer's own exit to
-  a shell — and **spike 0's second pass refuted it: under
-  autoinstall the installer never asks.** `Exit to (S)hell, (H)alt
-  or (R)eboot` is an *interactive* install's question, so the
-  response-file line answering it is inert; the install ends, the
-  machine reboots on its own, and the console comes up
-  `OpenBSD/amd64 (openbsd.my.domain) (ttyC0)` at `login:`. No
-  script ever holds the installer's shell, so nothing is left for
-  the `sed` to ride. **Readiness therefore logs in, and it is not
-  the later general mechanism but the only one** — measured by hand
-  against the installed guest: `login:` → the user → `Password:` →
-  the secret → `openbsd#`, which confirms this entry's guess at the
-  prompt shape exactly. Two things follow. The **credential is
-  load-bearing from the first delivery** rather than deferred with
-  a later piece, through P13's sources and never a blueprint field.
-  And **what the API carries it as is a surface question this entry
-  leaves open** (S2, and S4 if the machine document ever names the
-  account): `wait_ready(user=, password=)` is the obvious shape and
-  is not settled here — D113's `prompt=`, where the caller declares
-  what the guest draws, is where that round starts.
+- **Prompt.** Root's default `ksh` prompt is `<hostname># `, which
+  spike 0 confirmed against the actually-installed guest (it reads
+  `openbsd#`); the shape to match is a row ending in `# ` or `$ `
+  after some non-blank text, and D113's rule for a declared prompt
+  still applies if a guest's `.profile` redraws it differently. The
+  echo behavior is unchanged: the terminal echoes back the typed
+  command where the prompt used to be. **One wrinkle the VNC plane
+  adds**: the guest draws its own text cursor, so the recognizer
+  reads that as a character cell, and the bottom row comes back as
+  `openbsd# _`. Matching a shape anchored to the very end of the row
+  therefore misses by that one extra character — this is a property
+  of the VNC plane, not of this platform, so it needs to be fixed at
+  that shared layer (see the design document's "the cursor is a
+  glyph" section).
+- **Outcome probe.** After each command, Reliquary sends
+  `test $? -ne 0 && echo RLQ-EXEC-FAILED` as its own line — plain
+  text that Reliquary writes and reads back, so this leaves G2 and
+  P18 untouched, exactly as it works on DOS. One honest difference,
+  stated here rather than hidden (per P11): the shell returns exit
+  code 127 for a command it can't find, so the gap DOS has around
+  mistyped commands (where `COMMAND.COM` leaves the error level
+  unchanged) does **not** exist on OpenBSD. The same two rule ids
+  apply either way.
+- **Output.** Reliquary reads the rows between the echoed command and
+  the returned prompt, one screen deep, with F14's limit still in
+  force unchanged; the same value channels apply too — a guest
+  program can write to a drive that the caller then reads back on the
+  host (the exception carved out of P16), and OpenBSD mounts a vvfat
+  virtual hard disk as `msdos` using `mount_msdos(8)`, which is what
+  makes a directory-source drive usable from this guest without
+  Reliquary ever reading its contents itself.
+- **Readiness.** This is the one clause DOS never needed. DOS boots
+  straight to a command prompt; OpenBSD boots to a `login:` prompt,
+  and "ready to run commands" means having a logged-in shell. Two
+  approaches were weighed: *have readiness log in itself* (`wait_ready`
+  recognizes `login:`, types the username, then answers `Password:`
+  using the property sources and the `credentials` module, per P13),
+  or *have the recipe arrange for a shell to already be running* (by
+  editing `/etc/ttys`' `ttyC0` line to run `/bin/ksh` directly, so the
+  machine boots straight into a shell). The design round originally
+  chose the second option, reasoning that the installer itself exits
+  to a shell — but **spike 0's second pass proved that reasoning
+  wrong: under an unattended (autoinstall) run, the installer never
+  actually asks that question.** `Exit to (S)hell, (H)alt or (R)eboot`
+  is a question only an *interactive* install gets asked, so the
+  response-file line meant to answer it does nothing; instead, the
+  install finishes, the machine reboots on its own, and the console
+  comes up showing `OpenBSD/amd64 (openbsd.my.domain) (ttyC0)` at a
+  `login:` prompt. No script ever holds open the installer's shell,
+  so there's nothing there for the `/etc/ttys` edit to attach to.
+  **Readiness therefore has to log in itself, and that's not just the
+  fallback option — it's the only one that works.** This was measured
+  by hand against the installed guest: `login:`, then the username,
+  then `Password:`, then the password, then `openbsd#` — which
+  confirms this entry's guess about the prompt's shape exactly. Two
+  things follow from this. First, the **login credential is required
+  from day one**, not something that can be deferred to a later piece
+  of work, and it has to come through P13's credential sources, never
+  as a plain blueprint field. Second, **exactly how the API exposes
+  it is a question this entry leaves open** (a surface change under
+  S2, and under S4 too if the machine document ever names the
+  account): `wait_ready(user=, password=)` is the obvious shape, but
+  it isn't settled here — that decision should start from D113's
+  `prompt=` parameter, where the caller already declares what the
+  guest displays.
 
-**Surfaces touched** (SURFACES.md, by lookup): **S2** and **S1** —
-`exec`, `wait_ready` and `check=` gain a second platform with the
-same contract, and `wait_ready --prompt` reads as the shell prompt
-there; **S6** — the codex recipe takes the loader-step fix and the
-`openbsd` machine gains its `vnc` plane, with an `openbsd-verify`
-sibling of `freedos-verify` owed beside them; **S4** if the
-credential the login handshake needs takes a name in the machine
-document. **S3** and **S7** are unchanged: no statement and no
-event gains a meaning. The norms in `docs/spec/` for the verbs say
-"DOS is the delivered workflow" and are amended with the delivery.
+**Surfaces touched** (looked up in SURFACES.md): **S2** and **S1** —
+`exec`, `wait_ready`, and `check=` gain a second platform with the
+same contract as DOS, and `wait_ready --prompt` there reads as the
+shell prompt; **S6** — the codex recipe gets the boot-loader fix, and
+the `openbsd` machine gains its `vnc` plane setting, with an
+`openbsd-verify` command still owed as a sibling to `freedos-verify`;
+**S4**, if the credential this login handshake needs ends up getting
+a name in the machine document. **S3** and **S7** are unchanged:
+no new statement and no new event gains a meaning. The specs in
+`docs/spec/` for these commands currently say "DOS is the delivered
+workflow," and will be updated once this is delivered.
 
-**Out of scope, by the cut:** ssh as a control plane — the recipe
-already allows root over ssh, and a native plane is **P3**'s arc
-and F4's territory, not this entry's; guest-file verbs over it for
-the same reason; `win9x` and `winnt` (no recipe, no text console
-to bet on); any in-guest component; and the GUI era (F5).
+**Out of scope, by deliberate choice:** ssh as a control plane — the
+recipe already allows root login over ssh, but building a native
+control plane for it belongs to **P3**'s roadmap and to F4's
+territory, not to this entry; guest-file commands over ssh, for the
+same reason; `win9x` and `winnt` (there's no recipe for them, and no
+text console to build this approach on); any component installed
+inside the guest; and the GUI era (F5).
 
-**Proof.** Integration, asked for by name as the DOS boots are.
-**Spike 0 is done** — the install completes for real, and what it
-measured is folded above and into the design. What remains: a boot,
-`wait_ready` through the login handshake, `exec "uname -a"` reading
-back the kernel line, `exec "false", check=True` raising
-`command.signalled-failure` and `exec "nosuch"` raising the same,
-a row slice that does not include the boot's output, and the
-**agentless DOS suite passing byte-for-byte** — the dialect seam
-may not move a DOS reading by one row. P24: every touched surface
-tested against its own spelling.
+**Proof this works.** An integration test, requested by name the same
+way the DOS boot tests are. **Spike 0 is already done** — the install
+completes for real, and what it found has been folded into the design
+above. What's left to prove: a full boot, `wait_ready` completing the
+login handshake, `exec "uname -a"` correctly reading back the kernel
+version line, `exec "false", check=True` raising
+`command.signalled-failure`, `exec "nosuch"` raising the same error,
+a row slice that correctly excludes the boot's own output, and the
+**existing agentless DOS test suite still passing byte-for-byte** —
+adding this dialect must not shift a DOS reading by even one row. Per
+P24: every touched surface gets tested using its own exact spelling.
 
-**Sprint bound: too large as one, and the cut is visible.** (a) The
-dialect seam, DOS moved behind it with the suite unchanged; (b) the
-OpenBSD dialect **with readiness in it**, the platform's `vnc`
-default and the recipe's loader fix, proven against the machine
-spike 0 installed. The third piece this entry used to carry — route
-(1), "if and when a user's own OpenBSD asks for it" — **is gone,
-folded into (b)**: the measurement killed the route that would have
-avoided a login, and a handshake a dialect cannot reach a prompt
-without is not separable from it. Spike 0 no longer precedes the
-pledge; it has run.
+**This is too large for one sprint, and where to cut it is clear.**
+(a) Building the platform-dialect layer itself, moving DOS behind it
+with the existing test suite unchanged; (b) the OpenBSD dialect
+**including readiness**, the platform defaulting to the `vnc` plane,
+and the recipe's boot-loader fix, all proven against the machine
+spike 0 already installed. A third piece this entry used to carry —
+the option of waiting "until a user's own OpenBSD use actually asks
+for this" — **is gone, folded into piece (b)**: the measurement above
+ruled out the alternative approach that would have avoided needing a
+login step, and a dialect that can't even reach a shell prompt
+without a login handshake can't be split apart from that handshake.
+The spike no longer needs to happen before this gets pledged — it
+has already run.
 
 ## Horizon — smaller and later
 
-> **Not a feature, and so unnumbered.** This is a holding list of
-> items too small or too unformed to be one. An item leaves it by
-> being written up as a feature — taking the next free F-number
-> then — or by going to [TASKS.md](../TASKS.md) if it turns out to
-> be ordinary small work.
+> **This is not a feature, so it has no number.** It's a holding
+> list of items too small, or too vaguely defined, to be a feature
+> yet. An item leaves this list either by being written up as a full
+> feature — taking the next free F-number when that happens — or by
+> moving to [TASKS.md](../TASKS.md) if it turns out to be ordinary
+> small work instead.
 >
-> **The traceability rule does not reach here** (settled by the
-> 2026-07-27 demand-citation sweep, which would otherwise have
-> flagged four items). That rule binds *pledged* items and design
-> documents; a Horizon item is neither, and an item too unformed
-> to be a feature is too unformed to know what demands it.
-> Acquiring a citation is part of being written up — so an
-> uncited item here is the list working, and a re-run of that
-> sweep should not flag one.
+> **The traceability rule (requiring a cited use case) does not apply
+> to this list** (this was settled by the 2026-07-27 demand-citation
+> sweep, which would otherwise have flagged four items here as
+> violations). That rule only applies to *pledged* items and to design
+> documents; a Horizon item is neither one, and something too
+> undeveloped to be a real feature yet is also too undeveloped to know
+> what demand it actually serves. Getting an actual citation is part
+> of what it means to be written up as a feature — so an item on this
+> list without one is the list working as intended, and re-running
+> that sweep should never flag one.
 
-- Machine mobility: clone, export, import — the former
-  milestone 12 (the number guest agents inherited in the
-  same-day renumber), moved here 2026-07-23 for lack of
-  use-case
-  backing: clone has no use case at all, export's stands only
-  as the U8 draft, and import's U2 loses its scheduled
-  delivery with this move. Scheduling it back onto the
-  numbered arc is the pledge of those use cases. The
-  designs stay settled (owner, 2026-07-22) and their worked text
-  is at `git show cf56a0c:docs/spec/cli.md`, the last commit
-  before the CLI spec was made normative and the unbuilt commands
-  removed from it (2026-07-27 — a spec states what exists):
-  `export-drive` / `export-machine` with the decoupled
-  exporter vocabulary, `import-vm` with its consent points,
-  `clone-machine` as the machine snapshot; the `import-vm`
-  scope round (NIC/device translation, untranslatable config,
-  named-snapshot targets) remains its decide-first when it
-  returns. The durable-artifact exits become meaningful once
-  two backends exist — sequence at or after the second
-  backend.
-- **Host portability: Linux and macOS** (added 2026-07-23, owner).
-  Windows is the delivered host — the only one developed on,
-  tested on, and claimed in the packaging classifiers (AGENTS.md
-  "Dependencies and style"). Host code is written portably and
-  the other paths exist, but unexercised is unclaimed under P11.
-  Widening is gated on three jobs, each substantial and none of
-  them a by-product of ordinary work:
-  1. **Secret storage per host** — the credential-store capability
-     against a Secret Service provider on Linux and Keychain on
-     macOS. The `keyring` seam
-     (../design/script-properties.md, "Secret storage") is
-     built for exactly this, so the code is likely already right;
-     what is missing is *evidence*, and the no-plaintext-fallback
-     rule means a wrong guess fails a user's run outright.
-  2. **Backend verification per host** — QEMU discovery, process
-     ownership, paths, and the agentless display plane proven on
-     each host, not assumed from the Windows implementation.
-  3. **A place to run them** — CI or real hardware. Every claim
-     above rests on a suite actually executing there; U18 (drafted)
-     is the case for reaching such a host from this one, which
-     would make Reliquary its own answer.
-  Demand is uncited today: no use case asks to *run Reliquary on*
-  another host — U18 asks to reach another OS as a guest, which is
-  a different axis. Sequencing it is the pledge of whatever
-  case does.
-- `fork-blueprint` (a fire-and-forget authoring convenience;
-  `new-blueprint` scaffolding lands in milestone 6) —
-  currently unjustified: no use case demands it, and
-  `seed-blueprint` already serves the seed-and-customize seam.
-- `diff-blueprint <name>` — diff a user blueprint against the codex
-  blueprint of the same name (moved from [TASKS.md](../TASKS.md) by
-  the 2026-07-27 gate audit). Currently unjustified: no use case
-  demands it. It lands here rather than as a feature because one
-  line of intent is all there is, and here rather than in the task
-  queue because it is a CLI addition.
-- Bounded `guest-file-*` operations through a native guest
-  agent — distinct verbs, never bundled into a console
-  abstraction.
-- Media commands beyond `fetch-media` (verify, remove) —
-  **split by D46** (2026-07-27), which put U13 in force:
-  `verify` now stands on a use case in force ("verifies it is
-  exactly the build the scripts target"), so the
-  lack-of-demand objection to it is gone and what is left is
-  whether a standalone verb earns its place beside the
-  verification `fetch-media` already does. `remove` still has
-  no demand whatever — it stays unjustified.
-- A `pytest-reliquary` plugin (per AGENTS.md prior art) —
-  currently unjustified: adjacent to the U14/U15 drafts at
-  best, and test-framework semantics belong to consumers (the
-  doctrine boundary).
+- Machine mobility: cloning, exporting, and importing machines. This
+  was the former milestone 12 (the number that guest agents later
+  inherited in the same-day renumbering), moved to this list on
+  2026-07-23 for lack of use-case backing: cloning has no use case at
+  all behind it, exporting is backed only by the draft use case U8,
+  and importing's U2 loses its scheduled delivery date by this move.
+  Putting it back on the numbered milestones means pledging those use
+  cases. The designs themselves are still settled (owner, 2026-07-22),
+  and the worked-out text for them can be found with
+  `git show cf56a0c:docs/spec/cli.md` — the last commit before the CLI
+  spec was made normative and had its not-yet-built commands removed
+  from it (2026-07-27; a spec should only state what actually exists).
+  That text covers: `export-drive` / `export-machine`, using
+  vocabulary decoupled from any specific exporter; `import-vm`, with
+  its points where the user must consent; and `clone-machine`, as a
+  machine snapshot. The open questions for `import-vm`'s scope
+  (translating NIC and device settings, handling settings that can't
+  be translated, and named-snapshot targets) still need deciding when
+  this work resumes. Exporting to a portable file format only becomes
+  meaningful once a second backend exists — so this should be
+  scheduled at or after that second backend lands.
+- **Host portability: running Reliquary itself on Linux and macOS**
+  (added 2026-07-23, owner). Windows is the only host platform
+  actually delivered today — the only one developed on, tested on, and
+  claimed in the packaging metadata (AGENTS.md "Dependencies and
+  style"). The host-side code is written to be portable, and the other
+  code paths exist, but under P11, an untested path can't be claimed
+  as supported. Widening support is gated on three substantial jobs,
+  none of which happen automatically as a side effect of ordinary
+  work:
+  1. **Verifying secret storage on each host** — the credential-store
+     capability, tested against the Secret Service provider on Linux
+     and Keychain on macOS. The `keyring` integration
+     (../design/script-properties.md, "Secret storage") was already
+     built with this in mind, so the code is likely already correct;
+     what's missing is *proof it actually works*, and the rule against
+     falling back to plaintext storage means a wrong guess here would
+     make a user's run fail outright.
+  2. **Verifying the backend on each host** — QEMU discovery, process
+     ownership, file paths, and the agentless display plane all need
+     to be proven working on each host, not just assumed to work
+     because they work on Windows.
+  3. **Somewhere to actually run these tests** — either CI or real
+     hardware. Every claim above depends on a test suite actually
+     running there; the draft use case U18 is the case for reaching
+     such a host from this one, which would let Reliquary provide its
+     own test environment.
+  No demand is currently cited for this: no use case asks to *run
+  Reliquary itself on* a non-Windows host — U18 asks about reaching a
+  different OS as a *guest*, which is a separate question. Scheduling
+  this host-portability work means pledging whichever use case ends up
+  asking for it.
+- `fork-blueprint` (a convenience for quickly forking a blueprint
+  without further ceremony; `new-blueprint`'s scaffolding already
+  lands in milestone 6) — currently has no justification: no use case
+  demands it, and `seed-blueprint` already covers the
+  seed-and-customize workflow it would be used for.
+- `diff-blueprint <name>` — diff a user's blueprint against the codex
+  blueprint of the same name (moved here from [TASKS.md](../TASKS.md)
+  by the 2026-07-27 gate audit). Currently has no justification: no
+  use case demands it. It's on this list rather than written up as a
+  feature because there's only one line of intent behind it so far,
+  and it's here rather than in the task queue because it would add a
+  new CLI command.
+- Bounded `guest-file-*` operations reachable through a native guest
+  agent — as their own distinct commands, never bundled together into
+  a generic console abstraction.
+- Media commands beyond `fetch-media`, namely `verify` and `remove` —
+  **split apart by D46** (2026-07-27), which put U13 into force:
+  `verify` is now backed by an in-force use case ("verifies it is
+  exactly the build the scripts target"), so the lack-of-demand
+  objection to it is gone, and what's left to decide is only whether a
+  standalone `verify` command is worth adding alongside the
+  verification `fetch-media` already does. `remove` still has no
+  demand behind it at all, and stays unjustified.
+- A `pytest-reliquary` plugin (following the prior-art guidance in
+  AGENTS.md) — currently has no justification: at best it's adjacent
+  to the draft use cases U14 and U15, and test-framework-specific
+  behavior belongs to the projects that consume Reliquary, not to
+  Reliquary itself (the boundary the project's rules draw here).
 
 ## F39 — The machine-variable channel, both directions
 
-> **Demand: none known — and entered saying so** (owner,
-> 2026-08-01). No use case asks for this and none is drafted;
-> the owner suspects one will turn up, and this entry holds the
-> design questions so the argument is ready when it does.
-> Nothing is worked from here, and this proposal in particular
-> waits on a demand before pledging is even arguable.
-> Provenance: the `Session.set_machine_var` removal — the
-> method fell to cli.md's "the host side only reads", and this
-> is the capability it gestured at, argued properly instead of
-> arriving by stray method.
+> **No demand is currently known for this — and this entry says so
+> up front** (owner, 2026-08-01). No use case asks for it, and none
+> is even drafted yet; the owner suspects one eventually will, and
+> this entry holds the design questions ready so the argument can be
+> made quickly when it does. Nothing here is being worked on, and
+> this proposal in particular can't even be argued for pledging until
+> a demand shows up. Where this came from: the removal of the
+> `Session.set_machine_var` method, which conflicted with cli.md's
+> rule that "the host side only reads" machine variables. This entry
+> is the capability that method was reaching for, now argued for
+> properly instead of just showing up unannounced as a stray method.
 
-**The idea.** Machine variables run host→script as well as
-script→host: an orchestrator sets a value mid-run
-(`set-machine-var`, twin `set_machine_var`), and a running
-script retrieves or waits on it. The motivating shape is the
-trigger: a long-running script holds at a wait until another
-process supplies the go signal.
+**The idea.** Machine variables would flow from host to script, not
+just from script to host as they do today: an orchestrating process
+sets a value mid-run (via `set-machine-var`, with an API twin
+`set_machine_var`), and the running script reads it or waits on it.
+The motivating use case is a trigger: a long-running script pauses at
+a wait step until some other process sends the signal to continue.
 
-**The design load**, named now so the eventual round starts
-ahead:
+**The open design questions**, written down now so the eventual
+design round starts with a head start:
 
-- **Two one-way channels, never one shared map.** Guest-set
-  variables are the report channel and stay host-read-only —
-  "a value is what the current boot produced" is a provenance
-  guarantee, and a host writer sharing that namespace could
-  forge guest reports. Host-set variables take their own
-  namespace or map, invisible to the report readers. The
-  symmetry is in the mechanics, never the store.
-- **Script-side retrieval is cheap; the surface is not.** The
-  runner is host-side, so reading the state document is
-  trivial — but a wait channel or interpolation source is
-  language surface, governed by the goals and the V-rules, and
-  it is the part the round is really about.
-- **P19 binds.** Run-specific data never selects a branch, a
-  phase, or a path. A host signal may *gate* progress — that is
-  what a wait is — but a value that picks a path is refused
-  already, and the design must not become the flag-channel P19
-  exists to prevent.
-- **Properties are bound once, deliberately.** A run today is a
-  function of its bound inputs: dry-run's plan and the run
-  record both lean on that. A mid-run host input makes outcomes
-  timing-dependent. Screen waits already admit timing, but a
-  value channel is a bigger step than a signal, and the round
-  prices it or narrows to the signal.
-- **P6 lands every face together**: the CLI command, the
-  session twin, and the script-side read or wait arrive in one
-  change, and the command manifest gains the capability in the
-  same commit.
-- **cli.md's sentence is the gate.** "Writing is the script
-  verb's, and the host side only reads" is in force; this
-  proposal is an argued amendment of it and lands only through
-  the surface-change rule (P23), never by arrival.
+- **This needs to be two separate one-way channels, never one shared
+  map.** Variables set by the guest are the existing report channel,
+  and must stay read-only from the host's side — "a value is exactly
+  what this boot actually produced" is a guarantee about where the
+  data came from, and a host that could write into that same
+  namespace could forge a guest's reports. Host-set variables need
+  their own separate namespace or map, invisible to whatever reads
+  the guest's reports. Any symmetry here is in how the two channels
+  work, never in sharing the same storage.
+- **Reading the value from the script side is cheap; deciding the
+  language surface for it is the hard part.** The runner already runs
+  on the host, so reading a value out of the state document is
+  trivial — but adding a wait mechanism or a way to interpolate the
+  value into a script is a change to the scripting language itself,
+  governed by the language's design goals and its V-numbered rules,
+  and that's really what the eventual design round is about.
+- **P19 constrains this.** Data specific to one run must never choose
+  which branch, phase, or path a script takes. A host-sent signal is
+  allowed to *gate* progress — that's what a wait step already does —
+  but a value that picks between different paths is already
+  disallowed, and this design must not accidentally become the
+  flag-passing channel that P19 exists to prevent.
+- **Right now, script properties are all bound once, deliberately, at
+  the start.** Today a run is entirely a function of the inputs it was
+  bound with — both the dry-run plan and the run record depend on
+  that being true. A value supplied by the host mid-run would make
+  outcomes depend on timing. Screen-based waits already introduce some
+  timing dependence, but a full value channel is a bigger change than
+  a simple go/no-go signal, and the eventual design round needs to
+  either price out that bigger cost or scale this down to just a
+  signal.
+- **P6 requires every part of this to ship together**: the CLI
+  command, its API twin, and the script-side read-or-wait mechanism
+  all need to land in one single change, with the command manifest
+  gaining the capability in that same commit.
+- **The current rule in cli.md is the thing standing in the way.**
+  "Writing is the script verb's, and the host side only reads" is in
+  force today; this proposal is effectively an argued amendment to
+  that rule, and it can only land through the process for changing a
+  public surface (P23) — never by quietly showing up unannounced the
+  way `set_machine_var` originally did.
 

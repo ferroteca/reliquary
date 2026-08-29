@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Binding declared script properties before a run.
+"""Binds a script's declared properties to values before a run starts.
 
-A script declares each property it consumes; before the machine
-starts, every declaration is bound from the first source that
-answers. The flattened order is normative in
+A script declares each property it uses. Before the machine starts,
+each declaration is bound to a value from the first source, in this
+order, that has an answer for it. This order is fixed by
 docs/spec/script-spec.md, "The property sources":
 
     1. an explicit --property value      (the caller's answer)
@@ -14,15 +14,17 @@ docs/spec/script-spec.md, "The property sources":
     5. the declared derivation           (the script's answer)
     6. the interactive ask               (a person, once per key)
 
-This module owns all six. The declared derivation arrived last
-(milestone 8, T4) and slotted in between the file and the ask
-without disturbing the ranks around it — the model's own claim
-that a new tier is a one-line insertion (D19), tested once.
+This module implements all six sources. The declared derivation
+(source 5) was added later (milestone 8, T4) and was inserted
+between the file and the ask without disturbing the order of the
+others -- a one-line insertion, exactly as the source-tier model
+claims a new tier should be (D19), which this confirms.
 
-Binding finishes before any media is materialized or any machine is
-created or started (G3), so a missing value fails a run early rather
-than after a long machine start, and a program never hangs on a
-hidden prompt.
+Binding always finishes before any media file is created and before
+any machine is created or started (G3). That way a missing value
+fails the run early, instead of after a long machine startup, and
+the program never hangs waiting on a prompt the caller doesn't
+expect.
 """
 
 import collections
@@ -34,14 +36,15 @@ from . import credentials, facts, properties
 from .errors import PreflightError
 
 class PropertyBindingError(PreflightError):
-    """A declared property could not be bound before the run.
+    """Raised when a declared property can't be bound before the run starts.
 
-    Binding is preflight — it finishes before any media materializes
-    or any machine starts — so this is a PREFLIGHT ERROR, exit ``3``.
+    Binding happens during preflight -- before any media file is
+    created and before any machine starts -- so this is a preflight
+    error, and it exits with code ``3``.
     """
 
-# The sources named in provenance, for a dry run and the run's
-# event stream.
+# Names for each source, used when reporting where a value came
+# from -- in a dry run and in the run's event stream.
 FLAG = "--property"
 PARAMETER = "blueprint parameter"
 ENVIRONMENT = "environment"
@@ -50,11 +53,12 @@ DERIVATION = "declared derivation"
 ASK = "interactive ask"
 
 def _env_name(key):
-    """The RELIQUARY_PROPERTY_* variable a key mangles to.
+    """The RELIQUARY_PROPERTY_* environment variable name a key maps to.
 
-    Uppercased, with '.', '-' and '_' all mapped to '_'. The mapping
-    can collide (`a.b` and `a-b` land together); a run consulting two
-    keys that collide fails, naming both.
+    Uppercases the key and maps '.', '-', and '_' all to '_'. This
+    mapping can collide -- `a.b` and `a-b` both map to the same
+    variable name -- and a run that consults two keys which collide
+    fails, naming both.
     """
     mangled = key.upper()
     for character in ".-":
@@ -79,14 +83,14 @@ class _Binder:
     # -- the cascade ---------------------------------------------
 
     def bind(self, declaration):
-        """Bind one declared property, top source down.
+        """Bind one declared property, trying each source from the top down.
 
-        The parameter tier is special: a *direct* value answers, and
-        a *redirect* substitutes another key into the env/file lookup
-        and preempts the declared key's own env/file entry (a redirect
-        "replaces resolution of the declared key entirely"). Either
-        way, an unanswered key still reaches the ask, under its own
-        declaration and prompt.
+        The parameter tier is special: a *direct* parameter value
+        answers immediately. A *redirect* parameter instead
+        substitutes a different key into the environment/file
+        lookup, replacing the declared key's own environment/file
+        lookup entirely. Either way, if nothing answers, the key
+        still reaches the ask, using its own declaration and prompt.
         """
         key = declaration.key
         kind = declaration.kind
@@ -100,8 +104,9 @@ class _Binder:
             answer = self._ask(declaration)
         if answer is None:
             if self._dry_run:
-                # A dry run names what *would* answer; with no
-                # concrete source, an interactive run would ask.
+                # A dry run reports what *would* answer: since no
+                # source has a concrete value, an interactive run
+                # would fall through to asking.
                 self._sources[key] = ASK
                 return
             raise PropertyBindingError(
@@ -118,12 +123,15 @@ class _Binder:
             self._secret_keys.add(key)
 
     def _parameter_answer(self, key, kind):
-        """The parameter tier, and the env/file it governs the key for.
+        """Try the parameter tier, then the environment/file lookup it points to.
 
-        With no parameter, the env/file lookup is on the declared key
-        itself. A direct parameter answers outright. A redirect moves
-        the lookup to its target key and labels the provenance, but
-        does not itself reach the ask.
+        If there is no parameter for this key, the environment/file
+        lookup uses the declared key itself. A direct parameter
+        answers right away. A redirect parameter moves the
+        environment/file lookup to a different target key and labels
+        the source accordingly, but if that lookup finds nothing,
+        this returns None -- it does not itself fall through to the
+        ask; the caller does that.
         """
         binding = self._parameters.get(key)
         if binding is None:
@@ -138,7 +146,7 @@ class _Binder:
         return (value, f"{PARAMETER} -> {source}")
 
     def _env_then_file(self, key, kind):
-        """Environment then properties file, for one lookup key."""
+        """Look up one key: the environment variable first, then the properties file."""
         name = _env_name(key)
         value = os.environ.get(name)
         if value is not None:
@@ -159,7 +167,8 @@ class _Binder:
                     "declaration",
                     rule_id="prop.secret-under-plain-key")
             if self._dry_run:
-                # A dry pass names the source without reading the value.
+                # A dry run reports the source without reading the
+                # actual secret value.
                 return (None, FILE)
             value = properties.get_secret(
                 key, context=self._context,
@@ -179,14 +188,15 @@ class _Binder:
         return (stored, FILE)
 
     def _derivation_answer(self, declaration):
-        """The script's own answer: the first candidate that resolves.
+        """Try the script's own derivation: the first candidate that resolves.
 
-        Candidates are tried in declaration order; the first whose
-        references all resolve to non-empty values answers. A literal
-        candidate (no references) always answers, so it stops
-        resolution here. A candidate touching an empty or unavailable
-        fact — or a declared key that itself did not bind — does not
-        answer, and resolution falls through to the ask.
+        Candidates are tried in the order they are declared. The
+        first one whose references all resolve to non-empty values
+        is the answer. A literal candidate (one with no references)
+        always resolves, so it always answers here. A candidate that
+        touches an empty or unavailable fact -- or a declared key
+        that itself did not bind -- does not answer, and resolution
+        moves on, eventually falling through to the ask.
         """
         for candidate in declaration.defaults:
             resolved = self._resolve_candidate(candidate)
@@ -207,12 +217,15 @@ class _Binder:
         return "".join(rendered)
 
     def _reference_value(self, key):
-        """A derivation reference: a bound declared key, or an rlq fact.
+        """Resolve one reference inside a derivation: a bound declared key, or an rlq fact.
 
-        Static validation (V6) guaranteed the key is one or the other,
-        so a fact lookup here never raises. A declared key not yet in
-        the bound set resolves to None — it did not answer — which the
-        dependency ordering makes deterministic.
+        Static validation (V6) already guaranteed the key is one or
+        the other, so looking it up as a fact here never raises. If
+        the key is a declared key that has not bound yet, this
+        returns None -- meaning it did not answer -- and the
+        dependency ordering from _binding_order guarantees a
+        referenced key is always bound before the keys that
+        reference it, which keeps this deterministic.
         """
         if facts.is_fact(key):
             return facts.resolve(key)
@@ -255,7 +268,7 @@ class BoundProperties:
         self.secret_keys = secret_keys
 
     def secret_values(self):
-        """The bound secret values, for the runtime's redaction."""
+        """The bound values that are secrets, so the runtime can redact them."""
         return {self.values[key] for key in self.secret_keys
                 if self.values.get(key)}
 
@@ -263,7 +276,7 @@ class BoundProperties:
         return bool(self.values)
 
 def _preflight_environment(declarations):
-    """Fail closed when two consulted keys mangle to one variable."""
+    """Raise an error up front if two declared keys map to the same environment variable."""
     seen = {}
     for declaration in declarations:
         name = _env_name(declaration.key)
@@ -287,12 +300,14 @@ def _validate_explicit(declarations, explicit):
                 "script", rule_id="prop.undeclared-flag")
 
 def _binding_order(declarations):
-    """Order declarations so a derivation's referents bind first.
+    """Order declarations so any key a derivation references binds before it does.
 
-    A `default=` may reference another declared key's bound value, so
-    that key must resolve first. The order is a stable topological
-    sort over those edges — declaration order otherwise — and the
-    static acyclic guarantee (V6) means it always exists.
+    A `default=` derivation can reference another declared key's
+    bound value, so that other key has to resolve first. This does a
+    stable topological sort over those reference edges, keeping
+    declaration order wherever two keys have no dependency between
+    them. Static validation (V6) already guarantees there are no
+    reference cycles, so this ordering always exists.
     """
     by_key = {d.key: d for d in declarations}
     ordered = []
@@ -315,12 +330,12 @@ def _binding_order(declarations):
 
 def bind_properties(script, *, parameters=None, explicit=None,
                     properties_file=None, context=None, asker=None):
-    """Bind every declared property, or fail closed naming the key.
+    """Bind every property a script declares, or raise an error naming the key that failed.
 
-    ``asker`` is called ``asker(key, prompt, secret) -> value`` for a
-    key no earlier source answered; pass ``None`` for a
+    ``asker`` is called as ``asker(key, prompt, secret) -> value``
+    for any key that no earlier source answered. Pass ``None`` for a
     noninteractive run, where an unanswered key is an error. Returns
-    :class:`BoundProperties`.
+    a :class:`BoundProperties`.
     """
     declarations = list(script.properties)
     _validate_explicit(declarations, explicit)
@@ -333,13 +348,14 @@ def bind_properties(script, *, parameters=None, explicit=None,
     return binder.result()
 
 def console_asker():
-    """An interactive asker, or None when there is no terminal.
+    """Build an interactive asker function, or return None if there is no terminal to ask on.
 
-    Asking requires both stdin and stderr to be ttys: the prompt
-    writes to stderr and the answer reads from stdin (the CLI output
-    discipline). Without a terminal the binder gets no asker and an
-    unresolved property fails before the machine starts, so a program
-    never hangs on a hidden prompt.
+    Asking requires both stdin and stderr to be ttys: the prompt is
+    written to stderr and the answer is read from stdin, following
+    the CLI's usual output rules. Without a terminal, the binder gets
+    no asker at all, so an unresolved property fails before the
+    machine starts instead of the program hanging on a prompt nobody
+    can see.
     """
     if not (sys.stdin.isatty() and sys.stderr.isatty()):
         return None
@@ -356,21 +372,22 @@ def console_asker():
 
     return ask
 
-# A bare key referenced by a media location has no `property` node to
-# declare it — the reference site is the declaration. It binds as
-# ordinary text through the same order minus the derivation (which
-# needs a `default=` a location cannot carry).
+# A bare key referenced by a media `location` has no `property` node
+# declaring it -- the reference itself is the only declaration it
+# gets. It binds as plain text, through the same source order but
+# skipping the derivation source (that needs a `default=`, which a
+# location cannot carry).
 _LocationKey = collections.namedtuple(
     "_LocationKey", ("key", "kind", "prompt", "defaults"))
 
 def bind_keys(keys, *, parameters=None, explicit=None, properties_file=None,
               context=None, asker=None):
-    """Bind a set of bare keys through the source order, as text.
+    """Bind a set of bare keys through the usual source order, as plain text.
 
-    The location-reference counterpart of :func:`bind_properties`:
-    keys named by a media `location` (or `sha256`) with no `property`
-    declaration behind them. Returns ``{key: value}``; an unbound key
-    raises :class:`PropertyBindingError`.
+    This is the counterpart to :func:`bind_properties` for keys
+    named by a media `location` (or `sha256`) that have no
+    `property` declaration behind them. Returns ``{key: value}``. An
+    unbound key raises :class:`PropertyBindingError`.
     """
     declarations = [
         _LocationKey(key=key, kind="text", prompt=None, defaults=())
@@ -385,18 +402,20 @@ def bind_keys(keys, *, parameters=None, explicit=None, properties_file=None,
 
 def describe_keys(keys, *, parameters=None, explicit=None,
                   properties_file=None, context=None):
-    """Bind what a location's bare keys can bind, asking nothing.
+    """Bind whatever a location's bare keys can bind without asking anyone.
 
-    The dry counterpart of :func:`bind_keys`, as
-    :func:`describe_sources` is of :func:`bind_properties`: the same
-    sources in the same order, but it never prompts, never reads a
-    secret's value, and never fails on an unanswered key — an
-    interactive create would ask, so that key reports the ask as its
-    source and carries no value.
+    This is the dry-run counterpart of :func:`bind_keys`, the same
+    way :func:`describe_sources` is the dry-run counterpart of
+    :func:`bind_properties`: it checks the same sources in the same
+    order, but never prompts, never reads a secret's actual value,
+    and never fails on a key nothing answered. For a key that an
+    interactive run would have to ask about, this reports the ask as
+    its source and leaves it with no value.
 
-    Returns :class:`BoundProperties`: ``values`` holds what
-    concretely bound, which is what a location can be rendered from,
-    and ``sources`` names every key including the ones that did not.
+    Returns a :class:`BoundProperties`: ``values`` holds whatever
+    concretely bound (what a location can actually be rendered
+    from), and ``sources`` names every key, including the ones that
+    did not bind.
     """
     declarations = [
         _LocationKey(key=key, kind="text", prompt=None, defaults=())
@@ -412,14 +431,14 @@ def describe_keys(keys, *, parameters=None, explicit=None,
 
 def describe_sources(script, *, parameters=None, explicit=None,
                      properties_file=None, context=None):
-    """Name each declared property's supplying source, without a run.
+    """Name the source that would supply each declared property, without running anything.
 
-    The dry counterpart of :func:`bind_properties` for a script's
-    dry run:
-    it consults the same sources in order, never prompts, never reads
-    a secret's value, and never fails on an unanswered key — an
-    interactive run would ask, so its source is reported as the ask.
-    Returns ``{key: source}``.
+    This is the dry-run counterpart of :func:`bind_properties`: it
+    checks the same sources in the same order, never prompts, never
+    reads a secret's actual value, and never fails on a key nothing
+    answered. For a key that an interactive run would have to ask
+    about, this reports the ask as its source. Returns ``{key:
+    source}``.
     """
     declarations = list(script.properties)
     _validate_explicit(declarations, explicit)

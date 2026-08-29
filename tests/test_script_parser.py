@@ -21,7 +21,8 @@ _FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                          "fixtures")
 
 
-# The milestone's reference script types end to end.
+# The tests below parse the whole reference script and check that
+# its typed fields come out right end to end, not just in fragments.
 
 @pytest.fixture(scope="module")
 def reference():
@@ -44,10 +45,12 @@ def test_headers_carry_their_values(reference):
 
 
 def test_the_phases_are_named_in_order(reference):
-    """Flat, though the reference wraps every one of them in a scope.
+    """The list of phase names is flat, even though the reference
+    script wraps its `formatting` phase in a `with` scope.
 
-    The phase namespace is what `entry` and `goto` address, and a
-    `with` block changes where control *is*, never which phases exist.
+    `entry` and `goto` look phases up by name in that flat list.
+    Wrapping a phase in `with` changes where control goes when the
+    scope's action runs; it does not add, remove, or rename phases.
     """
     assert [phase.name for phase in reference.phases] == [
         "startup", "cd-boot", "partitioning", "formatting", "hd-boot",
@@ -365,8 +368,9 @@ def test_a_node_accepting_no_modifier_says_so():
 
 
 def test_a_wait_takes_the_timing_modifiers_that_are_its_own():
-    # Only the timing set is a wait's own; every other modifier
-    # names a channel, and V7 owns that diagnostic.
+    # Only the timing modifiers (timeout, deadline, stable) belong
+    # to `wait` itself. Any other modifier name is read as an
+    # observation channel instead, and V7 covers that error message.
     with pytest.raises(ScriptParseError) as caught:
         parse_script(_HEAD + 'wait "x" exclude="y"\n')
     assert "unknown observation channel: exclude" in str(caught.value)
@@ -412,7 +416,8 @@ def test_a_repeated_header_is_rejected():
     assert "platform may appear only once" in str(caught.value)
 
 
-# The lexer's authored messages survive the lark layer.
+# The lexer's own error messages come through unchanged, even
+# though lark's grammar layer runs on top of the lexer.
 
 def test_modifier_spacing_keeps_its_message_in_any_context():
     for source in (_HEAD + 'wait "x" timeout = 5m\n',
@@ -483,7 +488,8 @@ def test_set_takes_no_modifiers():
     assert "set does not accept" in str(caught.value)
 
 
-# The milestone-one spellings are gone, not bridged.
+# The old milestone-one syntax was removed outright; there is no
+# compatibility bridge that still accepts it.
 
 def test_the_old_surface_no_longer_parses():
     for label, source in (
@@ -523,11 +529,11 @@ def test_a_boot_scope_carries_its_keys_and_wraps_its_phases():
 
 
 def test_a_wrapped_phase_is_still_in_the_flat_phase_namespace():
-    """A scope changes where control *is*, never which phases exist.
+    """Wrapping a phase in `with` does not add or remove phases; it
+    only changes where control goes when the block's action runs.
 
-    That is what keeps `goto`, `entry` and the timing plan unaware of
-    the construct: the graph they address is the same flat namespace
-    whether a `with` wraps it or not.
+    `goto`, `entry`, and the timing plan all look phases up by name
+    in the same flat list, whether a `with` block wraps them or not.
     """
     script = parse_script(
         _HEAD + "machine stopped\nentry startup\n"

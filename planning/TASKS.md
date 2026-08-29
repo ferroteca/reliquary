@@ -5,123 +5,144 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # TASKS
 
-The pledged work backlog. A **proposed** task lives in the issue
-tracker — <https://github.com/ferroteca/reliquary/issues> — which is
-the only queue a proposed task has (D43): the tracker is a task's
-proposed state and this file is its pledged one. So nothing parks
-here awaiting a verdict; arriving *is* the verdict.
+This is the backlog of pledged work. A task that's still just
+proposed lives in the issue tracker —
+<https://github.com/ferroteca/reliquary/issues> — which is the only
+place a proposed task exists (D43): the issue tracker is a task's
+"proposed" stage, and this file is its "pledged" stage. So nothing
+here is waiting for a decision — showing up in this file *is* the
+decision.
 
-**Everything in this file is pledged** — the one vocabulary
-([README.md](README.md)) applying here exactly as in the
-directories. An entry is in the *pledged* state, so entering it is
-approving it: nothing waits on a verdict, nothing needs a citation
-or a decision of its own, and there is nothing to promote. The
-directory is not its home because `proposed/` and `pledged/` hold
-*demand and capability*, argued at length, and a task is none of
-those — free-standing work too small to be a feature and too small
-to need the argument. That kind distinction is the distinguisher,
-not size.
+**Everything listed here is pledged** — the same four-word
+vocabulary used in [README.md](README.md) (proposed, pledged,
+completed, rejected) applies here too. Because an entry here is
+already in the pledged state, adding it to this file *is* approving
+it: nothing waits for a decision, nothing needs its own citation,
+and there's nothing left to promote. This file doesn't live inside
+the `pledged/` directory, because `proposed/` and `pledged/` hold
+demand and capability — things argued for at length — and a task
+isn't either of those. It's free-standing work that's too small to
+count as a feature, and too small to need a formal argument. That's
+a difference in kind, not just in size.
 
-**This file is the third work input queue** (D43, widening D39's
-two), and adding to it is governed by the gate covering all writing
-under `planning/` — weighing most here, this being the one governed
-act that grants approval with no argument behind it.
+This file is the third of the project's three work-intake queues
+(D43, which expanded D39's original two). Adding something here is
+controlled by the same approval gate that covers all writing under
+`planning/` — and that gate matters most here, because this is the
+one action where approval is granted with no argument behind it at
+all.
 
-**A queue holds what waits.** Work that arrives already done never
-appears here: there is nothing to schedule, only a decision to make,
-and an entry filed and closed in one act is ceremony.
+**A queue is for work that's waiting to be done.** Work that's
+already finished never gets added here — there's nothing left to
+schedule, only a decision, and filing an entry just to close it in
+the same act would be pointless.
 
-**Anything is struck when it is done** (D45, generalized by D52) —
-tasks, audits, restructures and rounds alike. Its record is its
-commit, its CHANGELOG line, and the D-numbers it produced, so it
-leaves this file by deletion and nothing is parked. **Not a
-retrospective either**: a note explaining what an emptied group
-used to hold is the same parking one paragraph further on, and it
-has to be edited every time the work it accounts for moves. The
-same holds for the **work-item breakdowns inside a pledged
-feature**: when the feature delivers, its list is deleted with its
-F-number rather than archived. A record whose reasoning outlives
-the work is a decision, and decisions live in
-[DECISIONS.md](DECISIONS.md) — kept beside
-the work instead, a summary drifts from what it summarizes and a
-reader has no way to tell.
+**Anything gets deleted from this file once it's done** (D45,
+extended by D52) — tasks, audits, restructures, and multi-step
+rounds of work all follow this rule. The record of what happened is
+its commit, its CHANGELOG entry, and any D-numbers it produced — so
+it leaves this file by being deleted, nothing sits around
+afterward. This file also isn't a place for retrospectives: a note
+explaining what a now-empty section used to contain is really the
+same problem, just one paragraph later, and it would have to be
+updated every time the underlying work moves. The same applies to
+the **lists of work items inside a pledged feature**: once the
+feature is delivered, its whole list is deleted along with its
+F-number rather than archived. Anything whose reasoning needs to
+outlive the work itself is a decision, and decisions belong in
+[DECISIONS.md](DECISIONS.md) — if that kind of record were kept
+next to the work instead, a summary would drift out of sync with
+what it's summarizing, and a reader would have no way to tell.
 
-**There is no order here.** Nothing in this file is scheduled, and
-nothing claims priority over anything else; whoever picks work up
-picks whatever they like. The one ordering that does bind is a
-feature's: **work that only makes sense as part of one pledged
-feature lives with that feature**, in
-[pledged/FEATURES.md](pledged/FEATURES.md), and has to be done to
-complete it. A task here that merely *relates* to a feature is
-still free to be picked whenever.
+**Nothing here is in any particular order.** No entry is scheduled,
+and none takes priority over another — whoever wants to do the work
+picks whatever they like. The one place order does matter is inside
+a feature: work that only makes sense as part of one pledged
+feature is listed with that feature, in
+[pledged/FEATURES.md](pledged/FEATURES.md), and has to happen in
+order to complete it. But a task in this file that's merely
+*related* to a feature — not required by it — can still be picked
+up whenever.
 
-Housekeeping (D38) is the same instinct one size smaller: work tiny
-enough and obvious enough that it needs no entry here **at all**,
-approved as a class in advance, with the commit as its record. This
-file is where the pre-approved work that is still worth writing
-down goes. The full intake machinery — the raw queues, the
-housekeeping test, and how pledge is recorded — is in
+Housekeeping (D38) is one size smaller still: work that's tiny and
+obviously worth doing doesn't need an entry here **at all** — it's
+pre-approved as a category, and the commit is its only record. This
+file is for pre-approved work that's still worth writing down;
+housekeeping is for pre-approved work that isn't. The full picture
+of how work enters the project — the intake queues, the
+housekeeping test, and how pledging gets recorded — is in
 [README.md](README.md).
 
-**Refused work is not recorded here** (D52). Entry to this file
-*is* approval (D43), so a rejected task is one that never
-entered — refusal happens at the door, and its record is the issue
-that was closed or the [DECISIONS.md](DECISIONS.md) entry that
-argued it, that file already being the guard against
-re-litigating.
+**Rejected work doesn't get recorded here** (D52). Since adding
+something to this file is itself the approval (D43), a rejected
+task is simply one that was never added — the rejection happens at
+the door. The record of that rejection is the closed GitHub issue,
+or the entry in [DECISIONS.md](DECISIONS.md) that argued against
+it; DECISIONS.md already serves as the guard against re-arguing the
+same rejected idea.
 
-The queue proper is [Pledged](#pledged) below — grouped by kind
-because the actor and the gate differ, though the grouping is not
-a running order.
+The actual queue is the [Pledged](#pledged) section below. It's
+grouped by kind of work, because different kinds are done by
+different people and approved by different checks — but the
+grouping isn't an order to work through.
 
-Standing questions to re-ask as the design hardens are not tasks
-and live with the decision record, under
-[DECISIONS.md](DECISIONS.md)'s open questions.
+Open questions to revisit later as the design becomes more settled
+aren't tasks — those live in [DECISIONS.md](DECISIONS.md), under its
+open questions section.
 
 ## Every task is itemized
 
-**A task carries a T-number** (D86) — `T8 — Widen the drive report`,
-number and name together, the way an F-number reads, at whatever
-heading depth its group sits at. A
-task is an item like any other, and D42's rule reaches it for
-D42's reason: every item that can be depended on needs a handle,
-because a heading someone may reword is not something to point
-at. The number is what a commit cites, what another task points
-at, and what survives this file's own regrouping — the groups
-below are kinds rather than a running order, so an entry may move
-between them, and without a number its heading text is the whole
-of its identity.
+**Every task has a T-number** (D86), written like this:
+`T8 — Widen the drive report` — the number and the name together,
+the same way an F-number is written, no matter what heading level
+the task sits at. A task is an item like any other item in this
+system, and D42's numbering rule applies to it for the same reason
+it applies elsewhere: anything other work might depend on needs a
+stable handle, because a heading's wording can be edited later and
+isn't something safe to point at. The number is what a commit
+cites, what another task can point to, and what survives even if
+this file gets reorganized — the groupings below are by kind of
+work, not by order, so an entry can move between groups. Without a
+number, a task would be identified only by its heading text, which
+isn't stable enough.
 
-**The number is issued at entry**, which for a task is the pledge
-itself: a task has no proposed state under `planning/` (D43), so
-there is no earlier moment to issue one at, and the idea that
-preceded it carries the tracker's own issue number instead. That
-is the one asymmetry with an F-number, which is issued at
-proposal and travels into `pledged/` unchanged.
+**A task's number is issued the moment it's added to this file**,
+which for a task is the same moment as being pledged: a task never
+has a "proposed" stage inside `planning/` (D43), so there's no
+earlier point at which a number could be issued. Before that, the
+idea is only identified by its GitHub issue number. This is the one
+way tasks differ from features: an F-number is issued when the
+feature is first proposed, and it carries that same number all the
+way into `pledged/`.
 
-**And it evaporates on delivery**, with the work rather than
-outliving it. That is D42's second handle class: a use case, a
-principle and a decision persist, so their numbers are permanent,
-while a feature names work not yet done and its handle goes when
-the work lands. A task is work, so a struck task takes its number
-with it (D52). **Evaporating is not reusable** — the number
-retires and is never issued again, so a T-number surviving in a
-commit message can never resolve to something else later, and
-gaps in the sequence are history rather than a promise.
+**A task's number retires when the task is delivered** — it doesn't
+outlive the work. This is the second of the two kinds of handle D42
+defines: a use case, a principle, and a decision are permanent
+records, so their numbers stay forever, while a feature's number
+just names work that hasn't happened yet, and goes away once that
+work lands. A task is work too, so when a task is struck off the
+list, its number is retired along with it (D52). A retired number
+is never reused — so a T-number that survives in an old commit
+message will always point to the same thing, and a gap in the
+numbering just means something was finished, not something still
+pending.
 
-**T-numbers are issued against the sequence ledger**
-([SEQUENCES.md](SEQUENCES.md); owner, 2026-07-31), which holds the
-high-water mark this file used to state — take the next number
-there and advance it in the same edit. The reasons the mark must
-be stated at all — the queue empties, a struck task's only record
-is its commit (D52), and a search sees only the branch it stands
-on — live with the ledger, along with the sequence's T8 start.
+**T-numbers now come from the shared sequence ledger**
+([SEQUENCES.md](SEQUENCES.md); owner, 2026-07-31), which now holds
+the highest-issued number that used to be tracked in this file.
+Take the next number from there, and update it in the same edit.
+The reasons a running mark needs to be tracked at all — this queue
+empties out over time, a struck task's only remaining record is its
+commit (D52), and a search only sees the branch you're on — are
+explained alongside the ledger, along with why the T-sequence
+starts at T8.
 
 ## Pledged
 
-Grouped by kind, because the actor and the gate differ: an audit
-is mechanical, a defect needs no pledge because the norm it
-violates already is one. A group with nothing in it is not listed:
-an empty heading is a record of retired work, which this file does
-not keep.
+Grouped by kind of work, because who does it and how it's approved
+differ: an audit is mechanical, and a bug fix needs no separate
+pledge because the rule it's violating is already a commitment on
+its own. A group with nothing in it isn't shown at all — an empty
+heading would just be a record of finished work, and this file
+doesn't keep those.
 

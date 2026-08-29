@@ -1,35 +1,38 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The timing model of the reliquary script language.
+"""The timing model for the reliquary script language.
 
-Three families scope differently
-(docs/spec/script-spec.md, "Timing"):
+There are three kinds of timing settings, and each is scoped
+differently (see docs/spec/script-spec.md, "Timing"):
 
-- ``timeout`` and ``stable`` are per-observation settings and
-  **lexically scoped**, so a container's ``timeout`` is the
-  default for every observation it lexically contains. Resolution
-  is innermost-wins — statement, branching ``wait``, phase,
-  header, the built-in 60s — and entirely a parse-time question;
+- ``timeout`` and ``stable`` are per-observation settings, and they
+  are **lexically scoped**: a container's ``timeout`` becomes the
+  default for every observation lexically inside it. The innermost
+  setting wins -- statement, then branching ``wait``, then phase,
+  then header, then the built-in 60s default. This is entirely
+  decided at parse time.
 - ``deadline`` is a **budget**, dynamically scoped to one
-  activation. It is never inherited, so resolution has nothing to
-  decide: a phase's budget is the one written on it, and the
-  header's bounds the run.
-- ``pacing`` is a per-guest-input setting and lexically scoped
-  like the first family — statement, phase, header, the built-in
-  0.1s. It has no branching-``wait`` rung because an observation
-  container cannot carry it: pacing paces the actor, and a
-  ``wait`` acts on nothing.
+  activation. It is never inherited, so there is no resolution to
+  do: a phase's budget is whatever is written on that phase, and
+  the header's deadline bounds the whole run.
+- ``pacing`` is a per-guest-input setting, lexically scoped the
+  same way as ``timeout``/``stable`` -- statement, phase, header,
+  then the built-in 0.1s default. It has no branching-``wait``
+  level, because an observation container can't carry pacing:
+  pacing paces the actor sending input, and a ``wait`` doesn't send
+  input.
 
-:func:`resolve` therefore computes the whole plan up front: every
-observation's effective timeout and the scope that supplied it,
-every guest-input verb's effective pacing and its scope, each
-phase's budget, and the run's. ``run-script --dry-run`` reports
-the plan, a timing failure names the clock that expired and its
-source scope, and the runner never re-derives a bound it could
-have been handed.
+Because of this, :func:`resolve` computes the whole timing plan up
+front: every observation's effective timeout and which scope
+supplied it, every guest-input verb's effective pacing and its
+scope, each phase's budget, and the run's deadline. ``run-script
+--dry-run`` prints this plan, a timing failure names the clock that
+expired and where it came from, and the runner never has to
+re-derive a bound -- it is always handed one that was already
+resolved.
 
-This module works structurally over the typed tree, so it imports
-no node type.
+This module works structurally over the typed tree and does not
+import any node type.
 """
 
 from dataclasses import dataclass, field
@@ -37,44 +40,49 @@ from typing import Mapping, Optional, Tuple
 
 from .errors import StaticError
 
-# The built-in observation bound, when nothing else supplies one.
+# The built-in timeout for an observation, used when nothing else sets one.
 DEFAULT_TIMEOUT = "60s"
 
 # The built-in gap before the first key event of a guest-input verb.
-# Deliberately small, and a floor rather than an estimate (D69):
-# what makes a guest ready to *read* differs in kind from screen to
-# screen — an installer arming its keyboard handler, a shell entering
-# its read loop — so no single number serves every one, which is the
-# argument for the per-phase and per-statement override carrying real
-# weight. Nonzero because that readiness is unobservable (G1).
+# This is deliberately small, and it's a floor, not an estimate
+# (D69): what makes a guest ready to *read* input differs from
+# screen to screen -- an installer arming its keyboard handler vs. a
+# shell entering its read loop -- so no single number is right for
+# every case, which is why the per-phase and per-statement overrides
+# matter. The value is nonzero because that readiness can't be
+# observed directly (G1).
 DEFAULT_PACING = "0.1s"
 
-# The built-in quiescence gate: the proportion of the screen that must
-# hold still before a sample is one a condition is evaluated against.
-# The number falls out of the geometry rather than out of taste. A
-# text screen is 80 x 25 = 2000 cells, so one row of text is 80 of
-# them — 4% — and any threshold looser than 0.96 calls a screen
-# stable while a line is being drawn into it. Furniture costs an order
-# of magnitude less (a cursor 1 cell, a clock 8), so 0.99 sits in the
-# gap: above furniture, below content. Written nowhere by default,
-# which is the whole point — a guard every author had to spell would
-# be the burden the pacing round objected to.
+# The built-in stability threshold: the proportion of the screen that
+# must stay unchanged before a sample counts as stable enough to
+# evaluate a condition against. This number comes from the screen's
+# geometry, not a guess. A text screen is 80 x 25 = 2000 cells, so
+# one row of text is 80 of them -- 4% -- and any threshold looser
+# than 0.96 would call a screen stable while a line is still being
+# drawn into it. Screen furniture (a cursor, a clock) changes far
+# fewer cells than that -- a cursor is 1 cell, a clock is 8 -- so
+# 0.99 sits between the two: above what furniture changes, below what
+# content changes. It's not written anywhere by default on purpose --
+# forcing every script author to spell this value out themselves was
+# exactly the extra work the pacing design round pushed back against.
 DEFAULT_STABILITY = "0.99"
 
 _UNITS = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0}
 
-#: The verbs that deliver keystrokes, and so pay the pacing gap.
-#: Host-side verbs (``insert``, ``eject``, ``set-boot``,
-#: ``screenshot``, ``start``, ``stop``, ``set``, ``http``) are not
-#: guest input and do not.
+#: The verbs that send keystrokes to the guest, and so wait out the
+#: pacing gap before their first key event. Host-side verbs
+#: (``insert``, ``eject``, ``set-boot``, ``screenshot``, ``start``,
+#: ``stop``, ``set``, ``http``) don't send guest input, so they
+#: don't pay this gap.
 INPUT_VERBS = frozenset({"enter", "type", "press", "select", "click"})
 
 
 def parse_duration(spelling):
-    """Return a duration spelling in seconds.
+    """Convert a duration spelling (such as "5s") into seconds.
 
-    The lexer has already typed the spelling, so this raises only
-    on a value that never came from a script.
+    The lexer has already checked that `spelling` is a valid
+    duration, so this only raises for a value that didn't come
+    from a parsed script.
     """
     unit = "ms" if spelling.endswith("ms") else spelling[-1:]
     try:
@@ -85,16 +93,17 @@ def parse_duration(spelling):
 
 
 class _Sourced:
-    """The scope-naming half a resolved setting shares.
+    """Mixin shared by resolved settings, for naming the scope they came from.
 
-    A failure and a plan report both say *where* a setting came from,
-    and that sentence is the same whether the setting is a duration or
-    a proportion.
+    Both a failure message and a dry-run plan report need to say
+    *where* a setting's value came from, and that sentence is
+    written the same way whether the setting is a duration or a
+    proportion.
     """
 
     @property
     def source(self):
-        """The source scope, as a failure or a plan report says it."""
+        """Where this value came from, worded the way a failure or plan report states it."""
         where = self.scope
         if self.scope_name is not None:
             where = f"{where} {self.scope_name}"
@@ -119,12 +128,13 @@ class Bound(_Sourced):
 
 @dataclass(frozen=True)
 class Level(_Sourced):
-    """One resolved proportion: its value and where it came from.
+    """One resolved proportion setting: its value and where it came from.
 
-    Bound's sibling for a setting that is not a clock. Stability is a
-    fraction of the screen rather than a span of time, so it takes its
-    own record instead of borrowing a field named ``seconds`` — the
-    same reason the language spells it `stability` and not `stable`.
+    This is Bound's counterpart for a setting that isn't a duration.
+    Stability is a fraction of the screen, not a span of time, so it
+    gets its own record instead of reusing a field named ``seconds``
+    -- the same reason the language calls this setting `stability`,
+    not `stable`.
     """
 
     spelling: str
@@ -145,11 +155,11 @@ class Observation:
     timeout: Bound
     stable: Optional[Bound] = None
     stability: Optional[Level] = None
-    #: The landmark this observation watches for, where it watches
-    #: one (F65). A dry run names it: what a landmark wait costs is
-    #: the same clock as any other, and what it *needs* — an asset on
-    #: disk and a plane that captures pixels — is exactly what a
-    #: reader is checking the plan for.
+    #: The landmark this observation watches for, if it watches one
+    #: (F65). A dry run prints it: a landmark wait costs the same
+    #: clock as any other wait, but it also needs something extra --
+    #: an asset on disk and a plane that can capture pixels -- and
+    #: that's exactly what a reader checking the plan wants to see.
     landmark: Optional[str] = None
 
 
@@ -177,7 +187,7 @@ class TimingPlan:
     default_stability: Optional[Level] = None
 
     def at(self, node):
-        """The plan entry for a parsed node, by its source position."""
+        """Return the observation plan entry for a parsed node, matched by its line/column."""
         for observation in self.observations:
             if (observation.line, observation.column) == (node.line,
                                                           node.column):
@@ -187,9 +197,10 @@ class TimingPlan:
     def pacing_at(self, node):
         """The resolved pacing for a guest-input node, or ``None``.
 
-        The runner asks rather than re-deriving: the scope that
-        supplied a gap is a parse-time fact, and a failure report
-        that names it can only do so if one answer was computed once.
+        The runner looks this up instead of recomputing it: which
+        scope supplied the gap is decided at parse time, and a
+        failure message can only name that scope if it was computed
+        once and reused.
         """
         for entry in self.inputs:
             if (entry.line, entry.column) == (node.line, node.column):
@@ -219,8 +230,9 @@ def resolve(script):
             inner_stability = _level(phase.stability, "phase", phase.name,
                                      phase.line) or stability
             if phase.handlers:
-                # A reactive phase's timeout is itself a clock: the
-                # interval it allows with no handler firing.
+                # A reactive phase's timeout is itself a clock: it's
+                # the interval the phase allows to pass with no
+                # handler firing.
                 observations.append(Observation(
                     "reactive interval", phase.line, phase.column,
                     phase.name, inner, None, inner_stability))
@@ -265,9 +277,10 @@ def format_plan(plan, name=None):
                      f"{observation.timeout}")
             if observation.stable is not None:
                 entry += f"; stable {observation.stable}"
-            # Reported only where it was overridden: the default is
-            # stated once above, and repeating it on every line would
-            # bury the observations that actually differ.
+            # Only shown when it differs from the default: the
+            # default stability is already printed once above, and
+            # repeating it on every line would bury the observations
+            # that actually override it.
             if (observation.stability is not None
                     and observation.stability is not
                     plan.default_stability):
@@ -308,11 +321,12 @@ def _header_stability(script):
 
 
 def _landmark(node):
-    """The landmark an observation watches, or ``None``.
+    """The landmark an observation watches for, or ``None``.
 
-    Read off the node's own conditions rather than passed down: a
-    branching wait carries none itself and each of its handlers
-    carries its own, which is exactly what the plan should show.
+    This reads the landmark straight off the node's own conditions
+    instead of having it passed down: a branching wait itself
+    carries no landmark, but each of its handlers carries its own,
+    and that's exactly what the plan needs to show.
     """
     for condition in getattr(node, "conditions", ()):
         if condition.kind == "landmark":
@@ -321,14 +335,14 @@ def _landmark(node):
 
 
 def _level(spelling, scope, scope_name, line):
-    """A level for a written proportion, or ``None`` if none was."""
+    """A Level for a written proportion, or ``None`` if none was written."""
     if spelling is None:
         return None
     return Level(spelling, float(spelling), scope, scope_name, line)
 
 
 def _bound(spelling, scope, scope_name, line):
-    """A bound for a written duration, or ``None`` if none was."""
+    """A Bound for a written duration, or ``None`` if none was written."""
     if spelling is None:
         return None
     return Bound(spelling, parse_duration(spelling), scope, scope_name, line)
@@ -336,12 +350,13 @@ def _bound(spelling, scope, scope_name, line):
 
 def _statements(statements, default, pacing, stability, phase,
                 observations, inputs):
-    """Resolve a statement list under its innermost defaults.
+    """Resolve a list of statements using the innermost defaults passed in.
 
-    A ``with`` scope is transparent to the timing model: it carries no
-    timing modifier and so introduces no scope, and what it wraps
-    resolves against exactly the defaults it would have had without
-    the block. Nothing here changes when one is written.
+    A ``with`` block is invisible to the timing model: it can't
+    carry a timing modifier of its own, so it doesn't introduce a
+    new scope. Statements inside a ``with`` block resolve against
+    exactly the same defaults they would have outside it -- nothing
+    here treats a ``with`` block specially.
     """
     for statement in statements:
         units = getattr(statement, "units", None)
@@ -350,24 +365,26 @@ def _statements(statements, default, pacing, stability, phase,
                         observations, inputs)
             continue
         if not hasattr(statement, "verb"):
-            continue                  # a phase, resolved by `resolve`
+            continue                  # a phase -- resolve() already handles those
         if statement.verb in INPUT_VERBS:
             inputs.append(Input(
                 statement.verb, statement.line, statement.column, phase,
                 _bound(statement.pacing, "statement", None,
                        statement.line) or pacing))
         if statement.verb == "select":
-            # An observation-bearing action, so it lands in both
-            # lists: its feedback watches run within the statement's
-            # effective timeout, and it still delivers keys.
+            # `select` both watches and sends input, so it's added
+            # to both lists here: its feedback checks run within the
+            # statement's effective timeout, and it also delivers
+            # keystrokes.
             observations.append(Observation(
                 "select", statement.line, statement.column, phase, default,
                 None, stability))
             continue
         if statement.verb == "click":
-            # Like `select`, twice in the plan: its search is a real
-            # landmark match (F65's own machinery), not select's text
-            # scan, so it carries the landmark the way a `wait` does.
+            # Like `select`, `click` is added to the plan twice: its
+            # search is a real landmark match (using F65's own
+            # machinery), not select's text scan, so it also carries
+            # a landmark, the way a `wait` does.
             observations.append(Observation(
                 "click", statement.line, statement.column, phase, default,
                 None, stability, statement.arguments[0]))
@@ -384,12 +401,13 @@ def _statements(statements, default, pacing, stability, phase,
                 _bound(statement.stable, "statement", None, statement.line),
                 own, _landmark(statement)))
             continue
-        # A branching wait bounds reaching the first match, and is
-        # the innermost scope for the observations its handlers
-        # lexically contain. Unlike `stable`, `stability` may be
-        # written here: an unstable frame evaluates none of the
-        # handlers, so the gate belongs to the sample and therefore to
-        # the container.
+        # A branching wait's timeout bounds how long it can take to
+        # reach the first matching handler, and it's the innermost
+        # scope for the observations its handlers lexically contain.
+        # Unlike `stable`, `stability` can be written here: an
+        # unstable frame skips evaluating all of the handlers, so
+        # the stability gate belongs to the sample as a whole, which
+        # means it belongs to the container.
         branching = _bound(statement.timeout, "branching wait", None,
                            statement.line) or default
         inherited = _level(statement.stability, "branching wait", None,
@@ -404,13 +422,14 @@ def _statements(statements, default, pacing, stability, phase,
 
 def _handler(handler, default, pacing, stability, phase, observations,
              inputs):
-    """Resolve one handler: its own hold, then its body.
+    """Resolve one handler: its own wait, then the statements in its body.
 
-    The branching ``wait`` above is the innermost *timeout* scope for
-    this body and no scope at all for pacing — it cannot carry one —
-    so the pacing default passes straight through from the phase. It
-    *is* a stability scope, which is where the two observation
-    families diverge.
+    The branching ``wait`` containing this handler is the innermost
+    *timeout* scope for the handler's body, but it isn't a pacing
+    scope at all -- a branching wait can't carry a pacing setting --
+    so the pacing default passes straight through from the phase
+    unchanged. It *is* a stability scope, though, which is where the
+    timeout and pacing scoping rules diverge.
     """
     own = _level(handler.stability, "statement", None,
                  handler.line) or stability

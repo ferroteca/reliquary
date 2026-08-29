@@ -14,11 +14,11 @@ _HIGHLIGHT = 0x1B
 
 
 class _Screen:
-    """A mutable text screen that renders the seam's frame pair.
+    """A mutable text screen, used to build the (text, attributes) frame pairs that screen_stability reads.
 
     Sample sequences are built by writing into one of these and
     taking a `frame()` after each edit, so a test reads as the
-    guest's own drawing rather than as two literal grids.
+    guest's own drawing instead of as a list of literal grids.
     """
 
     def __init__(self, rows=_ROWS, columns=_COLUMNS):
@@ -51,11 +51,12 @@ def _observe(monitor, frames, start=0.0, cadence=0.1):
 
 
 def _border_at(screen, moment):
-    """A 76-cell border marching on the wall clock, not the sample.
+    """A 76-cell border that animates by wall-clock time, not by sample index.
 
-    Advancing on wall time is what makes this a test of the
-    measure rather than of the harness: a denser poll sees the
-    same animation, only sampled more often.
+    Advancing by wall time, rather than by call count, is what makes
+    this test exercise the stability measure itself and not just the
+    test harness: a denser poll sees the same animation, just
+    sampled more often.
     """
     step = int(moment / 0.1)
     pattern = "".join("-" if (column + step) % 2 else "="
@@ -77,8 +78,8 @@ def test_an_unchanging_screen_is_stable():
 
 def test_a_line_of_text_arriving_is_not_a_stable_screen():
     # 80 cells of 2000 is 4% of the screen, so any threshold
-    # looser than 0.96 would call this settled — it is the event
-    # the default exists to refuse
+    # looser than 0.96 would call this stable. This is the case the
+    # default threshold exists to catch as not stable.
     screen = _Screen()
     frames = [screen.frame()] * 4
     screen.write(12, 0, "Copying FreeDOS system files to C:" + "." * 40)
@@ -96,10 +97,13 @@ def test_a_line_of_text_arriving_is_not_a_stable_screen():
     (24, 70, "12:04:31"),
 ], ids=["blinking cursor", "percentage counter", "clock"])
 def test_screen_furniture_stays_below_the_threshold(row, column, text):
-    # the default's job is to sit in the gap between furniture and
-    # content, so each item costs an order of magnitude less than
-    # the row of text above. One change each, so this is the
-    # threshold answering and never the animation mask.
+    # The default threshold has to sit between furniture (small,
+    # persistent elements like a cursor or a clock) and real
+    # content: each of these items changes an order of magnitude
+    # fewer cells than the line of text in the test above. Each
+    # case here changes only once, so this tests the threshold
+    # value itself, not the animation mask, which needs a change to
+    # repeat.
     screen = _Screen()
     frames = [screen.frame()] * 4
     screen.write(row, column, text)
@@ -140,10 +144,10 @@ def test_a_highlight_moving_by_attribute_alone_is_a_change():
 
 
 def test_a_marching_border_is_decoration_not_movement():
-    # "little ants" round a menu churn every border cell at every
-    # sample, so raw magnitude never approaches the threshold —
-    # yet nothing of consequence is happening, and the region the
-    # change occupies is itself perfectly steady
+    # A "marching ants" border like this changes every border cell
+    # on every sample, so its raw magnitude never approaches the
+    # threshold — yet nothing meaningful is happening, and the
+    # region where the change occurs is itself perfectly steady.
     screen = _Screen().write(10, 20, "Install to harddisk")
     frames = []
     for step in range(12):
@@ -158,11 +162,12 @@ def test_a_marching_border_is_decoration_not_movement():
 
 
 def test_the_verdict_does_not_depend_on_the_poll_rate():
-    # stability counted between *consecutive samples* — or
-    # decoration counted over the last N samples — is a property
-    # of guest x poll rate, not of the guest: a recorded run polls
-    # denser than a production one, and the two must not take
-    # different paths through the same script
+    # If stability were measured between consecutive samples, or
+    # decoration were counted over just the last N samples, the
+    # verdict would depend on the poll rate as well as on what the
+    # guest is doing. A recorded run polls more densely than a
+    # production run, and the two must reach the same verdict on
+    # the same script.
     verdicts = {}
     for cadence in (0.1, 0.05, 0.025):
         screen = _Screen().write(10, 20, "Install to harddisk")
@@ -195,8 +200,9 @@ def test_a_wholly_churning_screen_is_compared_unmasked():
 
 
 def test_a_redraw_below_the_recurrence_bar_stays_content():
-    # a cell that changes once is content wherever it sits, and
-    # twice is still not decoration: only recurrence earns the mask
+    # A cell that changes once counts as content, wherever it sits,
+    # and changing twice still isn't decoration: only enough
+    # repeats earns the mask.
     screen = _Screen()
     frames = [screen.frame()] * 3
     for step in range(2):
@@ -210,10 +216,10 @@ def test_a_redraw_below_the_recurrence_bar_stays_content():
 
 
 def test_an_animation_starting_mid_wait_is_absorbed():
-    # the menu machinery's learned mask is sampled once, on a
-    # screen that had to be quiet first, so decoration that begins
-    # later never enters it at all; recurrence needs no learning
-    # phase and no quiet moment
+    # A mask learned from one quiet sample, taken before the
+    # animation starts, would never include decoration that begins
+    # later. This measure's recurrence check needs no such learning
+    # phase, and no quiet moment to sample first.
     screen = _Screen().write(10, 20, "Install to harddisk")
     monitor = screen_stability.ScreenStability()
     verdicts = []
@@ -246,9 +252,10 @@ def test_a_change_exactly_one_window_old_is_outside_it():
 
 
 def test_a_window_never_observed_cannot_be_judged():
-    # quiescence over a span nobody watched is not an answer the
-    # measure has: every guarded observation pays one window
-    # before its condition is first evaluated
+    # Whether the screen was stable over a time span nobody
+    # observed is not something the measure can answer: every
+    # stability check has to wait through one full window of
+    # samples before its condition can first be evaluated.
     screen = _Screen().write(0, 0, "C:\\>")
     monitor = screen_stability.ScreenStability()
 
@@ -256,7 +263,7 @@ def test_a_window_never_observed_cannot_be_judged():
 
     assert not reading.stable
     assert reading.stability is None
-    # Young, not blind: two more samples fix this one.
+    # Too young to judge, not blind: two more samples would settle it.
     assert not reading.blind
 
 
@@ -281,8 +288,9 @@ def _blinking():
 
 
 def test_the_minimum_viable_cadence_is_stated_not_assumed():
-    # repeats samples must fit the window, with the margin's room
-    # to spare, so the defaults demand a read every ~0.17s.
+    # Fitting `animation_repeats` samples inside `animation_window`,
+    # with margin to spare, is why the defaults demand a read at
+    # least every ~0.17s.
     assert screen_stability.viable_cadence() == pytest.approx(1.0 / 6)
     # And the inverse: what a 0.83s reader needs to keep the guard.
     assert screen_stability.viable_window(0.83) == pytest.approx(4.98)
@@ -301,10 +309,11 @@ def test_a_dense_poll_keeps_the_default_window():
 
 
 def test_a_sparse_poll_widens_the_window_and_keeps_the_guard():
-    # The same screen at a screenshot backend's cost. Recurrence
-    # is measured over the span this caller can observe, so the
-    # blink is still recognized as decoration rather than scored
-    # as content forever.
+    # The same blinking screen, but polled at a screenshot
+    # backend's slower cadence. Recurrence is measured over the
+    # span this caller can actually observe, so the blink is still
+    # recognized as decoration instead of being scored as content
+    # forever.
     monitor = screen_stability.ScreenStability()
 
     reading = _observe(monitor, _blinking(), cadence=0.83)
@@ -335,10 +344,11 @@ def test_a_cadence_past_the_cap_is_answered_as_blind():
 
 
 def test_blindness_is_never_claimed_before_a_cadence_is_known():
-    # One sample is a young monitor, not a slow caller, and
-    # calling it blind would stand the guard down on every run's
-    # opening read. Two samples is the whole evidence needed:
-    # nothing later can make a hopeless cadence workable.
+    # After one sample, the monitor is young, not the caller slow,
+    # and calling it blind would disable the guard on every run's
+    # very first read. Two samples are all the evidence needed:
+    # once a cadence is too slow to work, no later sample changes
+    # that.
     monitor = screen_stability.ScreenStability()
     frames = _blinking()
 
@@ -352,12 +362,12 @@ def test_blindness_is_never_claimed_before_a_cadence_is_known():
 
 
 def test_an_idle_backoff_is_not_mistaken_for_a_slow_caller():
-    """The regression the capability rule exists to prevent.
+    """Backing off to a slower poll rate must not be mistaken for blindness.
 
-    The script runtime polls densely while a screen moves and
-    backs off to 2s once it settles. Counting samples in the last
-    window would read that backoff as blindness and stand the
-    guard down exactly when the next redraw arrives.
+    The script runtime polls densely while a screen is changing and
+    backs off to a 2s interval once it settles. Counting samples in
+    just the last window would read that backoff as blindness and
+    disable the guard exactly when the next redraw arrives.
     """
     screen = _Screen().write(0, 0, "C:\\>")
     monitor = screen_stability.ScreenStability()

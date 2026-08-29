@@ -1,12 +1,12 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The dry run: what a create would do, having done none of it.
+"""Tests for dry runs: what a create or run-script would do, without doing any of it.
 
-Two invariants carry the feature and both are asserted directly
-here, because everything else it reports is only worth having if
-they hold: it **leaves no state behind**, and its **return is not
-the run's**. The rest of the module checks that what it predicts is
-what a create then does — the only claim that makes a plan worth
+Two things must always hold, and are tested directly first: a dry
+run leaves no state on disk, and it returns a DryRun object, not a
+machine id or an actual run result. Everything else in this module
+checks that what a dry run predicts matches what a real create or
+run then actually does — the only thing that makes a plan worth
 reading.
 """
 
@@ -34,10 +34,11 @@ from reliquary.script_timing import format_plan, resolve as resolve_timing
 from reliquary.script_validation import reach
 from tests import fake_backend
 
-#: The payload the remote media pins, and its hash. A create for real
-#: is given this in the cache, so it is a cache hit rather than a
-#: download; a dry run with an empty cache still reports
-#: `would-download`, which is the state under test.
+#: The payload the remote media's sha256 field pins, and its hash. A
+#: real create finds this payload already in the cache, so it's a
+#: cache hit rather than a download; a dry run with an empty cache
+#: still reports `would-download`, which is the state this module
+#: tests.
 TOOLS = b"TOOLS-PAYLOAD"
 TOOLS_SHA = hashlib.sha256(TOOLS).hexdigest()
 
@@ -162,11 +163,12 @@ def test_it_materializes_no_image(dry):
 
 
 def test_a_codex_blueprint_is_refused_rather_than_read(dry):
-    # This test used to assert the opposite: create_machine seeded a
-    # codex blueprint on first reference and a dry run read it where
-    # it lay, seeding nothing. Neither happens now (D88) — the
-    # blueprints directory is the sole source — so what a dry run
-    # must not do is unchanged and what it refuses has grown.
+    # This test used to check the opposite: create_machine seeded a
+    # codex blueprint the first time it was referenced, and a dry
+    # run read the codex blueprint directly instead of seeding it.
+    # Neither happens now (D88) — the blueprints directory is the
+    # only source of blueprints — so a dry run still writes nothing,
+    # but it now refuses more cases than it used to.
     context = Context(home_dir=dry.home)
     with pytest.raises(PreflightError) as caught:
         create_machine("freedos", context=context, dry_run=True)
@@ -176,9 +178,9 @@ def test_a_codex_blueprint_is_refused_rather_than_read(dry):
 
 
 def test_nothing_is_hashed(dry):
-    # `cached` says the file is there, not that it is the right
-    # one: verifying what is cached is a later --dry-run=verify,
-    # and hashing a LiveCD is not a step that costs nothing.
+    # `cached` means the file is present, not that it's the right
+    # file — checking that is a separate, later --dry-run=verify
+    # step, because hashing a LiveCD takes real time.
     dry.write_mixed()
     cache = os.path.join(dry.home, "cache", "media")
     os.makedirs(cache)
@@ -207,8 +209,8 @@ def test_a_real_create_still_returns_the_id(dry):
 
 
 def test_the_document_serializes_whole(dry):
-    # --json prints exactly what the twin returns, so the twin's
-    # return has to survive json.dumps with nothing dropped.
+    # --json prints exactly what dry.run() returns, so that result
+    # has to survive json.dumps with nothing dropped.
     dry.write_mixed()
     document = dataclasses.asdict(dry.run())
     round_tripped = json.loads(json.dumps(document))
@@ -281,8 +283,9 @@ def test_an_uncached_remote_would_download(dry):
     assert entry["state"] == "would-download"
     assert entry["source"] == "https://example.invalid/tools.img"
     assert entry["sha256"] == TOOLS_SHA
-    # No byte total: nothing on this host knows one, and a total
-    # appears only where something does.
+    # No "size" field: nothing on this host knows the size of an
+    # unfetched remote payload. "size" appears only where something
+    # does know it.
     assert "size" not in entry
 
 
@@ -326,9 +329,10 @@ def test_a_container_child_names_the_download_behind_it(dry):
 
 
 def test_a_cached_container_hides_the_download_behind_it(dry):
-    # The closure `prune` reclaims by: a container is fetched only
-    # while its child is missing, so a cached child reports no
-    # download at all.
+    # This mirrors how `prune-media` decides what it can reclaim: a
+    # container is only fetched while its child is still missing, so
+    # once the child is cached, the plan reports no download for the
+    # container either.
     dry.write("demo", {
         "platform": "dos",
         "drives": {"cdrom0": "inner"},
@@ -375,7 +379,9 @@ def test_a_bound_location_resolves_all_the_way(dry):
     assert plan["properties"]["license-iso"] == "--property"
 
 
-# --backend asks about another host, so only capability decides.
+# --backend can name a backend not installed on this host, so what
+# decides whether the dry run accepts it is capability, not
+# availability.
 
 def test_an_absent_but_capable_backend_answers_yes(dry):
     dry.write_mixed()
@@ -410,7 +416,7 @@ def test_backend_overrides_the_blueprint_field(dry):
     # Without --backend, the blueprint's declared backend wins.
     assert dry.run().plan["backend-source"] == "declared"
     assert dry.run().plan["backend"] == "qemu"
-    # --backend overrides it, pinning assignment itself.
+    # --backend overrides that, pinning which backend gets assigned.
     dry.install("vmware", available=True,
                 capabilities=Capabilities(
                     backend="vmware",
@@ -425,12 +431,12 @@ def test_backend_overrides_the_blueprint_field(dry):
 
 
 def test_without_the_flag_assignment_still_needs_availability(dry):
-    # The question changes with the flag and not without it: an
-    # ordinary dry run reports what *this* host would do.
+    # --backend changes the question being asked; without it, an
+    # ordinary dry run just reports what this host would do.
     dry.write_mixed()
     dry.backend.available = False
     # VirtualBox is a real capable candidate on hosts that have
-    # it (F52); pin it absent so the walk has nothing left.
+    # it (F52); pin it absent so there's no backend left to pick.
     dry.install("virtualbox", available=False)
     with pytest.raises(PreflightError) as caught:
         dry.run()
@@ -465,7 +471,8 @@ def test_a_declared_backend_is_named_as_the_source(dry):
     assert dry.run().plan["backend-source"] == "declared"
 
 
-# The judgment assignment is built from, on its own.
+# backends.evaluate() is the underlying judgment that backend
+# assignment relies on; tested here on its own.
 
 def test_it_reports_both_answers_separately():
     requirements = backends.Requirements(media=("cdrom",))
@@ -551,8 +558,10 @@ def test_an_unconditional_goto_carries_reachability_along():
 
 
 def test_the_shipped_install_script_is_mostly_the_guests():
-    # The real shape this exists to report: a branching wait puts
-    # most of a real installer script behind the guest.
+    # This is the real-world case the reachability check exists for:
+    # a branching wait means most of a real installer script can
+    # only run depending on what the guest does, so static analysis
+    # can't confirm it will run.
     path = os.path.join(
         os.path.dirname(os.path.abspath(reliquary.__file__)),
         "codex", "scripts", "freedos-install.rlqs")
@@ -561,15 +570,16 @@ def test_the_shipped_install_script_is_mostly_the_guests():
     assert reachable > 0
 
 
-# run_script(dry_run=True): the check family's one spelling.
+# run_script(dry_run=True) replaces the separate check-script
+# command; this section tests it as the one way to check a script.
 
 def _codex_context(home):
     """A home the codex blueprint has been seeded into.
 
-    Nothing resolves out of the library any more (D88), so a test
-    wanting the shipped script asks for it by name first — which is
-    what a user does, `seed-blueprint` bringing the scripts the
-    blueprint names along with it.
+    A blueprint's scripts no longer resolve straight from the
+    library (D88), so a test that wants the shipped script has to
+    seed it by name first, the same as a user would — `seed-blueprint`
+    brings along the scripts the blueprint names.
     """
     context = Context(home_dir=home)
     seed_blueprint("freedos", context=context)
@@ -606,12 +616,12 @@ def test_a_seeded_name_plans_without_writing(tmp_path):
 
 
 def test_an_unseeded_name_is_refused_naming_the_fix(tmp_path):
-    """The dry run refuses where a live run refuses, and says how.
+    """A dry run refuses in the same case a live run refuses, and says how to fix it.
 
-    It used to read a codex script where it lay — the one way the
-    library reached a run without being asked. With the fallback
-    gone there is nothing to read, so the honest answer is the
-    refusal plus the command that fixes it (P11, D88).
+    This used to fall back to reading a codex script directly,
+    without the user seeding it first. That fallback is gone (D88),
+    so now there's nothing to read, and the honest response is a
+    refusal plus the command that fixes it (P11).
     """
     home = str(tmp_path)
     with pytest.raises(PreflightError) as caught:
@@ -645,9 +655,10 @@ def test_a_blueprint_label_resolves_without_creating_a_machine(tmp_path):
 
 
 def test_a_blueprint_with_a_machine_reaches_the_preflight_tier(tmp_path):
-    # The selector chooses the tier, so --blueprint has to resolve
-    # a machine exactly as a live run does -- which is what the
-    # retired spelling did only for --machine.
+    # The selector determines which tier a dry run reaches, so
+    # --blueprint has to resolve to a machine exactly as a live run
+    # does. The retired check-script command only did that for
+    # --machine.
     with fake_backend.installed():
         context = _codex_context(str(tmp_path))
         create_machine("freedos", context=context)
@@ -718,11 +729,11 @@ def test_display_and_progress_are_refused(tmp_path):
 
 
 def test_record_is_refused(tmp_path):
-    """The fourth refusal, on the same ground as the other three.
+    """The fourth refusal, for the same reason as the other three.
 
-    A dry run reads no screen, so a capture would be an empty
-    file — and a flag accepted to no effect is the dishonesty
-    P11 exists to refuse.
+    A dry run doesn't read the guest's screen, so `--record` would
+    just create an empty file. Accepting a flag that has no effect
+    would be exactly the kind of dishonesty P11 exists to refuse.
     """
     home = str(tmp_path)
     context = _codex_context(home)
@@ -734,7 +745,8 @@ def test_record_is_refused(tmp_path):
         "the refusal wrote a transcript anyway")
 
 
-# The surface collisions the respelling had to settle.
+# CLI conflicts that had to be resolved when check-script was
+# folded into run_script --dry-run.
 
 @pytest.fixture
 def flat_home(tmp_path):
@@ -773,8 +785,9 @@ def test_json_is_legal_on_a_dry_run(flat_home):
 
 
 def test_json_is_still_refused_on_a_live_run(flat_home):
-    # The flip is the whole point: a plan is a document, a run is
-    # a stream, and one flag means one thing on each.
+    # This split is the whole point: a plan is a document, so --json
+    # fits; a run is a stream, so --json is refused there and
+    # --progress jsonl exists instead.
     code, _out, err = _cli_run(
         flat_home, "run-script", "flat", "--blueprint", "nope", "--json")
     assert code == 2

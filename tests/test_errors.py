@@ -166,21 +166,21 @@ def test_an_unexpected_fault_exits_one(scripted_home):
 
 
 def test_an_internal_error_exits_one(scripted_home):
-    # The other population of exit 1: deliberate, in the hierarchy,
-    # and still a fault — no user input reaches it, so there is
-    # nothing for a caller to restate.
+    # The other case that exits 1: InternalError is deliberate and
+    # part of the hierarchy, but still a bug — no user input caused
+    # it, so there's nothing for a caller to restate.
     code, text = _run_raising(
         scripted_home, InternalError("phase 'wat' is unrecognized"))
     assert code == 1
     assert "unrecognized" in text
 
 
-# The five mistakes that exited 1, measured end to end (D58).
+# The five mistakes that used to exit 1, checked end to end (D58).
 #
-# Every row of the defect's table, driven through `cli.main` rather
-# than asserted against a class — the exit code is what a CLI-driving
-# program sees (U9), and it was the exit code that was wrong while the
-# taxonomy underneath was right all along.
+# Each case here is run through `cli.main` itself, not just checked
+# against an exception class, because the exit code is what a
+# program driving the CLI actually sees (U9). The exit code was the
+# bug — the error-class hierarchy underneath was already correct.
 
 def _cli(home, *argv):
     err = io.StringIO()
@@ -231,14 +231,14 @@ def test_malformed_blueprint_json_is_static(home):
     assert "line" in text
 
 
-# No deliberate raise in the package is a bare builtin.
+# No deliberate `raise` in the package uses a bare builtin exception.
 #
-# `except ReliquaryError` is documented as the catch-all, which only
-# holds if every deliberate raise is in the hierarchy — so the rule is
-# asserted structurally rather than left to review. A builtin escaping
-# this way is exactly how an ordinary mistake came to report as
-# reliquary's own fault: the CLI had a clause naming seven of them and
-# printed exit 1.
+# `except ReliquaryError` is documented as the catch-all, and that's
+# only true if every deliberate raise is in the hierarchy — so this
+# test checks it structurally instead of relying on code review. A
+# builtin exception escaping this way is exactly how an ordinary
+# mistake used to get reported as reliquary's own fault: the CLI had
+# a clause naming seven builtins by hand and printed exit 1 for them.
 
 #: Builtins a deliberate raise may never use again.
 FORBIDDEN = {
@@ -273,13 +273,13 @@ def test_no_deliberate_raise_uses_a_forbidden_builtin():
 
 
 def test_the_one_permitted_builtin_is_the_abstract_method_idiom():
-    """`raise NotImplementedError` survives only argument-less.
+    """`raise NotImplementedError` is allowed only with no argument.
 
-    An abstract method's stub is an invariant the language
-    enforces, not a report to a caller. Given an argument it is a
-    message someone reads, which makes it a capability gap — a
-    PREFLIGHT ERROR, since the request is legal and this build
-    does not satisfy it.
+    A bare `raise NotImplementedError` in an abstract method is a
+    language-level guard, not a message meant for a caller. Given an
+    argument, it becomes a message someone reads — which makes it a
+    capability gap, a PREFLIGHT ERROR, since the request itself is
+    valid and this build just doesn't support it yet.
     """
     wrong = [f"{module}:{line}"
              for module, line, name, node in _raise_sites()
@@ -289,18 +289,18 @@ def test_the_one_permitted_builtin_is_the_abstract_method_idiom():
     assert wrong == [], "\n".join(wrong)
 
 
-# `script-spec.md` requires an id of every diagnostic (D55).
+# `script-spec.md` requires every diagnostic to carry an id (D55).
 #
-# The requirement had been read as the script surface's, because the
-# error classes were read as tiers of a script run. D58 generalized the
-# classes and the requirement travelled with them, which took the
-# population from 30 to 288. It reads zero now, and this is what keeps
-# it there: the next diagnostic added without an id fails here rather
-# than being noticed later by a measurement.
+# That requirement used to be read as applying only to scripts,
+# because the error classes were understood as tiers of a script
+# run. D58 made the classes general-purpose, and the id requirement
+# grew with them — from 30 diagnostics to 288. This test is what
+# keeps the count of violations at zero: a new diagnostic added
+# without an id fails here, instead of being caught later by hand.
 #
-# The corpora assert that the *right* id fires for a given input; this
-# asserts only that one exists, which is the part a corpus cannot cover
-# for surfaces it has no fixtures for.
+# The corpus tests check that the *right* id fires for a given
+# input. This test only checks that some id exists, which covers the
+# surfaces the corpus has no fixtures for.
 
 #: Classes that name no rule, and why.
 #:

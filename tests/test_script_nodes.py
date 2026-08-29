@@ -116,9 +116,11 @@ def test_a_malformed_reference_is_named():
 
 
 def test_a_media_name_may_lead_with_a_digit():
-    # The sigil classifies the token, so @86Box is unambiguous
-    # where a bare 86Box would lex as a duration; a property
-    # key, which also appears bare, keeps letter-initial (D24).
+    # The `@` sigil marks this token as a media reference, so
+    # `@86Box` is unambiguous even though a bare `86Box` would lex
+    # as a duration. A property key also appears bare elsewhere (in
+    # a `property` declaration), so it still has to start with a
+    # letter (D24).
     assert tokenize("insert cdrom0 @86Box", 1)[-1].value == "86Box"
     with pytest.raises(ScriptParseError) as caught:
         tokenize("wait $86key", 1)
@@ -196,9 +198,10 @@ def test_a_line_must_begin_with_a_node_name():
 
 
 def test_diagnostics_render_with_a_caret():
-    # The rendering ends with the diagnostic's id in parentheses,
-    # which is where the V-numbers used to sit: it is the stable
-    # handle a consumer switches on, where the wording is not.
+    # The rendered message ends with the diagnostic's id in
+    # parentheses — the same position V-numbers used to sit in. The
+    # id is the stable value code can switch on; the wording of the
+    # message is not.
     with pytest.raises(ScriptParseError) as caught:
         parse_nodes("start\nwait 30\n", path="x.rlqs")
     assert str(caught.value) == (
@@ -207,10 +210,11 @@ def test_diagnostics_render_with_a_caret():
         "\n2 | wait 30\n         ^")
 
 
-# A script carries no JSON island inside ordinary blocks. Authored
-# assets — media definitions and landmarks — live in their own files
-# beside the script, so every block holds nodes. The HTTP content body
-# is a raw text body attached to one node, not a block.
+# A script never has a block of raw JSON embedded inside an
+# ordinary block. Authored assets — media definitions and landmarks
+# — live in their own files beside the script, so every block holds
+# nodes. The HTTP content body is raw text attached to one node, not
+# a block.
 
 def test_every_block_holds_nodes():
     phase, = parse_nodes("phase p {\n    finish\n}\n")

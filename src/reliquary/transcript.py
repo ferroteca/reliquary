@@ -2,18 +2,21 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Screen transcript capture and reconstruction.
 
-Internal debugging and corpus tool, not an application surface (D98):
-no stability guarantee, no ``docs/spec/`` entry, and a change to the
-format is housekeeping. The invocation -- ``--record <path>`` on
-``run-script`` and ``run_script(record=)`` on the session -- *is*
-surface and lands on S1/S2 in the same change.
+This is an internal debugging and test-corpus tool, not a public
+application surface (D98): there is no stability guarantee, no
+``docs/spec/`` entry for it, and a change to the file format is just
+housekeeping. The command-line invocation, though -- ``--record
+<path>`` on ``run-script`` and ``run_script(record=)`` on the
+session -- *is* a public surface, and lands on S1/S2 in the same
+change as everything else here.
 
-The capture wraps the **carrier seam** (the adapter session's
-``text_screen()`` / ``send_keys()`` / ``screenshot()`` /
-``change_medium()`` / ``pointer_event()``), so it is backend-neutral
-by construction.
-Reconstruction stands a fake session at that same seam, and the
-whole interpretation layer runs unmodified above it.
+Capture wraps the **carrier seam**: the adapter session's
+``text_screen()``, ``send_keys()``, ``screenshot()``,
+``change_medium()``, and ``pointer_event()`` methods. Wrapping at
+that seam is what makes capture work the same regardless of
+backend. Reconstruction stands up a fake session at that same seam,
+and the entire interpretation layer above it runs completely
+unmodified.
 """
 
 import hashlib
@@ -26,10 +29,11 @@ from .errors import PreflightError, StaticError
 
 _DIGEST = "sha256"
 
-#: Bumped when the encoding changes, so a transcript taken before it
-#: is refused by name rather than failing its digests. There is no
-#: compatibility parsing here and no reader for an older one (D98, and
-#: the pre-1.0 rule): a stale capture is re-recorded.
+#: Bumped whenever the encoding changes, so a transcript captured
+#: before the change is refused with a clear name rather than just
+#: failing its digest checks. There is no compatibility parsing
+#: here, and no reader for an older format version (D98, and the
+#: pre-1.0 rule): a stale capture just gets re-recorded.
 _FORMAT_VERSION = "rlqt-2"
 
 
@@ -44,27 +48,30 @@ def _stamp(moment):
 
 
 def _canonical(rows, attributes):
-    """The canonical form for a digest: JSON of (text rows, attribute rows).
+    """The canonical form used for computing a digest: JSON of (text rows, attribute rows).
 
     Rows are strings; attribute rows are lists of ints, one per cell.
-    Identity is the whole pair — a cursor menu moves its selection by
-    attribute alone.
+    Both together decide identity -- a cursor menu can move its
+    selection using attributes alone, with the text unchanged.
     """
     return json.dumps([list(rows), attributes], sort_keys=True)
 
 
 def pack_attributes(attributes):
-    """Attribute rows as runs — ``[[count, token], …]`` for each row.
+    """Pack attribute rows into runs: ``[[count, token], ...]`` for each row.
 
-    Per-cell arrays were seventy per cent of the first real capture:
-    eighty tokens a row, twenty-five rows a keyframe, where a DOS row
-    is one to four runs of them. The saving is worth having, but the
-    argument is the one the deltas were chosen on — a reviewer reads
-    "normal, then a highlight from column ten for fifteen cells"
-    where they used to read eighty sevens.
+    Storing one attribute value per cell made up seventy percent of
+    the size of the first real capture: eighty tokens per row,
+    twenty-five rows per keyframe, where a typical DOS row actually
+    only has one to four distinct runs of attributes. The space
+    saved is worth having, but the real reason this format was
+    chosen is readability, the same reason deltas were chosen: a
+    reviewer now reads "normal, then a highlight from column ten for
+    fifteen cells" instead of eighty sevens in a row.
 
-    A token is opaque and only ever compared for equality, so this
-    holds whatever the seam's own vocabulary turns out to be.
+    A token is treated as opaque and only ever compared for
+    equality, so this works with whatever vocabulary the carrier
+    seam happens to use.
     """
     packed = []
     for row in attributes:
@@ -85,11 +92,12 @@ def unpack_attributes(packed):
 
 
 def compute_digest(rows, attributes):
-    """SHA-256 of the canonical screen representation.
+    """Compute the SHA-256 digest of a screen's canonical representation.
 
-    A few bytes per entry, checked at reconstruction so a bug or a
-    hand-edited fixture fails loudly rather than yielding a screen
-    that never existed.
+    This costs only a few bytes per entry, and it is checked during
+    reconstruction so a bug or a hand-edited fixture fails loudly
+    instead of quietly producing a screen that never actually
+    existed.
     """
     return hashlib.new(_DIGEST,
                        _canonical(rows, attributes).encode()).hexdigest()
@@ -106,19 +114,22 @@ def compute_deltas(before, rows):
 
 
 def script_identity(script_path):
-    """What a capture is a capture *of*, as header fields.
+    """What a capture is a capture *of*, as a set of header fields.
 
-    A transcript is replayed by standing the same script back up over
-    it, and the file is the only thing that knows which script that
-    was. The digest is the other half: a script edited since the
-    capture was taken diverges partway through, and "this capture was
-    taken against a different freedos-install.rlqs" is a better
-    answer than a keystroke mismatch eleven minutes in.
+    A transcript is replayed by standing the same script back up
+    over it, and the script file itself is the only thing that
+    records which script that was. The digest fields cover the
+    other half of the problem: if the script was edited after the
+    capture was taken, a replay would diverge partway through, and
+    "this capture was taken against a different version of
+    freedos-install.rlqs" is a much better error than a keystroke
+    mismatch eleven minutes into a replay.
 
-    Empty where there is no readable script behind the run — a
-    caller holding a parsed tree and no path — because a header field
-    that is sometimes a guess is worse than one that is sometimes
-    absent (P11).
+    Returns an empty dict when there is no readable script file
+    behind the run -- for example, a caller holding a parsed tree
+    but no file path -- because a header field that is sometimes
+    just a guess is worse than one that is sometimes missing
+    entirely (P11).
     """
     if not script_path:
         return {}
@@ -141,27 +152,30 @@ class _TranscriptWriter:
         self._pace = pace
         self._script = script
         self._script_digest = script_digest
-        #: The command an `exec` capture is of. A capture states its
-        #: input whatever kind of run it was: a script by name and
-        #: digest, a command by its text — which *is* the whole input,
-        #: so there is nothing else to pin it against.
+        #: The command an `exec` capture ran. A capture always states
+        #: what its input was, whatever kind of run it recorded: a
+        #: script by name and digest, or a command by its literal
+        #: text -- which *is* the entire input, so there is nothing
+        #: else to check a replay against.
         self._command = command
-        #: And the limit it was given, because a wait that expires is
-        #: a conclusion the timeout decided: replaying a capture under
-        #: a different one asks a different question of it.
+        #: The timeout the run was given. A wait that expires reaches
+        #: its conclusion because of the timeout, so replaying the
+        #: same capture under a different timeout would be asking it
+        #: a different question.
         self._timeout = timeout
         self._written_header = False
         self._started = None
         self._last_wall = None
         self._stopped = False
-        #: The frame not yet written, held open so the reads it goes
-        #: on to absorb can be counted onto it. A frame's count is not
-        #: known when the frame arrives — only when the screen next
-        #: changes — so writing eagerly is what threw the count away.
+        #: The frame that has not been written yet, held open so
+        #: later reads of the same screen can be counted onto it. A
+        #: frame's final read count is not known when the frame
+        #: first arrives -- only once the screen changes again -- so
+        #: writing it out immediately would throw that count away.
         self._pending = None
 
     def open(self, clock=time.monotonic, now=_utc_now):
-        """Begin the transcript — one header line."""
+        """Begin the transcript by writing its one header line."""
         self._file = open(self._path, "w", encoding="utf-8")
         self._started = clock()
         self._last_wall = now()
@@ -188,18 +202,20 @@ class _TranscriptWriter:
 
     def write_frame(self, rows, attributes, samples=1,
                     clock=time.monotonic, now=_utc_now):
-        """Record one screen reading, collapsing it onto the last.
+        """Record one screen reading, collapsing it onto the previous one if identical.
 
-        A read identical to the one still pending is **absorbed onto
-        it** rather than dropped: the frame's sample count is what
-        separates "this screen held two seconds across forty samples"
-        from "it held two seconds with nobody looking", and only the
-        first says the guest was quiet (P11).
+        A read that is identical to the frame still pending is
+        **absorbed onto it** rather than dropped entirely: the
+        frame's sample count is what tells "this screen held for two
+        seconds across forty samples" apart from "it held for two
+        seconds with nobody looking," and only the first of those
+        actually says the guest was quiet (P11).
 
-        The frame is therefore held until the screen changes, a call
-        interrupts, or the transcript closes — its count is not
-        knowable any earlier. Its timestamps stay those of the read it
-        first appeared on, which is when the screen actually arrived.
+        Because of this, a frame is held open until the screen
+        changes, a call interrupts it, or the transcript closes --
+        its final count is not knowable any earlier than that. Its
+        timestamps stay those of the read it was first seen on,
+        which is when the screen actually appeared.
         """
         if self._stopped or self._file is None:
             return
@@ -209,12 +225,13 @@ class _TranscriptWriter:
         if pending is not None and pending["rows"] == rows and \
                 pending["attributes"] == attributes:
             pending["samples"] += samples
-            # And *when* each of them was taken. The count alone says
-            # the guest was quiet; the moments say at what cadence
-            # somebody looked, which is what a reconstruction has to
-            # put back — every window measure in the layer above is
-            # over wall-clock, so a read answered at a moment nobody
-            # read at is a different run.
+            # This also records *when* each read happened. The count
+            # alone only shows that the guest was quiet; the actual
+            # moments show at what cadence someone was reading, and a
+            # reconstruction has to reproduce that too -- every
+            # window-based measurement in the layer above operates on
+            # wall-clock time, so answering a read at a moment nobody
+            # actually read at would make it a different run.
             pending["absorbed"].append(round(clock() - self._started, 3))
             return
         self._flush_frame()
@@ -246,19 +263,23 @@ class _TranscriptWriter:
         prev = getattr(self, "_last_frame", None)
         prev_attributes = getattr(self, "_last_attributes", None)
         if prev is None or prev_attributes != attributes:
-            # Two things force a full frame, and a changed *row* is
-            # not one of them — a changed row is what a delta is for.
+            # Two things force writing a full frame here, and a
+            # changed *row* is not one of them -- a changed row is
+            # exactly what a delta is for.
             #
-            # A gap in sampling (a call, or the first frame) is the
-            # first: continuity cannot be claimed across one, so the
-            # next entry restates the screen whole.
+            # The first is a gap in sampling (a call, or this being
+            # the very first frame): continuity cannot be assumed
+            # across a gap, so the next entry has to restate the
+            # whole screen.
             #
-            # Changed attributes are the second, and they are the
-            # whole of what a delta cannot carry: deltas are rows, the
-            # digest covers rows *and* attributes, so a selection bar
-            # moving under identical text would otherwise be written
-            # as an empty row delta and rebuilt from the wrong
-            # attributes. A cursor menu moves by attribute alone.
+            # The second is changed attributes, which is exactly what
+            # a delta cannot express: a delta only records row text,
+            # while the digest covers rows *and* attributes. So a
+            # selection bar moving under otherwise identical text
+            # would be written as an empty row delta and then
+            # rebuilt with the wrong attributes if this were not a
+            # keyframe. A cursor menu can move by attribute alone,
+            # with no text change at all.
             entry["keyframe"] = True
             entry["rows"] = rows
             entry["attributes"] = pack_attributes(attributes)
@@ -273,8 +294,9 @@ class _TranscriptWriter:
         """Record a carrier call the run made."""
         if self._stopped or self._file is None:
             return
-        # A call ends the frame it interrupted: the count that frame
-        # absorbed is complete, and what follows is a new screen.
+        # A call ends whatever frame it interrupted: that frame's
+        # absorbed count is now final, and whatever comes next is a
+        # new screen.
         self._flush_frame()
         entry = {
             "type": "call",
@@ -284,19 +306,22 @@ class _TranscriptWriter:
         }
         if fields:
             entry.update(fields)
-        # A call is a sampling gap: the next frame must be a keyframe.
+        # A call creates a sampling gap, so the next frame recorded
+        # must be a keyframe.
         self._last_frame = None
         self._last_attributes = None
         self._write_json(entry)
 
     def write_gone(self, reason, clock=time.monotonic, now=_utc_now):
-        """Record the carrier going away — the machine is no longer there.
+        """Record the carrier going away -- the machine is no longer there.
 
-        The one entry the seam cannot write for itself: identity is
-        verified while a session is being opened, so a machine that
-        powered itself off refuses the session *before* the recording
-        wrapper exists. A capture that loses the moment cannot replay
-        a ``wait machine=stopped``, which is how a DOS install ends.
+        This is the one entry the seam cannot write for itself:
+        identity gets verified while a session is being opened, so a
+        machine that has powered itself off refuses the session
+        *before* the recording wrapper even exists to see it happen.
+        A capture that lost this moment could not replay a ``wait
+        machine=stopped``, which is exactly how a DOS install script
+        ends.
         """
         if self._stopped or self._file is None:
             return
@@ -307,28 +332,31 @@ class _TranscriptWriter:
             "wall": _stamp(now()),
             "reason": reason,
         }
-        # Nothing continues across a machine that stopped: whatever is
-        # read next is a screen this transcript has not seen.
+        # Nothing carries over across a machine stopping: whatever
+        # gets read next is a screen this transcript has never seen
+        # before.
         self._last_frame = None
         self._last_attributes = None
         self._write_json(entry)
 
     def write_outcome(self, result, clock=time.monotonic, now=_utc_now,
                       **fields):
-        """Record what the run concluded — the half the seam cannot show.
+        """Record what the run concluded -- the part the carrier seam itself cannot show.
 
-        At the carrier seam a run that returned the right answer and
-        one that returned somebody else's text are the same file: the
-        same keys go out, the same screens come back, and *which rows
-        it called the answer* is a decision taken above. A capture of
-        a run that failed is the same story — the refusal is a
-        conclusion, not a carrier call.
+        At the carrier seam, a run that returned the right answer
+        and one that returned the wrong text look identical: the
+        same keys go out, the same screens come back, and *which
+        rows counted as the answer* is decided above the seam, not
+        at it. A capture of a run that failed tells the same story
+        -- the failure is a conclusion drawn above the seam, not
+        something the carrier reported.
 
-        So the driver states its conclusion, once, as the last entry,
-        and a replay is asserted against it. ``result`` is ``ok`` or
-        ``failed``; the rest is the driver's, since what a conclusion
-        *is* differs by what was run — rows for a command, a phase for
-        a script, a rule id for either when it refused.
+        So the driver records its conclusion once, as the last
+        entry, and a replay is checked against it. ``result`` is
+        either ``ok`` or ``failed``; everything else is up to the
+        driver, since what counts as "the conclusion" differs by
+        what was run -- output rows for a command, a phase name for
+        a script, a rule id for either one when it failed.
         """
         if self._stopped or self._file is None:
             return
@@ -343,11 +371,12 @@ class _TranscriptWriter:
         self._write_json(entry)
 
     def stop(self, reason, clock=time.monotonic, now=_utc_now):
-        """End recording mid-run — a bound secret reached the guest."""
+        """End recording mid-run because a bound secret value reached the guest."""
         if self._stopped or self._file is None:
             return
-        # What was captured before the secret is kept whole, count
-        # and all; it is everything after that stops.
+        # Everything captured before the secret is kept intact,
+        # counts and all -- it is only what comes after that stops
+        # being recorded.
         self._flush_frame()
         entry = {
             "type": "secret-stopped",
@@ -381,11 +410,11 @@ class _TranscriptWriter:
 class RecordingSession:
     """Wraps an adapter session, recording every carrier call.
 
-    Sits at the carrier seam — between the adapter session and
-    ``DisplayConsole`` — so the entire interpretation layer runs
-    unmodified above it. Consecutive identical frames are collapsed,
-    absorbing their sample count; a keyframe is written after every
-    sampling gap.
+    Sits at the carrier seam -- between the adapter session and
+    ``DisplayConsole`` -- so the entire interpretation layer above
+    it runs completely unmodified. Consecutive identical frames get
+    collapsed together, with their sample counts combined; a
+    keyframe is written after every sampling gap.
     """
 
     def __init__(self, inner_session, writer):
@@ -407,16 +436,18 @@ class RecordingSession:
             fields={"combos": list(list(c) for c in combos)})
 
     def text_screen(self, font_banks=()):
-        """Return the screen, and offer every read to the transcript.
+        """Return the screen, and offer every read to the transcript writer.
 
-        **Every** read is offered, including one identical to the
-        last: collapsing is the writer's, because a frame's absorbed
-        sample count is only known once the screen changes, and a read
-        dropped here would be a sample the transcript could never
-        count. A keyframe after every sampling gap (a call) bounds the
-        damage when a reporter is missing. ``font_banks`` (F61) passes
-        straight through — the recording carries only rows and
-        attributes, never which fonts produced them.
+        **Every** read gets offered to the writer, including one
+        identical to the last: collapsing identical reads together
+        is the writer's job, not this method's, because a frame's
+        absorbed sample count is only knowable once the screen
+        actually changes. A read dropped here would be a sample the
+        transcript could never count at all. A keyframe written
+        after every sampling gap (a call) limits how much damage a
+        missing entry can do. ``font_banks`` (F61) passes straight
+        through unchanged -- the recording only ever carries rows
+        and attributes, never which fonts produced them.
         """
         rows, attributes = self._inner.text_screen(font_banks)
         # Copy the mutable lists the adapter hands back, so what the
@@ -429,25 +460,26 @@ class RecordingSession:
         return rows, attributes
 
     def framebuffer(self):
-        """Pass the capture through; the transcript holds no pixels.
+        """Pass the framebuffer read through unchanged; the transcript holds no pixels.
 
-        A transcript is a *text-screen* format — rows and attribute
-        tokens (planning/design/screen-transcripts.md) — so a
-        framebuffer read is offered nothing to record. Recording a run
-        that watches a landmark therefore keeps working and produces
-        a capture that cannot reconstruct that wait, which
-        :meth:`ReplaySession.framebuffer` says out loud rather than
-        improvising a screen (P11).
+        A transcript only stores a *text-screen* format -- rows and
+        attribute tokens (planning/design/screen-transcripts.md) --
+        so a framebuffer read has nothing here it could record.
+        Recording a run that watches a landmark still works, but
+        produces a capture that cannot reconstruct that particular
+        wait; :meth:`ReplaySession.framebuffer` says that plainly
+        when replay is attempted, instead of making up a screen
+        (P11).
         """
         return self._inner.framebuffer()
 
     def pointer_event(self, x, y, buttons):
-        """Pass the event through; the transcript holds no pixels.
+        """Pass the pointer event through unchanged; the transcript holds no pixels.
 
-        The same reasoning as :meth:`framebuffer`: a `click`'s search
-        already made this landmark's capture unreplayable, so
-        recording the delivery that followed would promise a
-        reconstruction it cannot give (F66).
+        Same reasoning as :meth:`framebuffer`: a `click`'s landmark
+        search already made this capture unreplayable, so recording
+        the pointer event that followed the search would just
+        promise a reconstruction it cannot actually deliver (F66).
         """
         self._inner.pointer_event(x, y, buttons)
 
@@ -492,10 +524,11 @@ class _TranscriptReader:
         self.script_digest = None
         self.command = None
         self.timeout = None
-        #: What the recorded run concluded, or ``None`` where the run
-        #: never reached a conclusion — a capture cut short by a
-        #: secret, or one whose driver crashed. A fixture asserting a
-        #: conclusion says so; a reader gets the absence honestly.
+        #: What the recorded run concluded, or ``None`` when the run
+        #: never reached a conclusion -- a capture cut short by a
+        #: secret reaching the guest, or one whose driver crashed. A
+        #: fixture that wants to assert a conclusion can, and a
+        #: reader gets an honest ``None`` when there is not one.
         self.outcome = None
         self._entries = None
 
@@ -580,10 +613,11 @@ class _TranscriptReader:
 class ReplaySession:
     """A fake adapter session that replays from a transcript.
 
-    Stands at the carrier seam — the same place the recording
-    wrapped — so the interpretation layer runs unmodified above it.
-    A request the transcript does not cover is an error naming what
-    was asked (P11): never an improvised answer, never an empty one.
+    Stands at the carrier seam -- the same place the recording
+    wrapped around -- so the interpretation layer above it runs
+    completely unmodified. A request the transcript does not cover
+    produces an error naming exactly what was asked for (P11): never
+    an improvised answer, and never an empty one.
     """
 
     backend = "transcript"
@@ -591,25 +625,30 @@ class ReplaySession:
     def __init__(self, entries, advance=None):
         self._entries = entries
         self._index = 0
-        #: Called with each consumed entry's recorded ``elapsed``.
-        #: Elapsed is what reconstruction runs on and wall time is
-        #: provenance: a reader whose clock ticks by its own sleeps
-        #: puts frames 200ms apart that the guest drew a third of a
-        #: second apart, and the stability measure — which judges over
-        #: wall-clock windows precisely so a denser poll cannot reach a
-        #: different verdict — then reaches a different verdict.
+        #: Called with each consumed entry's recorded ``elapsed``
+        #: value. Reconstruction advances time based on ``elapsed``,
+        #: not on the recorded wall-clock time, which is kept only
+        #: as provenance. A reader whose own clock ticks based on
+        #: its own sleeps would place frames 200ms apart that the
+        #: guest actually drew a third of a second apart, and the
+        #: stability measure -- which deliberately judges over
+        #: wall-clock windows so that polling more densely can never
+        #: change its verdict -- would then reach a different
+        #: verdict than it did during the real run.
         self._advance = advance
         # The current reconstructed screen.
         self._rows = None
         self._attributes = None
-        #: Reads the current frame still answers before the replay
-        #: advances. A capture collapses a held screen into one entry
-        #: carrying the count it absorbed, so a replay that advanced
-        #: once per read would run out of transcript long before the
-        #: run ran out of statements.
+        #: How many more reads the current frame can still answer
+        #: before the replay has to advance to the next entry. A
+        #: capture collapses a screen that was read repeatedly into
+        #: one entry carrying the count of reads it absorbed, so a
+        #: replay that advanced to a new entry on every read would
+        #: run out of transcript long before the run ran out of
+        #: statements.
         self._remaining = 0
-        #: The moments the frame now standing was read again at, one
-        #: taken off the front per repeat read.
+        #: The moments the currently standing frame was read again
+        #: at, with one taken off the front for each repeat read.
         self._absorbed = []
 
     def native(self):
@@ -624,35 +663,39 @@ class ReplaySession:
             self._advance(elapsed)
 
     def _pace_absorbed(self, data):
-        """The moments a held frame's absorbed reads were taken at.
+        """The moments a held frame's absorbed reads were originally taken at.
 
-        A collapsed frame stands for reads that happened between it
-        and whatever came next, and the file records when each of them
-        was: answering them all at the frame's own instant would bunch
-        a screen's samples at its start and leave a hole in front of
-        the following one, which every window measure above reads as a
-        cadence the run never had.
+        A collapsed frame stands in for every read that happened
+        between it and whatever entry came after it, and the
+        transcript file records exactly when each of those reads
+        happened. Answering all of them at the frame's own single
+        instant would bunch all of a screen's samples right at its
+        start and leave a gap right before the next entry -- and
+        every window-based measurement above this layer would read
+        that as a sampling cadence the run never actually had.
         """
         self._absorbed = list(data.get("absorbed") or ())
 
     def remaining_calls(self):
-        """Carrier calls the capture holds that the replay never made.
+        """Count the carrier calls the capture holds that the replay never actually made.
 
-        A run that ends early raises nothing — it simply stops asking,
-        and an unread transcript is silent — so "the replay finished"
-        and "the replay did what was captured" are different claims.
-        This is the second one.
+        A run that ends early does not raise anything -- it just
+        stops asking, and an unread transcript stays silent about
+        that -- so "the replay finished without error" and "the
+        replay did everything the capture recorded" are two
+        different claims. This checks the second one.
         """
         return sum(1 for entry in self._entries[self._index:]
                    if entry.kind == "call")
 
     def text_screen(self, font_banks=()):
-        # A replay reproduces the captured rows regardless of what a
-        # live font prefix would have been — the recognizer already
-        # ran, once, when the capture was taken.
+        # A replay reproduces the captured rows no matter what a live
+        # font prefix would currently be -- the recognizer already
+        # ran once, when the capture was originally taken.
         if self._remaining > 0:
-            # The frame is still standing: it was read this many more
-            # times when it was captured, at the moments it recorded.
+            # The current frame is still standing: it was read this
+            # many more times when it was originally captured, at the
+            # moments the transcript recorded.
             self._remaining -= 1
             if self._absorbed and self._advance is not None:
                 self._advance(self._absorbed.pop(0))
@@ -661,21 +704,25 @@ class ReplaySession:
         while self._index < len(self._entries):
             entry = self._entries[self._index]
             if entry.kind == "vm-gone":
-                # Reproduced as the refusal the adapter made, not as a
-                # transcript error: the run above is meant to meet what
-                # it met when the capture was taken, and a `wait
-                # machine=stopped` is answered by exactly this.
+                # Reproduced as the same refusal the adapter made at
+                # capture time, not as a transcript error: the run
+                # above is meant to encounter exactly what it
+                # encountered when the capture was taken, and a
+                # `wait machine=stopped` is answered by exactly this
+                # refusal.
                 self._index += 1
                 raise PreflightError(
                     entry.data.get("reason")
                     or "the recorded VM is not reachable",
                     rule_id="machine.vm-unreachable")
             if entry.kind == "call":
-                # The capture had already sent something here, and the
-                # run read the screen instead. Stepping over the call
-                # is what turns a one-read difference into a keystroke
-                # mismatch minutes later, against a screen neither run
-                # was ever looking at: the divergence is *here*.
+                # The capture had already sent something at this
+                # point, but the replay tried to read the screen
+                # instead. Silently stepping over the call is exactly
+                # what would turn a one-read difference here into a
+                # keystroke mismatch minutes later, against a screen
+                # neither run was actually looking at -- so this is
+                # where the real divergence gets reported.
                 raise TranscriptError(
                     f"the capture's next event is a "
                     f"{entry.data.get('carrier', '?')} call at "
@@ -726,13 +773,14 @@ class ReplaySession:
                 rule_id="transcript.send-keys-mismatch")
 
     def framebuffer(self):
-        """Refused: a transcript records screens, never pixels.
+        """Refuse: a transcript records screens, never pixels.
 
-        The format holds character rows and attribute tokens, which
-        no landmark can be matched against. A reconstruction that
-        improvised one would report a match or a miss the recorded run
-        never made, so the replay says what it was asked for and
-        stops (P11).
+        The format only holds character rows and attribute tokens,
+        which no landmark can be matched against. A reconstruction
+        that made up a framebuffer would report a match or a miss
+        that the recorded run never actually made, so instead the
+        replay states exactly what was asked for and stops there
+        (P11).
         """
         raise TranscriptError(
             "a transcript records text screens and holds no "
@@ -740,12 +788,14 @@ class ReplaySession:
             rule_id="transcript.no-framebuffer")
 
     def pointer_event(self, x, y, buttons):
-        """Refused: replaying `click`'s search already failed first.
+        """Refuse: replaying `click`'s landmark search already failed first.
 
-        A `click`'s landmark search reads :meth:`framebuffer`, which a
-        transcript refuses by name before delivery is ever reached —
-        this exists so a caller reaching past that gate is told what
-        it asked of, rather than meeting an ``AttributeError`` (F66).
+        A `click`'s landmark search reads :meth:`framebuffer`, which
+        a transcript refuses by name before the pointer event
+        delivery here would ever be reached. This method exists so a
+        caller that somehow gets past that earlier refusal is told
+        plainly what it asked for, instead of hitting an
+        ``AttributeError`` (F66).
         """
         raise TranscriptError(
             "a transcript records text screens and holds no "
@@ -753,13 +803,14 @@ class ReplaySession:
             rule_id="transcript.no-framebuffer")
 
     def screenshot(self, path):
-        """Check the image's *name*, which is the part the script chose.
+        """Check the image's *filename*, which is the part the script actually chose.
 
-        The directory is the capturing machine's own, and a
-        reconstruction by definition runs somewhere else — the whole
-        path would refuse every replay of every capture. What the run
-        decided is the filename: `screenshot installed` in the script,
-        `failure-step-31` from the failure report.
+        The directory in a captured path belongs to the machine that
+        recorded the capture, and a reconstruction by definition
+        runs somewhere else -- checking the whole path would make
+        every replay of every capture fail. What the script actually
+        decided is the filename: `screenshot installed` from the
+        script text, or `failure-step-31` from a failure report.
         """
         entry = self._next_call("screenshot")
         expected_path = os.fspath(path)

@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The replay harness's own round trip: record a run, then replay it.
 
-F43's corpus is captured rather than authored, so this module cannot
-be the corpus — it is the proof that the path the corpus will run on
-works, taken against a transcript this test records itself. What it
-pins is the claim `screen-transcripts.md` makes and nothing above the
-seam can check on its own: a recorded run, replayed, drives the real
-interpretation layer to the same carrier calls in the same order.
+F43's corpus is captured, not hand-written, so this module can't be
+that corpus itself. Instead it proves that the path the corpus will
+run on actually works, against a transcript this test records for
+itself. What it checks is the claim `screen-transcripts.md` makes
+that nothing above the carrier interface can check on its own: a
+recorded run, replayed, drives the real interpretation layer to the
+same carrier calls in the same order.
 """
 
 import contextlib
@@ -80,7 +81,7 @@ def _record(tmp_path):
 
 
 def test_a_recorded_run_replays_through_the_interpretation_layer(tmp_path):
-    """The tracer bullet: capture, then drive the real layer off it.
+    """The core case: record a run, then drive the real interpretation layer off that recording.
 
     Nothing here is stubbed between the transcript and the runner —
     `DisplayConsole`, the prompt reading and the dispatch are the
@@ -156,11 +157,12 @@ class _EchoingGuest:
 def test_an_exec_run_replays_to_the_conclusion_it_reached(tmp_path):
     """The second kind of fixture: a command rather than a script.
 
-    Prompt detection and echo scanning are the exec adapter's, so a
-    script capture never touches them — and at the seam a run that
-    returned the right rows and one that returned somebody else's are
-    the same file. The capture therefore states its conclusion, and
-    that is what the replay is held to.
+    Prompt detection and echo scanning belong to the exec adapter, so
+    a script capture never touches them — and at the carrier
+    interface, a run that returned the right rows and one that
+    returned the wrong ones look like the same file. So the capture
+    states its conclusion explicitly, and that's what the replay is
+    checked against.
     """
     path = os.path.join(str(tmp_path), "exec.rlqt")
     writer = _TranscriptWriter(path, pace=0.05, command="VER", timeout=30)
@@ -192,16 +194,18 @@ _LIFECYCLE = ('platform dos\n'
 
 
 def test_a_whole_lifecycle_replays_off_a_capture(tmp_path):
-    """The shape every codex script has, with no hypervisor in it.
+    """The shape every codex script has, with no hypervisor involved.
 
-    A capture holds the carrier and nothing above it, so the two
-    halves the harness supplies are exercised here rather than only by
-    the corpus: `MachineLayer` answers the phase a script starts in and
-    the `start` it makes, and the machine going away — recorded by the
-    run, because the seam refuses the session before the wrapper
-    exists — is what answers the closing `wait machine=stopped`. The
-    `screenshot` goes through the same handle as every other carrier
-    call, which is how it reaches the transcript at all.
+    A capture only records carrier calls, nothing above that level,
+    so this test exercises both halves the replay harness supplies
+    rather than leaving that only to the corpus: `MachineLayer`
+    answers which phase a script starts in and what `start` does, and
+    the machine going away — recorded by the run, because opening a
+    session is refused before the session wrapper even exists once
+    the guest is gone — is what answers the closing `wait
+    machine=stopped`. The `screenshot` call goes through the same
+    handle as every other carrier call, which is how it reaches the
+    transcript at all.
     """
     home = str(tmp_path)
     machine_home = os.path.join(home, "machine")
@@ -228,9 +232,9 @@ def test_a_whole_lifecycle_replays_off_a_capture(tmp_path):
         def takes_it_and_stops_answering(self, combos, delay=0.06):
             """The `enter` is `fdapm poweroff`: the guest goes down.
 
-            At the seam that has exactly one form — the next session
-            refuses to open, because identity cannot be verified
-            against a machine that is gone.
+            At the carrier interface that has exactly one form: the
+            next session refuses to open, because identity can't be
+            verified against a machine that's gone.
             """
             adapter.session_error = PreflightError(
                 "the recorded VM is not reachable",

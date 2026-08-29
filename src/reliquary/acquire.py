@@ -2,15 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Execute a resolved fetch plan into the media cache.
 
-A media's :func:`reliquary.resolve.resolve_media_plan` yields a nested
-plan of :class:`~reliquary.resolve.Download` / ``LocalFile`` /
-``Extract`` / ``Alternatives`` steps; this module runs it,
-SHA-256-verifying every file.
+:func:`reliquary.resolve.resolve_media_plan` returns a plan built
+from :class:`~reliquary.resolve.Download` / ``LocalFile`` /
+``Extract`` / ``Alternatives`` steps, possibly nested. This module
+runs that plan, checking every resulting file's SHA-256.
 
-Every cached file is keyed by the **name of the media it is**, in the
-one ``cache/media/`` directory — a container is a media like any other
-now, so there is no second cache for it. ``local`` payloads attach in
-place and are never copied in.
+Every cached file is stored under the name of the media it
+represents, in one ``cache/media/`` directory — a container (like a
+zip a media is extracted from) is just a media like any other, so it
+doesn't get a separate cache. A ``local`` payload is used from where
+it already sits on disk and is never copied into the cache.
 
 Design: docs/spec/blueprint-model.md ("The cache").
 """
@@ -31,29 +32,33 @@ from .home import media_dir
 _CHUNK = 1024 * 1024
 _MISMATCH_POLICIES = ("fail", "prompt", "refetch")
 
-# How often a long transfer reports itself. Honest totals only: a
-# byte count appears when the source named one, and hashing and
-# extraction report elapsed time alone (media-spec "Fetch progress").
+# How often (in seconds) a long transfer reports its progress. Byte
+# totals are only reported when the source actually gave one; hashing
+# and extraction only report elapsed time, since neither has a
+# trustworthy total to show (media-spec "Fetch progress").
 _PROGRESS_INTERVAL = 0.5
 
-# Per-operation socket timeout. A mirror that accepts the connection
-# and then stalls is a failed location, not a reason to hang forever:
-# the timeout surfaces as an OSError, which ``_run`` already treats as
-# one location failing so the next alternative is tried.
+# Socket timeout for one network operation. If a mirror accepts the
+# connection and then stalls, that counts as a failed location rather
+# than something to wait on forever: the timeout raises an OSError,
+# and `_run` already treats an OSError as one location failing, so it
+# moves on to try the next mirror.
 _SOCKET_TIMEOUT = 30
 
 
 @contextlib.contextmanager
 def _scratch(partial):
-    """Discard the scratch file unless the transfer reaches its replace.
+    """Delete the ``.part`` scratch file if the transfer doesn't finish.
 
-    A transfer writes ``<destination>.part`` and renames it only once
-    it is whole, so an interrupted one leaves that file behind. There
-    is no resume — the next attempt opens it ``"wb"`` and starts over —
-    so an abandoned partial is never anything but garbage, and a
-    cancelled LiveCD fetch would otherwise strand hundreds of
-    megabytes in the cache. The file is this function's own creation,
-    and by the time this runs the writing handle is closed.
+    A transfer writes to ``<destination>.part`` and only renames it to
+    the real destination once the whole file has arrived. If the
+    transfer is interrupted, that ``.part`` file is left behind.
+    There's no resume support — the next attempt just opens it with
+    ``"wb"`` and starts over — so a leftover partial file is useless.
+    Without this cleanup, a cancelled LiveCD fetch could leave
+    hundreds of megabytes of a half-downloaded file sitting in the
+    cache forever. By the time this cleanup runs, the file's write
+    handle is already closed.
     """
     try:
         yield
@@ -64,16 +69,17 @@ def _scratch(partial):
 
 
 def _check_cancelled(cancelled):
-    """Abort a host transfer at a chunk boundary when the run stops.
+    """Stop a host transfer at a chunk boundary if the run was cancelled.
 
-    Cancellation reaches the transfer loops as the run engine's own
-    ``threading.Event``, threaded from the caller — a fetch outside a
-    run passes ``None`` and is simply uninterruptible. The check sits
-    at every chunk boundary because that is the severability the
-    execution model promises: input deliveries are atomic, *host
-    transfers abort* (docs/spec/cli.md, "Cancel ends the run,
-    not the machine"). Without it a Ctrl-C during a large fetch is not
-    seen until the whole statement finishes, which can be minutes.
+    ``cancelled`` is the run engine's own ``threading.Event``, passed
+    down from the caller — a fetch running outside of a run passes
+    ``None`` and simply can't be interrupted. This check runs at every
+    chunk boundary because that's the granularity the execution model
+    promises: input deliveries finish completely once started, but a
+    host transfer can be aborted partway through (docs/spec/cli.md,
+    "Cancel ends the run, not the machine"). Without this check,
+    pressing Ctrl-C during a large download wouldn't take effect until
+    the whole statement finished, which could be minutes later.
     """
     if cancelled is not None and cancelled.is_set():
         raise RunCancelled(
@@ -98,12 +104,13 @@ def _cached_name(name, extension):
 
 
 def _explain_mismatch(name, expected, actual, source):
-    """Why a cached file is not the one this blueprint means.
+    """Explain why a cached file's hash doesn't match what the blueprint expects.
 
-    Two causes look identical to a hash comparison and want different
-    fixes — the payload upstream changed, or two projects share one
-    media name across a common cache — so the message names both and
-    the flag that separates them.
+    A hash mismatch has two possible causes that look identical from
+    the hash alone: the upstream file changed, or two different
+    projects happen to use the same media name in a cache they share.
+    The message names both possibilities, and the flag that lets the
+    user resolve either one.
     """
     return (f"cached {name!r} has SHA-256 {actual}, but this blueprint "
             f"pins {expected}"
@@ -190,8 +197,9 @@ def _extract(container_path, member, destination, name, events,
         with zipfile.ZipFile(container_path) as bundle:
             with bundle.open(member) as source, \
                     open(partial, "wb") as handle:
-                # Copied a chunk at a time rather than with copyfileobj
-                # so decompressing a large member stays severable.
+                # Copied a chunk at a time instead of with
+                # copyfileobj, so a cancellation check can run between
+                # chunks while decompressing a large member.
                 while True:
                     _check_cancelled(cancelled)
                     chunk = source.read(_CHUNK)
@@ -200,8 +208,8 @@ def _extract(container_path, member, destination, name, events,
                     handle.write(chunk)
     os.replace(partial, destination)
     if events is not None:
-        # Extraction reports elapsed time only: a compressed member
-        # has no honest running total to show against.
+        # Only elapsed time is reported for extraction — a compressed
+        # member has no reliable byte total to show progress against.
         events.emit(_events.TRANSFER_END, name=name, operation="extract",
                     source=f"{container}/{member}",
                     elapsed=round(time.monotonic() - started, 3))
@@ -231,15 +239,17 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
     if isinstance(plan, resolve.Alternatives):
         errors = []
         for option in plan.options:
-            # A cancellation is not a failed location: RunCancelled sits
-            # outside the classes caught here, so it leaves the mirror
-            # loop rather than sending the fetch to the next alternative.
+            # RunCancelled isn't one of the exceptions caught below,
+            # so a cancellation propagates straight out of this loop
+            # instead of being treated as "this mirror failed, try the
+            # next one".
             try:
                 return _run(option, name, extension, context, on_mismatch,
                             events, cancelled)
             except (OSError, RunFailure) as error:
-                # Each mirror attempt is its own event: a fallback that
-                # succeeded should not hide the one that did not.
+                # Record each failed mirror attempt as its own event,
+                # so a fallback that succeeds doesn't hide the earlier
+                # failure that made it necessary.
                 errors.append(f"{_describe(option)}: {error}")
                 if events is not None:
                     events.emit(_events.TRANSFER_END, name=name,
@@ -250,11 +260,13 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
             rule_id="media.all-locations-failed")
 
     if isinstance(plan, resolve.LocalFile):
-        # A local payload is used in place, so it has to still be
-        # there. Checked before verifying: an absent file is a
-        # different problem from a wrong one, and saying so here keeps
-        # it from reaching the backend as a failure to open a path.
-        # (A directory source is legal — vvfat — so this is `exists`.)
+        # A local payload is used in place, so it needs to actually be
+        # there. This check runs before verifying the hash: a missing
+        # file is a different problem from a wrong one, and catching
+        # it here gives a clear error instead of letting the backend
+        # fail trying to open a path that doesn't exist.
+        # (A directory is a legal source here — vvfat — so this checks
+        # `exists`, not `isfile`.)
         if not os.path.exists(plan.path):
             raise PreflightError(
                 f"media {name!r} is declared at {plan.path}, but nothing "
@@ -296,9 +308,9 @@ def _cache_hit(destination, name, expected, on_mismatch, source, context,
                cancelled=None):
     """Whether the cached file is already the one wanted.
 
-    The preflight identity check: it runs before any network or
-    extraction work, so a pinned media that is already cached costs one
-    hash and nothing else.
+    This check runs before any network or extraction work, so a media
+    that's pinned by hash and already cached only costs computing one
+    hash — nothing else.
     """
     if not os.path.exists(destination):
         return False
@@ -343,31 +355,33 @@ def payload_extension(media, plan):
 
 
 def residency(plan, name, extension, context=None):
-    """What running ``plan`` would have to do, having run none of it.
+    """Report what running ``plan`` would do, without actually doing any of it.
 
-    The dry counterpart of :func:`_run`, and it lives here because
-    the cache layout is this module's invariant: only what knows
-    where a payload lands can say whether it is already there. Every
-    node the plan would cache becomes one entry, outermost first,
-    each a mapping of ``name`` / ``state`` / ``source`` / ``path``
-    (and ``sha256`` / ``size`` / ``mirrors`` where they are known).
-    The states:
+    This is the dry-run counterpart of :func:`_run`. It lives in this
+    module because only this module knows the cache's file layout, so
+    only it can say whether a given payload is already there. Every
+    step the plan would cache becomes one entry in the result,
+    outermost step first. Each entry is a dict with ``name`` /
+    ``state`` / ``source`` / ``path`` (plus ``sha256`` / ``size`` /
+    ``mirrors`` when they're known). The possible states:
 
     ``cached``
         the cache already holds this payload
     ``would-download``
-        it does not, and a URL supplies it
+        it doesn't, and a URL would supply it
     ``would-extract``
-        it does not, and it comes out of a container — whose own
-        entry follows, since the container is fetched only when the
-        child is missing (the closure ``prune`` reclaims by)
+        it doesn't, and it comes out of a container — the container's
+        own entry follows this one, since the container is only
+        fetched if the extracted file turns out to be missing (this
+        is also what ``prune`` uses to reclaim space)
     ``local-present`` / ``local-missing``
-        a host path outside the cache, used in place
+        a host path outside the cache, used from where it sits
 
-    **Nothing is hashed.** ``cached`` says the file is there, not
-    that it is the right one: hashing a LiveCD is not a step that
-    costs nothing, and checking what is already cached is what a
-    later ``--dry-run=verify`` would add.
+    Nothing gets hashed here. ``cached`` only means the file exists at
+    that path, not that it's the correct one — hashing a large file
+    like a LiveCD isn't free, so this function doesn't do it. Checking
+    whether an already-cached file is actually correct is what a
+    future ``--dry-run=verify`` would add.
     """
     entries = []
     _residency(plan, name, extension, context, entries)
@@ -382,9 +396,9 @@ def _residency(plan, name, extension, context, entries):
         return
 
     if isinstance(plan, resolve.LocalFile):
-        # A local payload is used in place and never enters the
-        # cache, so its residency is simply whether it is still there
-        # — the check ``_run`` makes before verifying anything.
+        # A local payload is used from where it sits and never enters
+        # the cache, so all there is to report is whether it's still
+        # there — the same check `_run` makes before verifying it.
         present = os.path.exists(plan.path)
         entry = {
             "name": name,
@@ -423,15 +437,19 @@ def fetch_media(media, namespace, context=None, on_mismatch="fail",
     """Return a media's verified payload path, fetching on demand.
 
     ``media`` is a :class:`reliquary.document.Media`; ``namespace`` a
-    :class:`reliquary.resolve.Namespace`. A blank has no payload and
-    returns ``None``. A local payload is used in place; everything else
-    caches at ``cache/media/<media-name>.<ext>``. ``properties`` binds
-    any ``${key}`` in the media's location (milestone 8, T5).
+    :class:`reliquary.resolve.Namespace`. A blank media has no
+    payload and this returns ``None``. A local payload is used from
+    where it sits; everything else is cached at
+    ``cache/media/<media-name>.<ext>``. ``properties`` supplies the
+    values for any ``${key}`` reference in the media's location
+    (milestone 8, T5).
 
-    ``cancelled`` is the run engine's ``threading.Event``, checked at
-    every transfer chunk so a cancelled run stops mid-fetch instead of
-    at the end of the statement; ``None`` (a fetch outside a run)
-    leaves the transfer uninterruptible, as before.
+    ``cancelled`` is the run engine's ``threading.Event``. It's
+    checked at every transfer chunk, so a cancelled run stops
+    mid-fetch instead of only at the end of the current statement.
+    Pass ``None`` (for a fetch outside of a run) to leave the transfer
+    uninterruptible, as it always was before cancellation support
+    existed.
     """
     if on_mismatch not in _MISMATCH_POLICIES:
         raise StaticError(

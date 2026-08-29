@@ -5,65 +5,75 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # The sequence ledger
 
-The planning root holds what never moves ([README.md](README.md)),
-and this file is the handle ledger: **the next number to issue for
-every handle sequence the project carries**. Issue from here and
-advance the mark in the same edit, on `main`.
+This file is one of the files in `planning/` that never moves (see
+[README.md](README.md)). It tracks the next number to issue for
+every numbered ID the project uses. When you take a number from
+here, update the mark in the same commit, on the `main` branch.
 
-**These lines are not status columns** (D42): each records what
-its sequence has spent, and says nothing about what was done, by
-whom, or when. A number, once issued, is never reissued — a struck
-task or a delivered feature takes its number with it, and gaps in
-a sequence are history rather than a promise.
+**These lines are not a status log** (D42): each one just records
+how many numbers a sequence has used so far. It doesn't say what
+was done, who did it, or when. Once a number is issued, it's never
+issued again — when a task is struck or a feature is delivered, its
+number goes with it, and a gap in the numbering is just history,
+not something still pending.
 
-Why a ledger, when the record could be searched: a search sees
-only the branch it stands on. A struck task's only record is its
-commit (D52), a feature's retirement is named in
-[DECISIONS.md](DECISIONS.md) only once its round lands, and a
-number issued on an unmerged feature branch is visible from
-nowhere else — so the incidental cover fails exactly when feature
-branches arrive (owner, 2026-07-31). **The permanent classes count
-here too** (owner, same day): a file that keeps every entry it has
-ever held, and vision lists whose handles never evaporate, still
-count their populations only on the branch being searched — a
-decision recorded or a use case drafted on an unmerged branch
-mints a number invisible from `main` — and one rule for every
-class spares each issuance the which-kind-is-this reasoning.
+Why keep a ledger instead of just counting existing entries?
+Because a search only sees the branch you're currently on. A struck
+task's only remaining record is its commit (D52); a retired feature
+only gets named in [DECISIONS.md](DECISIONS.md) once that round of
+work is merged; and a number issued on a feature branch that hasn't
+been merged yet is invisible everywhere else. So counting entries
+would break as soon as feature branches are involved (owner,
+2026-07-31). This also applies to the sequences that never lose
+entries (owner, same day) — files that keep every entry forever,
+and lists whose numbers never retire. Even for those, counting
+entries only counts what's visible on the branch you're searching:
+a decision or a use case drafted on an unmerged branch would mint a
+number nothing on `main` can see. Using one ledger for every ID
+type means you never have to work out case-by-case whether a given
+type is safe to count instead.
 
-Where a mark and a file's own population disagree, someone issued
-past the ledger: advance the mark. The higher number governs, and
-nothing is ever reissued.
+If the mark here and the actual number of entries in a file
+disagree, it means someone issued a number without updating this
+ledger. In that case, move the mark up to match. The higher number
+always wins, and no number is ever reissued.
 
 ## The marks
 
-- **The next D-number to issue is D120** — decisions, recorded in
-  [DECISIONS.md](DECISIONS.md).
-- **The next F-number to issue is F68** — features, drafted in
-  [proposed/FEATURES.md](proposed/FEATURES.md) or cut straight to
-  [pledged/FEATURES.md](pledged/FEATURES.md) on pledge.
-- **The next G-number to issue is G8** — the authored language's
-  goals ([docs/spec/script-spec.md](../docs/spec/script-spec.md)).
-- **The next P-number to issue is P28** — architectural
-  principles, one namespace across proposed, pledged, and the root
+- **The next D-number to issue is D120** — used for decisions,
+  recorded in [DECISIONS.md](DECISIONS.md).
+- **The next F-number to issue is F68** — used for features,
+  drafted in [proposed/FEATURES.md](proposed/FEATURES.md), or,
+  when pledged straight away, entered directly into
+  [pledged/FEATURES.md](pledged/FEATURES.md).
+- **The next G-number to issue is G8** — used for the scripting
+  language's design goals, listed in
+  [docs/spec/script-spec.md](../docs/spec/script-spec.md).
+- **The next P-number to issue is P28** — used for architectural
+  principles. One shared numbering sequence covers proposed,
+  pledged, and the root list.
+- **The next R-number to issue is R13** — used for recurring
+  obligations, listed in [RECURRING.md](RECURRING.md). An R-number
+  retires when its obligation is retired.
+- **The next S-number to issue is S9** — used for application
+  surfaces, listed in root [ARCHITECTURE.md](../ARCHITECTURE.md)
+  under "The application surfaces."
+- **The next T-number to issue is T32** — used for tasks, entered
+  into [TASKS.md](TASKS.md); entering a task is the same act as
+  pledging it (D43). This sequence started counting from T8, not
+  T0, because T0 through T7 were already used by an earlier
+  numbering scheme that numbered three separate lists
+  independently; those old numbers survive in
+  [DECISIONS.md](DECISIONS.md), in the entries that adopted them.
+  Starting the new sequence at T8 avoids any T-number meaning two
+  different things.
+- **The next U-number to issue is U28** — used for use cases. One
+  shared numbering sequence covers proposed, pledged, and the root
   list.
-- **The next R-number to issue is R13** — recurring obligations,
-  standing in [RECURRING.md](RECURRING.md), the number
-  evaporating when an obligation is retired.
-- **The next S-number to issue is S9** — application surfaces
-  (root [ARCHITECTURE.md](../ARCHITECTURE.md), "The application
-  surfaces").
-- **The next T-number to issue is T32** — tasks, entering
-  [TASKS.md](TASKS.md), entry being the pledge (D43). The sequence
-  started at **T8** because T0–T7 were spent by an earlier
-  per-list numbering that ran three separate times, surviving in
-  [DECISIONS.md](DECISIONS.md) under the entries that landed them;
-  beginning above them is what keeps every T-number in the record
-  resolving to exactly one thing.
-- **The next U-number to issue is U28** — use cases, one namespace
-  across proposed, pledged, and the root list.
-- **The next V-number to issue is V18** — the script language's
-  static validation rules
-  ([docs/spec/script-spec.md](../docs/spec/script-spec.md)). The
-  sequence spent 1–15 under its old S-spelling before D84 renamed
-  the letter — the number never changes — and the id retired
-  before the rename stays retired under the new letter.
+- **The next V-number to issue is V18** — used for the scripting
+  language's static validation rules, listed in
+  [docs/spec/script-spec.md](../docs/spec/script-spec.md). This
+  sequence used the letter S for numbers 1 through 15 before
+  decision D84 renamed the letter to V (only the letter changed,
+  not the numbers). An ID that was already retired before the
+  rename stays retired under its new V-numbered name.

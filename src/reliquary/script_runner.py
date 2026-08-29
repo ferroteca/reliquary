@@ -2,17 +2,19 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Runtime executor for ``.rlqs`` scripts on QEMU/DOS.
 
-The dynamic semantics are docs/spec/script-spec.md's
-"Execution model": execution is defined over **samples** — discrete
-readings of the machine — and over the **episodes** a condition's
-consecutive holding samples form. Dispatch is single-threaded and
-run to completion, so no sample is taken while a statement list is
-executing, and every clock is checked at a boundary: a statement
-start or a dispatch sample.
+The dynamic semantics this module implements come from
+docs/spec/script-spec.md's "Execution model": execution is defined
+in terms of **samples** -- discrete readings of the machine -- and
+**episodes**, which are runs of consecutive samples where a
+condition holds. Dispatch is single-threaded and runs each
+statement list to completion, so no sample is ever taken while a
+statement list is executing, and every timing clock is only checked
+at a boundary: the start of a statement, or a dispatch sample.
 
-Timing is not re-derived here. :mod:`reliquary.script_timing`
-resolved every bound at parse time, so this module looks each one
-up and can name the scope that supplied it when a clock expires.
+Timing values are not recomputed here. :mod:`reliquary.script_timing`
+already resolved every bound at parse time, so this module just
+looks each one up, and can name which scope supplied it when a
+clock expires.
 """
 
 import collections
@@ -54,33 +56,37 @@ from . import transcript as _transcript
 from .machines import DryRun
 
 
-# Returned by a statement list that ended in `finish`: the run is
-# complete, distinct from both "fell off the end" (None) and a
-# phase name to transfer to.
+# Returned by a statement list that ended in `finish`, meaning the
+# run is complete. This is distinct from both "fell off the end of
+# the list" (None) and a phase name to transfer control to.
 _FINISH = object()
 
-# Seconds between dispatch samples. Cadence is the control plane's
-# business, never the script's (G5).
+# Seconds between dispatch samples. How often to sample is the
+# control plane's decision, never something a script controls (G5).
 _RECORD_PACE = 0.1
 
 _POLL_INTERVAL = 2.0
 
-#: And how often while a screen is still moving. The poll above waits
-#: a screen out cheaply, but it cannot confirm one has settled: a
-#: quiescence window is only observable by sampling inside it, and two
-#: reads two seconds apart say nothing about the last 200ms. Dense
-#: reads are spent only there, never for the whole of a long wait.
+#: How often to sample while a screen is still moving (changing).
+#: The poll interval above waits out a stable screen cheaply, but it
+#: cannot confirm a screen has settled: whether a screen has gone
+#: quiet is only observable by sampling closely during that window,
+#: and two reads two seconds apart say nothing about the last 200ms
+#: of that window. Dense sampling is only used there, never across
+#: the whole of a long wait.
 _SETTLE_POLL = 0.1
 
-# The language's portable `press` names, mapped onto the seam's key
-# vocabulary — which is QEMU's qcode set (D103), so most entries are
-# the identity and the handful that are not (`enter`, `space`,
-# `pageup`, `pagedown`) are why this table exists at all. Every
-# backend receives these names, QEMU and VirtualBox alike.
+# Maps the language's portable `press` key names onto the carrier
+# seam's own key vocabulary, which is QEMU's qcode set (D103). Most
+# entries just map a name to itself; the handful that don't
+# (`enter`, `space`, `pageup`, `pagedown`) are the entire reason this
+# table exists. Every backend receives these mapped names, QEMU and
+# VirtualBox alike.
 #
-# Membership in the language's closed vocabulary is owned by static
-# validation; keeping this map explicit makes an unsupported key fail
-# closed.
+# Which key names the language allows at all is decided by static
+# validation, not by this table. Keeping this map explicit means an
+# unsupported key name fails safely instead of being silently
+# passed through.
 _QEMU_KEY_NAMES = {
     "enter": "ret",
     "esc": "esc",
@@ -114,13 +120,16 @@ def _normalize_row(text):
 def resolve_key(spelling):
     """Resolve one `press` key or chord to QEMU key names.
 
-    A chord's non-modifier member may be a single printable
-    character (``ctrl+c``); a bare key name may not.
+    A chord's non-modifier member can be a single printable
+    character (as in ``ctrl+c``); a bare key name by itself cannot.
 
-    An unknown name is a STATIC ERROR carrying its own message: the
-    CLI's `press` calls this directly (no script, no line number), so
-    a bare ``KeyError`` here reported an ordinary typo as reliquary's
-    own fault. A run re-raises it against the statement's line.
+    An unknown key name raises a STATIC ERROR with its own clear
+    message. The CLI's `press` command calls this function directly
+    (with no script and no line number involved), so letting a bare
+    ``KeyError`` escape here would have reported an ordinary user
+    typo as if it were a bug in reliquary itself. A script run
+    catches and re-raises this error against the statement's actual
+    line number.
     """
     parts = spelling.split("+")
     resolved = []
@@ -272,17 +281,21 @@ class _HttpService:
 
 
 class _PropertyUnbound(Exception):
-    """A ``${key}`` reference reached the runtime unbound.
+    """A ``${key}`` reference reached the runtime without a bound value.
 
-    The one deliberate raise outside the hierarchy, and deliberately
-    so. It is a private signal rather than an error: every raise is
-    caught by the statement dispatcher, which restates it as a located
-    ``ScriptRuntimeError``, so no caller ever sees this class. Making
-    it a ``ReliquaryError`` would give it an exit code and a tidy
-    one-line report — which is what it would get if it ever escaped,
-    and an escape is a bug in the dispatcher that should show a
-    traceback instead. So the rule that every deliberate *error* is in
-    the hierarchy holds; this is not one.
+    This is the one deliberate exception in this codebase outside
+    reliquary's normal error hierarchy, and that is intentional. It
+    is a private internal signal, not a user-facing error: every
+    place this is raised, it is caught by the statement dispatcher
+    and restated as a located ``ScriptRuntimeError``, so no external
+    caller ever actually sees this class. Making it a
+    ``ReliquaryError`` would give it a clean exit code and a tidy
+    one-line report -- which is exactly what it would get if it ever
+    escaped uncaught, and an escape here means a bug in the
+    dispatcher, which should show a full traceback instead of a
+    tidy error message. So the rule that every user-facing error
+    lives in the hierarchy still holds; this exception is just not
+    one of those.
     """
 
     def __init__(self, key):
@@ -310,10 +323,10 @@ class _Located:
 class ScriptRuntimeError(_Located, RunFailure):
     """An error that occurred during script execution.
 
-    The dynamic tier of the taxonomy — a RUN FAILURE, exit ``4``.
-    ``clock`` and ``scope`` are set when a timing bound expired, so
-    the failure report can name which clock ran out and where it came
-    from.
+    This is the dynamic (runtime) tier of the error taxonomy -- a
+    RUN FAILURE, exit code ``4``. ``clock`` and ``scope`` are set
+    when a timing bound expired, so the failure report can name
+    which clock ran out and which scope it came from.
     """
 
     clock = None
@@ -323,9 +336,10 @@ class ScriptRuntimeError(_Located, RunFailure):
 class ScriptPreflightError(_Located, PreflightError):
     """A machine rule broken before the first guest input (exit ``3``).
 
-    Same diagnostic shape as a runtime error — it cites the statement
-    that would have broken the rule — but it is raised before the run
-    touches the guest, so it belongs to the preflight tier.
+    This has the same diagnostic shape as a runtime error -- it
+    cites the statement that would have broken the rule -- but it is
+    raised before the run ever touches the guest, so it belongs to
+    the preflight tier instead.
     """
 
 
@@ -333,10 +347,10 @@ class ScriptPreflightError(_Located, PreflightError):
 class ScriptRun:
     """The output of a ``run-script <label>`` invocation.
 
-    The run **returns its output** and stores nothing (D36):
-    ``events`` is the run's whole event stream, in order, the
-    terminal event last. A caller that wants a record keeps this;
-    reliquary keeps none.
+    A run **returns its output** and stores nothing itself (D36):
+    ``events`` is the run's entire event stream, in order, with the
+    terminal event last. A caller that wants a record of the run has
+    to keep this object; reliquary itself keeps no copy.
     """
 
     machine_id: str
@@ -349,51 +363,59 @@ class ScriptRun:
 
 @dataclasses.dataclass(frozen=True)
 class _Sample:
-    """One reading of every channel, taken at one instant.
+    """One reading of every channel, taken at a single instant.
 
-    ``rows`` are normalized for matching; ``frame`` is the screen as
-    the seam handed it over — character rows and their attribute
-    tokens — which is what the quiescence gate compares, identity
-    being the whole pair.
+    ``rows`` are normalized for matching against conditions;
+    ``frame`` is the screen exactly as the carrier seam handed it
+    over -- character rows together with their attribute tokens --
+    which is what the quiescence (stability) check compares, since
+    identity for that check is the whole pair, not just the text.
 
-    ``unreadable`` is the third kind of sample, beside a screen and a
-    stopped machine: the carrier answered, and what it handed over was
-    not a text screen. It holds the *reason* rather than a flag, so a
-    failure report can say which shape was captured — a screen nobody
-    could read is not a blank one, and reporting it as blank would
-    make a graphics-mode guest indistinguishable from a cleared one.
-    No condition holds on such a sample, so a wait simply keeps
-    looking and expires on its own clock.
+    ``unreadable`` covers a third kind of sample, alongside a normal
+    screen and a stopped machine: the carrier answered, but what it
+    handed back was not a text screen at all. It holds the *reason*,
+    not just a true/false flag, so a failure report can say exactly
+    what shape was captured -- a screen nobody could read is not the
+    same thing as a blank screen, and reporting it as blank would
+    make a graphics-mode guest indistinguishable from one that was
+    actually cleared. No condition can ever hold on a sample like
+    this, so a `wait` just keeps looking and eventually expires on
+    its own clock.
     """
 
     rows: tuple = ()
     stopped: bool = False
     frame: tuple = ()
     unreadable: str = None
-    #: The plane's captured framebuffer, read only when a landmark
-    #: condition is armed (F65) — the pixels a landmark is matched
-    #: against, and what the quiescence gate judges on such a sample.
+    #: The captured framebuffer image, read only when a landmark
+    #: condition is armed (F65). This holds the pixels a landmark is
+    #: matched against, and it is what the quiescence check judges
+    #: for a sample like this.
     image: object = None
-    #: How many cells of this screen matched no glyph well enough to
-    #: be believed and were read as spaces. A screen can be perfectly
-    #: readable *as a shape* and still be mostly unrecognized, which
-    #: `unreadable` above cannot express: that one says no screen
-    #: arrived, this one says one did and part of it is a guess.
+    #: How many cells of this screen matched no glyph confidently
+    #: enough to be trusted, and were read as blank spaces instead.
+    #: A screen can be perfectly readable *as a shape* and still be
+    #: mostly unrecognized character-by-character, which
+    #: `unreadable` above cannot express: `unreadable` means no
+    #: screen arrived at all, while this means a screen did arrive
+    #: and part of its content is a guess.
     unclear: int = 0
-    #: The fonts this read was matched through, in try order (F61) —
-    #: empty for a backend that scrapes resolved characters, which
-    #: recognizes nothing and so consults no font.
+    #: The fonts this read was matched against, in the order they
+    #: were tried (F61). Empty for a backend that reads already
+    #: resolved characters directly, since that kind of backend
+    #: recognizes nothing itself and so consults no font.
     fonts: tuple = ()
 
 
 class _Observation:
     """One armed condition, tracking its episodes.
 
-    An **episode** is a maximal run of consecutive samples at which
-    the condition holds. ``stable`` is satisfied once the current
-    episode's age reaches its duration; ``consumed`` implements the
-    reactive rearm rule — a fired handler re-arms only after a
-    sample at which its condition does not hold.
+    An **episode** is the longest run of consecutive samples during
+    which the condition holds. ``stable`` is satisfied once the
+    current episode's age reaches its required duration. ``consumed``
+    implements the reactive re-arm rule: a handler that already
+    fired only re-arms after a sample where its condition stops
+    holding.
     """
 
     def __init__(self, condition, stable=None, landmark=None,
@@ -402,12 +424,13 @@ class _Observation:
         self.stable = stable
         self.consumed = False
         self._episode = None
-        #: The resolved declaration a landmark condition watches for,
-        #: bound at preflight so no sample resolves an asset (F65).
+        #: The resolved declaration a landmark condition watches
+        #: for, bound at preflight so no sample ever has to resolve
+        #: an asset itself (F65).
         self.landmark = landmark
         self.capture_format = capture_format
-        #: The last verdict this observation reached, which is what
-        #: the failure report's nearest miss quotes.
+        #: The last verdict this observation reached. This is what
+        #: the failure report quotes as the "nearest miss."
         self.result = None
 
     @property
@@ -422,11 +445,13 @@ class _Observation:
     def matches_row(self, row):
         """Whether one screen row satisfies this condition.
 
-        The per-row form the whole-sample test is built from, so a
-        match event can name the row that satisfied it rather than
-        merely asserting that one did. A landmark matches a screen
-        and never a row, so it answers no here and the match event
-        names the variant instead.
+        This is the per-row check that the whole-sample test is
+        built out of, so a match event can name the specific row
+        that satisfied the condition instead of just asserting that
+        some row did. A landmark condition matches against a whole
+        screen, never a single row, so this always answers no for
+        one, and the match event instead names the landmark variant
+        that matched.
         """
         if self.condition.channel == "machine" or self.watches_pixels:
             return False
@@ -440,9 +465,10 @@ class _Observation:
             return sample.stopped
         if self.watches_pixels:
             if sample.image is None:
-                # A stopped machine, or an unreadable capture: no
-                # pixels arrived, so nothing was matched and nothing
-                # is claimed. The wait keeps looking.
+                # Either the machine is stopped or the capture was
+                # unreadable: no pixels arrived, so nothing was
+                # matched and nothing is claimed here. The wait just
+                # keeps looking.
                 return False
             self.result = _landmarks.match(self.landmark, sample.image,
                                            self.capture_format)
@@ -464,13 +490,14 @@ class _Observation:
 
 @dataclasses.dataclass
 class _ActiveScope:
-    """One entered ``with`` scope, and the value it will put back.
+    """One entered ``with`` scope, and the value it will restore on exit.
 
-    ``captured`` is read at entry, before the change is applied: a
-    tuple of drive keys for the machine's boot order, or a slot's
-    medium as the ``(media, path)`` pair that reinstates it — a
-    declared media by name, an anonymous image by the path it was
-    mounted from, and ``(None, None)`` for a slot that was empty.
+    ``captured`` is read at entry, before the scope's change is
+    applied: a tuple of drive keys for the machine's boot order, or
+    a slot's medium as the ``(media, path)`` pair needed to restore
+    it -- a declared media by name, an anonymous image by the path
+    it was mounted from, or ``(None, None)`` for a slot that was
+    empty.
     """
 
     scope: object
@@ -495,13 +522,15 @@ class _ScriptEngine:
         self._script_path = script_path
         self._running = False
         self._display = False
-        #: The banks a `font` statement's names resolved to, tried
-        #: before the host's own — empty until a script names one.
+        #: The font banks a `font` statement's names resolved to,
+        #: tried before the host's own default banks. Empty until a
+        #: script actually names one.
         self._font_prefix = ()
         #: ``{name: LandmarkDeclaration}`` for every `@name` this
-        #: script watches, and the capture format the machine's
-        #: driving plane states — both resolved at preflight (F65),
-        #: so no sample reads an asset or asks the seam anything.
+        #: script watches, along with the capture format the
+        #: machine's driving plane reports. Both are resolved once,
+        #: at preflight (F65), so no individual sample needs to
+        #: resolve an asset or ask the carrier seam anything.
         self._landmarks = dict(landmarks or {})
         self._capture_format = capture_format
         self._now = clock
@@ -517,38 +546,43 @@ class _ScriptEngine:
         self._secret_recorded = False
         self._record_pace = record_pace
         self._recording_writer = recording_writer
-        # A pace is a ceiling on the interval, never a floor: recording
-        # exists to close the two-second holes, so it can only make the
-        # run sample harder than it otherwise would.
+        # A recording pace can only shorten the sampling interval,
+        # never lengthen it: recording exists to close the
+        # two-second gaps between samples, so it can only make the
+        # run sample more often than it otherwise would.
         self._pace_settle = min(_SETTLE_POLL, record_pace or _SETTLE_POLL)
         self._pace_idle = min(_POLL_INTERVAL, record_pace or _POLL_INTERVAL)
         self._phase = None
         self._run_started = None
         self._phase_started = None
         self._phase_budget = None
-        # The failure report's raw material, kept as the run goes:
-        # what is pending, the route taken and how often each phase
-        # was revisited, and the last screen read.
+        # Raw material for the failure report, kept up to date as
+        # the run goes: what is currently pending, the route taken
+        # through the script, how often each phase was revisited,
+        # and the last screen that was read.
         self._pending = None
         self._pending_literal = None
-        #: The armed landmark observations, kept for the failure
-        #: report: their verdicts are the nearest-miss geography.
+        #: The currently armed landmark observations, kept for the
+        #: failure report: their verdicts describe how close the
+        #: nearest miss actually was.
         self._pending_landmarks = ()
         self._route = []
         self._revisits = collections.Counter()
         self._last_sample = None
-        #: Learned from the first console opened, since only the
-        #: adapter's session knows whether its screens are interpreted
-        #: from pixels. Assuming the cheap path until then costs
-        #: nothing: a cadence needs two samples before it exists.
+        #: Learned from the first console that gets opened, since
+        #: only the adapter's session actually knows whether its
+        #: screens are recognized from pixels. Assuming the cheap
+        #: path until then costs nothing: a sampling cadence needs
+        #: at least two samples before it even exists.
         self._recognized_screens = False
         self._guard_reported = False
-        #: The scopes control is currently inside, outermost first,
-        #: and what each of them will put back.
+        #: The `with` scopes control is currently inside, outermost
+        #: first, and what each one will restore on exit.
         self._scopes = []
-        #: What the run has already put back, for the failure report:
-        #: a scope took state a diagnostician would otherwise have
-        #: found, so the run has to say what it took.
+        #: What the run has already restored, kept for the failure
+        #: report: a scope changed state that whoever is debugging a
+        #: failure would otherwise expect to still see, so the run
+        #: has to say what it already put back.
         self._restored = []
         self._cancelled = threading.Event()
         self.events = (events if events is not None
@@ -562,9 +596,10 @@ class _ScriptEngine:
         """Request a stop; the run ends at the next event boundary.
 
         Boundaries are statement starts, dispatch samples, and the
-        chunk boundaries of a host transfer, so an input delivery in
-        flight completes atomically while a large media fetch aborts
-        where it stands — the execution model's severability
+        chunk boundaries within a host file transfer, so an input
+        delivery already in flight completes atomically, while a
+        large media fetch can abort wherever it currently stands --
+        this is the execution model's severability guarantee
         (script-spec "The run's output and failure").
         """
         self._cancelled.set()
@@ -590,24 +625,27 @@ class _ScriptEngine:
         return failure
 
     def _poll_interval(self, settled):
-        """Return the sleep interval between samples.
+        """Return the sleep interval to use between samples.
 
-        When recording, neither interval may exceed the record pace:
-        the recorder cannot have a sampler of its own (QEMU admits one
-        QMP client), so the run's own polls *are* the capture, and a
-        two-second idle poll would leave a two-second hole through
-        most of a boot. Taking the pace as a floor instead left the
-        production cadence exactly as it was, which is the same as
-        having no pace at all.
+        While recording, neither interval is allowed to exceed the
+        record pace: the recorder cannot run its own separate
+        sampler (QEMU only allows one QMP client at a time), so the
+        run's own polls *are* the capture, and a two-second idle
+        poll would leave a two-second gap in the recording through
+        most of a boot. If the pace were instead used as a floor (a
+        minimum), the normal sampling cadence would stay exactly as
+        it was, which would be the same as recording having no pace
+        setting at all.
         """
         return self._pace_idle if settled else self._pace_settle
 
     def _redact(self, message):
-        """Blank any bound secret value out of a rendered line.
+        """Blank any bound secret value out of a rendered line of text.
 
-        Protects reliquary's own output — the event stream and its
-        diagnostics. It cannot reach what a guest installer prints,
-        logs, or shows in an explicitly requested screenshot.
+        This protects reliquary's own output -- the event stream and
+        its diagnostic messages. It has no way to reach what a guest
+        installer itself prints, logs, or shows in a screenshot the
+        script explicitly requested.
         """
         for value in self._secret_values:
             if value and value in message:
@@ -618,7 +656,7 @@ class _ScriptEngine:
         return self.events.emit(kind, **fields)
 
     def _progress(self, expiry, timeout, description, now):
-        """Advance the live display — elapsed against its limit."""
+        """Advance the live display, showing elapsed time against its limit."""
         self.events.tick(
             phase=self._phase.name if self._phase is not None else "-",
             step=self._step, description=description,
@@ -634,11 +672,11 @@ class _ScriptEngine:
             return "-"
 
     def _report_final(self):
-        """Record the phase the script and the machine finished in.
+        """Record which phase the script and the machine each finished in.
 
-        Called on every exit path — success, script error, or
-        unexpected exception — so it is always clear what state the
-        machine is left in, not just what happened along the way.
+        Called on every exit path -- success, a script error, or an
+        unexpected exception -- so it is always clear what state the
+        machine was left in, not just what happened along the way.
         """
         self.machine_phase = self._read_machine_phase()
         self.final_phase = self._phase.name if self._phase else "-"
@@ -661,11 +699,12 @@ class _ScriptEngine:
                 # A linear script's one ending: reaching end of file
                 # completes the run.
                 self._execute(self._script.statements)
-            # The run reached its end inside whatever scopes were
-            # still open, and the last thing it does is close them. A
-            # restore that cannot be made fails the run here — the
-            # cost D104 named and accepted, arriving through the arm
-            # below like any other failure.
+            # The run reached its end while still inside whatever
+            # scopes were open, and the last thing it does is close
+            # them. If a restore cannot be made, it fails the run
+            # right here -- a cost D104 identified and accepted,
+            # handled through the same failure path as any other
+            # error below.
             self._unwind(None)
             self._report_final()
             self._terminal(None)
@@ -692,7 +731,7 @@ class _ScriptEngine:
             self.events.clear()
 
     def _terminal(self, error):
-        """Emit the stream's last word: what the run came to."""
+        """Emit the last event in the stream: how the run concluded."""
         self._emit(
             _events.RUN_END, outcome=outcome(error),
             **{"exit-code": exit_code(error) if error else 0,
@@ -703,14 +742,15 @@ class _ScriptEngine:
     def _fail(self, error):
         """Emit the failure report, then the terminal event.
 
-        Everything the report can name comes from the run itself: the
-        pending condition or action, the clock that expired and the
-        scope that supplied it, the route with its revisit counts, the
-        nearest miss on the last screen read, an automatic screenshot,
-        the command to try next — and **what a scope put back**. That
-        last is not decoration: a scoped change is state a
-        diagnostician would otherwise have found on the machine, so a
-        run that took it back has to say so.
+        Everything in the report comes from the run itself: the
+        pending condition or action, which clock expired and which
+        scope supplied it, the route taken with revisit counts, the
+        closest match found on the last screen read, an automatic
+        screenshot, the command to try next -- and **what a scope
+        already put back**. That last item is not just decoration: a
+        scoped change is state that whoever debugs the failure would
+        otherwise expect to still find on the machine, so a run that
+        already undid it has to say so.
         """
         self.events.clear()
         self._emit(
@@ -731,11 +771,11 @@ class _ScriptEngine:
         self._terminal(error)
 
     def _nearest_miss(self):
-        """The screen row that came closest to the pending literal.
+        """The screen row that came closest to matching the pending literal.
 
-        Only a text condition has a nearest miss: a regex names a
-        shape rather than a string, and there is nothing honest to
-        measure against.
+        Only a plain-text condition has a meaningful "nearest miss":
+        a regex describes a shape, not a literal string, so there is
+        nothing honest to measure a row's similarity against.
         """
         target = self._pending_literal
         if not target or not self._last_sample:
@@ -750,17 +790,19 @@ class _ScriptEngine:
     def _landmark_miss(self):
         """The nearest miss of every landmark this expiry was watching.
 
-        A landmark's own answer to `nearest-miss` above, and it has to
-        be its own field because the two measure different things: a
-        text miss is the row closest to a literal, and this is the
-        *variant* closest to the capture, with the regions it failed
-        on and the percentage each achieved. Per-region and never one
-        pooled score — a small failing region drowns in a large
-        matching screen's average, and the report loses the geography
-        that makes it actionable.
+        This is the landmark equivalent of `nearest-miss` above, and
+        it needs its own separate field because the two measure
+        different things: a text miss is the row closest to a
+        literal string, while this is the *variant* of the landmark
+        closest to what was captured, along with which regions
+        failed to match and the percentage each one achieved. This
+        is reported per-region rather than as one pooled score,
+        because a small failing region would otherwise get drowned
+        out by a large screen's overall matching average, and the
+        report would lose the exact detail that makes it actionable.
 
-        Silent where no landmark was armed, which is every run of
-        every script that watches text alone.
+        Returns nothing where no landmark was armed, which covers
+        every run of every script that only watches text.
         """
         misses = [observation.result.describe()
                   for observation in self._pending_landmarks
@@ -769,58 +811,64 @@ class _ScriptEngine:
         return tuple(misses) or None
 
     def _unreadable_screen(self):
-        """Why the last read produced no screen, where it produced none.
+        """Why the last read produced no screen, in cases where it produced none.
 
-        This is the other half of the nearest miss, and it answers the
-        case that one cannot: where every sample was unreadable there
-        are no rows to be near the target, so a silent report would
-        leave an expiry looking like a condition that merely never
-        matched. Naming the captured shape is what turns it into the
-        answer — the guest never reached a text mode.
+        This covers the case `_nearest_miss` cannot: when every
+        sample was unreadable, there are no rows to compare against
+        the target at all, so a silent report here would make an
+        expiry look like a plain condition that simply never
+        matched. Naming the actual shape that was captured turns
+        that into a real answer -- for example, that the guest never
+        reached a text mode.
         """
         if not self._last_sample:
             return None
         return self._last_sample.unreadable
 
     def _unreadable_cells(self):
-        """How much of the last screen was a guess, when any of it was.
+        """How much of the last screen was a guess, in cases where any of it was.
 
-        The nearest miss compares the target against rows that may
-        never have been read: a cell matching no glyph becomes a
-        space, so a screen drawn in a font this host does not have
-        arrives looking merely sparse and a `wait` on a word in it
-        expires with nothing to show for itself. Saying how many
-        cells were substituted turns "it never appeared" into "it may
-        have been there and unreadable", which are different problems
-        with different fixes.
+        `_nearest_miss` compares the target against rows that may
+        never have actually been read correctly: a cell that matches
+        no glyph gets substituted with a space, so a screen drawn in
+        a font this host does not have ends up looking merely
+        sparse, and a `wait` on a word within it expires with
+        nothing useful to show. Reporting how many cells were
+        substituted turns "it never appeared" into "it may have been
+        there and just unreadable" -- two different problems with
+        two different fixes.
 
-        Silent at zero, and silent for a backend that scrapes
-        resolved characters — it recognizes nothing, so it can
-        misrecognize nothing.
+        Returns nothing when the count is zero, and for a backend
+        that reads already resolved characters directly, since that
+        backend recognizes nothing, so it can never misrecognize
+        anything either.
         """
         if not self._last_sample or not self._last_sample.unclear:
             return None
         return self._last_sample.unclear
 
     def _fonts_tried(self):
-        """The fonts the last read was matched through, in try order.
+        """The fonts the last read was matched against, in the order they were tried.
 
-        Beside `unreadable-cells`' count: an author who named the
-        wrong font is told what was actually consulted rather than
-        left with a silent timeout (F61, P11). Silent at empty —
-        the ordinary case, and a scraped read's always.
+        This is reported alongside the `unreadable-cells` count: an
+        author who named the wrong font in a `font` statement is
+        told exactly which fonts were actually consulted, instead of
+        being left with just a silent timeout (F61, P11). Returns
+        nothing when the list is empty, which is the ordinary case,
+        and always the case for a scraped read.
         """
         if not self._last_sample or not self._last_sample.fonts:
             return None
         return self._last_sample.fonts
 
     def _failure_screenshot(self):
-        """Capture the failing screen, unless a secret has been typed.
+        """Capture the failing screen, unless a secret has already been typed.
 
         Once a secret reaches the guest, automatic screenshots are
-        suppressed for the rest of the run: an installer may echo what
-        it was given, and an automatic capture is not the author's own
-        deliberate call.
+        suppressed for the rest of the run: an installer might echo
+        back what it was given, and taking an automatic screenshot
+        is not a deliberate choice made by the script author the way
+        an explicit `screenshot` statement is.
         """
         if not self._running or self._secret_entered:
             return None
@@ -828,8 +876,8 @@ class _ScriptEngine:
         try:
             self._machine().screenshot(name)
         except Exception:
-            # A failure report must never fail; the machine may
-            # already be gone.
+            # A failure report must never itself fail; the machine
+            # may already be gone by this point.
             return None
         return os.path.join(self._machine_home, "screenshots",
                             f"{name}.png")
@@ -841,10 +889,11 @@ class _ScriptEngine:
         return f"rlq list-machines --machine {self._machine_id}"
 
     def _log_bindings(self):
-        """Report each bound property's key and source — never a value.
+        """Report each bound property's key and source -- never its value.
 
-        The stream is evidence of provenance, so a run is auditable
-        without exposing what any source supplied.
+        The event stream serves as evidence of where each value came
+        from, so a run stays auditable without ever exposing what
+        any source actually supplied.
         """
         bindings = self._property_bindings
         if not bindings or not bindings.sources:
@@ -894,11 +943,13 @@ class _ScriptEngine:
     # -- scoped machine-state changes ----------------------------
 
     def _enter_scope(self, scope):
-        """Capture what a scope owns, then make its change.
+        """Capture what a scope owns, then apply its change.
 
-        Entry is a boundary like a statement start, so a cancellation
-        lands here rather than between the capture and the change — a
-        scope that never applied owns nothing and is never pushed.
+        Entering a scope is a boundary, just like the start of a
+        statement, so a cancellation lands here rather than partway
+        between the capture and the change -- a scope whose change
+        never got applied owns nothing yet and is never pushed onto
+        the active scope stack.
         """
         self._check_clocks(scope.action)
         captured = self._capture(scope)
@@ -906,8 +957,9 @@ class _ScriptEngine:
                    target=scope.target, detail=self._detail(scope.action),
                    line=scope.line)
         self._apply(scope)
-        # Pushed only once the change is made: a scope whose entry
-        # failed owns nothing and must not be unwound.
+        # Only pushed once the change has actually been made: a
+        # scope whose entry failed owns nothing yet, and must not be
+        # unwound later.
         self._scopes.append(_ActiveScope(scope, captured))
 
     def _capture(self, scope):
@@ -930,12 +982,13 @@ class _ScriptEngine:
             self._set_boot_prefix(scope.action)
 
     def _set_boot_prefix(self, action):
-        """Put the named drives first, keeping the rest of the order.
+        """Put the named drives first in the boot order, keeping the rest of the order unchanged.
 
-        The difference from `set-boot`, and the whole reason the head
-        is spelled `boot` (D104): a stage says "boot the CD first",
-        and an author should not have to restate an order they are not
-        changing.
+        This is the difference from `set-boot`, and the entire
+        reason this `with` head is spelled `boot` rather than
+        `set-boot` (D104): a script typically just wants to say
+        "boot the CD first," and an author should not have to
+        restate the whole order just to change one part of it.
         """
         keys = list(action.arguments)
         state = _machines.load_machine_state(self._machine_id,
@@ -949,9 +1002,10 @@ class _ScriptEngine:
     def _leave_scopes(self, depth):
         """Restore every scope deeper than ``depth``, innermost first.
 
-        Raises where a restore cannot be made, which is a run failure
-        like any other: the run is still going, so there is no earlier
-        error for this one to displace.
+        Raises if a restore cannot be made, and that is a run
+        failure like any other: the run is still going at this
+        point, so there is no earlier error for this new one to be
+        overshadowed by.
         """
         while len(self._scopes) > depth:
             self._restore(self._scopes.pop())
@@ -960,11 +1014,12 @@ class _ScriptEngine:
         """Close every open scope as the run ends.
 
         ``failing`` is the error the run is already ending with, or
-        ``None`` on a run that otherwise succeeded. It decides what a
-        restore that cannot be made does: on a clean run it becomes
-        the run's failure, and on a failing one it is reported and the
-        original error stands — a restore that could not be made is
-        never the more useful of two diagnostics.
+        ``None`` for a run that otherwise succeeded. It decides what
+        happens if a restore fails: on a clean run, that restore
+        failure becomes the run's failure; on a run that was already
+        failing, the restore failure is only reported and the
+        original error still stands -- a failed restore is never
+        the more useful of the two diagnostics to surface.
         """
         problem = None
         while self._scopes:
@@ -976,12 +1031,14 @@ class _ScriptEngine:
             raise problem
 
     def _restore(self, active):
-        """Put back what one scope captured, reporting either way.
+        """Put back what one scope captured, reporting the outcome either way.
 
-        A restore that cannot be made says **what it could not undo**
-        rather than only why: the machine layer's refusal names the
-        rule (a boot order is stopped-only), and only the run knows
-        which scope was open and what it was holding.
+        If a restore cannot be made, the error says **what it could
+        not undo**, not just why: the machine layer's own refusal
+        names the rule that blocked it (for example, a boot order
+        can only be set while stopped), but only the run itself
+        knows which scope was open and what value it was holding to
+        restore.
         """
         scope = active.scope
         wanted = self._wanted(scope, active.captured)
@@ -1002,26 +1059,26 @@ class _ScriptEngine:
     def _wanted(scope, captured):
         """What a restore will put back, as a phrase, before it runs."""
         if scope.head == "boot":
-            # A machine always has an order, so the empty case is
-            # unreachable rather than a policy: there is simply
-            # nothing to put back, and `set_boot_order` refuses an
-            # empty order in any case.
+            # A machine always has a boot order, so the empty case
+            # here cannot actually happen -- it is not a deliberate
+            # policy choice. There is simply nothing to put back,
+            # and `set_boot_order` refuses an empty order anyway.
             return " ".join(captured) if captured else "no recorded order"
         media, path = captured
         if media is not None:
             return f"@{media}"
-        # An anonymous image the slot held when the run arrived is
-        # mounted in place, so putting it back names the path again
-        # rather than resolving anything.
+        # An anonymous image that the slot held when the run started
+        # is mounted in place by path, so putting it back just names
+        # that same path again instead of resolving anything.
         return path if path is not None else "empty"
 
     def _put_back(self, scope, captured):
-        """Reinstate one captured value, or raise saying it could not.
+        """Reinstate one captured value, or raise saying it could not be restored.
 
-        The machine calls are made directly rather than through
-        :meth:`_machine_change`: the caller states the change that
-        failed, and a diagnostic located twice reads worse than one
-        located once.
+        The underlying machine calls here are made directly, not
+        through :meth:`_machine_change`: the caller states which
+        change failed, and a diagnostic that gets located twice
+        reads worse than one located just once.
         """
         if scope.head == "boot":
             if captured:
@@ -1038,9 +1095,10 @@ class _ScriptEngine:
                                   context=self._context)
         if media is None and path is None:
             return
-        # No cancel event: a run ending on a Ctrl-C still owes the
-        # machine what it took, and a fetch that aborts on arrival
-        # would leave the slot empty rather than as it was found.
+        # No cancel event here: a run ending on a Ctrl-C still owes
+        # the machine whatever it took from it, and a fetch that
+        # aborted partway through would leave the slot empty
+        # instead of as it was originally found.
         _machines.insert_media(
             self._machine_id, slot, media, file=None if media else path,
             context=self._context, events=self.events)
@@ -1056,15 +1114,18 @@ class _ScriptEngine:
         return f"{action.arguments[0]} {sigil}{name}"
 
     def _cross_into(self, name):
-        """Leave the scopes a phase sits outside; enter the ones it is in.
+        """Leave the scopes a phase sits outside; enter the ones it sits inside.
 
-        **The scope is where control is, not where the text is**
-        (D104): a phase is inside a group whichever way control
-        reached it, so the two chains are compared rather than the two
-        positions. Their common prefix stays untouched, what the old
-        phase had beyond it is restored innermost first, and what the
-        new one has beyond it is applied outermost first — which makes
-        re-entry re-apply, with no case of its own.
+        **A scope tracks where control currently is, not where the
+        text is positioned** (D104): a phase counts as inside a
+        scope group however control actually reached it, so this
+        compares the two scope chains rather than the two phases'
+        text positions. Their shared prefix is left untouched;
+        whatever the old phase had beyond that prefix gets restored
+        innermost first, and whatever the new phase has beyond it
+        gets applied outermost first -- which means re-entering the
+        same phase re-applies its scopes, with no special case
+        needed for that.
         """
         chain = self._script.phase_scopes.get(name, ())
         depth = 0
@@ -1104,13 +1165,14 @@ class _ScriptEngine:
     # -- statements ----------------------------------------------
 
     def _execute(self, statements):
-        """Run a statement list; report how control left it.
+        """Run a statement list, and report how control left it.
 
-        A ``with`` scope in a linear script brackets a run of the list:
-        control is inside it for exactly the statements it wraps, so
-        entering and leaving are where the text says. A failure inside
-        leaves the scope on the stack, where the run's unwind restores
-        it — the same path every other outcome takes.
+        A ``with`` scope in a linear script brackets a run of the
+        list: control is only considered inside it for exactly the
+        statements it wraps, so entering and leaving happen exactly
+        where the script text says. A failure inside the scope
+        leaves it on the scope stack, where the run's unwind step
+        restores it -- the same path every other outcome takes too.
         """
         for statement in statements:
             units = getattr(statement, "units", None)
@@ -1140,9 +1202,10 @@ class _ScriptEngine:
                        line=statement.line)
             return _FINISH
         try:
-            # A `${key}` reaches the runtime unbound from a condition
-            # as easily as from an argument, so one handler covers
-            # every statement that can carry one.
+            # An unbound `${key}` can reach the runtime from a
+            # condition just as easily as from an argument, so one
+            # handler here covers every kind of statement that could
+            # carry one.
             if verb == "wait":
                 return self._wait(statement)
             if verb == "enter":
@@ -1187,7 +1250,7 @@ class _ScriptEngine:
             statement, rule_id="prop.unbound-at-runtime")
 
     def _set(self, statement):
-        """Record a machine variable — the script's channel to the host."""
+        """Record a machine variable -- the script's channel for sending a value to the host."""
         key = statement.arguments[0]
         value = _render_literal(statement.arguments[1], self._bindings)
         self._action(statement, "set", f"{key}={value!r}")
@@ -1202,11 +1265,13 @@ class _ScriptEngine:
     def _font(self, statement):
         """Replace the font prefix (F61, D109).
 
-        `font @name...` states from this point forward: the named
-        fonts are tried before the host's own, in the order given. A
-        second `font` **replaces** the prefix rather than appending
-        to it — it is not an accumulating list, and an author who
-        wants both names them together on the one statement.
+        `font @name...` applies from this point forward: the named
+        fonts are tried, in the order given, before the host's own
+        default fonts. A second `font` statement **replaces** this
+        prefix rather than adding to it -- it does not build up an
+        accumulating list, so an author who wants several fonts
+        together has to name them all together on the same
+        statement.
         """
         names = []
         for kind, name in statement.arguments:
@@ -1228,13 +1293,15 @@ class _ScriptEngine:
     # -- observation ---------------------------------------------
 
     def _observation(self, condition, stable):
-        """Arm one condition, binding what preflight already resolved.
+        """Arm one condition, using what preflight has already resolved.
 
-        A landmark carries its declaration and the plane's capture
-        format from here rather than resolving either mid-run: both
-        are preflight's answers (G3), and a sample that had to read a
-        file to decide would be a refusal arriving after the first
-        guest input.
+        A landmark observation carries its declaration and the
+        plane's capture format from here, rather than resolving
+        either one mid-run: both were already answered during
+        preflight (G3), and a sample that had to read a file to
+        decide something would mean a refusal could show up after
+        the first guest input, which is exactly what preflight
+        exists to prevent.
         """
         landmark = (self._landmarks.get(condition.value)
                     if condition.kind == "landmark" else None)
@@ -1281,8 +1348,9 @@ class _ScriptEngine:
         self._emit(_events.HANDLER_FIRE, keyword="on",
                    description=_describe(handler.condition),
                    line=handler.line)
-        # The sample loop holds no session, so a handler body is free
-        # to open its own: QEMU's QMP server admits one client.
+        # The sample loop holds no session open of its own, so a
+        # handler body is free to open one: QEMU's QMP server only
+        # allows one client at a time.
         return self._execute(handler.statements)
 
     def _run_reactive(self, phase):
@@ -1305,9 +1373,10 @@ class _ScriptEngine:
             self._check_clocks()
             sample = self._read(text, pixels)
             now = self._now()
-            # An unstable frame evaluates *none* of the handlers,
-            # which is why the gate belongs to the container rather
-            # than to any one of them.
+            # An unstable (still-changing) frame is not evaluated
+            # against *any* of the handlers, which is why the
+            # stability gate belongs to the container (the phase),
+            # not to any single handler.
             settled = self._settled(gate, monitor, sample, now)
             expired = now >= expiry
             if not (settled or (expired and not self._measured)):
@@ -1318,8 +1387,8 @@ class _ScriptEngine:
             fired = None
             for index, observation in enumerate(observations):
                 # Every armed observation sees every sample, so the
-                # episodes of the handlers that did not fire stay
-                # honest too.
+                # episode tracking for handlers that did not fire
+                # this time stays accurate too.
                 if observation.update(sample, now) and fired is None:
                     fired = index
             if fired is None:
@@ -1360,13 +1429,17 @@ class _ScriptEngine:
             self._check_clocks(statement)
             sample = self._read(text, pixels)
             now = self._now()
-            # An unsettled sample is not one the condition is judged
-            # on, and sampling tightens while the screen moves: a
-            # quiescence window is only observable from inside it.
-            # **The gate delays acceptance and never causes failure by
-            # itself** — at expiry the condition is evaluated on
-            # whatever is there, so a timeout still means samples were
-            # taken and none satisfied it, never that nobody looked.
+            # An unsettled (still-changing) sample is not one the
+            # condition gets judged against, and sampling tightens
+            # while the screen keeps moving: whether a screen has
+            # gone quiet is only observable by sampling closely
+            # during that window.
+            # **The stability gate only delays acceptance and never
+            # causes a failure by itself** -- at expiry, the
+            # condition is evaluated against whatever screen is
+            # currently there, so a timeout still means samples were
+            # taken and none of them satisfied the condition, never
+            # that nobody actually looked.
             settled = self._settled(gate, monitor, sample, now)
             expired = now >= expiry
             if not (settled or (expired and not self._measured)):
@@ -1419,10 +1492,11 @@ class _ScriptEngine:
     def _matched(self, description, sample, observation, elapsed, line):
         """Report a match, naming the evidence that satisfied it.
 
-        A text condition is satisfied by a row and names it; a
-        landmark is satisfied by a *variant* and names that instead,
-        since which rendering matched is the fact an author acts on
-        when several are in play.
+        A text condition is satisfied by a specific row, and this
+        names it. A landmark condition is satisfied by a *variant*,
+        and this names that instead, since which rendering actually
+        matched is the fact an author needs when several variants
+        are being tried.
         """
         row = None
         for candidate in sample.rows:
@@ -1442,12 +1516,13 @@ class _ScriptEngine:
         return entry.timeout if entry is not None else self._plan.default
 
     def _gate(self, node):
-        """The quiescence gate the plan resolved for this observation.
+        """The stability gate the timing plan resolved for this observation.
 
-        ``None`` where the guard is off — ``stability=0`` is the
-        author's escape for a screen the default would refuse, and it
-        must cost nothing at all, not even the window that
-        establishing quiescence would otherwise take.
+        Returns ``None`` when the gate is turned off --
+        ``stability=0`` is the author's escape hatch for a screen
+        the default threshold would otherwise reject, and turning it
+        off has to cost nothing at all, not even the time it would
+        otherwise take to establish that the screen has settled.
         """
         entry = self._plan.at(node)
         level = (entry.stability if entry is not None
@@ -1457,26 +1532,30 @@ class _ScriptEngine:
         return level
 
     def _settled(self, gate, monitor, sample, now):
-        """Whether this sample is one a condition may be judged on.
+        """Whether this sample is one a condition is allowed to be judged on.
 
-        A condition can hold perfectly on a screen that is still
-        painting, and that is the screen a wait must not act on — so
-        an unsettled sample is skipped rather than evaluated, and the
-        wait keeps looking. A stopped machine has no screen to judge,
-        and the machine channel still has to be answerable there.
+        A condition can hold perfectly well against a screen that is
+        still being painted, and that is exactly the screen a wait
+        must not act on -- so an unsettled sample is skipped rather
+        than evaluated, and the wait just keeps looking. A stopped
+        machine has no screen to judge at all, and the machine
+        channel still needs to be answerable in that case.
         """
         # A landmark sample is judged on the pixels it was matched
-        # on, which is the same contract one grain finer (F65): a
-        # capture that arrived is what the gate reads, and the text
-        # frame only where none did.
+        # against -- the same rule as for text, just one level more
+        # precise (F65): the gate reads whatever capture actually
+        # arrived, and only falls back to the text frame when no
+        # capture did.
         reading_of = sample.image if sample.image is not None else (
             sample.frame)
         if gate is None or sample.stopped or not reading_of:
             return True
-        # Quantize to the grid this reading path's noise justifies:
-        # a text scrape varies by milliseconds, an interpreted
-        # framebuffer by hundreds of them, and a window resized on
-        # that noise would judge two identical runs differently.
+        # Round timing to the resolution this reading path's noise
+        # actually justifies: a text scrape's timing varies by a
+        # few milliseconds, while an interpreted framebuffer's
+        # varies by hundreds of them, and a window sized to match
+        # that noise would otherwise judge two identical runs
+        # differently.
         monitor.cadence_step = (
             _stability.TEXT_CADENCE_STEP
             if sample.image is None and not self._recognized_screens
@@ -1484,34 +1563,40 @@ class _ScriptEngine:
         reading = monitor.observe(reading_of, now=now)
         self._report_guard(monitor, reading)
         if reading.stability is not None:
-            # The window was observed, so there is a verdict here
-            # rather than merely an absence of evidence. Which of
-            # those two it is decides what an expiry may do.
+            # The window was actually observed, so there is a real
+            # verdict here, not just an absence of evidence. Which
+            # of those two this is decides what an expiry is allowed
+            # to do.
             self._measured = True
         if reading.stable:
             return True
         if reading.blind:
-            # The cadence cannot see decoration, so the guard has no
-            # verdict to give — and a guard with no verdict must not
-            # refuse. Blocking here is not caution but a deadlock: no
-            # later sample can improve what the poll rate forbids, so
-            # the wait would spend its whole clock skipping frames it
-            # was never able to judge. Standing down returns this
-            # observation to what it was before the gate existed,
-            # which is the honest fallback and keeps "the gate never
-            # causes a failure on its own" true at every cadence.
+            # The sampling cadence cannot even see the screen's
+            # decoration at this rate, so the stability gate has no
+            # verdict to give -- and a gate with no verdict must not
+            # block. Blocking here would not be caution, it would be
+            # a deadlock: no later sample can improve on what the
+            # poll rate itself forbids, so the wait would spend its
+            # entire clock skipping frames it was never able to
+            # judge in the first place. Standing down returns this
+            # observation to how it behaved before the gate existed
+            # at all, which is the honest fallback, and it keeps
+            # "the gate never causes a failure on its own" true at
+            # every sampling cadence.
             return True
         self._gated = reading
         return False
 
     def _report_guard(self, monitor, reading):
-        """Say once what cadence was measured and what it bought.
+        """Report, once, what sampling cadence was measured and what it achieves.
 
-        Emitted at the first sample that has a cadence at all — two
-        reads in — rather than at preflight, because nothing before
-        the run has read a screen and the answer is measured, never
-        configured. Once per run: it is a property of the host and
-        the reading path, not of the statement being judged.
+        This is emitted at the first sample that actually has a
+        cadence to report -- which takes two reads -- rather than
+        during preflight, because nothing before the run starts has
+        actually read a screen, and this value is measured, never
+        just configured. It is only emitted once per run: cadence is
+        a property of the host and the reading path, not of
+        whichever statement happens to be judged at the time.
         """
         if self._guard_reported:
             return
@@ -1528,14 +1613,16 @@ class _ScriptEngine:
             recognized=self._recognized_screens)
 
     def _gate_note(self):
-        """What to add to an expiry that skipped unsettled samples.
+        """What to add to an expiry message when unsettled samples got skipped.
 
-        A wait now expires two ways that look identical from outside:
-        the condition never matched, or it matched only on frames the
-        guard skipped. The second is baffling without help — the text
-        is plainly there in any screenshot taken at the time — so the
-        failure says which, and the animated region is what makes the
-        message locate the problem rather than restate the expiry.
+        A wait can now expire in two ways that look identical from
+        the outside: the condition genuinely never matched, or it
+        only matched on frames the stability gate skipped over. The
+        second case is baffling without an explanation -- the text
+        is plainly visible in any screenshot taken at the time -- so
+        the failure message says which case happened, and naming the
+        animated region is what lets the message actually point at
+        the problem instead of just restating that the wait expired.
         """
         reading = self._gated
         if reading is None:
@@ -1550,23 +1637,25 @@ class _ScriptEngine:
         return f"{note})"
 
     def _pace(self, statement):
-        """Let the guest settle before the first key event.
+        """Let the guest settle before the first key event of this statement.
 
-        Agentlessly the guest's *input* readiness is unobservable
-        where its output is not, so a control plane that types the
-        instant a screen paints asserts something it cannot know
-        (G1). This is the gap the plan resolved for this statement —
-        never re-derived here, so a report can name the scope that
-        supplied it.
+        Without an agent inside the guest, whether the guest is
+        ready for *input* cannot be observed the way its output can,
+        so a control plane that starts typing the instant a screen
+        finishes painting is asserting something it cannot actually
+        know (G1). This is the gap the timing plan already resolved
+        for this statement -- it is never recomputed here, so a
+        report can name which scope supplied it.
 
-        It is control-plane pacing and not a `delay` verb: the pause
-        is a property of delivering input, not a step an author
-        sequences. `send_keys` already paces *between* key events;
-        this is the missing pause before the first.
+        This is control-plane pacing, not a `delay` verb an author
+        writes: the pause is a property of *delivering* input, not a
+        step the author sequences explicitly. `send_keys` already
+        paces *between* key events; this fills in the missing pause
+        before the very first one.
 
-        The gap is taken before delivery, so a cancellation arriving
-        during it ends the run cleanly at this boundary rather than
-        mid-delivery.
+        The gap is taken before delivery happens, so a cancellation
+        that arrives during it ends the run cleanly at this
+        boundary, rather than in the middle of delivering input.
         """
         gap = self._plan.pacing_at(statement)
         if gap is None or gap.seconds <= 0:
@@ -1575,13 +1664,14 @@ class _ScriptEngine:
         self._check_clocks(statement)
 
     def _check_clocks(self, statement=None):
-        """Check the budgets — and a cancellation — at a boundary."""
+        """Check the timing budgets, and whether a cancellation was requested, at this boundary."""
         if self._cancelled.is_set():
-            # "As it stands" is the whole promise of a cancellation, so
-            # an open scope is the one thing that has to be said out
-            # loud: its restore is about to run, and a machine that
-            # comes back different from the one the interrupt left is
-            # only honest if the message named it first.
+            # "Left as it stands" is the entire promise a
+            # cancellation makes, so an open scope is the one thing
+            # that has to be called out explicitly: its restore is
+            # about to run, and reporting a machine that ends up
+            # different from the one the interrupt actually left is
+            # only honest if the message says so first.
             left = "is left as it stands"
             if self._scopes:
                 left += (", apart from the scoped changes being put "
@@ -1614,17 +1704,19 @@ class _ScriptEngine:
     def _reads(observations):
         """What one sample of this observation set has to capture.
 
-        Two reading paths, and a set spanning both pays for both: a
-        landmark needs the plane's pixels and a text condition needs
-        the recognized screen, and the two are separate carrier calls
-        (`control_display.DisplayConsole`). A landmark-only wait skips
-        the recognizer entirely, which is the whole point on a GUI
-        screen — matching glyphs there is work thrown away.
+        There are two separate reading paths, and an observation set
+        that spans both pays the cost of both: a landmark condition
+        needs the plane's pixels, and a text condition needs the
+        recognized screen, and these are two separate carrier calls
+        (`control_display.DisplayConsole`). A wait with only
+        landmark conditions skips the character recognizer entirely,
+        which is the whole point on a GUI screen -- matching
+        individual glyphs there would be wasted work.
 
-        A set with no screen condition at all still reads the text
-        screen, exactly as it did before landmarks existed: the read
-        is what notices a machine that stopped underneath a
-        `machine=stopped` wait.
+        An observation set with no screen condition at all still
+        reads the text screen, exactly as it did before landmarks
+        ever existed: that read is what notices a machine that
+        stopped underneath a `machine=stopped` wait.
         """
         pixels = any(one.watches_pixels for one in observations)
         text = not pixels or any(
@@ -1647,15 +1739,16 @@ class _ScriptEngine:
                     try:
                         frame = console.screen(self._font_prefix)
                     except UnreadableScreen as error:
-                        # **A capture already in hand outlives a text
+                        # **A capture already in hand survives a text
                         # read that failed**, and on a landmark's own
                         # screen that is the ordinary case: a GUI page
-                        # is not an 80x25 text grid, so the recognizer
-                        # refuses it while the pixels a landmark is
-                        # matched on arrived perfectly. Losing the
-                        # sample here would mean a branching wait
-                        # mixing a text arm with a landmark arm could
-                        # never fire the landmark one.
+                        # is not an 80x25 text grid, so the character
+                        # recognizer refuses it while the pixels a
+                        # landmark is matched against still arrived
+                        # perfectly. Discarding the sample here would
+                        # mean a branching wait that mixes a text arm
+                        # with a landmark arm could never fire the
+                        # landmark arm.
                         if capture is None:
                             raise
                         unreadable = str(error)
@@ -1675,12 +1768,13 @@ class _ScriptEngine:
             self._mark_stopped()
             return self._sampled(_Sample((), True))
         except UnreadableScreen as error:
-            # The guest is painting something the 80x25 contract cannot
-            # describe — a graphics-mode BIOS splash on every VirtualBox
-            # boot, before the guest reaches text. That is a sample the
-            # wait looks past, never the end of the run: the machine is
-            # healthy and the screen the script waits for has simply not
-            # been drawn yet.
+            # The guest is painting something the 80x25 text
+            # contract cannot describe -- a graphics-mode BIOS
+            # splash on every VirtualBox boot, before the guest
+            # reaches text mode. This is a sample the wait just
+            # looks past, never the end of the run: the machine is
+            # healthy and the screen the script is waiting for has
+            # simply not been drawn yet.
             return self._sampled(_Sample((), False, (), str(error)))
         return self._sampled(
             _Sample(tuple(_normalize_row(row) for row in rows), False,
@@ -1696,12 +1790,13 @@ class _ScriptEngine:
 
     @staticmethod
     def _cache_root_or_none(context):
-        """The resolved cache root, or None where none can be resolved.
+        """The resolved cache root directory, or None if it cannot be resolved.
 
         The adapters keep host-extracted support files there, and a
-        run that cannot name the directory simply does without —
-        re-extracting costs time, never correctness, so this must
-        never be the thing that fails a run.
+        run that cannot name the directory simply does without one
+        -- re-extracting those files just costs time, never
+        correctness, so this must never be the thing that fails a
+        run.
         """
         try:
             return _resolve_cache_dir(context)
@@ -1709,16 +1804,20 @@ class _ScriptEngine:
             return None
 
     def _machine(self):
-        """The handle **every** carrier call goes through.
+        """Return the handle **every** carrier call goes through.
 
-        One constructor rather than three, because the recorder is
-        installed here: a caller that builds its own handle makes a
-        carrier call the transcript never sees, which is what the
-        `screenshot` verb did — and both codex scripts take one.
+        This is one constructor used everywhere, instead of three
+        separate ones, because the recorder gets installed right
+        here: a caller that built its own handle instead would make
+        a carrier call the transcript never sees, which is exactly
+        what the `screenshot` verb used to do -- and both codex
+        scripts also depend on going through this one path.
 
-        Passed at construction rather than assigned after: `Machine`
-        is frozen, so the assignment this replaced raised on every
-        recorded run at its first screen read.
+        The recorder is passed in at construction time rather than
+        assigned onto the object afterward: `Machine` is a frozen
+        object, so the assignment this replaced used to raise an
+        error on every recorded run, the first time it tried to read
+        a screen.
         """
         wrapper = None
         if self._recording_writer is not None:
@@ -1733,8 +1832,9 @@ class _ScriptEngine:
         """Yield a console over an identity-verified session.
 
         Every sample and every input verb opens its own session, so
-        none is ever held while a statement list runs — QEMU's QMP
-        server admits one client at a time.
+        no session is ever held open while a statement list is
+        running -- QEMU's QMP server only allows one client to be
+        connected at a time.
         """
         try:
             with self._machine().console() as console:
@@ -1748,13 +1848,15 @@ class _ScriptEngine:
             raise
 
     def _note_vm_gone(self, error):
-        """Record the moment the carrier went away, where recording.
+        """Record the moment the carrier went away, if recording is active.
 
-        The seam cannot record this one: the session refuses to open,
-        so the wrapper that would have written it never exists. It is
-        the guest powering itself off — the answer a `wait
-        machine=stopped` is waiting for — so a capture without it
-        replays up to the shutdown and no further.
+        The carrier seam itself cannot record this event: the
+        session refuses to open in the first place, so the recording
+        wrapper that would normally write it never gets created.
+        This is the guest powering itself off -- the exact event a
+        `wait machine=stopped` is waiting for -- so a capture missing
+        this entry can only replay up to the shutdown, and no
+        further.
         """
         writer = self._recording_writer
         if writer is not None:
@@ -1809,14 +1911,15 @@ class _ScriptEngine:
         self._completed(statement, "type")
 
     def _note_secret(self, literal):
-        """Record that a secret was entered, for later suppression.
+        """Record that a secret was entered, so later output can suppress it.
 
-        Once a secret reaches the guest, automatic failure screenshots
-        are suppressed for the rest of the run; an explicitly
-        requested screenshot is the author's own call and is never
-        suppressed. Recording stops too: a raw screen carries a typed
-        password in plain text, and a frame is a grid so event-stream
-        redaction cannot reach it.
+        Once a secret reaches the guest, automatic failure
+        screenshots are suppressed for the rest of the run; an
+        explicitly requested screenshot is the author's own
+        deliberate choice and is never suppressed. Recording stops
+        too: a raw captured screen carries the typed password in
+        plain text, and a frame is a grid of cells, not a line of
+        text, so the event stream's redaction cannot reach into it.
         """
         if self._secret_entered or not self._secret_values:
             return
@@ -1867,14 +1970,15 @@ class _ScriptEngine:
         self._completed(statement, "select")
 
     def _resolve_spot(self, statement, landmark):
-        """The spot a `click` targets: named, or the lone one (F66).
+        """The spot a `click` targets: the one named, or the single spot if there is only one (F66).
 
         Preflight already proved this succeeds for a literal `spot=`
-        (or no `spot=` at all — the lone-spot default, only legal
-        where exactly one exists). An interpolated `spot=` is checked
-        here instead, for the same reason a `$property` media
-        reference resolves at runtime rather than preflight: its
-        value is unknowable before binding.
+        value (or for no `spot=` at all -- the default of using the
+        single spot, which is only legal when exactly one spot
+        exists). An interpolated `spot=` value is instead checked
+        here, for the same reason a `$property` media reference
+        resolves at runtime rather than preflight: its actual value
+        cannot be known before binding happens.
         """
         if statement.spot is not None:
             name = _render_literal(statement.spot, self._bindings)
@@ -1890,13 +1994,13 @@ class _ScriptEngine:
     def _click(self, statement):
         """Find a landmark, then deliver a click at one of its spots.
 
-        Two halves, like `select`: the *search* reuses `wait`'s exact
-        machinery (`_observation`/`_arm`/`_observe`) since a `click`'s
-        target is a real landmark pixel-match, not a text scan — a
-        timeout here names the statement's clock with no pointer
-        event ever delivered. The *delivery* — pace, then the
-        composed click-and-park — follows only once the search has
-        matched.
+        This has two halves, like `select`: the *search* reuses
+        `wait`'s exact machinery (`_observation`/`_arm`/`_observe`),
+        since a `click`'s target is a real landmark pixel match, not
+        a text scan -- a timeout here names the statement's own
+        clock, with no pointer event ever having been delivered. The
+        *delivery* -- pacing, then the combined click-and-park
+        motion -- only happens once the search has actually matched.
         """
         name = statement.arguments[0]
         condition = statement.conditions[0]
@@ -1926,10 +2030,10 @@ class _ScriptEngine:
         name = validate_screenshot_name(name)
         self._action(statement, "screenshot", name)
         self._requires_running(statement)
-        # No run directory exists any more (D36), so an author's
-        # screenshot rests with the machine it was taken from. Through
-        # `_machine()` like every other carrier call, so a recorded
-        # run's transcript carries it.
+        # There is no run directory any more (D36), so an author's
+        # screenshot is kept with the machine it was taken from.
+        # This goes through `_machine()` like every other carrier
+        # call, so a recorded run's transcript captures it too.
         self._machine().screenshot(name)
         self._completed(statement, "screenshot")
 
@@ -1941,9 +2045,10 @@ class _ScriptEngine:
             except KeyError:
                 raise _PropertyUnbound(name) from None
         self._action(statement, "insert", f"{slot} @{name}")
-        # The stream carries the fetch's transfer/verify events (an
-        # insert can pull hundreds of megabytes, and silence reads as
-        # a hang); the cancel event makes that fetch severable.
+        # The event stream carries the fetch's transfer/verify
+        # events (an insert can pull down hundreds of megabytes, and
+        # silence there would read as a hang); the cancel event lets
+        # that fetch be interrupted cleanly.
         self._machine_change(
             statement, _machines.insert_media, slot, name,
             events=self.events, cancelled=self._cancelled)
@@ -1962,13 +2067,15 @@ class _ScriptEngine:
         self._completed(statement, "set-boot")
 
     def _machine_change(self, statement, operation, *arguments, **options):
-        """Apply a persistent machine-state change, naming failures.
+        """Apply a persistent machine-state change, naming the statement if it fails.
 
-        ``options`` reach the operation unchanged, so a change that
-        fetches media can be given the run's stream and cancel event
-        without every other change growing parameters it has no use
-        for. A ``RunCancelled`` raised inside is deliberately not
-        caught here: it is the run stopping, not this change failing.
+        ``options`` are passed through to the operation unchanged,
+        so a change that fetches media can be given the run's event
+        stream and cancel event, without every other kind of change
+        having to grow parameters it has no use for. A
+        ``RunCancelled`` raised inside is deliberately not caught
+        here: that means the run is stopping, not that this
+        particular change failed.
         """
         try:
             operation(self._machine_id, *arguments, context=self._context,
@@ -2064,15 +2171,17 @@ class _ScriptEngine:
 
 
 def _walk(script):
-    """Yield every statement of a script, nested bodies included.
+    """Yield every statement of a script, including statements inside nested bodies.
 
-    The validation and timing layers walk the tree too, but each
-    threads its own scope context and neither may import this
-    module's; this is the plain traversal.
+    The validation and timing layers each walk the tree too, but
+    each of them threads its own scope context, and neither can
+    import this module. This is the plain traversal used by this
+    module.
 
     A ``with`` head is yielded as the action it is written as, so a
-    scoped `insert` answers to the same preflight rules as a written
-    one; the pseudo-verb ``boot`` is the head-only third.
+    scoped `insert` answers to the same preflight rules as an
+    ordinary written `insert`; the pseudo-verb ``boot`` is the
+    third, head-only case.
     """
 
     def statements(items, handlers=()):
@@ -2125,13 +2234,14 @@ def _no_such_landmark(name, namespace):
 def _observed(script):
     """Yield every node that carries an observation condition.
 
-    ``_walk`` above is the plain statement traversal and drops the
-    handlers it descends through; a condition sits on the handler
-    itself as often as on a `wait`, so the two walks are separate
-    rather than one generalized to yield both kinds. `click` (F66)
-    carries one too — its search is a landmark match like `wait`'s —
-    so it joins `wait` here rather than growing a second walk for the
-    same three landmark refusals.
+    ``_walk`` above is the plain statement traversal, and it drops
+    the handlers it descends through. A condition sits on the
+    handler itself just as often as on a `wait`, so this needs its
+    own separate walk rather than generalizing `_walk` to yield both
+    kinds. `click` (F66) carries a condition too -- its search is a
+    landmark match, just like `wait`'s -- so it is included alongside
+    `wait` here instead of needing a second walk for the same three
+    landmark checks.
     """
 
     def walk(items, handlers=()):
@@ -2155,14 +2265,16 @@ def _observed(script):
 
 
 def _pool_kind(name, context, want):
-    """Which *other* kind of the one ``@`` pool holds ``name``.
+    """Which *other* kind in the one ``@`` pool holds ``name``, if any.
 
-    The pool is one namespace across media, fonts and landmarks, so a
-    reference that misses its own kind has usually hit another one —
-    and saying *which* is the difference between "no landmark named
-    'freedos'" and "'freedos' is a media". Consulted only on a miss,
-    so an ordinary run never resolves a namespace it had no use for,
-    and never re-resolves the kind that just missed.
+    The `@` pool is one shared namespace across media, fonts, and
+    landmarks, so a reference that misses its own kind has usually
+    matched a different kind instead -- and saying *which* one is
+    the difference between an error that says "no landmark named
+    'freedos'" and one that says "'freedos' is a media". This is
+    only consulted after a miss, so an ordinary successful run never
+    resolves a namespace it had no use for, and never re-resolves
+    the kind that just failed to match.
     """
     lookups = {
         "media": lambda: load_namespace(context).media,
@@ -2174,20 +2286,21 @@ def _pool_kind(name, context, want):
             if kind != want and name in holds():
                 return kind
     except ReliquaryError:
-        # The pool is being consulted to *improve* a refusal that is
-        # already certain. A second failure while looking must not
-        # replace the first one.
+        # This lookup is only being done to *improve* a refusal
+        # that has already happened. A second failure that occurs
+        # while looking must not replace the original one.
         return None
     return None
 
 
 def _wrong_kind(name, want, used_for, context, statement, script_path):
-    """The kind-at-binding refusal, or ``None`` if nothing else holds it.
+    """The refusal for a `@name` that resolved to the wrong kind, or ``None`` if nothing else holds that name.
 
-    One rule in three directions: the use decides which kind a
-    ``@name`` must be, so a reference landing on another kind of the
-    same pool is told what it hit and where it was used, rather than
-    being reported as a name nobody declared.
+    This is one rule applied in three directions: how a `@name` is
+    used decides which kind it must be, so a reference that actually
+    landed on a different kind in the same pool is told exactly
+    what it hit and where it was used, instead of just being
+    reported as an undeclared name.
     """
     other = _pool_kind(name, context, want)
     if other is None:
@@ -2201,12 +2314,13 @@ def _wrong_kind(name, want, used_for, context, statement, script_path):
 
 @dataclasses.dataclass(frozen=True)
 class _Resolved:
-    """What preflight settled that a run then needs in hand.
+    """What preflight already settled, that a run then needs to have in hand.
 
-    Both halves are answers a sample must never go looking for: a
-    landmark declaration is read off disk, and the capture format is
-    the seam's, and either arriving mid-run would be a refusal after
-    the first guest input (G3).
+    Both fields hold answers a sample must never go looking for
+    itself: the landmark declaration is read off disk, and the
+    capture format comes from the carrier seam, and either one
+    arriving mid-run instead of at preflight would mean a refusal
+    could happen after the first guest input (G3).
     """
 
     landmarks: dict = dataclasses.field(default_factory=dict)
@@ -2214,31 +2328,35 @@ class _Resolved:
 
 
 def _capture_format(machine_state):
-    """The pixel format the machine's driving plane captures in.
+    """The pixel format the machine's driving control plane captures in.
 
-    The first declared control plane drives the session (F63), so it
-    is the one asked. ``None`` — the plane reads no framebuffer — is
-    what makes a landmark condition a named refusal below.
+    The first declared control plane is the one that drives the
+    session (F63), so it is the one asked here. Returning ``None``
+    -- meaning the plane reads no framebuffer at all -- is what
+    turns a landmark condition into a named refusal below.
     """
     plane = (machine_state.get("control-planes")
              or ["agentless-display"])[0]
     backend = machine_state.get("backend")
     if not backend:
-        # A state with no backend recorded cannot be asked, and the
-        # plane is still the honest half of the answer.
+        # A state with no backend recorded cannot be asked at all,
+        # but the plane's name is still an honest half of the
+        # answer, so it is still returned.
         return plane, None
     return plane, _backends.adapter(backend).capture_format(plane)
 
 
 def _preflight_spot(node, landmark, script_path):
-    """Refuse a `click`'s `spot=` before the machine starts (F66).
+    """Refuse an invalid `click` `spot=` before the machine starts (F66).
 
-    A landmark declaring exactly one spot needs no modifier; more (or
-    none at all) makes one required, and a name the declaration does
-    not carry is refused by name. An interpolated `spot=` cannot be
-    checked here — its value is unknowable before binding, the same
-    reason a `$property` media reference resolves later rather than
-    here — so it is left to runtime (`_ScriptEngine._resolve_spot`).
+    A landmark that declares exactly one spot needs no `spot=`
+    modifier at all; a landmark with more spots (or none) makes
+    writing `spot=` required, and a name the landmark declaration
+    does not actually have is refused by name. An interpolated
+    `spot=` value cannot be checked here -- its actual value cannot
+    be known before binding happens, the same reason a `$property`
+    media reference is resolved later rather than here -- so that
+    case is left to runtime (`_ScriptEngine._resolve_spot`).
     """
     spot = node.spot
     if spot is not None and spot.interpolated:
@@ -2264,18 +2382,20 @@ def _preflight_spot(node, landmark, script_path):
 def _preflight_landmarks(script, machine_state, script_path, context):
     """Bind every `@name` a condition watches, or refuse by name (F65).
 
-    Three refusals apply to every landmark condition, all of them
-    before the machine is touched (G3): the name resolves to nothing;
-    it resolves to another kind of the one `@` pool, which is the
-    kind check at binding — a media or a font in condition position
-    names the use and the kind; and the machine's driving plane
-    captures no framebuffer, which is capability preflight at the
-    *condition's* granularity rather than the script's, since a
-    script watching no landmark asks nothing of the plane. `click`
-    (F66) adds three more, checked only for it: the machine's
-    `pointing-device` is not `tablet`; the driving plane cannot
-    deliver a pointer event even though it captures one (a plane can
-    hold one capability without the other); and `spot=`, above.
+    Three refusals apply to every landmark condition, and all of
+    them happen before the machine is touched at all (G3): the name
+    resolves to nothing; the name resolves to a different kind in
+    the one `@` pool, which is the kind check done at binding time
+    -- a media or font name used in condition position names both
+    the use and the kind involved; and the machine's driving control
+    plane captures no framebuffer at all, which is a capability
+    check done at the *condition's* granularity rather than the
+    whole script's, since a script that watches no landmark makes no
+    demand on the plane at all. `click` (F66) adds three more checks
+    that apply only to it: the machine's `pointing-device` must be
+    `tablet`; the driving plane must be able to deliver a pointer
+    event even if it captures one (a plane can have one capability
+    without the other); and the `spot=` check above.
     """
     namespace = None
     resolved = {}
@@ -2330,35 +2450,38 @@ def _preflight_landmarks(script, machine_state, script_path, context):
 
 def _preflight_machine_rules(script, machine_state, script_path,
                              context=None):
-    """Fail before any guest input when a script names something the
-    machine or the namespace does not define.
+    """Fail before any guest input when a script names something the machine or the namespace does not define.
 
-    Returns the :class:`_Resolved` bundle the run then holds: the
-    landmark declarations it will match against and the capture
-    format of the plane driving it, both settled here so no sample
-    resolves an asset.
+    Returns the :class:`_Resolved` bundle the run then holds onto:
+    the landmark declarations it will match against, and the
+    capture format of the plane driving it, both settled here so no
+    sample has to resolve an asset itself later.
 
-    Two of the machine rules preflight owes (script-spec.md,
-    "Validation and preflight"): a media reference naming no media
-    the namespace defines, and an undeclared slot or boot drive.
+    Two of the machine rules preflight is responsible for
+    (script-spec.md, "Validation and preflight"): a media reference
+    naming no media the namespace defines, and an undeclared boot
+    drive or slot.
 
-    ``insert``/``eject``/``set-boot`` never create or remove a drive
-    — the blueprint alone defines machine topology — so every named
-    slot must exist in the machine's state.  ``insert``/``eject``
-    further require a floppy or cdrom slot. A ``with`` head is checked
-    as the action it spells, the scoped ``boot`` prefix answering to
-    ``set-boot``'s rule: every key names a declared drive.
+    ``insert``, ``eject``, and ``set-boot`` never create or remove a
+    drive -- the blueprint alone defines a machine's drive topology
+    -- so every named slot must already exist in the machine's
+    state. ``insert`` and ``eject`` additionally require a floppy or
+    cdrom slot. A ``with`` head is checked as whichever action it
+    actually spells, with the scoped ``boot`` prefix following the
+    same rule as ``set-boot``: every key must name a declared drive.
 
-    A ``$property`` media argument resolves at binding, not here, so
-    only a literal ``@name`` is checked. The namespace is loaded
-    lazily: a script inserting nothing by name never pays for it.
-    The slot is checked before the media on the same statement, in
-    the order the author wrote them.
+    A ``$property`` media argument is resolved at binding, not here,
+    so only a literal ``@name`` is checked here. The media namespace
+    is loaded lazily, so a script that inserts nothing by name never
+    pays the cost of loading it. The slot is checked before the
+    media on the same statement, in the order the author actually
+    wrote them.
 
-    A third: a ``font`` naming no font the source defines (F61) —
-    checked the same way, a literal ``@name`` only, its own namespace
-    loaded lazily and separately from media's, since a script naming
-    no font never resolves one.
+    There is a third rule too: a ``font`` statement naming no font
+    the source defines (F61) -- checked the same way, only for a
+    literal ``@name``, with its own namespace loaded lazily and
+    separately from media's, since a script that names no font never
+    has to resolve one.
     """
     drives = machine_state.get("drives", {})
     namespace = None
@@ -2476,13 +2599,14 @@ def execute_script(script, *, machine_id, context=None, display=False,
 
 
 def _record_outcome(writer, failure, engine):
-    """Tell the transcript what the run concluded, where recording.
+    """Tell the transcript what the run concluded, if recording is active.
 
-    The seam cannot show this: a run that reached its `finish` and one
-    that expired on the same screens make the same carrier calls, and
-    which of them happened is decided above. A capture is asserted
-    against it, so a fixture of a run that *failed* is a fixture like
-    any other.
+    The carrier seam itself cannot show this: a run that reached its
+    `finish` and one that expired against the same screens make
+    exactly the same carrier calls, and which of those actually
+    happened is decided above the seam. A capture is checked against
+    this recorded outcome, so a fixture of a run that *failed* works
+    exactly like any other fixture.
     """
     if writer is None:
         return
@@ -2495,32 +2619,33 @@ def _record_outcome(writer, failure, engine):
 
 @contextlib.contextmanager
 def _cancel_on_interrupt(engine):
-    """Turn Ctrl-C into a cancellation the runner ends cleanly on.
+    """Turn Ctrl-C into a cancellation the runner can end cleanly on.
 
     A foreground Ctrl-C requests a stop; the run ends at the next
-    event boundary with a ``cancelled`` terminal event and exit ``5``,
-    leaving the machine as-is (no implicit teardown). Installing a
-    handler is what makes the stop land *at a boundary* rather than
-    wherever the interrupt happened to arrive — an input delivery in
-    flight completes.
+    event boundary with a ``cancelled`` terminal event and exit code
+    ``5``, leaving the machine as-is (with no implicit teardown).
+    Installing a signal handler is what makes the stop land *at a
+    boundary*, instead of wherever the interrupt happened to arrive
+    -- an input delivery already in flight still completes.
 
-    Signal handlers belong to the main thread; a run driven from any
-    other thread simply keeps Python's default behavior, and the
-    ``KeyboardInterrupt`` is translated below instead.
+    Signal handlers can only be installed on the main thread; a run
+    driven from any other thread simply keeps Python's default
+    behavior, and the resulting ``KeyboardInterrupt`` is translated
+    below instead.
 
-    A *second* Ctrl-C restores the default handler and interrupts at
-    once. The graceful stop is the promise, not a trap: without an
-    escalation the only way out of a stop that will not land is
-    killing the terminal.
+    A *second* Ctrl-C restores the default signal handler and
+    interrupts immediately. The graceful stop is meant to be a
+    promise, not a trap: without this escalation, the only way out
+    of a stop that will not land would be killing the terminal.
     """
     installed = False
     previous = None
 
     def _interrupt(*_):
         if engine.cancelled:
-            # Asked twice: the caller wants out now, not at the next
-            # boundary. Hand the signal back to Python and let this
-            # one raise.
+            # Asked twice: the caller wants out immediately, not at
+            # the next boundary. Hand the signal back to Python and
+            # let this one raise normally.
             with contextlib.suppress(ValueError, OSError, TypeError):
                 signal.signal(signal.SIGINT, previous)
             raise KeyboardInterrupt
@@ -2544,12 +2669,14 @@ def _cancel_on_interrupt(engine):
 
 
 def _existing_machine(*, machine=None, blueprint=None, context=None):
-    """Resolve a selector to an existing machine, or None to be created.
+    """Resolve a selector to an existing machine, or None if one should be created.
 
-    Never creates: the create-if-none decision is deferred so property
-    binding can run before it (G3 — binding precedes machine creation).
-    The blueprint lookup is scoped to this invocation's source, so a
-    same-named machine from another project is never adopted.
+    This never creates a machine itself: the decision to create one
+    is deferred so that property binding can run before it does (G3
+    -- binding always precedes machine creation). The blueprint
+    lookup is scoped to this invocation's own source, so a
+    same-named machine from a different project is never mistakenly
+    adopted.
     """
     if machine is None and blueprint is None:
         raise StaticError(
@@ -2565,14 +2692,15 @@ def _existing_machine(*, machine=None, blueprint=None, context=None):
 
 
 def _blueprint_component(blueprint, context):
-    """The blueprint's machine component, from the blueprints directory.
+    """The blueprint's machine component, read from the blueprints directory.
 
-    Mirrors ``create_machine``'s own resolution so the parameters and
-    scripts map read here are exactly the ones a subsequent create
-    would use — which now means seeding nothing (D88). Returns None
-    when the name resolves to no component; the eventual create then
-    raises the missing-blueprint error, naming the seed command where
-    the codex ships that name.
+    This mirrors ``create_machine``'s own resolution, so the
+    parameters and scripts map read here are exactly the ones a
+    later create call would use -- which means seeding nothing on
+    its own (D88). Returns None when the name resolves to no
+    component; a later create call then raises the missing-blueprint
+    error, naming the seed command for wherever the codex ships that
+    name.
     """
     namespace = load_namespace(context)
     return namespace.machines.get(blueprint)
@@ -2598,29 +2726,33 @@ def _resolve_script_stem(label, scripts_map):
 
 
 def _ensure_script_path(stem, context=None):
-    """Resolve ``stem`` from the scripts directory, seeding nothing.
+    """Resolve ``stem`` from the scripts directory, without seeding anything.
 
-    The directory is the sole source (D88); resolution and its
-    diagnostics come from ``locate_script``, which names the seed
-    command where the codex ships that script.
+    The scripts directory is the sole source (D88); resolution and
+    its error messages both come from ``locate_script``, which names
+    the seed command for wherever the codex ships that script.
     """
     return locate_script(stem, context=context)
 
 
 def _blueprint_invocation(state, context):
-    """The blueprint's `scripts` and `parameters`, read live.
+    """The blueprint's `scripts` and `parameters`, read live from the blueprint file.
 
-    Neither configures what a machine *is*: `parameters` feed script
-    binding and `scripts` name which instructions to run, so both sit
-    outside the shape baseline — no state, no `apply`, no digest
-    involvement (docs/spec/instance-model.md) — and are read from the
-    blueprint file each run rather than from the machine snapshot.
-    Recording the label map made a machine unable to run a label its
-    blueprint gained after creation until an `apply` it had no shape
-    reason to need, which is the asymmetry this resolves (D101).
+    Neither one configures what a machine actually *is*: `parameters`
+    feed script binding, and `scripts` name which instructions to
+    run, so both sit outside the machine's shape baseline entirely
+    -- no state, no `apply` step, no digest involvement
+    (docs/spec/instance-model.md) -- and both are read fresh from
+    the blueprint file on every run, rather than from the machine's
+    snapshot. Recording the label map into the machine snapshot
+    instead would have meant a machine could not run a script label
+    its blueprint gained after the machine was created, not until an
+    `apply` it had no shape-related reason to need -- and resolving
+    that asymmetry is exactly what this does (D101).
 
     A machine whose blueprint file has since moved contributes
-    neither — its own state remains authoritative for shape.
+    neither `scripts` nor `parameters` -- its own recorded state
+    remains the authority for shape.
     """
     source = state.get("blueprint-source")
     if not source or not os.path.exists(source):
@@ -2642,51 +2774,53 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
                display=False, properties=None, properties_file=None,
                progress="auto", dry_run=False, expect=None,
                record=None):
-    """Resolve ``label``, ensure a machine, run it, and return its output.
+    """Resolve ``label``, ensure a machine exists, run it, and return its output.
 
     Looks up ``label`` in the machine's blueprint ``scripts`` map
-    first; when absent, treats ``label`` as a bare script stem under
-    ``scripts/``.  With ``--blueprint`` and no machine yet, creates
-    one.  Declared properties bind before the machine starts, from
-    ``properties`` (explicit ``--property`` values), the blueprint
-    parameters, the environment, the properties file, or — on a
-    terminal under an interactive ``progress`` mode — an interactive
-    ask.
+    first; when it is absent there, treats ``label`` as a bare
+    script stem under ``scripts/``. With ``--blueprint`` given and no
+    machine yet, creates one. Declared properties bind before the
+    machine starts, from ``properties`` (explicit ``--property``
+    values), the blueprint parameters, the environment, the
+    properties file, or -- on a terminal, under an interactive
+    ``progress`` mode -- an interactive ask.
 
-    The run **returns its output** and stores nothing (D36): the
-    returned :class:`ScriptRun` carries the whole event stream, which
-    ``progress`` also renders live (``auto | pretty | plain |
-    jsonl``). A failure raises by error class; a Ctrl-C ends the run
-    at the next event boundary and raises
+    A run **returns its output** and stores nothing itself (D36):
+    the returned :class:`ScriptRun` carries the whole event stream,
+    which ``progress`` also renders live (``auto | pretty | plain |
+    jsonl``). A failure raises using the appropriate error class; a
+    Ctrl-C ends the run at the next event boundary and raises
     :class:`~reliquary.errors.RunCancelled`.
 
-    ``expect`` **contracts the run on what it leaves behind**: a
-    mapping of machine-variable key to the value the run is expected
-    to have `set`. Every key is read once the run completes, and one
-    that is unset or holds something else raises
-    :class:`~reliquary.errors.RunFailure` naming key, wanted and got.
-    Without it the caller reads the variable afterwards and the join
-    is theirs to get right — an unset variable and a machine that
-    never ran read alike, deliberately, so a script that failed to
-    reach its `set` is silent. This makes that silence loud, in one
-    call rather than two.
+    ``expect`` **checks the run against what it should leave
+    behind**: a mapping from a machine-variable key to the value the
+    run is expected to have `set`. Every key is read once the run
+    completes, and any key that is unset or holds something else
+    raises :class:`~reliquary.errors.RunFailure`, naming the key,
+    the wanted value, and the value it actually got. Without
+    ``expect``, the caller has to read the variable afterward and
+    connect the dots themselves -- an unset variable and a machine
+    that never ran read identically, on purpose, so a script that
+    failed to reach its `set` fails silently. ``expect`` turns that
+    silence into a loud failure, in one call instead of two.
 
-    It is a **postcondition and not a wait**, which is what the
-    surface can honestly offer: this function blocks and only a
-    running script's `set` writes a variable, so by the time it
-    returns the value is final and there is nothing left to poll. A
-    wait belongs where the setter is somebody else — another thread
-    running this same call, or a detached run — which is
-    :func:`~reliquary.machines.wait_machine_var`.
+    This is a **postcondition check, not a wait**, which is the most
+    this function can honestly promise: this function blocks until
+    the run finishes, and only a running script's `set` writes a
+    variable, so by the time this function returns, the value is
+    already final and there is nothing left to poll for. A real wait
+    belongs where the setter is a different actor -- another thread
+    running this same call, or a detached run -- which is what
+    :func:`~reliquary.machines.wait_machine_var` is for.
 
     ``dry_run=True`` returns a :class:`~reliquary.machines.DryRun`
-    instead — a document, not a stream — having started no machine
-    and delivered no guest input. It is the only mode in which the
-    selector is optional, because its presence chooses which tier is
-    checked; ``display``, a non-default ``progress``, ``expect`` and
-    ``record`` are refused with it — a plan has no window to show, no
-    stream to render, no run whose outcome could be contracted, and
-    no screens to capture.
+    instead -- a document, not a stream -- having started no machine
+    and delivered no guest input at all. This is the only mode where
+    the selector is optional, because whether one is given decides
+    which tier of checking applies; ``display``, a non-default
+    ``progress``, ``expect``, and ``record`` are all refused together
+    with it -- a plan has no window to show, no stream to render, no
+    run whose outcome could be checked, and no screens to capture.
     """
     if dry_run:
         if expect:
@@ -2763,17 +2897,19 @@ def run_script(label, *, blueprint=None, machine=None, context=None,
 
 
 def _check_expectations(expect, machine_id, context):
-    """Hold the finished run to what it was expected to leave.
+    """Check the finished run against what it was expected to leave behind.
 
-    Read once each, in the caller's own key order so a diagnostic is
-    reproducible, and the *first* mismatch raises: a run that missed
-    its first postcondition has already gone wrong, and listing the
-    rest would report consequences beside the cause.
+    Each key is read once, in the caller's own key order, so a
+    diagnostic is reproducible, and the *first* mismatch raises
+    immediately: a run that missed its first postcondition has
+    already gone wrong, and listing the rest of the mismatches would
+    just report downstream consequences alongside the actual cause.
 
-    Nothing polls. The run is over, so every variable it was going to
-    set is set (D90) — an unset key here means the script never
-    reached that `set`, which is exactly the silence this exists to
-    break.
+    Nothing here polls. The run is already over, so every variable
+    it was ever going to set has been set by now (D90) -- an unset
+    key at this point means the script never actually reached that
+    `set`, which is exactly the kind of silence this function exists
+    to break.
     """
     for key, wanted in (expect or {}).items():
         got = _machines.get_machine_var(
@@ -2805,39 +2941,43 @@ def _redactor(bindings):
 
 def _dry_run_script(label, *, blueprint=None, machine=None, context=None,
                     properties=None, properties_file=None):
-    """Evaluate a script run, committing none of it.
+    """Evaluate what a script run would do, without committing any of it.
 
-    The script half of the dry run whose rule is stated in
-    docs/spec/cli.md. Read-only throughout: it seeds nothing, creates
-    no machine, executes no guest step, never prompts and never reads
-    a secret's value — it stops before the machine starts and before
-    any statement reaches a guest.
+    This is the script half of the dry run, whose rule is stated in
+    docs/spec/cli.md. It stays read-only throughout: it seeds
+    nothing, creates no machine, executes no guest step, never
+    prompts, and never reads a secret's actual value -- it stops
+    before the machine would start and before any statement would
+    reach a guest.
 
-    **The selector chooses the tier**, which is why it is optional
-    here and required for a real run. Without one, ``label`` is a
-    bare script stem and every legality rule applies. With
-    ``blueprint=`` or ``machine=`` it resolves through that
-    blueprint's ``scripts`` map first and the machine rules apply as
-    well — the two modes script-spec.md specifies, preserved by the
-    respelling rather than collapsed into one.
+    **The selector decides which checking tier applies**, which is
+    why it is optional here even though it is required for a real
+    run. Without one, ``label`` is treated as a bare script stem and
+    every legality rule is checked. With ``blueprint=`` or
+    ``machine=`` given, it resolves through that blueprint's
+    ``scripts`` map first, and the machine-specific rules are
+    checked as well -- these are the two modes script-spec.md
+    specifies, kept distinct here rather than collapsed into one.
     """
     machine_id = None
     scripts_map = {}
     parameters = {}
     if machine is not None or blueprint is not None:
-        # Resolved exactly as a live run resolves it, and stopping
-        # where a run would create: `--blueprint` naming a blueprint
-        # with no machine yet leaves nothing to apply the machine
-        # rules against, which the report says rather than implying
-        # the tier it could not reach.
+        # Resolved exactly the way a live run would resolve it, and
+        # stopping exactly where a live run would instead create a
+        # machine: a `--blueprint` naming a blueprint with no
+        # machine yet leaves nothing to apply the machine rules
+        # against, and the report says so explicitly rather than
+        # silently implying a checking tier it could not actually
+        # reach.
         machine_id = _existing_machine(
             machine=machine, blueprint=blueprint, context=context)
     if machine_id is not None:
         state = _machines.load_machine_state(machine_id, context)
         scripts_map, parameters = _blueprint_invocation(state, context)
     elif blueprint is not None:
-            # Read-only: locate resolves the codex file directly in home
-        # mode without seeding, so a dry run never writes.
+        # Read-only: this locates the codex file directly in home
+        # mode without seeding anything, so a dry run never writes.
         doc = load_document(locate_blueprint(blueprint, context=context))
         machine_component = doc.machines.get(blueprint)
         if machine_component is None and len(doc.machines) == 1:
@@ -2887,10 +3027,11 @@ def _dry_script_report(plan, timing, script_path):
                      "was selected, so the machine rules were not "
                      "applied")
     else:
-        # The selector chose the preflight tier and there is nothing
-        # to apply it against. A run would create the machine here;
-        # a dry run says so instead of reporting the tier it reached
-        # as though it were the tier that was asked for.
+        # The selector asked for the preflight tier, but there is
+        # nothing yet to apply it against. A real run would create
+        # the machine at this point; a dry run says so explicitly
+        # instead of reporting the tier it actually reached as if it
+        # were the tier that was asked for.
         lines.append("tier: static -- that blueprint has no machine "
                      "yet, so the machine rules had nothing to apply "
                      "to; a run would create one")
@@ -2908,9 +3049,10 @@ def _dry_script_report(plan, timing, script_path):
                  f"{counts['total']} statically reachable")
     unreached = counts["total"] - counts["statically-reachable"]
     if unreached:
-        # Said outright rather than left to be inferred: a plan can
-        # only ever be a plan, and a report that implied otherwise
-        # would be claiming a completeness it cannot have.
+        # Stated outright rather than left for the reader to infer:
+        # a plan can only ever be a plan, and a report that implied
+        # otherwise would be claiming a completeness it does not
+        # actually have.
         lines.append(f"  {unreached} depend on what the guest does, so "
                      "no static pass can promise they run")
     lines.append("")

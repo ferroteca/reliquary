@@ -2,21 +2,21 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Unit-test guards against live external effects.
 
-**This module arms the guard as well as checking it.** The blocking
-lives in ``tests/__init__.py``, and importing that package is what
-installs it — but ``unittest discover -s tests`` treats this
-directory as the top level and imports every module here under a
-top-level name, so nothing imports the package on its own account.
-Until the import below, the guard was armed only because an
+This module installs the blocking from ``tests/__init__.py``, not
+just checks it. Importing that package is what installs the
+blocking — but ``unittest discover -s tests`` treats this directory
+as the top level and imports every module here under a top-level
+name, so nothing imports the package on its own. Before the import
+below was added, the blocking was only in place because an
 integration module happened to say ``from tests import ...``, on a
 line *after* its own ``from reliquary ...`` imports: anything that
-broke the package left the whole suite unguarded (T26).
+broke that import left the whole suite unblocked (T26).
 
-Collection imports every module before it runs any test, so arming
-here covers every test in the suite. What it does not cover is a
-module that spawns a subprocess at *import* time, alphabetically
-ahead of this one — nothing does, and one that did would be its own
-defect.
+pytest imports every module before it runs any test, so importing
+`tests` here covers every test in the suite. What it does not cover
+is a module that spawns a subprocess at *import* time, alphabetically
+ahead of this one — no module does that, and one that did would be
+its own bug.
 """
 
 import subprocess
@@ -26,14 +26,16 @@ import pytest
 
 import tests
 
-#: A name no host has. The guard refuses *any* subprocess, so what is
-#: named here is irrelevant to what is being tested — but it decides
-#: what happens when the guard is **absent**. Naming a real hypervisor
-#: meant the test written to prove that no unit test starts a VM was
-#: the one that started it: a live ``qemu-system-i386`` window,
-#: orphaned, holding the runner's stdout open so the run hung instead
-#: of failing (T26). An executable that cannot exist fails closed on
-#: every path.
+#: A name no real host has. The blocking rejects *any* subprocess
+#: call, so which name is used here does not matter for what this
+#: test checks — but it matters for what happens if the blocking is
+#: **not** installed. This test used to name a real hypervisor
+#: executable, and when the blocking was missing, the very test
+#: meant to prove no unit test starts a VM was the one that started
+#: one: a live ``qemu-system-i386`` window, left running, holding the
+#: test runner's stdout open so the run hung instead of failing
+#: (T26). A name that matches no real executable fails safely no
+#: matter what.
 ABSENT = "reliquary-no-such-executable"
 
 
@@ -56,14 +58,16 @@ def _require_armed():
         "names would reach the host: " + ", ".join(missing))
 
 
-# The guard is checked, and checking it starts nothing. Both halves
-# matter: a guard that can be silently absent is worse than none,
-# because the suite still reports success — so its presence is
-# asserted directly rather than inferred from a call that happens to
-# be refused.
+# This checks that the blocking is installed, without starting
+# anything itself. Both a direct check and the tests below matter: a
+# blocking that is silently missing is worse than no blocking at
+# all, because the suite would still report success. So its presence
+# is asserted directly here, instead of only being inferred from a
+# call elsewhere that happens to be refused.
 
 def test_the_guard_is_armed():
-    """Asserted on its own, so disarming fails here and by name."""
+    """Checked on its own, so if the blocking is removed, this test
+    is the one that fails, by name."""
     _require_armed()
 
 

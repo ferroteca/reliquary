@@ -13,38 +13,44 @@ from .machine_handle import Machine
 
 _PROMPT_RE = re.compile(r"^[A-Z]:(\\[^>]*)?>$")
 
-#: How often the screen is read while waiting for a command to finish.
-#: The first seconds are polled hard and the rest slowly, because the
-#: two waits want opposite things: the echo has to be *caught* before
-#: the command's own output can scroll it away, and after that there
-#: is nothing to catch, only a prompt to wait out.
+#: How often the screen is read while waiting for a command to
+#: finish. The first few seconds are polled fast, the rest slowly,
+#: because the two phases of the wait want different things: the
+#: command's echo has to be caught before the command's own output
+#: scrolls it off the top of the screen, and after that there is
+#: nothing left to catch — just a prompt to wait for.
 _ECHO_POLL = 0.1
 _ECHO_WINDOW = 3.0
 _PROMPT_POLL = 2.0
 
-#: And how often once a prompt *has* been seen, until the screen under
-#: it settles. The slow interval waits a prompt out cheaply, but it
-#: cannot confirm one: a quiescence window is only observable by
-#: sampling inside it, and two reads two seconds apart say nothing
-#: about the last 200ms. So the ramp gains a third rung rather than
-#: losing its second — dense reads are spent only where the question
-#: has become "is this screen finished?", and never for the whole of a
-#: long command.
+#: How often the screen is read once a prompt has been seen, while
+#: waiting for the screen under it to stop changing. The slow poll
+#: interval above is cheap for waiting a prompt out, but it can't
+#: confirm the screen has actually settled: whether the screen is
+#: still changing can only be told by reading during the window in
+#: question, and two reads two seconds apart say nothing about the
+#: 200ms right before the second one. So there are three poll rates
+#: in total, not two: fast reads are only spent once the question has
+#: become "has this screen actually stopped changing?", not for the
+#: whole length of a long-running command.
 _SETTLE_POLL = 0.1
 
-#: How often the screen is read while a boot is still under way. A
-#: boot is seconds to minutes with nothing to catch along the way, so
-#: it is waited out at the slow rate and the dense one is spent only
-#: once a prompt is on screen and the question is whether it settled.
+#: How often the screen is read while a boot is still in progress. A
+#: boot can take anywhere from seconds to minutes with nothing that
+#: needs to be caught along the way, so it is waited out at the slow
+#: rate; fast reads only start once a prompt shows up on screen and
+#: the question becomes whether it has settled.
 _READY_POLL = 2.0
 
-#: The outcome probe, and the word it looks for. `IF ERRORLEVEL n` is
-#: true for *n or greater* and is portable across DOS shells in a way
-#: `%ERRORLEVEL%` expansion is not, so a failing command prints the
-#: sentinel and a succeeding one prints nothing at all. Both answers
-#: are text reliquary composed and reads back, which is why this
-#: attaches no meaning to the guest's own output (G2, P18): the
-#: sentinel is not a word the command said, it is a word we did.
+#: The command that probes whether the last command failed, and the
+#: word it prints when it did. `IF ERRORLEVEL n` is true for n *or
+#: greater*, and works across DOS shells in a way `%ERRORLEVEL%`
+#: expansion does not, so a failing command prints the sentinel word
+#: and a succeeding one prints nothing. Both outcomes are text
+#: Reliquary itself wrote and then reads back — this deliberately
+#: attaches no meaning to anything the guest itself printed (G2,
+#: P18): the sentinel is a word Reliquary said, not a word the
+#: command said.
 _PROBE_SENTINEL = "RLQ-EXEC-FAILED"
 _PROBE_COMMAND = f"IF ERRORLEVEL 1 ECHO {_PROBE_SENTINEL}"
 
@@ -59,34 +65,40 @@ class AgentlessGuestExec:
                    prompt: str | None = None) -> None:
         """Wait for a DOS prompt.
 
-        The standard shape, or exactly ``prompt`` when the caller
-        declares one (D113): there is no earlier screen here to read
-        a customized prompt off, the way :meth:`execute` does (D112),
-        so a guest that boots to one is recognized only when the
-        caller says what it draws — the script language's own
-        ``wait "C:\\>"`` stance, at the API. The text is the bottom
-        row as the guest draws it, compared exactly; a pattern is
-        the wider door D112 refused.
+        Recognizes either the standard DOS prompt shape, or exactly
+        the text in ``prompt`` if the caller supplied one (D113).
+        There is no earlier screen here to read a customized prompt's
+        text off of, the way :meth:`execute` can (D112), so if the
+        guest boots to a customized prompt, this can only recognize
+        it when the caller states its exact text — the same thing the
+        script language's own ``wait "C:\\>"`` statement does at the
+        script level. The match is against the bottom row exactly as
+        the guest draws it; a looser pattern match was rejected
+        (D112).
 
-        **A prompt is not ready the moment it appears** (D115). The boot
-        is the screen likeliest to still be moving — an
-        ``AUTOEXEC.BAT`` with ``ECHO ON`` paints the prompt and then
-        the command on the same row, and the standard shape matches
-        the row in between — so a prompt is a candidate until the
-        screen under it has settled (:mod:`screen_stability`), the
-        same rule :meth:`execute` holds its completion to. The
-        hazard is weaker here (nothing is sliced, a caller merely
-        proceeds early and its first command reads a screen still
-        painting), and the rule is the same because what the actor
-        does next does not change whether the screen was finished.
+        A prompt is not treated as ready the instant it appears
+        (D115). The boot screen is the one most likely to still be
+        changing — an ``AUTOEXEC.BAT`` with ``ECHO ON`` prints the
+        prompt and then the next command on the same row, and
+        partway through, that row can briefly look exactly like the
+        plain prompt shape. So a prompt sighting is only a candidate
+        until the screen under it has stopped changing (see
+        :mod:`screen_stability`), the same rule :meth:`execute` uses
+        to decide a command is complete. The risk here is smaller —
+        nothing gets cut off, a caller just proceeds a little early
+        and its first command then reads a screen that is still
+        being drawn — but the rule is the same either way, because
+        what the caller does next doesn't change whether the screen
+        had actually finished.
 
-        Expiry raises :class:`~reliquary.errors.WaitExpired` — a
-        ``RunFailure`` *and* a ``TimeoutError`` (D90, D114): the
-        prompt not arriving is the work not happening, while nothing
-        about the machine went wrong and the boot may still finish,
-        so a caller holding the loop asks again. A prompt that was
-        seen but never settled is said to be, as :meth:`execute`
-        says it.
+        Timing out raises :class:`~reliquary.errors.WaitExpired`,
+        which is both a ``RunFailure`` and a ``TimeoutError`` (D90,
+        D114): the prompt not showing up means the expected thing
+        hasn't happened yet, but nothing about the machine is
+        necessarily broken, and the boot may still finish — so a
+        caller retrying in a loop can just ask again. A prompt that
+        was seen but never settled is reported as such, the same way
+        :meth:`execute` reports it.
         """
         print("rlq: waiting for a DOS prompt...", file=sys.stderr)
         with self._machine.console() as console:
@@ -116,29 +128,32 @@ class AgentlessGuestExec:
                 check: bool = False):
         """Type a DOS command, wait for the prompt, and return its output.
 
-        The output is what the command left on the visible screen —
-        the rows between its echo and the prompt that came back.
-        Agentless capture has one honest limit: a command that
-        scrolls more than a screenful leaves only its tail there.
-        Reliquary attaches no meaning to any of it (G2); the text is
-        the caller's to read.
+        The returned output is whatever the command left on the
+        visible screen — the rows between its echo and the prompt
+        that came back afterward. Agentless capture has one honest
+        limit: a command whose output scrolls past more than one
+        screenful only leaves its last screenful behind. Reliquary
+        attaches no meaning to any of this text (G2); reading it is
+        the caller's job.
 
-        ``check`` asks the one question the rows cannot answer: **did
-        it work?** A setup command's output is nothing and its success
-        is everything, so success and failure otherwise come back
-        looking identical. With ``check`` a command that signalled
-        failure raises :class:`RunFailure` naming it, and the row
-        return is unchanged either way — this adds a channel rather
-        than reinterpreting the existing one.
+        ``check`` answers the one question the returned rows cannot:
+        did the command actually work? A setup command's output is
+        often nothing at all, and its success is everything, so a
+        success and a failure would otherwise look identical. With
+        ``check=True``, a command that signalled failure raises
+        :class:`RunFailure` naming it; the returned rows are the same
+        either way — this adds a separate way to ask about failure,
+        it doesn't change what the rows mean.
 
-        **A prompt alone does not mean this command finished.**
-        :meth:`wait_ready` returns *because* a prompt is on screen, so
-        a completion test that only asks for one is satisfied by the
-        prompt already sitting there — and returns whatever was above
-        it, which is the boot's output rather than the command's. The
-        wait therefore needs evidence that *this* command landed: its
-        echo, or failing that a screen that has changed since it was
-        sent.
+        A prompt on screen by itself does not mean this particular
+        command finished. :meth:`wait_ready` returns as soon as a
+        prompt is on screen, so a completion check that only looked
+        for a prompt would be satisfied by a prompt that was already
+        there before this command ran — and would return whatever was
+        above it, which is leftover boot output, not this command's
+        output. So this method also needs evidence that this specific
+        command actually ran: either its echo on screen, or failing
+        that, a screen that has changed since the command was sent.
         """
         rows = self._run(command, timeout)
         if check:
@@ -148,20 +163,24 @@ class AgentlessGuestExec:
     def _refuse_if_failed(self, command, timeout):
         """Ask the guest whether ``command`` signalled failure.
 
-        Opt-in, and asked *after* the command has finished, so the
-        ordinary path pays nothing. The probe is one more command at
-        the prompt, read back through the same echo discipline as any
-        other: its output is the sentinel or it is empty.
+        This only runs when the caller opts in with ``check=True``,
+        and only after the command has already finished, so the
+        ordinary path pays nothing for it. The probe itself is just
+        one more command typed at the prompt, read back through the
+        same echo-matching logic as any other command: its output is
+        either the sentinel word, or nothing.
 
-        **Its honest scope is commands that ran and signalled
-        failure.** `COMMAND.COM` leaves ERRORLEVEL untouched when it
-        cannot find a program at all, so a mistyped command escapes
-        the probe and reads as success — recognizing the shell's own
-        "Bad command or file name" would mean curating guest output
-        spellings, which a localized DOS makes unbounded and which is
-        the guessing P10 refuses. That limit is stated rather than
-        papered over (P11), and a mistyped command is an authoring
-        error caught in authoring.
+        This check's honest limit is that it only catches commands
+        that ran and then signalled failure. `COMMAND.COM` leaves
+        ERRORLEVEL untouched when it can't find the program at all,
+        so a mistyped command escapes this probe entirely and reads
+        as success. Recognizing DOS's own "Bad command or file name"
+        message instead would mean hard-coding every wording that
+        message can take, which a localized DOS makes an unbounded
+        list — exactly the kind of guessing P10 refuses to do. That
+        limit is stated here rather than hidden (P11); a mistyped
+        command counts as an authoring mistake, caught while
+        authoring, not something this check is meant to catch.
         """
         try:
             output = self._run(_PROBE_COMMAND, timeout)
@@ -176,22 +195,24 @@ class AgentlessGuestExec:
                 rule_id="command.signalled-failure")
 
     def _run(self, command, timeout):
-        """Type one command, wait for the prompt, return its rows.
+        """Type one command, wait for the prompt, and return its rows.
 
-        **A prompt is not read the moment it appears.** It can arrive
-        mid-scroll, or the bottom row can transiently resemble one
-        while output is still drawing, and acting on either slices the
-        output at a boundary that never existed — a short, plausible,
-        wrong answer, which is the shape P11 forbids. So a completion
-        is a candidate until the screen under it has settled
-        (:mod:`screen_stability`), and the menu machinery's rule —
-        look twice before believing a screen — finally reaches the
-        command path, ten feet from where it was already in force.
+        A prompt is never trusted the instant it appears. It can show
+        up mid-scroll, or the bottom row can briefly look like a
+        prompt while the screen is still being drawn, and acting on
+        either would cut the output off at a boundary that was never
+        really there — a short, believable, but wrong answer, exactly
+        the kind of mistake P11 forbids. So a prompt sighting is only
+        a candidate until the screen under it has stopped changing
+        (see :mod:`screen_stability`) — the same "read the screen
+        twice before trusting it" rule the menu code uses, applied
+        here to commands too.
         """
         with self._machine.console() as console:
             before = [row for row in console.screen_text() if row]
-            # The prompt the command is typed at: the echo sits where
-            # it was (D111), and its coming back is completion (D112).
+            # The prompt the command is typed at. The command's echo
+            # appears where this prompt was (D111), and this same
+            # prompt coming back is what counts as completion (D112).
             prompt = before[-1] if before else ""
             console.send_text(command)
             sent = time.monotonic()
@@ -205,9 +226,11 @@ class AgentlessGuestExec:
                 reading = settling.observe(frame, now=now)
                 rows = [row for row in frame[0] if row]
                 width = _screen_width(frame)
-                # Sticky: once the echo has been seen, a later screen
-                # without it is a scrolled one, not a command that
-                # never ran. Nothing else can tell those apart.
+                # Once the echo has been seen once, it stays counted
+                # as seen: a later screen where it's no longer visible
+                # just means output has scrolled it off, not that the
+                # command never ran. There's no other way to tell
+                # those two cases apart.
                 echoed = (echoed or
                           _echo_at(rows, before, command, width) is not None)
                 landed = echoed or rows != before
@@ -226,11 +249,12 @@ class AgentlessGuestExec:
 
 
 def _poll_interval(confirming, elapsed):
-    """How long to wait before the next read.
+    """Return how long to wait before reading the screen again.
 
-    Confirming outranks the ramp: once a prompt is on screen the
-    question has changed from "has it finished?" to "is this screen
-    finished?", and only the second needs dense reads.
+    Once a prompt is on screen (``confirming``), that overrides the
+    normal fast-then-slow schedule: the question has changed from
+    "has the command finished?" to "has this screen stopped
+    changing?", and only that second question needs fast reads.
     """
     if confirming:
         return _SETTLE_POLL
@@ -238,52 +262,59 @@ def _poll_interval(confirming, elapsed):
 
 
 def _settling_note(reading):
-    """Why a prompt that *was* seen never ended the wait.
+    """Explain why a prompt that was seen never ended the wait.
 
-    The shared note (:func:`screen_stability.unsettled_note`) in
-    this adapter's words: what was on screen here is a prompt.
+    Reuses :func:`screen_stability.unsettled_note`'s message, but
+    says "prompt" instead of "match", since that's what was actually
+    on screen here.
     """
     return screen_stability.unsettled_note(reading).replace(
         "a match was on screen", "a prompt was on screen", 1)
 
 
 def _screen_width(frame):
-    """How many cells wide the screen is, read off the attribute rows.
+    """Return how many cells wide the screen is, read off the
+    attribute rows.
 
-    The text rows cannot say: they come back right-stripped, so a
-    full row and a short one are told apart only by the attribute
-    half of the seam's contract, which carries one token per cell
-    whatever the backend. A frame with no attribute rows has no
-    width to offer, and ``0`` says so — wrapping is then undetectable
-    and only a one-row echo can be found.
+    The text rows can't say: they come back right-stripped, so a full
+    row and a short row look the same. The attribute rows can tell
+    them apart instead, since every backend must return one attribute
+    token per cell regardless of row length. A frame with no
+    attribute rows has no width to report, and ``0`` says so — with
+    no known width, line wrapping can't be detected, and only an echo
+    that fits on one row can be found.
     """
     return max((len(row) for row in frame[1]), default=0)
 
 
 def _is_prompt(row, prompt):
-    """Whether ``row`` is a prompt the wait may complete on (D112).
+    """Return whether ``row`` is a prompt the wait may treat as
+    complete (D112).
 
-    Two shapes, and no third. The standard DOS prompt, ``X:\\path>``,
-    is what every unconfigured DOS draws, and it is what lets a
-    command that changes the prompt's *text* — ``CD`` — complete. And
-    exactly the prompt the guest was sitting at when the command was
-    sent, whatever its shape: the guest's own statement of what its
-    prompt looks like (D72), which needs no pattern and is what makes
-    a customized guest usable from its first command. A wider pattern
-    is the false positive P11 refuses — any row ending in ``>`` would
-    become a completion signal.
+    Only two shapes count, nothing wider. The standard DOS prompt
+    shape, ``X:\\path>``, is what every unconfigured DOS draws, and
+    matching it is what lets a command that changes the prompt's own
+    text (like ``CD``) still be recognized as complete. The other
+    shape is exactly the prompt the guest was sitting at when the
+    command was sent, whatever it looks like — the guest's own screen
+    already states what its prompt looks like (D72), so no pattern is
+    needed, and this is what makes a guest with a customized prompt
+    usable from its very first command. Matching anything wider is
+    the false positive P11 refuses to risk — any row merely ending in
+    ``>`` would otherwise count as completion.
     """
     return bool(_PROMPT_RE.match(row) or (prompt and row == prompt))
 
 
 def _prompt_note(prompt):
-    """What the expired wait was waiting for, so the reader looks here.
+    """Describe what the expired wait was actually waiting for.
 
     A command that changes a customized prompt — ``PROMPT`` itself,
-    or ``CD`` under one — returns to text the wait has no evidence
-    for, and the expiry has to say so: "the guest never returned to
-    the prompt" sends the reader to the guest, which ran the command
-    perfectly well.
+    or ``CD`` while a customized prompt is set — returns to a prompt
+    text this wait has no record of, so the timeout message needs to
+    say so explicitly. Without this note, "the guest never returned
+    to the prompt" would send the reader to debug the guest, when the
+    command actually ran fine.
     """
     if not prompt:
         return ""
@@ -293,13 +324,15 @@ def _prompt_note(prompt):
 
 
 def _echo_rows(prompt, command, width):
-    """The rows the guest draws when ``command`` is typed at ``prompt``.
+    """Return the rows the guest would draw when ``command`` is typed
+    at ``prompt``.
 
-    One line, ``prompt + command``, broken by the cell at ``width``
-    and right-stripped row by row, as the screen reads back; a chunk
-    that strips to nothing is dropped, as the blank-row filter drops
-    it from the screen. ``width`` ``0`` means unknown, and the line
-    then stands as one row.
+    This is one logical line, ``prompt + command``, broken into rows
+    every ``width`` cells and right-stripped row by row, matching how
+    the real screen reads back. A row that strips down to nothing is
+    dropped, matching how the blank-row filter drops it from the real
+    screen. ``width`` of ``0`` means the width is unknown, in which
+    case the whole line is treated as a single row.
     """
     line = (prompt + command).rstrip()
     if not line:
@@ -312,38 +345,49 @@ def _echo_rows(prompt, command, width):
 
 
 def _echo_at(rows, before, command, width=0):
-    """Where the command's echo ends in ``rows``, or ``None`` (D111).
+    """Find where the command's echo ends in ``rows``, or return
+    ``None`` (D111).
 
-    The echo is not found by its looks. The command was typed at the
-    prompt ``before`` ends with, so the echo is that row with the
-    command appended — wrapped by the cell when longer than the
-    screen is wide — and it sits *where the prompt was*: the rows
-    above it are the rows that were above the prompt, less whatever
-    scrolled off the top. Everything the command prints lands below
-    it, so a row that merely spells the same text (a file whose last
-    line is the echo of the command that types it) is never taken
-    for the echo — what sits above it is the command's own output
-    rather than the screen the command was typed into. The scan
-    starts where the prompt was and moves up, since scrolling is the
-    only way the echo moves, and the candidate needing the least of
-    it wins — the same command run twice finds the second echo, not
-    the first. The one screen this cannot tell apart is output
-    longer than a screenful whose first visible row is such a
-    lookalike: nothing is left above it to contradict it.
+    The echo isn't found by pattern-matching its appearance — it's
+    found by where it must be. The command was typed at the prompt
+    that ``before`` ends with, so the echo is that same prompt row
+    with the command text appended (wrapped across more than one row
+    if it's longer than the screen is wide), and it sits exactly
+    where the prompt was: the rows above it are the same rows that
+    were above the prompt before, minus however many scrolled off the
+    top since. Everything the command actually prints appears below
+    the echo, so a row that merely happens to contain the same text —
+    for example, a file being typed out whose last line matches the
+    command that typed it — is never mistaken for the echo, because
+    what sits above a genuine echo is the old screen content, not the
+    command's own output.
 
-    The last row of the echo is the index returned, since the
-    command's output starts on the row after it. ``width`` is the
-    screen's cell width; ``0`` means it is unknown, and only an
-    unwrapped echo can then be found.
+    The search starts at the position where the prompt used to be and
+    moves upward, since scrolling is the only thing that can move the
+    echo, and it prefers the candidate that needs to explain the
+    least scrolling — matching the position closest to where the
+    prompt actually was, before trying positions further up. That
+    means if the same command text appears on screen more than once
+    (running the same command twice, say), this finds the most recent
+    echo, not an earlier lookalike. The one case this can't tell
+    apart from a real echo is output longer than a full screen, whose
+    very first visible row happens to look just like the echo:
+    there's nothing left above it on screen to disprove it.
+
+    The row index returned is the echo's *last* row, since the
+    command's own output starts on the row right after it. ``width``
+    is the screen's cell width; ``0`` means it's unknown, in which
+    case only an unwrapped (single-row) echo can be found.
     """
     prompt = before[-1] if before else ""
     echo = _echo_rows(prompt, command, width)
     if not echo:
         return None
     above = before[:-1]
-    # From where the prompt was, upward: the echo can only have moved
-    # up, by scrolling, and the candidate that needs the least of it
-    # is the one every row above is accounted for.
+    # Search starts from where the prompt was and moves upward: the
+    # echo can only have moved up the screen, through scrolling, and
+    # the candidate that requires the least scrolling to explain is
+    # the one where every row above it is accounted for.
     for start in range(min(len(above), len(rows) - len(echo)), -1, -1):
         if rows[start:start + len(echo)] != echo:
             continue
@@ -354,23 +398,25 @@ def _echo_at(rows, before, command, width=0):
 
 
 def _command_output(rows, before, command, width=0, *, echoed):
-    """The rows a command produced, between its echo and the prompt.
+    """Return the rows a command produced, between its echo and the
+    prompt that came back.
 
-    ``rows`` are the non-blank screen rows, the last being the prompt
-    that came back; ``before`` the non-blank rows of the screen the
-    command was typed into, which is what places the echo; and
-    ``width`` the screen's cell width, which is what lets an echo
-    that wrapped be found at all.
+    ``rows`` are the screen's non-blank rows, with the last one being
+    the prompt that came back; ``before`` are the non-blank rows of
+    the screen the command was typed into, used to locate the echo;
+    ``width`` is the screen's cell width, needed to find an echo that
+    wrapped across more than one row.
 
-    ``echoed`` says whether the echo was seen at any point during the
-    wait, and it is what separates the two ways the echo can be
-    missing from the final screen. **Scrolled off** — the command
-    produced more than a screenful, which is agentless capture's
-    documented limit — leaves the visible tail, which is the honest
-    answer. **Never there at all** means the command's output could
-    not be located, and returning the rows above the prompt would
-    hand back somebody else's text as though it were the answer. That
-    is a failure to report, not a value to return (P11).
+    ``echoed`` records whether the echo was seen at any point during
+    the wait, and it's what tells apart the two different reasons the
+    echo might be missing from the final screen. If the command
+    produced more than a screenful of output — agentless capture's
+    documented limit — the echo has simply scrolled off the top, and
+    returning the visible tail is the honest answer. If the echo was
+    never seen at all, the command's output could not be located, and
+    returning the rows above the prompt would hand back someone
+    else's text as if it were this command's answer. That case is
+    reported as a failure, not returned as a value (P11).
     """
     end = len(rows) - 1
     index = _echo_at(rows[:end], before, command, width)

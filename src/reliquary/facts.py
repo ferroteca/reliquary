@@ -1,19 +1,21 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Reliquary-owned run facts — the `rlq.*` namespace.
+"""Reliquary's own run facts -- the `rlq.*` namespace.
 
-Facts are values Reliquary computes from the host, referenceable in a
-property's `default=` derivation and unwritable by any user source.
-Each fact's derivation is part of its contract (each is documented
-with its definition here); an empty or unavailable fact is
-*unanswerable* by design, so a derivation that reaches for one simply
-does not answer and resolution falls through to the next candidate or
-the ask.
+Facts are values Reliquary computes from the host machine. A
+property's `default=` derivation can reference them, but no user
+source can set them. Each fact's derivation is documented here, next
+to its own definition, and that documentation is part of the fact's
+contract. When a fact is empty or can't be determined, that counts as
+unanswerable on purpose: a derivation that reads it simply gets no
+answer, and property resolution falls through to the next candidate
+or to asking the user.
 
-The catalog is deliberately small. Growth is a design decision like
-any new source tier (docs/spec/script-properties.md); transforms
-in derivation syntax are permanently out — normalization lives here,
-in a fact's definition, arbitrary computation in the embedding API.
+The catalog is kept small on purpose. Adding a new fact is a real
+design decision, the same as adding any other source tier (see
+docs/spec/script-properties.md). Derivation syntax will never grow
+transforms -- normalization belongs here, in a fact's own definition;
+any other computation belongs in the embedding API.
 
 Spec: docs/spec/script-properties.md, "The property sources".
 """
@@ -27,11 +29,13 @@ from .errors import InternalError
 _ENV_PREFIX = "rlq.env."
 
 def _host_username():
-    """The host login name, normalized to a login-safe form.
+    """The host's login name, normalized into a login-safe form.
 
-    Lowercased, non-`[a-z0-9._-]` runs collapsed to a single `-`, and
-    surrounding `-`/`.` trimmed — a conservative shape most guest
-    logins accept. An unresolvable login is unanswerable.
+    Lowercases the name, collapses any run of characters outside
+    `[a-z0-9._-]` into a single `-`, and trims leading/trailing `-`
+    or `.`. This conservative shape is accepted by most guest login
+    systems. If the login name can't be read, the fact is
+    unanswerable.
     """
     try:
         raw = getpass.getuser()
@@ -42,11 +46,12 @@ def _host_username():
     return normalized or None
 
 def _host_full_name():
-    """The host account's descriptive name, or None.
+    """The host account's descriptive (display) name, or None.
 
-    Windows reads the account display name; POSIX reads the GECOS
-    field's first comma-part. Frequently empty, and an empty value is
-    an unanswerable fact by design.
+    On Windows this reads the account's display name; on POSIX it
+    reads the first comma-separated part of the GECOS field. This is
+    often empty, and an empty value counts as an unanswerable fact
+    on purpose.
     """
     if os.name == "nt":
         return _windows_full_name()
@@ -78,34 +83,39 @@ def _posix_full_name():
     return name or None
 
 def _host_env(name):
-    """A named host environment variable, verbatim, or None.
+    """The value of one host environment variable, unchanged, or None.
 
-    The raw escape hatch beside the curated facts: a derivation that
-    reads `rlq.env.<NAME>` is host-specific by construction. Lookup
-    follows the platform's own case rules; an unset or empty variable
-    is unanswerable.
+    This is the raw escape hatch alongside the curated facts above: a
+    derivation that reads `rlq.env.<NAME>` is inherently
+    host-specific. The variable name lookup follows whatever case
+    rules the platform uses. An unset or empty variable is
+    unanswerable.
     """
     if not name:
         return None
     value = os.environ.get(name)
     return value or None
 
-# The curated facts, each a zero-argument derivation. `rlq.env.<NAME>`
-# is handled separately because its tail is a parameter.
+# The curated facts. Each one is a zero-argument function that
+# computes its value. `rlq.env.<NAME>` isn't listed here because the
+# part after `rlq.env.` is a parameter, so it's handled separately
+# in _host_env.
 _CATALOG = {
     "rlq.host.username": _host_username,
     "rlq.host.full-name": _host_full_name,
 }
 
 def is_fact(key):
-    """Whether a key names a Reliquary run fact (the `rlq.*` namespace)."""
+    """Whether `key` names a Reliquary run fact (something in the `rlq.*` namespace)."""
     return key in _CATALOG or key.startswith(_ENV_PREFIX)
 
 def resolve(key):
-    """Return a fact's value, or None when it is unavailable/empty.
+    """Return the value of the fact named by `key`, or None if it is unavailable or empty.
 
-    Raises KeyError for a key outside the known `rlq.*` catalog, which
-    the static reference check (V6) has already ruled out before a run.
+    Raises KeyError if `key` is outside the known `rlq.*` catalog.
+    In practice this shouldn't happen at run time, because the
+    static reference check (V6) has already ruled out unknown keys
+    before a run starts.
     """
     if key in _CATALOG:
         return _CATALOG[key]()

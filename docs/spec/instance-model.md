@@ -5,24 +5,25 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # Machine blueprints and machines
 
-> **Status:** implemented for the QEMU subset. Materialization and
-> the lifecycle CLI (`create-machine` / `start-machine` /
-> `stop-machine` / `destroy-machine` / `recreate-machine` /
-> `apply-blueprint` / `list-machines`, `--blueprint` / `--machine`
-> selection), exclusive per-machine operation locks, operation
-> generations, and startup reconciliation of interrupted
-> transitional phases (`creating` / `stopping` / `destroying`) all
-> ship. **A run stores nothing in the machine** — `run-script`
-> returns its output to whoever drove it (D36), so there is no run
-> directory and never was one on this model. Clone and export
-> remain unbuilt (proposed/FEATURES.md); the legacy root-home
-> machine model was absorbed and deleted.
+> **Status:** implemented for the QEMU subset. The following all
+> ship today: materializing a machine and the lifecycle CLI
+> (`create-machine` / `start-machine` / `stop-machine` /
+> `destroy-machine` / `recreate-machine` / `apply-blueprint` /
+> `list-machines`, with `--blueprint` / `--machine` selection),
+> exclusive per-machine operation locks, operation generation
+> counters, and reconciling an interrupted transitional phase
+> (`creating` / `stopping` / `destroying`) on startup. **A run
+> stores nothing on the machine** — `run-script` returns its output
+> to whoever ran it (D36), so there is no run directory, and there
+> never was one in this model. Clone and export are not built yet
+> (proposed/FEATURES.md); the old root-home machine model has been
+> removed and replaced by this one.
 
-A **blueprint** is a reusable, user-owned JSON description of a kind of
-machine. A **machine** is one realization of that blueprint: its
-writable disks, backend object, and lifecycle. One blueprint
-may have zero, one, or many machines. Blueprints have names; machines
-have ids.
+A **blueprint** is a reusable, user-owned JSON file that describes a
+kind of machine. A **machine** is one instance of that blueprint: it
+has its own writable disks, its own backend object, and its own
+lifecycle. One blueprint can have zero, one, or many machines.
+Blueprints are identified by name; machines are identified by id.
 
 ```text
 <reliquary_home>/
@@ -38,82 +39,93 @@ have ids.
         └── <backend>/        the backend's own files (e.g. qemu/)
 ```
 
-A blueprint's name — its identity, the selection key — is its
-declared `name` field when it carries one, else its file stem
-(`<name>.rlqb`), resolved from whichever source supplies it
-(docs/spec/asset-resolution.md). It must be
-id-safe: it becomes a machine-id segment and a cache directory
-name. Two assets of one kind resolving to one effective name in a
-source are an error. The machine's state records which file it
-resolved from, and name selection matches only machines of the
-invocation's own resolution. A machine's
-identity is `<blueprint>-<n>`, where `<n>` is the lowest free
-non-negative integer for that blueprint at `create` time (destroy
-frees the number for reuse). Allocation is serialized with a
-per-blueprint lock under `cache/machines/.locks/`. The cache
-directory, run directories, and backend identity all use the
-machine id, and there is no separate machine name. A machine
-**is** its cache directory — nothing about a machine lives
-outside `cache/`, because a machine lives and dies as one thing.
-Deleting the cache deletes the machines, by design. A run stores
-nothing in the cache — it returns its output to the caller (D36),
-which keeps whatever is worth keeping on its own side of the seam
-(P4, P18; the return model — script spec).
+A blueprint's name — the identity you select it by — is its
+declared `name` field if it has one, otherwise its file stem
+(`<name>.rlqb`), resolved from whichever directory supplies it
+(docs/spec/asset-resolution.md). The name must be safe to use in an
+id: it becomes part of a machine id and part of a cache directory
+name. Two blueprint files that resolve to the same effective name
+in one source directory is an error. A machine's saved state records
+which file its blueprint resolved from, and `--blueprint <name>`
+selection only matches machines whose recorded blueprint source
+matches what resolving `<name>` produces for the current
+invocation. A machine's identity is `<blueprint>-<n>`, where `<n>`
+is the lowest non-negative integer not already used by that
+blueprint at the time `create-machine` runs (destroying a machine
+frees its number for reuse). This allocation is serialized with a
+per-blueprint lock file under `cache/machines/.locks/`, so two
+concurrent `create-machine` calls for the same blueprint can't pick
+the same number. The cache directory, any run directories, and the
+backend identity all use the machine id — there is no separate
+machine name. A machine **is** its cache directory: nothing about a
+machine exists outside `cache/`, because a machine is created and
+destroyed as a single unit. Deleting the cache directory deletes
+the machines — that's by design. A run stores nothing in the
+cache; it returns its output to whoever called it (D36), and that
+caller decides what to do with it (P4, P18; see the return model in
+the script spec).
 
-Commands select their targets with explicit flags, never
-positionally:
+Commands select their target machine with explicit flags, never by
+position:
 
-- `--blueprint <name>` — that blueprint's machine when exactly one
-  exists
-- `--machine <id>` — the full machine id, exactly (no prefix
-  matching, no bare-number form)
+- `--blueprint <name>` — that blueprint's one machine, when exactly
+  one exists
+- `--machine <id>` — the full machine id, exactly (no partial-id
+  matching, no bare number by itself)
 
-On machine-level verbs, `--blueprint <name>` alone fails when
-several machines exist (listing the candidate ids) or when none
-exist (suggesting `create-machine`; `run-script` creates one
-instead).
+On a command that acts on one machine, `--blueprint <name>` alone
+fails if several of that blueprint's machines exist (the error
+lists the candidate ids) or if none exist (the error suggests
+running `create-machine`; `run-script` creates one automatically
+instead of failing).
 
-## The machine directory and out-of-band access
+## The machine directory and out-of-band file access
 
-`get-machine-dir` (twin `get_machine_dir()`) returns the
-machine's cache directory as an absolute path — a query under
-the standard selectors, valid in any phase, touching nothing.
+`get-machine-dir` (matching API method `get_machine_dir()`)
+returns the machine's cache directory as an absolute path. It's a
+read-only query, usable with the standard selectors in any phase,
+and it doesn't touch anything.
 
-The path is the door to **out-of-band file exchange**, and it is
-the way a file crosses the host/guest boundary rather than a
-convenience (D108). Reliquary places no file on a machine's
-drives, reads none back and maps no volume to a guest letter: a
-machine's **file content is out of purview by design**, which is
-**P16**'s carve-out rather than a gap in it, so no supported use
-case asks Reliquary to reach inside a volume and none is failed by
-its not doing so. While the machine is stopped on every control
-plane, the content under `disks/` is plain host state: a drive
-whose media is a directory *is* that directory, and image drives
-are readable and writable with the user's own tools. Reliquary
-neither mediates nor records out-of-band access — what the
-next `start` finds on the drives is simply the machine's state,
-exactly as if the guest had written it.
+That path is how you reach a machine's files directly, and it's
+the intended way a file crosses between host and guest — not a
+workaround (D108). Reliquary never places a file on a machine's
+drives, never reads one back, and never maps a volume to a guest
+drive letter: **a machine's file content is deliberately out of
+Reliquary's reach** — this is what **P16**'s carve-out says, not a
+gap in what Reliquary does, so no supported use case needs
+Reliquary to look inside a volume, and none is left unsupported by
+it not doing so. While the machine is stopped, on every control
+plane, the contents under `disks/` are just ordinary files on the
+host: a drive whose media is a directory *is* that directory, and
+image-file drives can be read and written with your own tools.
+Reliquary doesn't track or manage this kind of access at all — what
+the next `start` finds on the drives is simply the machine's
+current state, exactly as if the guest itself had written it.
 
-The blessing has edges:
+This access has limits:
 
-- a running machine's drives are never touched from the host —
-  the stopped requirement is the contract, not advice;
-- `cache/media/` payloads stay outside it: hash-verified and
-  read-only by doctrine, and rewriting one breaks verification
-  and any `difference` machine backed by it;
-- a run's output is **not** in the machine to be custodied: it
-  returns to whoever drove it and is already on their side of the
-  seam (D36), so there is nothing here to read out, copy, or
-  write into;
-- `machine.json` (its live `vm` section included) and lock files
-  are Reliquary's own state, not an editing surface.
+- a running machine's drives must never be touched from the host —
+  requiring the machine to be stopped is a hard rule, not just
+  advice;
+- files under `cache/media/` are off limits: they're
+  hash-verified and read-only by design, and editing one breaks
+  that verification, and breaks any `difference` machine built on
+  top of it;
+- a run's output is **not** stored on the machine for you to
+  retrieve here: it's already returned to whoever ran it (D36), so
+  there's nothing on the machine to read, copy, or write for that
+  purpose;
+- `machine.json` (including its live `vm` section) and the lock
+  files are Reliquary's own internal state — do not edit them by
+  hand.
 
 ## Lifecycle
 
-A machine rests in one of two phases — `ready` or `running` — and
-passes through transitional phases (`creating`, `stopping`,
-`destroying`) that exist so an interrupted operation is
-detectable and recoverable:
+A machine sits at rest in one of two phases — `ready` or
+`running` — and passes through transitional phases (`creating`,
+`stopping`, `destroying`) while an operation is in progress. Those
+transitional phases exist so that if an operation is interrupted,
+Reliquary can detect that and recover:
 
 ```mermaid
 stateDiagram-v2
@@ -128,15 +140,17 @@ stateDiagram-v2
     destroying --> [*]
 ```
 
-`destroy` removes the machine entirely — there is no
-half-destroyed resting phase, because a machine is nothing but
-its cache directory. A running machine is stopped first, the
-per-machine lock held across both halves the same way `restart`
-holds it across stop and start, so nothing else can touch the
-machine in the gap. `recreate` is `destroy` + `create` as one
-command, reusing the same id. On startup Reliquary detects a
-machine stranded in a transitional phase and completes a safe
-rollback or fails with recovery instructions (see below).
+`destroy` removes the machine entirely — there is no partly
+destroyed resting phase, because a machine is nothing more than
+its cache directory. If the machine is running, `destroy` stops it
+first, holding the per-machine lock across both the stop and the
+destroy — the same way `restart` holds the lock across its own
+stop and start — so nothing else can touch the machine in between.
+`recreate` runs `destroy` and then `create` as a single command,
+reusing the same id. On startup, if Reliquary finds a machine
+stuck in a transitional phase, it either completes a safe rollback
+automatically or fails with instructions for recovering it by hand
+(see below).
 
 ```text
 rlq list-blueprints
@@ -150,84 +164,98 @@ rlq recreate-machine (--machine <id> | --blueprint <name>)
 rlq delete-blueprint <name>
 ```
 
-The mobility verbs — `clone-machine`, `export-drive`,
-`export-machine` — are **unbuilt** (the banner; Machine mobility
-in planning/proposed/FEATURES.md), so they are not written here:
-a spec states what exists. Their settled design is
-[api.md](api.md)'s, which scopes itself to the end goal.
+The mobility commands — `clone-machine`, `export-drive`,
+`export-machine` — are **not built yet** (see the status banner
+above; "Machine mobility" in planning/proposed/FEATURES.md), so
+they are not documented here: this spec describes what currently
+exists. Their settled design lives in [api.md](api.md), which
+describes the end-goal design rather than what's shipped.
 
-`list-blueprints` shows each blueprint and its machine count;
-`list-machines` shows each machine's id, blueprint, phase, and
-backend — both enumerated by scanning `cache/machines/`.
+`list-blueprints` shows each blueprint and how many machines it
+has; `list-machines` shows each machine's id, blueprint, phase,
+and backend. Both commands work by scanning `cache/machines/`.
 `create-machine` validates and resolves the current blueprint,
-materializes a new machine under the next free `<blueprint>-<n>`
-id — state, writable drives, backend object — and prints the id.
-`destroy-machine` deletes the machine entirely: the whole cache
-directory and the backend machine, stopping it first if it is
-running. `recreate-machine` is
-`destroy-machine` followed by `create-machine` as one command,
-reusing the same id. `delete-blueprint` takes only `--blueprint`: it
-removes the blueprint file itself and fails closed while any
-machine of it exists, naming the machine ids — destroy them
-first.
+then materializes a new machine under the next free
+`<blueprint>-<n>` id — its state, its writable drives, and its
+backend object — and prints the new id. `destroy-machine` deletes
+the machine entirely: the whole cache directory and the backend's
+own machine object, stopping the machine first if it's running.
+`recreate-machine` runs `destroy-machine` followed by
+`create-machine` as a single command, reusing the same id.
+`delete-blueprint` takes only `--blueprint`: it deletes the
+blueprint file itself, and refuses to run while any machine of
+that blueprint still exists — the error names those machine ids,
+so you destroy them first.
 
-Editing a blueprint affects future `create` operations, not existing
-machines. Each machine records the source blueprint and resolved digest at
-creation; that resolved snapshot is the machine's baseline.
+Editing a blueprint only affects machines created after the edit —
+it has no effect on machines that already exist. When a machine is
+created, Reliquary records the source blueprint and a digest of its
+resolved contents; that recorded snapshot is the machine's
+baseline.
 
-**The baseline is the machine's shape, and only that.** Two blueprint
-fields are deliberately outside it and are read from the blueprint
-file at each invocation instead: `parameters`, which feeds script
-property binding, and `scripts`, the label → stem map a
-`run-script <label>` resolves against. Neither decides what the
-machine *is* — they name what to run against it and what to bind
-into it — so neither is recorded, neither enters the digest, and
-neither needs an `apply` to take effect. A label added to a
-blueprint after its machine exists is runnable immediately; a
-machine whose blueprint file has since moved simply contributes
-neither, its own state remaining authoritative for shape (D101). Between
-`apply`s the machine's own state is authoritative — script
-`insert`/`eject` persists there, so a machine may legitimately
-diverge from its baseline — and `start` runs the machine as its
-state describes, never re-reading the current
-blueprint file. Adopting blueprint edits — and returning a
-diverged machine to its blueprint shape — is the explicit `apply`: with the
-machine stopped, it re-resolves the current blueprint and reconciles the
-machine to it — applicable differences (memory, boot order,
-backend settings, drives
-enabled or disabled, media changes) are applied and the recorded
-digest updated; contradictions the machine cannot absorb without
-regenerating (such as a changed `size` on an existing image) fail
-closed naming both sides, leaving `recreate` as the honest
-alternative. Applying a newer blueprint never happens implicitly at
-`start`. **And the reverse never happens**: no command writes a
-machine's divergence — an inserted medium, a changed boot order —
-back into its blueprint. The blueprint is the authored artifact,
-written by Reliquary once at most (`new-blueprint`, `add-media`)
-and only ever read after; a shape an author settles on at a
-machine is typed into the blueprint and adopted with `apply`, the
-one direction there is. An arrangement a run needed is not a fact
-about the machine (U24), and a machine left as a run arranged it
-is what the `with` scope and `apply` exist to undo (U26), so a
-verb copying state into the declaration would be writing the
-wrong one of the two (D30, D41). The one case where a machine's
-shape must be *captured* is a VM Reliquary did not build, and that
-is `import-vm`'s, which writes a new blueprint once.
+**The baseline covers only the machine's shape — nothing else.**
+Two blueprint fields are deliberately left out of it, and are read
+straight from the blueprint file every time instead: `parameters`,
+which feeds script property binding, and `scripts`, the label →
+file-stem map that `run-script <label>` looks a label up in.
+Neither of these decides what the machine *is* — they only say what
+to run against it and what values to bind into that run — so
+neither is recorded in the baseline, neither is part of the digest,
+and neither needs `apply` to take effect. A label added to a
+blueprint after its machine already exists can be run immediately.
+If a machine's blueprint file has since been moved or deleted, the
+machine simply has no `parameters` or `scripts` to read — its own
+recorded state still fully describes its shape (D101). Between
+calls to `apply`, the machine's own recorded state is what's
+authoritative, not the blueprint file: a script's `insert`/`eject`
+writes to that state, so a machine can legitimately end up
+different from its baseline. `start` runs the machine exactly as
+its own saved state describes, and never re-reads the current
+blueprint file. Adopting blueprint edits into an existing machine —
+and bringing a machine that has diverged back to its blueprint's
+shape — is what the explicit `apply` command is for: with the
+machine stopped, it re-resolves the current blueprint and
+reconciles the machine to it. Differences it can apply directly
+(memory, boot order, backend settings, drives turned on or off,
+media changes) are applied, and the machine's recorded digest is
+updated. Differences it cannot absorb without recreating the
+machine — such as a changed `size` on a disk image that already
+exists — cause `apply` to fail, naming both the old and new values;
+in that case `recreate` is the way to make the change happen.
+`start` never applies a newer blueprint on its own. **And the
+reverse never happens either**: no command writes a machine's own
+divergence — an inserted medium, a changed boot order — back into
+its blueprint file. The blueprint is the file you author: Reliquary
+writes to it at most once, when it's first created
+(`new-blueprint`, `add-media`), and only ever reads it after that.
+If you decide a shape you set up at the machine should become
+permanent, you type it into the blueprint yourself and bring it in
+with `apply` — that's the only direction changes flow. An
+arrangement a script set up for one run is not meant to become a
+permanent fact about the machine (U24); a machine left in whatever
+state a run arranged is exactly what the `with` scope and `apply`
+exist to undo (U26). So a command that copied the machine's current
+state back into the blueprint would be writing state into the wrong
+one of the two (D30, D41). The one case where a machine's shape
+genuinely needs to be *captured* into a blueprint is a VM Reliquary
+did not create itself — that's what `import-vm` is for, and it
+writes a new blueprint exactly once.
 
-`clone` creates a new machine under the next free
-`<blueprint>-<n>` id. It retains the same
-resolved blueprint snapshot but copies the source machine's writable drives
-when they exist; it is therefore a snapshot of a machine, not another
-name for a blueprint. A future `fork-blueprint` command may create a new editable blueprint; it
-is intentionally not implicit in clone.
+`clone` creates a new machine under the next free `<blueprint>-<n>`
+id. It keeps the same resolved blueprint snapshot as the source
+machine, but copies the source machine's writable drives if they
+exist. So a clone is a copy of a machine, not a second name for the
+same blueprint. A possible future `fork-blueprint` command could
+create a new, separately editable blueprint from a machine, but
+`clone` deliberately does not do that itself.
 
 ## The machine state
 
-The blueprint remains the plain machine JSON object described by the
-[machine blueprint](../blueprint-guide.md). The machine's one document is
-`cache/machines/<id>/machine.json` — the resolved
-blueprint fields plus the machine's own bookkeeping, not a second
-spelling of the blueprint schema:
+The blueprint is still the plain JSON object described in the
+[machine blueprint](../blueprint-guide.md) guide. A machine's state
+lives in exactly one file, `cache/machines/<id>/machine.json`. It
+holds the resolved blueprint fields plus the machine's own
+bookkeeping — it does not re-declare the blueprint schema:
 
 ```json
 {
@@ -239,91 +267,108 @@ spelling of the blueprint schema:
 }
 ```
 
-It contains the machine's own id (repeated inside the file as a
-safety check — it must match the directory it sits in, so a
-hand-copied or misplaced machine directory fails closed), the
-source blueprint name, creation time, lifecycle phase, operation
-generation, the resolved blueprint digest, backend ID, and realized
-drive/controller addresses. While running it also carries a `vm`
-section — the live-VM identity as every backend adapter records it:
-the `backend` that owns the VM, that backend's own machine
-identifier (`backend-id`), a per-start `token`, an adapter-shaped
-`endpoint`, and a `pid` where the backend runs as a process. It is
-written atomically with `phase` so the two can never disagree, and
-cleared when the machine stops. It must never be edited by hand.
+It contains the machine's own id, repeated inside the file as a
+safety check — this id must match the name of the directory it sits
+in, so a hand-copied or misplaced machine directory is refused
+rather than used. It also contains the source blueprint's name, the
+creation time, the lifecycle phase, the operation generation
+counter, the resolved blueprint digest, the backend ID, and the
+drive and controller addresses as they were actually assigned.
+While the machine is running, it also carries a `vm` section: the
+live VM's identity, as every backend adapter records it — the
+`backend` that owns the VM, that backend's own identifier for the
+VM (`backend-id`), a token generated fresh each time the machine
+starts (`token`), an endpoint whose shape depends on the adapter
+(`endpoint`), and, when the backend runs as a host process, that
+process's id (`pid`). This `vm` section is written atomically
+together with `phase`, so the two can never disagree with each
+other, and it's cleared when the machine stops. Never edit it by
+hand.
 
-Only the backend the record names may interpret its endpoint. A
-same-named VM of another home is never mistaken for this one: the
-identifier alone cannot authorize a command, because an addressable
-endpoint outlives its owner, so the per-start token is checked
-too.
+Only the backend named in the record is allowed to interpret its
+endpoint. A same-named VM belonging to a different `home` directory
+is never mistaken for this one: the identifier alone isn't enough
+to authorize a command against it, because an addressable endpoint
+can outlive the VM that originally owned it — so the per-start
+token is checked too.
 
-Beside the resolved shape sits the one **recorded observation** —
-a fact read from the machine's own materialization, never part of
-the blueprint digest. Per floppy drive, `launch-size`: the byte
-size of the medium attached at launch, which fixes the drive's
-geometry for the boot and is what refuses a live swap that
-geometry could not serve (U20). It is a file size and nothing
-more — **nothing here reads inside a disk**, so no volume count,
-partition table or filesystem fact is recorded (D108).
+Alongside the resolved shape, the state also carries one
+**recorded observation** — a fact read from how the machine was
+actually materialized, which is not part of the blueprint digest.
+For each floppy drive, `launch-size` records the byte size of the
+medium that was attached when the machine last launched. That size
+fixes the drive's geometry for the boot, and it's what causes
+Reliquary to refuse a live media swap that the drive's geometry
+couldn't support (U20). It is nothing more than a file size —
+**nothing here reads the contents of a disk** — so no volume count,
+partition table, or filesystem fact is ever recorded (D108).
 
-The phase is one of `creating`, `ready`, `running`, `stopping`,
-or `destroying`. Every mutating operation takes an exclusive
-per-machine lock before inspecting backend state. On startup
-Reliquary detects an interrupted phase, verifies backend
-identity, and either completes a safe rollback or fails with
-explicit recovery instructions. Atomic file replacement protects
-JSON writes; it does not pretend a host file write and a
-hypervisor operation are one transaction.
+The phase is always one of `creating`, `ready`, `running`,
+`stopping`, or `destroying`. Every operation that changes a machine
+takes an exclusive per-machine lock before it inspects the
+backend's state. On startup, if Reliquary finds an interrupted
+phase, it verifies the backend's identity and either completes a
+safe rollback or fails with explicit instructions for recovering by
+hand. JSON files are written atomically, which protects the file
+itself from corruption — but that doesn't make a host file write
+and a hypervisor operation into one single transaction, so the two
+can still end up out of sync if the hypervisor call itself fails
+partway.
 
-No home-wide limit caps how many machines run at once. The
-per-machine lock and per-start identity model already make
-concurrency safe — each machine is its own cache directory, its
-own backend object, and its own endpoint — so the honest ceiling
-is host resources (memory, and whatever the backend allocates per
-machine), surfaced as an ordinary `start` failure. Reliquary invents no cap of its
-own.
+There is no limit on how many machines can run at once within a
+`home` directory. The per-machine lock and the per-start identity
+check already make running several machines at once safe — each
+machine has its own cache directory, its own backend object, and
+its own endpoint — so the real limit is just host resources
+(memory, and whatever else the backend needs per machine), and
+you'll simply see that as an ordinary `start` failure when you hit
+it. Reliquary does not impose any additional cap of its own.
 
-There is no `installed` boolean. A script's outcome is the output
-the run returns to the caller (D36) — naming the script, its
-source digest, result, and produced artifacts — never a stored
-claim about the guest's contents. The run stores nothing in the
-cache; persisting a run into a record archive is
-asynchronous-runs backlog work (proposed/FEATURES.md "Asynchronous
-runs"), and the consumer keeps whatever output is worth
-keeping.
+There is no `installed` field recording whether a script succeeded.
+A script's outcome is entirely in the output the run returns to
+whoever called it (D36) — the script's name, its source digest, its
+result, and any artifacts it produced — never a value stored on the
+machine claiming something about the guest's contents. A run stores
+nothing in the cache; saving runs into a persistent record archive
+is backlogged asynchronous-run work (proposed/FEATURES.md
+"Asynchronous runs"), and until then, it's up to whoever calls
+`run-script` to keep whatever part of the output they need.
 
 ## Naming and identity
 
-Users author and rename blueprints by changing `.rlqb` files
-under an asset root.
-Machines are never renamed because the id is the whole identity:
-`<blueprint>-<n>`, assigned at `create` (lowest free number) and
-reused after `destroy`. Manual renames of machine directories under
-`cache/machines/` are unsupported. **And there is no alias**,
-generated or chosen: the id is already the readable pair a
-generated word would stand in for, and a second spelling of one
-identity is a map to keep in step. A blueprint's several machines
-are interchangeable instances of what it declares (P1) — one that
-differs in kind is a different blueprint — so nothing Reliquary
-knows tells them apart beyond the number, and what a machine is
-*for* is the caller's to keep on its own side of the seam (P4).
+You author and rename blueprints by editing `.rlqb` files under an
+asset directory. Machines are never renamed, because the machine
+id is its entire identity: `<blueprint>-<n>`, assigned when
+`create-machine` runs (using the lowest free number) and freed for
+reuse when the machine is destroyed. Manually renaming a machine
+directory under `cache/machines/` is not supported. **And there is
+no alias for a machine, generated or user-chosen**: the id is
+already a readable pair of blueprint name and number, so a
+generated nickname would just be a second name to keep in sync with
+it, for no benefit. A blueprint's several machines are
+interchangeable instances of the one thing it declares (P1) — a
+machine that differs in kind belongs to a different blueprint — so
+Reliquary has no way to tell two machines of the same blueprint
+apart beyond their number. What each machine is actually *used
+for* is something only the caller keeps track of, not Reliquary
+(P4).
 
 ## JSON remains the format
 
-The blueprint (its machine, media, source, and archive components)
-and the machine state remain JSON. They are declarative documents
-with strict schemas and benefit from editor completion, stable
-formatting, and precise diagnostics. The script language remains the
-separate line-oriented behavioral format. Reliquary publishes one
-composed-blueprint JSON Schema, versioned and packaged as
-[blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json)
-so editors can bind it today; it stays a synchronized companion to
-the prose specs, which remain normative, with Reliquary's own
-validation the parser's and a shared valid/invalid fixture corpus —
-run against both parser and schema at realignment — keeping the two
-honest against each other. The machine-state schema is authored
-beside this spec
-([machine-state.schema.json](../../src/reliquary/schemas/machine-state.schema.json)); the schema
-version tracks the Reliquary release, not a version field in user
-documents before 1.0.
+The blueprint (its machine, media, source, and archive sections)
+and the machine state both remain JSON. They are declarative
+documents with strict schemas, which gets you editor autocomplete,
+stable formatting, and precise error messages. The script language
+remains a separate, line-oriented format for describing behavior.
+Reliquary publishes one composed-blueprint JSON Schema, versioned
+and packaged as
+[blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json),
+so editors can use it today. That schema is kept in sync with the
+prose specs, which remain the normative source of truth; Reliquary's
+own validation logic is the parser's, and a shared corpus of valid
+and invalid fixtures is run against both the parser and the schema
+whenever they're realigned, to keep the two consistent with each
+other. The machine-state schema is maintained alongside this spec
+([machine-state.schema.json](../../src/reliquary/schemas/machine-state.schema.json));
+its version tracks the Reliquary release, not a version field
+inside user documents — that only applies before 1.0.

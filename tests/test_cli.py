@@ -227,8 +227,9 @@ def test_removed_globals_are_not_in_the_arity_table():
     # anywhere, so its entry named an option that was gone.
     assert "--qemu" not in cli._FLAG_ARITY
     assert "--platform" in cli._FLAG_ARITY
-    # --port went with the adapter seam: a QMP port is QEMU's own
-    # endpoint detail, and no command takes one any more.
+    # --port went away with the backend adapter boundary: a QMP port
+    # is QEMU's own endpoint detail, and no command takes one any
+    # more.
     assert "--port" not in cli._FLAG_ARITY
 
 
@@ -360,8 +361,8 @@ def test_json_void_twin_is_empty_object(plain_home):
 
 
 def test_json_list_codex_carries_the_description(plain_home):
-    """The record carries the field the human listing wraps (D97):
-    the two presentations show one surface."""
+    """The JSON record carries the same field the human-readable
+    listing wraps (D97) — both are views of the same data."""
     result, out = _json_out(plain_home, ["list-codex"])
     assert result == 0
     row = next(r for r in json.loads(out) if r["name"] == "freedos")
@@ -404,11 +405,11 @@ def test_list_machines_table(plain_home):
 
 
 def test_list_codex_names_the_library_and_nothing_of_yours(plain_home):
-    """Which command you ran is the provenance, so no column is.
+    """Which command you ran already says where a row came from, so there is no separate provenance column.
 
     `plain` is this fixture's own blueprint; the library's listing
-    must not mention it, and there is no value anywhere saying
-    where a row came from.
+    must not mention it, and nothing in the output should say where
+    a row came from.
     """
     result, out, _err = _out("--home-dir", plain_home, "list-codex")
     assert result == 0
@@ -427,11 +428,11 @@ def test_seed_blueprint_only_flag(plain_home):
 
 
 def test_the_builtin_flag_is_gone_from_both_listings(plain_home):
-    """One verb, one set: `--builtin` no longer turns yours into its.
+    """One verb, one set of results: `--builtin` can no longer swap a listing of what you have for a listing of what you do not.
 
-    A flag that flipped a listing of what you have into a listing
-    of what you do not was the same mixing the provenance column
-    carried, one layer down (D88).
+    A flag that flipped between those two listings caused the same
+    mixing of "yours" and "the library's" that the provenance column
+    caused, one layer down (D88).
     """
     for command in ("list-blueprints", "list-media"):
         stderr = io.StringIO()
@@ -598,14 +599,14 @@ def test_list_media(plain_home):
 
 
 def test_start_and_stop_via_blueprint_selector(plain_home):
-    """--blueprint start/stop resolve the sole machine.
+    """--blueprint on start/stop resolves to the one machine that blueprint made.
 
-    The CLI resolves against the record built from its own flags
-    — one session per invocation (P26), no process globals left
-    to consult — so a dropped --home-dir can never let stop
-    target a machine in another home (the identity name alone
-    cannot tell same-numbered machines of two homes apart): the
-    guarantee rests on the session's record alone.
+    The CLI resolves this against the record built from its own flags
+    for this one invocation (P26) — there are no process-wide globals
+    to fall back on. So a missing --home-dir can never make stop
+    target a machine in a different home: same-numbered machines in
+    two different homes have the same id, and nothing but the
+    session's own record tells them apart.
     """
     _out("--home-dir", plain_home, "create-machine", "--blueprint", "plain")
     with mock.patch("reliquary.session.Session.start_machine") as start:
@@ -613,8 +614,8 @@ def test_start_and_stop_via_blueprint_selector(plain_home):
                                        "start-machine",
                                        "--blueprint", "plain")
     assert result == 0
-    # The selector resolved live, under --home-dir: the record
-    # is the carrier.
+    # The --blueprint selector resolved to plain-0 using --home-dir.
+    # The session's own record carries that resolution through.
     start.assert_called_once()
     assert start.call_args.args == ("plain-0",)
 
@@ -769,12 +770,13 @@ def test_press_translates_portable_keys(plain_home):
 
 
 def test_a_selected_machine_carries_its_directory(plain_home):
-    """The machine's own directory is the whole address.
+    """The machine's own directory is the whole address needed.
 
     It is where the recorded VM identity lives, so without it a
-    guest-console command could not verify the machine it claims
-    to be talking to — and there is no port to pass instead: that
-    is the adapter's, on the far side of the seam.
+    guest-console command could not verify which machine it is
+    actually talking to. There is no port to pass instead — that is
+    the backend adapter's own detail, on the other side of that
+    boundary.
     """
     machine_home = _running_machine(plain_home)
     with mock.patch("reliquary.cli.screen_text",
@@ -787,7 +789,8 @@ def test_a_selected_machine_carries_its_directory(plain_home):
 
 
 # `wait` is the script language's verb: its conditions are parsed by
-# the language's own parser and lowered to the handle stratum (D116).
+# the language's own parser and translated down to calls on the
+# machine handle (D116).
 
 @pytest.mark.parametrize("text,expected", [
     ("C:\\>", ("screen", re.escape("C:\\>"))),
@@ -962,8 +965,9 @@ def test_insert_media_mounts_a_file_by_path(rig_home):
 #
 # ``adopt_environment()`` no longer runs on the CLI path — the CLI
 # builds one ``Context`` per invocation and opens a session on it
-# (P26) — so the environment honoring the suite used to certify
-# through home.py is stated here, against ``main()`` itself.
+# (P26) — so the environment-handling behavior this suite used to
+# verify through home.py is tested here instead, directly against
+# ``main()``.
 
 def test_the_environment_names_the_home(bare_home, monkeypatch):
     monkeypatch.setenv("RELIQUARY_HOME", bare_home)
@@ -1063,18 +1067,21 @@ def test_the_fault_exits_one():
     assert exit_code(InternalError("x")) == 1
 
 
-# The registered commands and the routed ones are one list.
+# The registered commands and the routed commands must always match.
 #
-# Two lists of the same 48 words survive in this module, and only one
-# of them is derived: ``_COMMANDS`` is read off the built parser,
-# while ``_dispatch`` routes on literal comparisons that nothing else
-# checks. A command registered without an arm reaches the
-# fall-through, which is a fault rather than the silent success it
-# once was — but a fault whoever runs the command discovers, where
-# this is the suite discovering it.
+# Two lists of the same roughly 48 command names exist in this
+# module, and only one is generated: ``_COMMANDS`` is read directly
+# off the built parser, while ``_dispatch`` routes by comparing
+# literal strings that nothing else checks against the parser. A
+# command registered with no matching arm in ``_dispatch`` reaches
+# the fall-through and raises — better than the silent success it
+# used to report, but still something someone running the command
+# would only discover the hard way. These tests catch the mismatch
+# earlier, before anyone runs the command.
 #
-# Walking the source for the arms follows ``test_errors.py``, which
-# walks every ``raise`` in the package for the same kind of reason.
+# Walking the source to find the arms follows the same approach as
+# ``test_errors.py``, which walks every ``raise`` in the package for
+# the same reason.
 
 def _routed():
     source = inspect.getsource(cli._dispatch)

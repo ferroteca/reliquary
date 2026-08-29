@@ -297,7 +297,8 @@ def test_a_failed_write_leaves_no_temporary_file(home_dir):
             if name.startswith(".user.properties.")] == []
 
 
-# A ``Context`` carries the selected file (P26's cargo).
+# A ``Context`` carries the selected properties file, which is part
+# of what P26 requires it to carry.
 
 def test_a_context_slot_selects_the_file(home_dir):
     selected = os.path.join(home_dir, "project.properties")
@@ -321,9 +322,10 @@ def test_an_explicit_argument_beats_the_context_slot(home_dir):
 
 
 def test_the_environment_is_never_read(home_dir, monkeypatch):
-    # RELIQUARY_PROPERTIES arrives through the record's slot,
-    # honoured in the CLI's construction step and nowhere in the
-    # engine: with no slot, the home's file is the selection.
+    # RELIQUARY_PROPERTIES only reaches the properties_file slot on
+    # the Context, and only the CLI's construction step reads that
+    # env var -- the engine itself never does. With no slot set, the
+    # home directory's own file is used.
     monkeypatch.setenv("RELIQUARY_PROPERTIES",
                        os.path.join(home_dir, "env.properties"))
     context = home.Context(home_dir=home_dir)

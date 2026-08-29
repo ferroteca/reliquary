@@ -2,13 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Agentless DOS provisioning and guest interaction.
 
-What a DOS guest names, reliquary names the same way — but only for
-what it actually drives. The drive-letter map and the guest-address
-grammar that once lived here went with the volume mapping and the
-in-band file family (D108): reliquary declares a machine's drives and
-moves their media, and what is *inside* a volume is the caller's
-(P16's file-content carve-out), so nothing here translates a host
-path into a letter any more.
+Reliquary uses the same names a DOS guest uses, but only for the
+drives it actually manages. The drive-letter map and the
+guest-address parsing that used to live in this file moved out along
+with volume mapping and the in-band file family (D108): Reliquary
+declares a machine's drives and moves media into them, but what is
+inside a volume is the caller's business (the file-content carve-out
+in P16). So this file no longer translates a host path into a drive
+letter.
 """
 
 import os

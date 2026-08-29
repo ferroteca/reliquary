@@ -6,16 +6,16 @@ Every line of a script is one node::
 
     node = name , { argument } , { modifier } , [ block ]
 
-This module implements the lexical rules and that shape only --
-what a line *looks like*. Typing (which node names exist, what
-arguments and modifiers each admits) and the V-numbered static
-rules belong to the layer above, in :mod:`reliquary.script`.
-The milestone-5 ``content`` declaration has one structural
-extension: a trailing ``\"\"\"`` opens a raw body that is skipped
-until its closing ``\"\"\"`` line.
+This module handles the lexical rules and that shape only -- what a
+line *looks like*. What node names exist, and what arguments and
+modifiers each one accepts, plus the V-numbered static rules, are
+handled by the layer above, in :mod:`reliquary.script`. The
+milestone-5 ``content`` declaration has one structural extension: a
+trailing ``\"\"\"`` opens a raw body that is skipped over until its
+closing ``\"\"\"`` line.
 
-Source of truth: docs/spec/script-spec.md, "Lexical rules"
-and "Core grammar".
+Source of truth: docs/spec/script-spec.md, "Lexical rules" and "Core
+grammar".
 """
 
 import re
@@ -26,35 +26,40 @@ from typing import Mapping, Optional, Tuple
 from .errors import InternalError, StaticError
 
 _DURATION = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:ms|s|m|h)$")
-# A bare number carrying no unit, which is what a proportion is.
-# Admitted only after a name that takes one, so "durations carry a
-# unit" stays the answer everywhere a duration was meant.
+# A bare number with no unit -- that's what a proportion looks like.
+# It's allowed only after a name that takes a proportion, so
+# "durations carry a unit" stays true everywhere else a duration was
+# expected.
 _FRACTION = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$")
 #: The names whose value is a proportion rather than a duration.
 FRACTION_VALUED = frozenset({"stability"})
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9._-]*$")
-# A media name may lead with a digit where a property key may not:
-# the `@` sigil already classifies the token, while a property key
-# also appears bare at its `property` declaration, where a leading
-# digit would lex as a duration (D24).
+# A media name is allowed to start with a digit; a property key is
+# not. The `@` sigil already marks a media reference as a media
+# name, but a property key also appears bare, with no sigil, at its
+# `property` declaration, where a leading digit would instead lex as
+# a duration (D24).
 _MEDIA_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*$")
 # A token ends at whitespace, a brace, a comment, or the line
 # terminator; strings and regexes end at their closing delimiter.
 _DELIMITERS = " \t{}#"
 
-# The node names: every header, declaration and verb. They live here
-# rather than with the parser because two layers need the same list
-# and neither may import the other -- the lexer recognizes them as
-# keywords in node-name position, and validation refuses them as
-# identifiers everywhere (V5).
+# Every node name: each header, declaration, and verb. This list
+# lives here instead of in the parser because two layers both need
+# it and neither can import the other: the lexer treats these words
+# as keywords when they appear in node-name position, and validation
+# separately rejects them as identifiers everywhere else (V5).
 #
-# The two jobs are separate on purpose. A word is a keyword only
-# where a node name may start, so `enter` is a verb at the head of a
-# line and an ordinary key name after `press`; the closed
-# vocabularies are validation's, not the grammar's (script-spec.md,
-# "Grammar"). What the grammar cannot express is the *reservation* --
-# that `phase enter` names no phase -- because a rejected identifier
-# there would surface as "unexpected token" instead of a named rule.
+# The two jobs are kept separate on purpose. A word counts as a
+# keyword only where a node name is allowed to start, so `enter` is
+# a verb at the start of a line but an ordinary key name after
+# `press`. Which specific node names and key names are valid is
+# validation's job, not the grammar's (script-spec.md, "Grammar").
+# What the grammar by itself can't express is the *reservation* --
+# that `phase enter` can't be used to name a phase called "enter" --
+# because if the grammar rejected that identifier itself, it would
+# show up as a generic "unexpected token" error instead of a named
+# rule.
 KEYWORDS = (
     "description", "platform", "machine", "entry", "timeout", "deadline",
     "pacing", "stability",
@@ -65,25 +70,25 @@ KEYWORDS = (
 )
 
 
-#: Every id the script parser stack raises, and the V-numbered rule
-#: it enforces.
+#: Maps every error id the script parser stack can raise to the
+#: V-numbered rule it enforces.
 #:
-#: Ids are finer than the rules — V7 is one restriction and
-#: ``obs.two-channels`` is one of six diagnostics under it — so this
-#: is many-to-one by design.
+#: Several ids can map to the same V-number. For example, V7 is one
+#: rule, and ``obs.two-channels`` is just one of six different ids
+#: raised for violations of it.
 #:
-#: Its scope is this module, the grammar transformer and validation,
-#: and nothing beyond. A V-number names a syntactic restriction, so
-#: an id raised elsewhere — ``media.unknown`` from resolution,
-#: ``machine.slot-not-declared`` from preflight — has none to map to
-#: and no entry here. Within the stack, an id no V-number covers maps
-#: to ``None`` rather than being left out, so the map answers for
-#: every id it can be asked about.
+#: This map only covers ids raised by this module, the grammar
+#: transformer, and validation. An id raised elsewhere -- such as
+#: ``media.unknown`` from resolution or ``machine.slot-not-declared``
+#: from preflight -- has no V-number and isn't listed here. An id in
+#: this module's scope that isn't tied to any V-number still gets an
+#: entry, mapped to ``None``, so every id you look up here gets an
+#: answer.
 #:
-#: It lives here rather than only in docs/spec/script-spec.md because
-#: a consumer switching on an id needs the rule without parsing
-#: prose; the spec's rule list carries the same mapping and a test
-#: holds the two together.
+#: This mapping is kept here, not just in docs/spec/script-spec.md,
+#: so code that needs to look up the rule for an id doesn't have to
+#: parse the spec's prose. A test checks that this map and the
+#: spec's rule list agree.
 RULE_OF = {
     "node.duplicate-modifier": "V4",
     "node.modifier-not-allowed": "V2",
@@ -130,18 +135,20 @@ RULE_OF = {
     "obs.empty-pattern": "V13",
     "obs.uncompilable-regex": "V13",
     "key.not-portable": "V14",
-    # Deliberately the *runtime* id, unchanged: the static pass and
-    # the machine layer enforce one rule, so a consumer switching on
-    # it never has to know which layer noticed. What V17 adds is when
-    # it is noticed, not what it means.
+    # This is deliberately the *runtime* id, left unchanged here: the
+    # static pass and the machine layer both enforce the same rule,
+    # so code that switches on this id never needs to know which
+    # layer caught the violation. V17 only changes when the
+    # violation is caught, not what it means.
     "machine.must-be-stopped": "V17",
 }
 
-#: The lexical and structural tiers. V1 is "syntax is well formed:
-#: no unknown node names, no unbalanced blocks", which the lexer and
-#: the grammar enforce between them, so these are its diagnostics.
-#: ``lex.`` is what the tokenizer rejects while reading characters;
-#: ``syn.`` is line, block and document shape.
+#: The lexical and structural rule ids. V1 means "syntax is well
+#: formed: no unknown node names, no unbalanced blocks," and the
+#: lexer and the grammar enforce it between them, so these are the
+#: diagnostics for V1. A ``lex.`` id is something the tokenizer
+#: rejects while reading characters; a ``syn.`` id is about line,
+#: block, and document shape.
 RULE_OF.update({
     "lex.unclosed-reference": "V1",
     "lex.invalid-reference": "V1",
@@ -167,15 +174,16 @@ RULE_OF.update({
     "prop.unknown-kind": "V5",
 })
 
-#: Ids this stack raises that no V-number covers, mapped to None.
+#: Ids this stack raises that no V-number covers. Mapped to None.
 #:
-#: Two reasons an id lands here. The http declaration's rules are
-#: static and legality-tier like the rest and simply predate the
-#: V-numbering. The last two are not legality rules at all: a
-#: source that is not text and a script file that is not there,
-#: which the parser reports because it is the layer that looked.
-#: Either way a consumer asking what rule an id enforces gets a
-#: truthful None rather than a V-number invented to fill the map.
+#: An id lands here for one of two reasons. The `http` declaration's
+#: rules are static, legality-tier rules just like the others, but
+#: they simply predate the V-numbering scheme. The last two ids
+#: aren't legality rules at all -- they cover a script source that
+#: isn't text, and a script file that doesn't exist -- and the
+#: parser reports them because it's the layer that checked. Either
+#: way, code that asks what rule an id enforces gets an honest None
+#: back, instead of a V-number invented just to fill in the map.
 RULE_OF.update({
     "http.port-not-a-number": "V16",
     "http.indent-not-a-mode": "V16",
@@ -207,31 +215,36 @@ RULE_OF.update({
 
 
 class ScriptParseError(StaticError):
-    """A script syntax or static-validation error with a source line.
+    """A script syntax or static-validation error, with the source line it happened on.
 
-    The legality tier of the error taxonomy: it is decided from the
-    script text alone, so it is a STATIC ERROR and exits ``2``.
+    This is the legality tier of the error taxonomy: it is decided
+    from the script text alone, so it is a STATIC ERROR and exits
+    with code ``2``.
 
-    ``rule_id`` is the stable dotted identifier naming the rule the
+    ``rule_id`` is the stable dotted identifier naming the rule that
     diagnostic enforces (docs/spec/script-spec.md, "Error classes
-    and exit codes"): ``obs.two-channels`` and its siblings, one
-    namespace across the error classes. It is a *field* rather than
-    text baked into the message, so a consumer can switch on it
-    without parsing prose and the beta id index can be generated
-    rather than hand-kept. The rendering appends it in parentheses,
-    which is where the V-numbers used to sit.
+    and exit codes") -- things like ``obs.two-channels`` and its
+    siblings, all sharing one namespace across every error class.
+    It is a *field* on the error, not text baked into the message,
+    so code can switch on it without parsing the message text, and
+    the id index in the beta docs can be generated instead of kept
+    up to date by hand. When the error is rendered, the id is
+    appended in parentheses, which is where V-numbers used to be
+    shown.
 
-    Ids are finer than the V-numbered rules they enforce: V7 is one
-    restriction and ``obs.two-channels`` is one of the several
-    diagnostics under it. The spec's rule list carries the mapping,
-    and a test holds the two together.
+    These ids are more specific than the V-numbered rules they
+    enforce: V7 is one rule, and ``obs.two-channels`` is one of
+    several different diagnostics raised for violations of it. The
+    spec's rule list is what defines that mapping, and a test checks
+    that the two stay in sync.
 
     ``rule_id`` is inherited from :class:`~reliquary.errors.ReliquaryError`,
-    where it lives because the spec puts every id in one namespace
-    across the classes. Every tier of this surface carries one now,
-    preflight and runtime included; other surfaces do not yet, and
-    the conformance corpora measure what remains rather than
-    estimating it.
+    where it lives because the spec keeps every id in one namespace
+    across all the error classes. Every tier of this error surface
+    carries a rule_id now, including preflight and runtime errors;
+    other error surfaces in the codebase do not yet, and the
+    conformance test corpora measure how much of that work remains,
+    rather than that being estimated by hand.
     """
 
     def __init__(self, line, message, column=1, rule_id=None):
@@ -250,7 +263,7 @@ class ScriptParseError(StaticError):
             self.source_line = source_lines[self.line - 1]
 
     def __str__(self):
-        """Render an actionable compiler-style diagnostic."""
+        """Render this error as a compiler-style diagnostic: location, message, and a caret."""
         location = f"{self.path or '<script>'}:{self.line}:{self.column}"
         cited = f" ({self.rule_id})" if self.rule_id else ""
         result = f"{location}: error: {self.message}{cited}"
@@ -270,11 +283,12 @@ class Interpolation:
 
 @dataclass(frozen=True)
 class StringLiteral:
-    """A double-quoted string as literal chunks and interpolations.
+    """A double-quoted string, broken into literal text chunks and interpolations.
 
-    Escapes are already decoded. ``\\${`` produces a literal
-    ``${`` chunk rather than an :class:`Interpolation`, so the
-    typed layer can tell an authored reference from escaped text.
+    Escape sequences are already decoded by this point. ``\\${``
+    produces a literal ``${`` text chunk instead of an
+    :class:`Interpolation`, so the layer above can tell a real
+    ``${key}`` reference apart from an escaped, literal ``${``.
     """
 
     parts: Tuple[object, ...]
@@ -294,17 +308,20 @@ class StringLiteral:
     def text(self):
         """The plain text of an uninterpolated literal."""
         if self.interpolated:
-            # A guard, not a question: `interpolated` is the question,
-            # and every caller asks it first. Reaching here is a bug.
+            # This is a safety check, not a real branch: callers are
+            # expected to check `interpolated` first, so getting
+            # here at all means there's a bug somewhere.
             raise InternalError("string carries a property reference")
         return "".join(self.parts)
 
     @property
     def spelling(self):
-        """The literal as authored, references left unresolved.
+        """The literal exactly as written, with any ``${key}`` references left unresolved.
 
-        For displaying a string no run has bound values for -- a
-        listing, a diagnostic -- where :attr:`text` would refuse.
+        Use this to display a string when no run has bound property
+        values for it yet -- for example in a listing or a
+        diagnostic message -- where :attr:`text` would raise
+        instead.
         """
         return "".join(
             part if isinstance(part, str) else "${" + part.key + "}"
@@ -343,11 +360,12 @@ class Modifier:
 
 @dataclass(frozen=True)
 class Node:
-    """One structural node: a name, arguments, modifiers, a block.
+    """One structural node: a name, its arguments, its modifiers, and an optional block.
 
-    ``block`` is ``None`` when the node opened no block. Every
-    block holds nodes: a script carries no JSON, so there is no
-    island and tokenization never suspends.
+    ``block`` is ``None`` when the node did not open a block. Every
+    block holds only other nodes -- a script never embeds JSON or
+    any other foreign syntax inside it, so tokenization never has to
+    pause partway through a line to hand off to a different parser.
     """
 
     name: str
@@ -534,9 +552,10 @@ def tokenize(text, number):
                                     number, index + 1))
                 index = end
                 continue
-        # A header's value follows its keyword rather than an `=`, so
-        # the leading word is what says whether a bare number belongs
-        # here — the same contextual admission the modifier path makes.
+        # A header's value follows its keyword directly, with no `=`,
+        # so it's the leading word that decides whether a bare
+        # number is allowed here -- the same kind of contextual check
+        # the modifier-scanning path above makes.
         token, index = _scan_value(
             text, index, number,
             bare_fraction=bool(tokens)
@@ -548,9 +567,10 @@ def tokenize(text, number):
 def parse_nodes(source, path="<script>"):
     """Parse a script into its structural node tree.
 
-    Enforces the lexical rules and the node shape only: balanced
-    blocks (V1), arguments before modifiers, and no modifier named
-    twice on one node (V4). Node names are not interpreted here.
+    Enforces only the lexical rules and node shape: blocks must be
+    balanced (V1), arguments must come before modifiers, and no
+    modifier can be named twice on one node (V4). Node names
+    themselves are not interpreted here.
     """
     if not isinstance(source, str):
         raise StaticError("script source must be text",

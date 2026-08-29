@@ -19,12 +19,15 @@ Three buckets, because two-phase validation is real:
 - ``invalid-at-resolution/`` — parses clean and is rejected only when
   resolved, so neither the parse assertion nor the schema applies.
 
-**Every fixture is a collected node**, through ``tests/corpus.py``, and
-the bucket counts are pinned there: this is the corpus that ran against
-the parser and not the schema while claiming the two cannot drift, and
-a loop of 135 fixtures is what let it (D106). A node is named for its
-file — ``test_a_valid_fixture_parses[machine-drives.rlqb]`` — which is
-how one is selected while it is being fixed.
+**Every fixture is its own pytest test case**, generated through
+``tests/corpus.py``, with the bucket counts pinned there. Before this,
+these 135 fixtures ran through `unittest`'s `subTest`, which made a
+test run look identical whether it exercised the full set or only
+part of it — and that is exactly how this corpus ended up checked
+against the parser but never against the schema, despite claiming the
+two could never drift apart (D106). A test case is named for its file
+— ``test_a_valid_fixture_parses[machine-drives.rlqb]`` — so a single
+failing fixture can be picked out directly while it is being fixed.
 
 The corpus README documents what single-document fixtures cannot reach.
 """
@@ -108,9 +111,10 @@ def test_a_valid_fixture_matches_the_schema(fixture):
 def test_a_valid_fixture_warns_exactly_when_it_declares_it(fixture):
     """A `// warns:` fixture must warn, and every other one must not.
 
-    One check over the whole bucket rather than two over its halves:
-    partitioned, the fixtures a check skips are invisible, which is the
-    shape this corpus was caught in.
+    This is one check over the whole bucket, not two separate checks
+    over each half. Splitting it that way would let a fixture that a
+    check silently skips go unnoticed — the same trap this corpus fell
+    into before (see the module docstring, D106).
     """
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -170,11 +174,12 @@ def test_a_rejection_carries_the_id_the_fixture_declares(fixture):
 
 
 def test_no_invalid_fixture_is_unidentified():
-    """The measurement, kept honest as the ids landed.
+    """Tracks how many invalid fixtures still have no diagnostic id.
 
-    It reads zero, and moving up means a diagnostic lost its id rather
-    than a fixture being added carelessly. Aggregate on purpose: the
-    number is the finding, and it names every offender at once.
+    It reads zero right now, and if the count ever goes up, that means
+    a diagnostic lost its id — not that a fixture was carelessly added
+    without one. Checked as one list on purpose: the count is the
+    finding, and the assertion below names every offender at once.
     """
     unidentified = sorted(
         os.path.basename(path) for path in INVALID
@@ -184,13 +189,15 @@ def test_no_invalid_fixture_is_unidentified():
 
 @corpus.parametrize(INVALID)
 def test_the_schema_rejects_exactly_what_the_fixture_declares(fixture):
-    """The schema half, one node per fixture — the check that vanished.
+    """The schema half of validation, one test case per fixture — this
+    is the check that used to silently go missing (D106).
 
     A `// schema: rejects` fixture must fail the published schema; an
-    unmarked one must pass it, because the marker records the overlap
-    between the two validators and a stale marker is how they drift
-    apart. Both directions in one check, so no fixture is filtered out
-    of the only place it would have been counted.
+    unmarked one must pass it. The marker records where the two
+    validators (parser and schema) are expected to overlap, and a
+    stale marker is how they would drift apart unnoticed. Both
+    directions are checked together, so no fixture slips out of the
+    one place it would have been counted.
     """
     if _declares(fixture, "// schema: rejects"):
         with pytest.raises(jsonschema.ValidationError):
@@ -203,11 +210,12 @@ def test_the_schema_rejects_exactly_what_the_fixture_declares(fixture):
     "platform", "backend", "materialize", "controller", "control-planes",
     "pointing-device"])
 def test_a_closed_vocabulary_is_schema_enforced(vocabulary):
-    """What the reach trim buys, asserted rather than assumed.
+    """Confirms closed vocabularies actually reject a `${...}`
+    reference, instead of just assuming the schema enforces it.
 
     A reference in a closed vocabulary must fail the schema, not merely
-    the parser: the enums stay plain so an editor can complete them,
-    and that is the whole argument for refusing a reference there
+    the parser: the enums stay plain strings so an editor can complete
+    them, and that is the whole argument for refusing a reference there
     (D26).
     """
     path = os.path.join(_CORPUS, "invalid", f"ref-in-{vocabulary}.rlqb")

@@ -2,29 +2,31 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """JSON5 document reader.
 
-Parses the published JSON5 grammar (https://spec.json5.org) so an
-authored blueprint has one external contract rather than a
-project-defined dialect (D102). Comments are blanked to spaces of
-the same length before the parse and the position scan, which keeps
-line and column numbers exact.
+Parses standard JSON5 (https://spec.json5.org), so an authored
+blueprint follows one public spec instead of a dialect this project
+invented (D102). Before parsing, comments are replaced with spaces
+of the same length, so line and column numbers in error messages
+still match the original file.
 
-**Non-finite numbers are refused.** JSON5 admits ``NaN``,
-``Infinity`` and ``-Infinity``; Reliquary does not — blueprint
-values remain ordinary JSON data after parsing.
+Non-finite numbers are rejected. JSON5 allows ``NaN``, ``Infinity``,
+and ``-Infinity``, but Reliquary does not accept them — after
+parsing, every blueprint value is ordinary JSON data.
 
-**Positions are recorded on request** (``positions=True``), which is
-what lets a blueprint diagnostic cite a line and column rather than a
-field breadcrumb alone. They are off by default: a caller that only
-wants values pays nothing, and the containers it gets back are the
-plain ones.
+Pass ``positions=True`` to record where each value came from in the
+source file, so a blueprint error can point at a line and column
+instead of just naming a field. This is off by default: a caller
+that only wants the values pays nothing extra, and gets back plain
+dicts and lists.
 
-The recording is a *second pass* over the same blanked text rather
-than a replacement parser. ``json5.loads`` stays the one authority
-on what a document means, and the scan below reads only the
-structure, which is all a position needs. Where the two disagree
-about shape the positions are dropped for that subtree rather than
-guessed at: an unlocated diagnostic is what this module produced
-before, and a *misplaced* caret is worse than none.
+Recording positions is a second pass over the same space-blanked
+text, not a second parser. ``json5.loads`` is still the only thing
+that decides what the document means; the scan below only reads the
+structure, which is all it needs to find positions. If the scan's
+idea of the shape ever disagrees with what ``json5.loads`` produced,
+positions for that part of the document are dropped rather than
+guessed — an error without a location is what this module already
+produced before positions existed, and a wrong location would be
+worse than none.
 """
 
 import math
@@ -34,40 +36,42 @@ import json5
 
 from .errors import StaticError
 
-# Structural characters and the value starts the scanner has to tell
-# apart. Numbers and the three literals are skipped as opaque runs: the
-# scan never interprets a scalar, so anything that is not a container,
-# a string or a delimiter is one token to step over.
+# Characters that end a scalar (a number or one of the three literals
+# true/false/null). The scanner does not parse the scalar's value —
+# it just steps over characters until one of these turns up.
 _SCALAR_END = set(",]} \t\r\n")
 
-# json5's ValueError message carries line and column in prose rather
-# than as attributes: "<string>:12 Unexpected ... at column 34".
+# json5's ValueError message carries the line and column as plain text
+# rather than as attributes: "<string>:12 Unexpected ... at column 34".
 _ERROR_AT = re.compile(
     r":(\d+)\s+(.*?)\s+at column\s+(\d+)\s*$")
 
-# ECMAScript IdentifierName, approximated for the position scan: a
-# start character, then continue characters. The scan never decides
-# meaning — json5.loads already did — so an exotic Unicode key that
-# this misses costs positions on that subtree, never a wrong value.
+# A rough match for a JSON5 unquoted key (an ECMAScript IdentifierName):
+# one start character, then zero or more continue characters. This is
+# only used to find positions, not to decide what's valid — json5.loads
+# already parsed the key — so an exotic Unicode key this pattern misses
+# just means no position is recorded for it; the value is unaffected.
 _IDENT_START = re.compile(r"[$_A-Za-z]")
 _IDENT_CONTINUE = re.compile(r"[$_A-Za-z0-9]")
 
-# One rule id for every refusal this module raises: the document is
-# not legal JSON5 under Reliquary's value-model constraint (D102).
+# The rule id used for every error this module raises: the document
+# either isn't valid JSON5, or it breaks Reliquary's rule against
+# non-finite numbers (D102).
 _RULE = "blueprint.json5"
 
 
 class PositionedDict(dict):
     """A JSON object that remembers where each of its members was written.
 
-    ``positions`` maps a member's key to the ``(line, column)`` of that
-    key's own token -- the field name, not its value, because a
-    blueprint diagnostic names a field and a caret under the name is
-    what reads. ``position`` is the object's own opening brace.
+    ``positions`` maps each member's key to the ``(line, column)`` of
+    the key itself, not its value — a blueprint error names a field,
+    and pointing at the field's name is what makes the error easy to
+    find in the source. ``position`` is the ``(line, column)`` of the
+    object's own opening brace.
 
-    It is a ``dict`` in every other respect, so a consumer that does not
-    know about positions -- the JSON schema validator, ``json.dumps``,
-    an equality assertion -- sees no difference.
+    Otherwise this behaves exactly like a plain ``dict``, so code that
+    doesn't know about positions — the JSON schema validator,
+    ``json.dumps``, an equality check — sees no difference.
     """
 
     __slots__ = ("positions", "position")
@@ -81,8 +85,9 @@ class PositionedDict(dict):
 class PositionedList(list):
     """A JSON array that remembers where each element was written.
 
-    ``positions`` maps an element's index to its ``(line, column)``;
-    ``position`` is the array's own opening bracket.
+    ``positions`` maps each element's index to its ``(line, column)``;
+    ``position`` is the ``(line, column)`` of the array's own opening
+    bracket.
     """
 
     __slots__ = ("positions", "position")
@@ -96,10 +101,11 @@ class PositionedList(list):
 def position_of(node, key):
     """The ``(line, column)`` of ``key`` within ``node``, or ``None``.
 
-    Tolerant by design: a plain ``dict`` or ``list`` -- what every
-    caller that did not ask for positions holds, and what the public
-    ``parse_document`` is handed when someone passes a value rather
-    than a path -- has none, and answers ``None`` rather than raising.
+    Deliberately tolerant: a plain ``dict`` or ``list`` has no
+    position data at all. That's what any caller who didn't pass
+    ``positions=True`` gets back, and it's also what ``parse_document``
+    receives when it's given an already-parsed value instead of a file
+    path. In both cases this returns ``None`` instead of raising.
     """
     positions = getattr(node, "positions", None)
     if positions is None:
@@ -115,21 +121,24 @@ def position(node):
 def loads(s, *, positions=False):
     """Load a JSON5 string.
 
-    A document that does not parse is a STATIC ERROR: the text alone
-    settles it, and the caller wrote the text. ``ValueError`` from
-    the JSON5 reader would otherwise escape as a bare exception and
-    report as reliquary's own fault (exit 1) rather than the author's
-    mistake. Its message carries the line and column, so it is kept
-    verbatim when present.
+    A document that fails to parse is treated as a STATIC ERROR: it's
+    the author's mistake, not Reliquary's, since the text alone
+    determines whether it's valid JSON5. Without this, a ``ValueError``
+    from the JSON5 library would escape as a bare exception and look
+    like a bug in Reliquary itself (exit code 1). The library's error
+    message already includes the line and column, so that text is kept
+    verbatim when it's present.
 
-    With ``positions``, objects and arrays come back as
-    :class:`PositionedDict` and :class:`PositionedList`, each carrying
-    the source position of its members.
+    With ``positions=True``, objects and arrays come back as
+    :class:`PositionedDict` and :class:`PositionedList` instead of
+    plain ``dict``/``list``, each recording where its members were
+    written in the source.
     """
-    # Replace comments with spaces of the same length so line/column
-    # numbers stay exact for both the JSON5 parse and the position
-    # scan. Strings — double- and single-quoted — are left alone so a
-    # "//" inside one is not mistaken for a comment.
+    # Replace comments with spaces of the same length, so line and
+    # column numbers stay correct for both the JSON5 parse below and
+    # the position scan later. Quoted strings (both "..." and '...')
+    # are left untouched, so a "//" inside a string isn't mistaken for
+    # the start of a comment.
     s = _blank_comments(s)
 
     try:
@@ -153,8 +162,10 @@ def loads(s, *, positions=False):
     _reject_nonfinite(value)
     if not positions:
         return value
-    # Both passes ran over the same blanked text, so the scan's offsets
-    # are the original file's: that is what comment blanking bought.
+    # Both the JSON5 parse and this scan ran over the same
+    # comment-blanked text, so the scan's line/column numbers match
+    # the original file. That's the whole reason comments were
+    # blanked instead of removed.
     return _attach(value, _Scanner(s).scan())
 
 
@@ -172,11 +183,13 @@ def _refuse_nonfinite(token):
 
 
 def _reject_nonfinite(value):
-    """Refuse any non-finite float that reached the value tree.
+    """Raise an error if a non-finite float made it into the value tree.
 
-    ``parse_constant`` catches the JSON5 spellings; this walk is the
-    belt for anything that arrived some other way (a custom hook, a
-    future library change) so the invariant stays fail-closed.
+    ``_refuse_nonfinite`` (the ``parse_constant`` hook) already catches
+    the JSON5 spellings like ``NaN``. This walk is a second check, in
+    case a non-finite value reaches the tree some other way — a custom
+    hook, or a future change to the json5 library — so the "no
+    non-finite numbers" rule still holds even then.
     """
     if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
         raise StaticError(
@@ -212,12 +225,13 @@ def _blank_comments(text):
 
 
 class _Node:
-    """One value's position, and its members' if it has any.
+    """One value's position, plus its members' positions if it has any.
 
-    ``keys`` holds an object member's *key* position, kept apart from
-    the member's own ``position`` because the two answer different
-    questions: a diagnostic about a field wants the name it was written
-    under, and one about the object that field holds wants its brace.
+    ``keys`` holds the position of an object member's *key*, kept
+    separate from that member's own ``position`` because they answer
+    different questions: an error about a field should point at the
+    field's name, while an error about the object that field holds
+    should point at that object's opening brace.
     """
 
     __slots__ = ("position", "members", "keys")
@@ -229,16 +243,17 @@ class _Node:
 
 
 class _Scanner:
-    """A structure-only walk recording where each value was written.
+    """Walks the text once, recording where each value was written.
 
-    It reads the shape and nothing else: strings are skipped
-    escape-aware so a brace inside one cannot be mistaken for
-    structure, unquoted keys are read as identifier runs, and every
-    other scalar is skipped as an opaque run up to the next delimiter.
-    Malformed text is not this pass's business -- ``json5.loads`` has
-    already accepted the document by the time it runs -- so it stops
-    at the first thing it cannot read and reports the positions it did
-    find.
+    It only reads the shape of the document, nothing else: strings are
+    skipped in an escape-aware way, so a brace inside a string isn't
+    mistaken for structure; unquoted keys are read as identifier runs;
+    and every other scalar (numbers, ``true``/``false``/``null``) is
+    just skipped up to the next delimiter. This scanner isn't
+    responsible for catching malformed text — ``json5.loads`` has
+    already accepted the document by the time this runs — so if it
+    hits something it can't read, it just stops and returns the
+    positions it found up to that point.
     """
 
     def __init__(self, text):
@@ -306,7 +321,7 @@ class _Scanner:
             return node
         while True:
             self._space()
-            if self._peek() == "}":        # a trailing comma, blanked
+            if self._peek() == "}":        # trailing comma: stop, no more members
                 break
             key_at = self._here()
             key = self._key()
@@ -339,7 +354,7 @@ class _Scanner:
         index = 0
         while True:
             self._space()
-            if self._peek() == "]":        # a trailing comma, blanked
+            if self._peek() == "]":        # trailing comma: stop, no more elements
                 break
             node.members[index] = self._value()
             index += 1
@@ -379,16 +394,18 @@ class _Scanner:
         while True:
             char = self._peek()
             if char == "\\":
-                # JSON5 allows a line continuation: backslash + newline
-                # is one escape, so step both. Any other escape is two
-                # characters the same way.
+                # JSON5 allows a line continuation (backslash followed
+                # by a newline), which counts as one escape, so step
+                # past both characters. Every other escape is also two
+                # characters, so the same step works.
                 self._step(2)
                 continue
             self._step()
             if char == quote:
                 break
-        # json5 decodes the escapes, so a key with one still matches
-        # the key json5.loads produced. Use it on the slice alone.
+        # Reuse json5.loads to decode the escapes in this slice, so a
+        # key containing an escape still comes out identical to the
+        # key json5.loads produced when it parsed the whole document.
         return json5.loads(self.text[start:self.index])
 
     def _scalar(self):
@@ -398,14 +415,16 @@ class _Scanner:
 
 
 class _Unreadable(Exception):
-    """The scan met something it could not read; positions stop here."""
+    """Raised when the scan hits something it can't read; positions stop there."""
 
 
 def _attach(value, node):
-    """Rebuild ``value``'s containers as positioned ones, in lockstep.
+    """Walk ``value`` and ``node`` together, rebuilding dicts and lists
+    as ``PositionedDict``/``PositionedList``.
 
-    A subtree whose shape does not match the scan keeps its plain
-    containers, so a disagreement costs positions and never truth.
+    If a subtree's shape doesn't match what the scanner found, that
+    subtree keeps its plain ``dict``/``list`` instead. So a mismatch
+    only means missing positions there — it never changes a value.
     """
     if node is None or node.members is None:
         return value

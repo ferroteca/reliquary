@@ -60,11 +60,12 @@ _ECHO_LOOKALIKE = (
     r"C:\>TYPE C:\ECHOLIKE.TXT",
 )
 
-#: The screens worth capturing, and every one of them is a screen a
-#: real guest draws rather than a defect staged for the camera. What
-#: the layer *does* with each is what the fixture pins — the right
-#: answer where it manages one, and the wrong answer where it does
-#: not, so that closing the gap retires the fixture loudly.
+#: The screens worth capturing here are all screens a real guest
+#: actually draws, not a staged defect. What the layer *does* with
+#: each one is what the fixture pins down — the right answer where
+#: the layer handles it correctly, and the wrong answer where it
+#: doesn't — so that once the gap is closed, the fixture starts
+#: failing loudly instead of staying silently out of date.
 _HAZARDS = (
     # An 85-column command wraps its echo across two rows, so no row
     # *ends* with it.
@@ -96,10 +97,11 @@ def _plant_echo_lookalike(home, machine_id):
     beyond the one this whole tier is about.
 
     The Ctrl-Z that ends `COPY CON` goes through `resolve_key`
-    because this is the **carrier** seam, whose vocabulary is the
-    backend's qcode set: a combo is a *list* of those names, and the
-    language's own `ctrl+z` spelling reaches QEMU as a key literally
-    named `+` (D103's three layers, entered at the wrong one).
+    because this goes over the **carrier** seam, whose key names are
+    QEMU's own qcode set: a key combo is a *list* of those names, and
+    the ordinary `ctrl+z` spelling reaches QEMU as a key literally
+    named `+` (D103 describes the three layers this can be entered
+    at, and this is the wrong one).
     """
     machine = Machine(machine_dir_path(machine_id, home))
     machine.send_text(r"COPY CON C:\ECHOLIKE.TXT")
@@ -109,17 +111,20 @@ def _plant_echo_lookalike(home, machine_id):
 
 
 def _capture_exec(home, machine_id, name, command, timeout):
-    """Run one command through the exec adapter, recording the seam.
+    """Run one command through the exec adapter, recording the
+    transcript.
 
-    `machines.exec` builds its own machine handle, so a capture is
-    taken by standing the adapter on one that carries the recorder —
-    the same seam `--record` wraps for a script, reached without
-    putting a flag on a surface for a fixture's sake.
+    `machines.exec` normally builds its own machine handle internally.
+    To capture a transcript here, this instead builds the handle
+    itself with the recorder wired into its session — the same
+    mechanism `--record` uses for a script, without adding a CLI flag
+    just for this fixture's sake.
 
-    **The conclusion is written here** because the seam cannot show
-    it: which rows the adapter called the output, or which refusal it
-    raised, is decided above the carrier and two different answers
-    make the same file.
+    **The final outcome is written explicitly here** because the raw
+    transcript alone cannot show it: which rows the adapter decided
+    counted as output, or which error it raised, is decided above the
+    low-level session, and a success and a failure could otherwise
+    produce the same-looking transcript file.
     """
     path = _capture(home, f"exec-{name}")
     writer = _TranscriptWriter(path, pace=None, command=command,
@@ -173,9 +178,9 @@ def test_freedos_plain_install_and_verify(integration_home):
         assert verified.machine_id == installed.machine_id
 
         # The handoff: the codex's readiness example leaves the
-        # machine running with `ready` set, and `--expect` contracts
-        # the run on it in one call rather than reading the variable
-        # back in a second.
+        # machine running with `ready` set, and `--expect` checks
+        # that condition as part of this same call, instead of a
+        # second call to read the variable back afterward.
         handed_off = run_script("ready", blueprint="freedos",
                                 context=home,
                                 expect={"ready": "yes"},

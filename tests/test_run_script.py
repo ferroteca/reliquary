@@ -77,12 +77,12 @@ def test_rejects_rlqs_suffix():
 
 # The label map is the blueprint's, read at invocation.
 #
-# A script label names *which instructions to run*, not what the
-# machine is, so it belongs with `parameters` on the live-read side of
-# the instance model rather than in the machine's shape baseline —
-# cli.md resolves a label against "the blueprint's `scripts` map", and
-# the U5 record has parameters read at invocation "like the scripts
-# map".
+# A script label names which instructions to run, not what the
+# machine is. So it belongs with `parameters`, which are read fresh
+# each time a script runs, rather than with the fixed shape the
+# machine was created with. cli.md resolves a label against "the
+# blueprint's `scripts` map", and the U5 record says parameters are
+# read at invocation "like the scripts map".
 
 @pytest.fixture
 def label_home(home):
@@ -298,11 +298,11 @@ def test_expect_fails_when_the_value_differs(wiring_home):
 
 
 def test_expect_fails_when_the_script_never_set_it(wiring_home):
-    """The silence this exists to break.
+    """`expect` catches a script that never reaches its `set`.
 
-    An unset variable and a machine that never ran read alike, so
-    without a contract a script that failed to reach its `set` is
-    indistinguishable from one that never had one.
+    An unset variable and a machine that never ran look the same, so
+    without a contract there is no way to tell a script that failed
+    to reach its `set` from one that never had a `set` at all.
     """
     with pytest.raises(RunFailure) as caught:
         _run_setting(wiring_home, None, None, expect={"ready": "yes"})
@@ -318,7 +318,7 @@ def test_expect_is_refused_on_a_dry_run(wiring_home):
 
 
 def test_no_expect_reads_no_variable(wiring_home):
-    """The default path pays nothing: no contract, no read."""
+    """Without `expect`, no variable is read at all."""
     with mock.patch("reliquary.machines.get_machine_var") as read:
         _run_setting(wiring_home, "ready", "yes")
     read.assert_not_called()
@@ -402,8 +402,9 @@ def test_cli_run_script_invokes_runtime_end_to_end(wiring_home):
         machine=None,
         display=False,
         properties=None,
-        # No properties_file: the selection rides in the record
-        # the session was opened on (P26's cargo), not per call.
+        # No properties_file: the Session already resolved which
+        # properties file to use when it was opened (P26), so
+        # run_script does not take one per call.
         progress="auto",
         dry_run=False,
         # No --expect given, so no contract: the CLI passes the
@@ -413,8 +414,9 @@ def test_cli_run_script_invokes_runtime_end_to_end(wiring_home):
         expect=None,
         record=None,
     )
-    # A stream-bearing command's human modes leave stdout empty:
-    # the outcome travels by exit code.
+    # For a command whose output is an event stream, the human-readable
+    # progress modes leave stdout empty: the outcome is reported
+    # through the exit code instead.
     assert stdout.getvalue() == ""
 
 
@@ -543,14 +545,16 @@ def test_the_runner_installs_the_recorder_through_construction(tmp_path):
 
 
 def _poll_gaps(tmp_path, **recording):
-    """Every interval a run waiting on a screen that never arrives slept."""
+    """Run a script that waits on a screen that never appears, and return the intervals it slept between polls."""
     home = str(tmp_path)
     machine_home = os.path.join(home, "machine")
     os.makedirs(machine_home)
-    # A clock of its own rather than the replay harness's: there, time
-    # is the transcript's and a sleep costs nothing, while what is
-    # measured here is a *live* run's cadence, where it is the whole
-    # of what passes between two samples.
+    # This test uses its own fake clock instead of the replay
+    # harness's. In the replay harness, time comes from the
+    # transcript and a sleep costs nothing. Here, what is being
+    # measured is the actual interval between polls in a live run, so
+    # the fake sleep has to advance the clock by the amount it was
+    # asked to sleep.
     now = [0.0]
     slept = []
 
@@ -588,15 +592,18 @@ def _poll_gaps(tmp_path, **recording):
 
 
 def test_a_recorded_run_polls_at_the_pace_it_records(tmp_path):
-    """The pace has to make the run sample harder, or it does nothing.
+    """`--record` must shorten the poll interval, or it captures nothing extra.
 
-    `--record` drives the interpretation layer's own poll clocks
-    because QEMU admits one QMP client and an independent sampler
-    cannot exist — so the pace is a *ceiling* on the interval, not a
-    floor. Taking the larger of the two left the idle poll at its
-    production 2.0s, which is the two-second hole through most of an
-    install that the whole mechanism exists to close: the first real
-    capture held 536 samples across five and a half minutes.
+    `--record` sets the poll interval used while a script waits on a
+    screen, because QEMU allows only one QMP client at a time, so
+    there can be no separate, independent sampler process. The record
+    pace is an upper bound on that interval, not a lower one. A bug
+    once took the larger of the record pace and the normal poll
+    interval, which left polling at its normal production interval of
+    2.0 seconds — the same two-second gap through most of an install
+    that this recording mechanism exists to close. Once fixed, the
+    first real capture held 536 samples across five and a half
+    minutes.
     """
     recorded = _poll_gaps(tmp_path, record_pace=0.25)
     assert max(recorded) <= 0.25, (
@@ -607,14 +614,15 @@ def test_a_recorded_run_polls_at_the_pace_it_records(tmp_path):
 
 
 def test_a_recorded_run_names_the_script_in_its_header(tmp_path):
-    """A capture says what it is a capture of, and against which text.
+    """A recorded transcript's header names the script it was recorded from, and its digest.
 
-    The corpus replays a fixture by standing the same script back up
-    over it, so the file has to carry which script that was — nothing
-    else in the directory knows. The digest is the other half: a
-    script edited since the capture was taken diverges partway
-    through, and naming the staleness beats a keystroke mismatch
-    reported from the middle of a run.
+    The corpus replays a fixture by running the same script against
+    it again, so the recorded file has to say which script that was —
+    nothing else in the directory records it. The digest catches the
+    other case: if the script was edited since the capture was taken,
+    replay would otherwise diverge partway through and report a
+    confusing keystroke mismatch from the middle of a run, instead of
+    being told plainly that the script is stale.
     """
     home = str(tmp_path)
     machine_home = os.path.join(home, "machine")
@@ -642,13 +650,14 @@ def test_a_recorded_run_names_the_script_in_its_header(tmp_path):
 
 
 def test_a_recorded_run_states_what_it_concluded(tmp_path):
-    """The half a capture cannot show, said once at the end.
+    """A recorded transcript's trailer states how the run ended, not just what it did.
 
-    Two runs over the same screens — one that reached its `finish`,
-    one that expired waiting — make the same carrier calls, so the
-    file is the same file and only the conclusion differs. A replay
-    is asserted against this, which is what makes a capture of a run
-    that failed a fixture like any other.
+    Two runs over the same screens can make exactly the same backend
+    calls and produce the same file up to that point — one that
+    reaches its `finish`, one that times out waiting — and only the
+    final outcome differs. The trailer records that outcome
+    explicitly, so replay can check a fixture the same way whether
+    the original run succeeded or failed.
     """
     home = str(tmp_path)
     machine_home = os.path.join(home, "machine")
@@ -675,12 +684,12 @@ def test_a_recorded_run_states_what_it_concluded(tmp_path):
 
 
 def _recording_engine(tmp_path, script_text):
-    """An engine over a running machine, recording to its own file.
+    """Build an engine over a running machine, recording to its own file.
 
-    Driven a verb at a time rather than through `run()`, following the
-    sibling test above: what is under test is which handle a carrier
-    call goes through, and the lifecycle around it says nothing about
-    that.
+    Tests using this drive one verb at a time directly, instead of
+    calling `run()`, the way the test above does: what they check is
+    which session object a backend call is routed through, and
+    running the full script lifecycle would not affect that.
     """
     home = str(tmp_path)
     machine_home = os.path.join(home, "machine")
@@ -709,13 +718,13 @@ def _entries(path):
 
 
 def test_the_screenshot_verb_records_its_carrier_call(tmp_path):
-    """A screenshot is a carrier call, so the transcript carries it.
+    """The transcript records screenshot calls to the backend.
 
-    `screenshot` built its own `Machine` and so never got the
-    recording wrapper the console is given, which made it the one
-    carrier call a capture silently dropped — and both codex scripts
-    take one, so it was every capture. A replay then meets a call the
-    transcript cannot answer.
+    `screenshot` used to build its own `Machine` object instead of
+    using the one wrapped for recording, so it was the one backend
+    call a capture silently missed. Both codex scripts call
+    `screenshot`, so every capture had this gap. On replay, the
+    transcript has no recorded answer for that call.
     """
     engine, script, writer, target = _recording_engine(
         tmp_path,
@@ -732,13 +741,14 @@ def test_the_screenshot_verb_records_its_carrier_call(tmp_path):
 
 
 def test_a_vanished_vm_is_recorded_as_the_carrier_going_away(tmp_path):
-    """The moment the machine stops is the seam's, and it is recorded.
+    """The transcript records a VM going away, even though this happens before the recording wrapper is normally attached.
 
-    Identity is verified while the session is being opened, so an
-    unreachable VM raises *before* the recording wrapper exists and
-    the seam cannot record its own disappearance. Both codex scripts
-    end on `wait machine=stopped`, which is answered by exactly this
-    failure — a capture that loses it is one no replay can finish.
+    Whether the VM is still reachable is checked while the session is
+    being opened, so an unreachable VM raises before the recording
+    wrapper exists, and normally nothing would record it. Both codex
+    scripts end on `wait machine=stopped`, so this is exactly the
+    failure they hit when the VM shuts itself down — if a capture
+    missed it, no replay of that capture could finish.
     """
     engine, _script, writer, target = _recording_engine(
         tmp_path, 'platform dos\nentry only\nphase only {\n'

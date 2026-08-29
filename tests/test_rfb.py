@@ -1,13 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The in-tree RFB client against a fake server at the socket seam.
+"""Tests for the in-tree RFB client, run against a fake server instead of a real hypervisor.
 
-No hypervisor: the server is a scripted loopback socket, so every
-case here is about the wire — the 3.8 handshake, the forced pixel
-format, Raw-only updates full and incremental, and key events. The
-one composition case reads a golden framebuffer back through the
-shared recognizer, which is what proves the client's pixel format
-and the recognizer agree on what a framebuffer is.
+The fake server is a scripted loopback socket. These tests cover the
+wire protocol: the RFB 3.8 handshake, the forced pixel format, Raw-only
+updates (both full and incremental), and key events. One test reads a
+golden framebuffer back through the shared recognizer, to check that
+the client's pixel format and the recognizer agree on what a
+framebuffer looks like.
 """
 
 import socket
@@ -338,12 +338,12 @@ def test_the_probe_raises_oserror_while_nothing_listens():
 # -- the recognition composition -----------------------------------
 
 def test_a_golden_framebuffer_reads_back_through_the_recognizer():
-    """What `render` drew, the wire carries and `recognize` reads.
+    """Round-trip a text screen through render, the wire, and recognize.
 
-    The one end-to-end case: a text screen drawn with the shipped
-    fallback font, served as a Raw framebuffer, pulled through the
-    client, and recognized back — which is exactly the composition
-    the VNC plane's `text_screen` runs.
+    This is the one end-to-end test: a text screen drawn with the
+    shipped fallback font, served to the client as a Raw framebuffer,
+    and read back with the recognizer. It is the same composition the
+    VNC plane's `text_screen` runs.
     """
     rows = ["C:\\>DIR", "", " Volume in drive C is RELIQUARY"]
     image = text_recognize.render(rows)

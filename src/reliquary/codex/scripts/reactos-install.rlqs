@@ -6,14 +6,17 @@ platform    winnt
 machine     stopped
 timeout     30s
 
-# Deliberately this thin. ReactOS's text-mode setup paints its own
-# font, which the shared recognizer's font-bank library does not
-# cover the way it covers FreeDOS's (docs/spec's own "the guest's own
-# font is an authored asset" story, D109) -- a `wait "..."` here would
-# be a text condition over a screen the recognizer cannot actually
-# read, which is a named capability gap rather than a script bug.
-# Driving the rest is a caller's job, over the same raw-pixel carrier
-# `click`'s own search already reads (`session.framebuffer()`) rather
-# than the recognizer.
+# This script only inserts the ISO and boots — it doesn't drive the
+# rest of setup with `wait` statements, on purpose.
+#
+# Reliquary reads text off a screen by recognizing each character's
+# shape against a library of known fonts. ReactOS's text-mode setup
+# draws its own custom font, which isn't in that library, so
+# reliquary can't read this screen's text correctly (this is a real
+# limitation, not a bug in this script — see D109).
+#
+# Whoever drives the rest of the install has to work from raw screen
+# pixels instead of recognized text (the same way `click` finds
+# things on screen). See test_reactos_click_integration.py for how.
 insert cdrom0 @reactos-iso
 start

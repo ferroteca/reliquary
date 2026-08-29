@@ -51,12 +51,13 @@ class _Clock:
 class _FakeConsole:
     """A console over scripted screens, recording what it is sent."""
 
-    #: How many reads each scripted screen is held for. A screen is a
-    #: *state the guest displays*, not a single read: a guest waiting
-    #: at a prompt holds it, and the quiescence gate (F48) will only
-    #: judge a condition on a screen that has stopped changing. One
-    #: read per entry would mean every sample caught the guest
-    #: mid-redraw, which is the one thing a wait must not act on.
+    #: How many times each scripted screen is returned before the next
+    #: one takes over. A real guest holds a screen for as long as it is
+    #: in that state, not for a single read, and the quiescence gate
+    #: (F48) only judges a condition once a screen has stopped
+    #: changing. If each entry were returned only once, every sample
+    #: would look like the guest was still mid-redraw, which a wait
+    #: must never treat as a match.
     HOLD = 3
 
     def __init__(self, screens=(), fail=False, hold=HOLD, captures=()):
@@ -67,9 +68,9 @@ class _FakeConsole:
         self.keys = []
         self.reads = 0
         self._held = 0
-        #: Framebuffer captures a landmark condition is matched
-        #: against (F65), held for `hold` reads apiece exactly as the
-        #: text screens above are and for the same reason.
+        #: The framebuffer captures a landmark condition is matched
+        #: against (F65). Each one is held for `hold` reads, the same
+        #: as the text screens above, and for the same reason.
         self.captures = list(captures)
         self.grabs = 0
         self._grabs_held = 0
@@ -77,10 +78,11 @@ class _FakeConsole:
     def screen_text(self):
         self.reads += 1
         if self.fail:
-            # A carrier whose transport died mid-session: the raw
-            # error reaches the runner, which reads it as the stopped
-            # observation. The adapter's own converted diagnostic is
-            # covered by the unreachable-VM test below.
+            # Simulates the connection to the guest dying mid-session.
+            # The raw error reaches the runner, which reads it as the
+            # machine having stopped. The unreachable-VM test below
+            # covers the case where the backend converts this into its
+            # own diagnostic first.
             raise ConnectionError("machine is gone")
         if not self.screens:
             return []
@@ -93,13 +95,13 @@ class _FakeConsole:
         return current
 
     def screen(self, font_banks=()):
-        """The same screens, as the seam's (rows, attributes) pair.
+        """The same screens, returned as a (rows, attributes) pair.
 
-        These scripts say what the guest displayed; the attribute half
-        is uniform because nothing here turns on a highlight, and a
-        screen that stops changing therefore reads as settled.
-        ``font_banks`` (F61) is accepted and ignored: nothing here
-        recognizes pixels to read a font prefix through.
+        The scripted rows are what the guest displayed. The attributes
+        are uniform because nothing here highlights text, so a screen
+        that stops changing reads as settled. ``font_banks`` (F61) is
+        accepted and ignored — nothing here recognizes pixels, so
+        there is no font prefix to read from them.
         """
         rows = self.screen_text()
         return rows, [[0x07] * 80 for _ in range(len(rows))]
@@ -224,7 +226,7 @@ def test_a_row_normalizes_its_whitespace():
 
 @pytest.mark.parametrize("name", sorted(PORTABLE_KEY_NAMES))
 def test_every_portable_key_name_resolves(name):
-    """One node per key, so a name the seam stopped mapping is named."""
+    """One test per key name, so a name that stops resolving is called out by that name, not lost inside a combined check."""
     assert resolve_key(name)
 
 
@@ -254,9 +256,9 @@ def test_a_screen_condition_matches_a_normalized_row(runtime):
     engine = runtime.engine('wait "Hello World"\n',
                             screens=[["", "  Hello   World  "]])
     runtime.run_linear(engine)
-    # Matched on the first *settled* sample. Establishing
-    # quiescence costs the window before any condition is judged
-    # (F48), which is the guard's stated price.
+    # Matches on the first settled sample. Reaching quiescence costs
+    # the whole window before any condition is even judged (F48) —
+    # that delay is the known cost of the guard.
     assert runtime.console.reads == 3
 
 
@@ -270,8 +272,8 @@ def test_a_condition_is_matched_only_at_a_fresh_sample(runtime):
     engine = runtime.engine('wait "second"\n',
                             screens=[["first"], ["second"]])
     runtime.run_linear(engine)
-    # Each screen is a state the guest holds, and each is judged
-    # only once it has settled.
+    # Each screen is a state the guest holds, and each one is judged
+    # only after it has settled.
     assert runtime.console.reads == 6
 
 
@@ -287,18 +289,18 @@ def test_a_timeout_names_the_clock_and_its_source_scope(runtime):
 
 
 def test_a_timeout_cannot_expire_before_one_sample(runtime):
-    # "A timeout always means samples were taken and none
-    # satisfied the condition, never no one looked" -- so a
-    # bound already elapsed still gets its sample, and a
-    # condition holding there succeeds.
+    # A timeout must mean samples were taken and none satisfied the
+    # condition — never that no one looked. So even if the timeout
+    # has already elapsed by the time the wait starts, it still gets
+    # one sample, and a condition that holds on that sample succeeds.
     engine = runtime.engine('timeout 1ms\nwait "ready"\n',
                             screens=[["ready"]])
     runtime.clock.now = 60.0
     runtime.run_linear(engine)
-    # And the quiescence gate cannot break that rule: it delays
-    # acceptance but never causes a failure by itself, so an
-    # already-elapsed bound still evaluates what is on screen
-    # rather than expiring on a sample nobody was allowed to read.
+    # The quiescence gate cannot break that rule either: it can delay
+    # acceptance, but it never causes a failure by itself. So even
+    # with the timeout already elapsed, the wait still evaluates what
+    # is on screen instead of expiring before reading a sample.
     assert runtime.console.reads == 2
 
 
@@ -315,9 +317,10 @@ def test_stable_requires_the_episode_to_hold(runtime):
     engine = runtime.engine('wait "ready" stable=4s\n',
                             screens=[["ready"]])
     runtime.run_linear(engine)
-    # One *settled* sample arms the episode; the hold is satisfied
-    # only once its age reaches the duration. The extra reads are
-    # the quiescence window, paid before the episode starts.
+    # One settled sample starts the stability timer; `stable` is
+    # satisfied only once that timer reaches the requested duration.
+    # The extra reads are the quiescence window, spent before the
+    # timer starts.
     assert runtime.console.reads == 5
 
 
@@ -326,8 +329,8 @@ def test_an_interrupted_episode_restarts_the_hold(runtime):
         'wait "ready" stable=2s\n',
         screens=[["ready"], ["busy"], ["ready"], ["ready"]])
     runtime.run_linear(engine)
-    # "busy" ends the episode and the hold starts over, each state
-    # judged once it has settled.
+    # "busy" breaks the stable streak and the timer restarts. Each
+    # state is judged only once it has settled.
     assert runtime.console.reads == 10
 
 
@@ -341,9 +344,10 @@ def test_a_machine_condition_observes_the_backend(runtime):
 
 
 def test_an_unreachable_vm_runtime_error_is_stopped(runtime):
-    # Production path: the adapter reports an unreachable VM as a
-    # PREFLIGHT ERROR naming its rule. That must still count as
-    # the stopped sample (not escape the wait).
+    # In production, the backend adapter reports an unreachable VM by
+    # raising PreflightError with its rule id. That error must still
+    # be read as the "machine stopped" sample, not let escape the
+    # wait unhandled.
     engine = runtime.engine("wait machine=stopped\n")
 
     @contextlib.contextmanager
@@ -555,10 +559,10 @@ def test_a_click_on_a_landmark_that_never_appears_delivers_nothing(
 
 
 def test_a_click_pays_the_pacing_gap_before_delivery(runtime, tmp_path):
-    # The fake clock only advances on a sleep, and the search itself
-    # burns a little polling the screen to quiescence before the
-    # (much larger) explicit pacing gap is paid — so this proves the
-    # gap was honored without pinning the search's own overhead.
+    # The fake clock only advances on a sleep. The search itself
+    # spends a little time polling the screen to quiescence before the
+    # much larger, explicit pacing gap is paid. This checks that the
+    # gap was honored without pinning down the search's own overhead.
     declaration = _landmark(tmp_path, spots={"only": {"x": 4, "y": 4}})
     capture = Image.new("RGB", (16, 8), (10, 20, 30))
     engine = runtime.engine(
@@ -615,8 +619,9 @@ def test_an_unreadable_text_screen_does_not_lose_the_capture(runtime,
 
 
 def test_a_landmark_wait_judges_only_settled_captures(runtime, tmp_path):
-    # The gate's contract one grain finer: a capture still changing is
-    # not one a condition is judged on, so the wait keeps looking.
+    # A finer check on the same rule: a capture that is still changing
+    # is not one a condition gets judged against, so the wait keeps
+    # looking.
     declaration = _landmark(tmp_path)
     right = Image.new("RGB", (16, 8), (10, 20, 30))
     engine = runtime.engine(
@@ -710,16 +715,16 @@ def test_a_handler_condition_may_name_a_channel(runtime):
 # A condition is judged only on a settled screen (F48).
 
 def _painting(count=80):
-    """Screens where the awaited text sits on a moving screen.
+    """Screens where the awaited text appears while the screen is still being redrawn.
 
-    Output arrives into a *different* row each frame, which is
-    what makes this content rather than decoration: cells that
-    churn in place recur, and recurrence is precisely what the
-    animation mask exists to set aside (a spinner has no bearing
-    on whether the awaited text is really on screen). A row here
-    is rewritten only every twenty frames — outside the animation
-    window — so nothing is ever masked and the screen is honestly
-    still being drawn.
+    Each frame writes to a different row, not the same row over and
+    over. That matters because the recognizer's animation mask ignores
+    cells that keep changing in the same spot, like a spinner — a
+    spinner says nothing about whether the awaited text is really on
+    screen. Because each row here is rewritten only once every twenty
+    frames, well outside the animation mask's window, nothing gets
+    masked, and the screen genuinely still looks like it is being
+    drawn.
     """
     frames = []
     for step in range(count):
@@ -755,9 +760,9 @@ def test_the_gate_names_itself_when_the_wait_expires(runtime):
 
 
 def test_stability_zero_turns_the_guard_off(runtime):
-    # the escape for a screen the default would refuse, and it
-    # must cost nothing at all — not even the window that
-    # establishing quiescence would otherwise take
+    # `stability=0` is how to bypass the check for a screen the
+    # default would otherwise refuse, and it must cost nothing at
+    # all — not even the delay of the quiescence window
     engine = runtime.engine("timeout 3s\nwait \"ready\" stability=0\n",
                             screens=_painting(), hold=1)
 
@@ -1859,8 +1864,8 @@ def test_a_script_watching_no_landmark_asks_the_plane_nothing(preflight):
     assert resolved.landmarks == {}
 
 
-# `click` preflight (F66): the three refusals its own entry names,
-# beside the three landmark ones above it shares with `wait`.
+# `click` preflight (F66) adds three refusals of its own, on top of
+# the three landmark refusals it shares with `wait`, tested above.
 
 def test_a_click_needs_the_tablet_pointing_device(preflight):
     # The default is `mouse` (the stock relative device every
@@ -2036,8 +2041,8 @@ def test_a_stopped_script_starts_the_machine_itself(preflight):
 
 # Ctrl-C asks once, then insists.
 #
-# The graceful stop is a promise, not a trap: a stop that will not
-# land must still have a way out that is not killing the terminal.
+# The graceful stop must not become a trap: if it never lands, the
+# user still needs a way out other than killing the terminal.
 
 class _AskableEngine:
     """The two members ``_cancel_on_interrupt`` uses."""
@@ -2080,9 +2085,10 @@ def test_the_previous_handler_is_restored():
 
 # Scoped machine-state changes — the `with` block (F54).
 #
-# The construct's whole claim is that the scope undoes itself on every
-# outcome, so what these drive is the *pairing*: what entry applied
-# and what exit put back, over a machine layer that records its calls.
+# The whole promise of `with` is that it undoes its change no matter
+# how the block ends. These tests check that pairing directly: what
+# change entering the block applies, and what change leaving it puts
+# back — using a fake machine layer that records every call it gets.
 
 _SCOPED_MACHINE = {
     "phase": "ready",
@@ -2093,12 +2099,15 @@ _SCOPED_MACHINE = {
 
 
 class _ScopedRun:
-    """A whole run over a machine layer that answers and records.
+    """A stand-in for a whole run, against a fake machine layer that both answers reads and records calls.
 
-    The double **applies** what it is told, because a scope reads the
-    machine twice — once to capture and once to decide what putting a
-    slot back involves — and a state frozen between those two reads
-    would answer the second question with the first one's world.
+    This fake actually applies every change it is given, instead of
+    only recording it, because a scope reads machine state twice: once
+    on entry, to capture what to restore later, and once on exit, to
+    work out what putting a slot back means. If the state stayed
+    frozen between those two reads, the exit read would answer with
+    the state from before entry, not the state the run actually left
+    behind.
     """
 
     def __init__(self, machines, state):
@@ -2127,11 +2136,12 @@ class _ScopedRun:
 
 @contextlib.contextmanager
 def _scoped(source, state=None, machine="freedos-0", screens=None):
-    """Run a script whole against a recording machine layer.
+    """Run a whole script against a machine layer that records every call.
 
-    ``screens`` gives the run a console, for the scripts whose route
-    is the guest's to choose — which is the only kind that can reach a
-    scope exit V17 could not rule on.
+    ``screens`` gives the run a console, needed only for scripts where
+    the guest's own behavior decides which route is taken — the only
+    kind of script that can reach a scope exit whose outcome V17's
+    static check could not determine ahead of time.
     """
     script = parse_script(source)
     with mock.patch("reliquary.script_runner._machines") as machines:
@@ -2188,11 +2198,13 @@ def test_the_exit_returns_the_target_to_what_it_held_on_entry():
 
 
 def test_a_goto_inside_the_group_neither_restores_nor_reapplies():
-    """The scope holds while control is inside it, and no longer.
+    """The scope stays open while execution is inside it, and no longer.
 
-    Every phase body ends in a transition, so a scope that closed at
-    each one would express nothing — which is why the reading is
-    dynamic rather than lexical (D104).
+    Every phase body ends by transitioning somewhere else, so a scope
+    that closed at the end of each phase's text would never cover
+    anything. That is why membership in the scope is decided by which
+    phase is currently running, not by which lines are inside the
+    braces (D104).
     """
     with _scoped("platform dos\nmachine stopped\nentry a\n"
                  "with boot cdrom0 {\n"
@@ -2217,8 +2229,9 @@ def test_leaving_the_group_restores_and_returning_reapplies():
 
 
 def test_a_failure_inside_the_scope_still_restores_and_says_so():
-    """What the author gave up by scoping is the state a
-    diagnostician would have found, so the report has to name it."""
+    """Scoping the change means the state left behind is not the state
+    the script set — it gets restored — so the failure report has to
+    say what it was restored to."""
     with _scoped("platform dos\nmachine stopped\nentry a\n"
                  "with boot cdrom0 {\n    phase a {\n"
                  '        wait "never" timeout=1ms\n        finish\n'
@@ -2231,8 +2244,9 @@ def test_a_failure_inside_the_scope_still_restores_and_says_so():
 
 
 def test_a_cancellation_restores_and_the_message_says_so():
-    """A cancellation leaves the machine as it stands — and a scope is
-    the one thing that does not, so the message names it."""
+    """A cancellation normally leaves the machine as it stands. A
+    scoped change is the one thing that still gets undone, so the
+    cancellation message has to say so."""
     with _scoped("platform dos\nmachine stopped\nentry a\n"
                  "with boot cdrom0 {\n    phase a {\n"
                  "        screenshot one\n        screenshot two\n"
@@ -2247,19 +2261,23 @@ def test_a_cancellation_restores_and_the_message_says_so():
 
 
 def test_a_boot_restore_reached_running_fails_the_run_naming_it():
-    """The cost D104 weighed and accepted, and what V17 cannot take.
+    """The cost D104 accepted, and the case V17 cannot catch ahead of time.
 
-    A boot order is stopped-only as a property of the machine, and a
-    restore is not exempted from it: a second writer under a different
-    rule is how such a guarantee erodes. So a run that hands back a
-    live machine fails at its last act, saying what it could not undo.
+    A boot order can only be changed while the machine is stopped, and
+    a restore is not an exception to that rule. If it were, that would
+    open a second path for changing the boot order while the machine
+    is running, undermining the "stopped only" guarantee. So a run
+    that ends with the machine still running fails at its very last
+    step, reporting the boot order it could not restore.
 
-    **The route here is the guest's**, which is the whole reason this
-    check still exists at run time. V17 moves the verdict to parse
-    time wherever the plan can promise the exit is reached running;
-    here one branch stops the machine and the other does not, so the
-    static pass answers `unknown` and says nothing — deliberately,
-    a false refusal being far worse than this late failure.
+    Which branch the guest takes decides whether the machine ends up
+    stopped or running, which is why this check still has to happen at
+    run time. V17's static check can rule at parse time whenever a
+    script's structure guarantees which state the exit reaches — but
+    here one branch stops the machine and the other does not, so V17
+    deliberately answers "unknown" and stays silent rather than
+    falsely rejecting a script that might turn out fine. A false
+    rejection would be worse than this late failure.
     """
     with _scoped("platform dos\nmachine stopped\n"
                  "with boot cdrom0 {\n    start\n"
@@ -2284,9 +2302,10 @@ def test_a_boot_restore_reached_running_fails_the_run_naming_it():
 
 
 def test_a_media_restore_needs_no_stopped_machine():
-    """`insert` and `eject` are running-or-stopped, so the restore is
-    live where the machine is up: the stopped rule the other half
-    carries is the boot order's, not the construct's."""
+    """`insert` and `eject` work whether the machine is running or
+    stopped, so their restore also runs live while the machine is up.
+    The stopped-only rule tested above belongs to the boot order,
+    not to `with` scoping itself."""
     with _scoped("platform dos\nentry a\n"
                  "with insert cdrom0 @livecd {\n    phase a {\n"
                  "        finish\n    }\n}\n",

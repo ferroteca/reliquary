@@ -2,13 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Installed tests for the QEMU adapter: ownership, images, rendering.
 
-Everything below the adapter seam that **only QEMU knows** — the owned
-launch and its identity verification, qcow2 materialization, the drive
-and boot rendering a machine's state lowers into, and the carriers a
-session exposes. What every adapter owes the seam alike — the name, the
-capability report, the image extension, discovery, the host font, and
-the refusal to command an unverified VM — is `test_backend_contract`,
-driven against this backend and VirtualBox from one text (F59).
+This file covers everything below the adapter seam that only QEMU
+knows about: the owned launch and its identity verification, qcow2
+materialization, the drive and boot rendering a machine's state turns
+into, and the carriers a session exposes. What every adapter must
+provide the same way — the name, the capability report, the image
+extension, discovery, the host font, and the refusal to command an
+unverified VM — is covered once, in `test_backend_contract`, and run
+against this backend and VirtualBox from that one file (F59).
 """
 
 import inspect
@@ -368,8 +369,9 @@ def test_an_empty_removable_slot_renders_a_medium_less_drive():
 
 
 def test_a_host_directory_renders_as_vvfat(root):
-    # The one capability only knowable after resolution, so it is
-    # judged here rather than at assignment.
+    # Whether a path is a directory can only be known once it is
+    # resolved on disk, so that check happens here, at render time,
+    # not earlier when the drive is declared.
     work = os.path.join(root, "work")
     os.makedirs(work)
     drives = {"hdd0": {"medium": "hdd", "slot": 0, "path": work}}
@@ -460,7 +462,9 @@ def test_start_renders_the_state_and_launches_it(root):
     assert launch.call_args.kwargs["log_dir"] == os.path.join(root, "qemu")
 
 
-# The escape hatch: honored, bounded, and never a second source.
+# The settings hatch: passed through to QEMU, but bounded -- it can
+# never become a second way to set something a reliquary field
+# already owns (drives, memory, and so on).
 #
 # One function validates and renders, so every assertion here is about
 # both at once — what `create` accepts is what `start` puts on the
@@ -498,9 +502,11 @@ def test_the_key_shapes_are_checked(section, rule):
     assert caught.value.rule_id == rule
 
 
-#: Every argument a blueprint field or the VM identity owns, and its
-#: owner. One node per argument: an entry that stopped being refused
-#: is a named failure rather than a loop nobody counts.
+#: Every argument that belongs to a blueprint field or to the VM
+#: identity, and which field owns it. Each argument gets its own
+#: parametrized test case, so if one stops being refused, the
+#: specific failing case is named rather than lost inside one loop
+#: over all arguments.
 _OWNED_ARGUMENTS = {
     "-m": "memory", "-smp": "cpus", "-boot": "boot",
     "-drive": "drives", "-hda": "drives", "-fda": "drives",
@@ -1028,9 +1034,10 @@ def test_vnc_pointer_events_reach_rfb_with_no_translation():
 def test_the_keysym_table_covers_the_seam_vocabulary():
     """Every seam key VirtualBox translates, the VNC plane translates.
 
-    The two adapters own D103's third layer each; this is what keeps
-    them covering the same seam names rather than drifting apart one
-    key at a time.
+    D103 settled the key-name boundary as QEMU's own qcode set, but
+    each adapter still owns its own translation into that set. This
+    test is what keeps the two adapters covering the same key names
+    instead of drifting apart one key at a time.
     """
     from reliquary import backend_virtualbox as vbox
     for name in vbox._SCANCODES:

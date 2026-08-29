@@ -1,17 +1,21 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The composed blueprint document: parsing specs into one catalog.
+"""Parses a blueprint document's specs into one catalog.
 
-A ``.rlqb`` root is an array of **specs** of two types — ``machine``
-and ``media`` — with a lone spec object accepted as sugar for the array
-of one. ``type`` defaults to ``media``. This module parses one document
-into a :class:`Document` without resolving cross-references between
-documents; whole-source resolution (binding a drive to its media, a
-child to its parent) is ``resolve.py``.
+A ``.rlqb`` root is an array of **specs**. Each spec is either a
+``machine`` or a ``media`` (``type`` defaults to ``media`` when not
+given). A single spec object is accepted as shorthand for an array
+containing just that one spec. This module parses one document into
+a :class:`Document`; it does not resolve references between
+documents — binding a drive to its media, or a child to its parent,
+happens in ``resolve.py``.
 
-Validation is **two-phase**: shape here, value at resolution. A field
-carrying a ``${...}`` reference cannot be coerced until the reference
-binds, so it is parsed into a :class:`Deferred` and finished later.
+Validation happens in two phases: this module checks shape (is the
+field the right type, is the value one of the allowed choices); the
+actual value is checked later, at resolution. A field holding a
+``${...}`` reference can't be checked yet, because its value depends
+on what the reference resolves to — so it's parsed into a
+:class:`Deferred` and checked later.
 
 Design: docs/spec/blueprint-model.md (normative).
 """
@@ -34,8 +38,9 @@ _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
 _POINTING_DEVICES = {"tablet", "mouse"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
 _SPEC_TYPES = {"machine", "media"}
-# Retired with the first-round four-component model; named so a stale
-# document is diagnosed rather than merely rejected.
+# These spec types existed in the original four-component model and
+# were retired. They're still named here so a blueprint using them
+# gets a specific error message instead of a generic "unknown type".
 _RETIRED_TYPES = {"source", "archive"}
 _RETIRED_SECTIONS = {"machines", "media", "sources", "archives"}
 
@@ -46,24 +51,32 @@ _SHA256 = re.compile(r"[0-9a-fA-F]{64}")
 _MIB = 1024 * 1024
 _UNIT_BYTES = {"K": 1024, "M": _MIB, "G": 1024 * _MIB, "T": 1024 * 1024 * _MIB}
 
-# The media-name charter (D24): the script `name` production with a
-# leading digit allowed. Split from the letter-initial property key,
-# which also appears bare at a declaration where a digit would lex as a
-# duration. Parens and brackets are out by argv, not grammar: every
-# media name is an argument to fetch-media / add-media / clean-media.
+# The rules for a valid media name (D24): the same as the script
+# language's `name` pattern, except a media name may start with a
+# digit. _PROPERTY_KEY is kept separate and must start with a letter,
+# because a property key can appear bare in a declaration where a
+# leading digit would otherwise be read as a duration (like "5m").
+# Parentheses and brackets aren't in the character set — not because
+# the grammar forbids them, but because every media name is passed as
+# a command-line argument to fetch-media / add-media / clean-media,
+# where those characters have special meaning to the shell.
 _MEDIA_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _PROPERTY_KEY = re.compile(r"[A-Za-z][A-Za-z0-9._-]*")
 
-# The reference closure has two halves and needs both (D26 as corrected
-# by D27): this class is the FIRST SCREEN, catching |, (, [, ?, = and
-# whitespace; the productions below decide, catching everything built
-# from already-legal characters. `${mem:-512M}` passes the class and is
-# refused by the production, `mem` not being a qualifier.
+# Checking a reference body takes two steps, and both are needed (D26,
+# corrected by D27). This pattern is the first step: it rejects
+# characters that should never appear, like |, (, [, ?, =, and
+# whitespace. The second step is the code below, which rejects
+# strings that pass this pattern but are still wrong. For example,
+# `${mem:-512M}` (bash-style default-value syntax) is made entirely
+# of characters this pattern allows, so it passes here — it's the
+# code below that rejects it, because "mem" isn't a real qualifier.
 _REFERENCE_BODY = re.compile(r"[A-Za-z0-9._:/-]+")
 
 _KNOWN_QUALIFIERS = {"media"}
-# A qualifier names a namespace to look in, never an operation: the set
-# is open, and these are spoken for.
+# A qualifier names which namespace to look a reference up in — never
+# an action to perform. More qualifiers may be added later; these
+# names are reserved for that even though only "media" is implemented.
 _RESERVED_QUALIFIERS = {"property", "env", "file", "machine", "script",
                         "landmark", "secret"}
 
@@ -72,27 +85,30 @@ _REMOTE_SCHEMES = {"http", "https"}
 
 
 class BlueprintWarning(UserWarning):
-    """A repaired-but-accepted authoring problem, named at its source."""
+    """Warns about an authoring mistake this module repaired instead of rejecting, reported at its source location."""
 
 
 # --- located diagnostics ---------------------------------------------
 
 class BlueprintError(StaticError):
-    """A blueprint diagnostic that can say *where* it happened.
+    """A blueprint diagnostic that can also report where it happened.
 
-    The legality tier of the error taxonomy, like every other diagnostic
-    this module raises: it is decided from the document text alone, so
-    it is a STATIC ERROR and exits ``2``. What it adds is the position
-    :class:`~reliquary.script_nodes.ScriptParseError` has always carried
-    on the script surface, rendered by the same skeleton (D70).
+    This is a STATIC ERROR like every other diagnostic this module
+    raises, which means it exits with code 2: the document's text
+    alone is enough to tell it's invalid, no need to run anything.
+    What's new here is a line/column position, the same thing
+    :class:`~reliquary.script_nodes.ScriptParseError` has always
+    carried for script files, rendered using the same format (D70).
 
-    **Position is optional and its absence is not a defect.** A document
-    parsed from a path has one; a value handed to the public
-    ``parse_document`` never did -- there is no text to point into --
-    and renders exactly as this module rendered before positions
-    existed. The breadcrumb is what both cases share, and it stays in
-    the message rather than moving into the rendering, so an unlocated
-    diagnostic reads today as it read yesterday.
+    The position is optional, and having none isn't a bug. A document
+    loaded from a file path gets one. A value passed straight into the
+    public ``parse_document`` function never does — there's no source
+    text to point into — and in that case the error renders exactly
+    as it did before positions existed. The field breadcrumb (like
+    "machine.drives.hdd0") is present either way and stays in the
+    message text itself, rather than being handled only by the
+    rendering code, so an error with no position still reads the same
+    as it always has.
     """
 
     def __init__(self, message, *, rule_id=None, position=None):
@@ -122,18 +138,20 @@ class BlueprintError(StaticError):
 
 
 class Where:
-    """A field breadcrumb, and the source position it names.
+    """Names a field (as a breadcrumb like "machine.drives.hdd0") and
+    tracks its position in the source, if there is one.
 
-    It stands where a plain breadcrumb string used to, and renders as
-    that string, so every message built with ``f"{where}: ..."`` reads
-    exactly as it did. What it adds is the position, carried alongside
-    the text and attached to whatever diagnostic the field raises.
+    It replaces what used to be a plain breadcrumb string, and prints
+    the same way, so any message built as ``f"{where}: ..."`` still
+    reads the same. The addition is the position, carried alongside
+    the breadcrumb text and attached to whatever error the field
+    raises.
 
-    Descent is explicit -- ``where.at(container, key)`` takes the
-    container the key belongs to rather than remembering it -- because
-    a position that silently drifts from the field it claims to name is
-    worse than no position at all, and an argument that has to be
-    passed cannot drift.
+    Moving to a child field is explicit: ``where.at(container, key)``
+    takes the container the key belongs to, rather than storing it in
+    advance. A position that quietly gets out of sync with the field
+    it's supposed to name is worse than having no position — and a
+    value that has to be passed in each time can't drift out of sync.
     """
 
     __slots__ = ("text", "position")
@@ -148,17 +166,18 @@ class Where:
     def at(self, container, key, text=None):
         """The breadcrumb for ``container[key]``, positioned at its key.
 
-        A container with no positions -- a plain ``dict`` from the
-        public entry point -- yields the parent's position, so a
-        diagnostic deep in an unlocated document still cites the
-        nearest thing anyone knows.
+        If ``container`` has no position data — a plain ``dict``, from
+        a value passed straight into the public entry point — this
+        falls back to the parent's own position, so an error deep in
+        an unpositioned document still points at the closest thing we
+        do know.
 
-        ``text`` overrides the composed wording, for the fields whose
-        breadcrumb has never been composed from its parent's: the
-        machine half says ``drives.hdd0.media`` where the media half
-        says ``spec[0].location``. That difference is older than
-        positions and is left exactly as it was, this change being
-        about where a diagnostic points and not what it says.
+        ``text`` overrides the breadcrumb wording for fields that were
+        never built from their parent's breadcrumb: the machine side
+        writes ``drives.hdd0.media``, while the media side writes
+        ``spec[0].location``. That difference predates positions and
+        is kept exactly as it was — this change is only about where an
+        error points, not what it says.
         """
         if text is None:
             text = f"{self.text}[{key}]" if isinstance(key, int) \
@@ -176,9 +195,10 @@ def _rooted(value, text):
     return Where(text, json5reader.position(value))
 
 
-# The unlocated defaults, for a caller that names no field: reaching one
-# means nobody threaded a breadcrumb to that call, which is the state
-# every one of these was in before positions existed.
+# Default breadcrumbs with no position, used when a caller doesn't
+# pass one in. Reaching one of these means the call site never
+# threaded a breadcrumb through — which is how every call worked
+# before positions were added.
 _MACHINE = Where("machine")
 _MEDIA = Where("media")
 _NAME = Where("name")
@@ -207,11 +227,14 @@ class Reference:
 
 @dataclass(frozen=True)
 class Deferred:
-    """A value carrying references, finished at resolution.
+    """A value that contains one or more references, checked fully at
+    resolution time.
 
-    Shape is checked here; the value cannot be — a reference may resolve
-    to anything the field's own parser must then accept, which is what
-    two-phase validation means.
+    This module only checks the value's shape (that it's a string with
+    references in it). The actual value can't be checked yet, since a
+    reference could resolve to anything — the field's own parser has
+    to check it once it knows. That's what "two-phase validation"
+    means.
     """
 
     text: str
@@ -220,14 +243,16 @@ class Deferred:
 
 @dataclass(frozen=True)
 class Location:
-    """One rung of a media's location. Exactly one ``kind``.
+    """One entry in a media's location list (a "rung"). Exactly one
+    ``kind`` applies.
 
-    ``url`` — a download; ``local`` — a host path relative to the
-    referencing file (made absolute when the document is loaded from
-    one); ``parent`` — a member of another media (the
-    containment edge, ``path`` optional: absent means the parent's own
-    bytes); ``property`` — supplied by a property; ``deferred`` — a
-    string whose references must resolve before it can be dispatched.
+    ``url`` — download from a URL. ``local`` — a path on the host,
+    relative to the file it was written in (made absolute when the
+    document is loaded from a file). ``parent`` — a member inside
+    another media (``path`` is optional; no path means the parent's
+    own bytes, unextracted). ``property`` — supplied by a property.
+    ``deferred`` — a string containing references that must resolve
+    before this location can be used.
     """
 
     kind: str
@@ -245,13 +270,15 @@ class Location:
 
 @dataclass(frozen=True)
 class Media:
-    """A media spec: owns content and materialization.
+    """A media spec: describes content, and how to materialize it.
 
-    ``read_only`` is ``None`` when unset (its effective default — true
-    on a cdrom, false elsewhere — resolves at materialization).
-    ``location`` is the mirror tuple, empty for a ``new`` blank.
-    ``anonymous`` marks the content-free blank: in no namespace, named
-    for its slot at materialization, unreferenceable from a script.
+    ``read_only`` is ``None`` when not set explicitly; its actual
+    default (true for a cdrom, false otherwise) is decided later, at
+    materialization. ``location`` is the tuple of mirrors to try, and
+    is empty for a ``new`` blank disk. ``anonymous`` marks a
+    content-free blank that has no name of its own: it's named after
+    its drive slot at materialization time, and a script can't refer
+    to it by name.
     """
 
     name: Optional[str]
@@ -270,10 +297,11 @@ class Media:
 class MachineDrive:
     """One drive slot: names a media, or ``None`` for an empty slot.
 
-    ``inline`` carries a media spec written in place at the drive. A
-    named inline media is registered in the catalog like any other and
-    ``media`` names it; the anonymous blank has no name and lives only
-    here.
+    ``inline`` holds a media spec written directly at the drive
+    instead of declared separately. If that inline media has a name,
+    it's registered in the catalog like any other media and ``media``
+    names it; an anonymous blank has no name and only exists here, on
+    this drive.
     """
 
     key: str
@@ -317,15 +345,18 @@ class Document:
 def _reference(body, where):
     """Parse one ``${...}`` body into a :class:`Reference`, or fail.
 
-    The character class screens; the two productions decide. Neither is
-    the whole test on its own (D27).
+    ``_REFERENCE_BODY`` filters out characters that should never
+    appear; the checks below then decide whether what's left is
+    actually valid. Neither check alone is sufficient on its own (D27).
     """
     if not body:
         raise where.error(
             f"{where}: empty reference '${{}}' — name a property key or a "
             "qualified target", rule_id="ref.empty")
     if "\\" in body:
-        # The Windows author's first guess. Name the rule, not the class.
+        # A Windows user's natural first guess is a backslash path.
+        # Give a specific error naming the actual rule, instead of the
+        # generic "malformed reference" message below.
         raise where.error(
             f"{where}: '${{{body}}}' uses a backslash — a containment path "
             "is '/'-separated always, following the container formats' own "
@@ -460,12 +491,14 @@ def _scan(text, where):
 
 
 def _text(value, where, *, closed=False, allowed=None):
-    """Validate an authored string, applying the reference reach rules.
+    """Validate an authored string, and check whether it's allowed to
+    contain a reference.
 
-    ``closed`` marks a closed-vocabulary position, where a reference is
-    refused outright: those are where a published schema's completion is
-    most valuable and where a reference destroys it (D26). ``allowed``
-    is the vocabulary, checked once no reference can be involved.
+    ``closed`` marks a field with a fixed set of allowed values, where
+    a reference is refused outright — that's exactly where an editor's
+    autocomplete is most useful and a reference would break it (D26).
+    ``allowed`` is that fixed set of values, checked only once we know
+    the value has no reference in it.
     """
     if not isinstance(value, str) or not value.strip():
         raise where.error(
@@ -489,7 +522,7 @@ def _text(value, where, *, closed=False, allowed=None):
 
 
 def _plain(value, where):
-    """An authored string that may never carry a reference (identity)."""
+    """An authored string that must never contain a reference (used for identity fields like names)."""
     if not isinstance(value, str) or not value.strip():
         raise where.error(
             f"{where} must be a non-empty string, got: {value!r}",
@@ -546,13 +579,14 @@ def _repair(stem):
 
 
 def _derive_name(location, where):
-    """Derive a media name from content-intrinsic material, or fail.
+    """Derive a media name from the media's own content, or fail.
 
-    The slot never names anything and neither does the ``.rlqb`` file:
-    the stem comes from the payload, so a spec pasted among siblings
-    resolves the same. An out-of-charter stem is repaired and warned;
-    one that cannot be repaired, or that does not exist at all, fails
-    closed demanding an explicit name.
+    Neither the drive slot nor the ``.rlqb`` filename is ever used to
+    name a media — the name always comes from the payload itself, so
+    copying a spec into a different file gives the same result. A stem
+    with invalid characters is repaired and a warning is raised; a
+    stem that can't be repaired, or doesn't exist at all, is a hard
+    failure that requires an explicit name instead.
     """
     first = location[0] if location else None
     stem = source = None
@@ -657,17 +691,19 @@ def _flag(value, where):
 def location_from_string(value, where):
     """Public: interpret a location string into a :class:`Location`.
 
-    The seam T5 uses to re-interpret a property-bound location value
-    (a path, a URL, or — refused as chaining — another reference).
+    This is the function T5 uses to re-interpret a location value that
+    came from a resolved property: a path, a URL, or — refused, since
+    chaining isn't allowed — another reference.
     """
     return _location_string(value, where)
 
 
 def _location_string(value, where):
-    """Interpret one location string by scheme.
+    """Interpret one location string by its scheme (bare path, URL, or reference).
 
-    Strings are interpreted, objects are explicit: every accepted string
-    has exactly one object desugaring, which is the canonical form.
+    A string location is shorthand: every string this function accepts
+    has an equivalent, more explicit object form, which is the
+    canonical form the string is being translated into.
     """
     spans, references = _scan(value, where)
     qualified = [ref for ref in references if ref.qualifier is not None]
@@ -696,7 +732,8 @@ def _location_scheme(value, where):
     if scheme.lower() in _REMOTE_SCHEMES:
         return Location(kind="url", url=value)
     if len(scheme) == 1:
-        # The drive-letter exemption: C:/isos/x.iso is a path.
+        # A single letter followed by ':' is a Windows drive letter,
+        # not a URL scheme — "C:/isos/x.iso" is a local path.
         return Location(kind="local", local=value)
     raise where.error(
         f"{where}: unrecognized location scheme {scheme + ':'!r} in "
@@ -739,8 +776,9 @@ def _location_object(value, where, register):
                                 where.at(value, "property")))
     parent = value["parent"]
     if isinstance(parent, collections.abc.Mapping):
-        # An inline parent: a container that exists only to be descended
-        # into need not be declared separately.
+        # The parent is written inline: a container that exists only
+        # to hold this media doesn't need to be declared as its own
+        # separate spec.
         inline = _media(parent, register, where=where.at(value, "parent"))
         parent_name = inline.name
         if parent_name is None:
@@ -807,8 +845,9 @@ def _unknown_media_field(unknown, where, container):
 def _media(value, register, *, where=_MEDIA, path=None, allow_anonymous=False):
     """Parse one media spec, registering it and any children it declares.
 
-    ``path`` marks a ``children`` entry, whose location is its parent
-    plus that path rather than a ``location`` of its own.
+    ``path`` is set when parsing a ``children`` entry: that media's
+    location is its parent plus this path, instead of a ``location``
+    field of its own.
     """
     if isinstance(value, str) and path is None:
         value = {"location": value}
@@ -839,9 +878,9 @@ def _media(value, register, *, where=_MEDIA, path=None, allow_anonymous=False):
     size = _size(value["size"], where.at(value, "size")) \
         if "size" in value else None
     if materialize is None:
-        # A spec carrying a size and no location is a blank: there is
-        # nothing else it could be, which is what lets the drive-inline
-        # blank be written {"size": "20M"}.
+        # A spec with a size but no location can only be a blank disk
+        # — there's nothing else it could mean. That's what lets an
+        # inline blank on a drive be written as just {"size": "20M"}.
         materialize = "new" if size is not None and not location else "use"
     if materialize == "new":
         if location:
@@ -897,10 +936,11 @@ def _media(value, register, *, where=_MEDIA, path=None, allow_anonymous=False):
 
 
 def _children(value, parent, register, where):
-    """Desugar a ``children`` batch into child-declares-parent specs.
+    """Expand a ``children`` list into individual media specs, each
+    pointing back at ``parent``.
 
     ``where`` names the ``children`` array itself, so each entry's
-    breadcrumb is composed from it rather than rebuilt.
+    breadcrumb is built from it rather than starting over.
     """
     if not isinstance(value, list):
         raise where.error(f"{where} must be an array",
@@ -925,7 +965,7 @@ def _children(value, parent, register, where):
 
 
 def _check_type_echo(value, expected, where):
-    """An optional ``type`` at a nested position is a checked echo."""
+    """If a nested spec repeats its own ``type``, check that it matches ``expected``."""
     if "type" not in value:
         return
     declared = _plain(value["type"], where.at(value, "type"))
@@ -1004,8 +1044,9 @@ def _drive(value, key, medium, slot, register, where):
             f"drives.{key} must be a media name, null, a drive object, or "
             "an inline media", rule_id="value.not-a-drive")
     if set(value) - _DRIVE_FIELDS:
-        # Not the hardware-attribute object, so it is an inline media:
-        # a full spec, or the {"size": ...} blank.
+        # This object has fields _DRIVE_FIELDS doesn't recognize, so
+        # it isn't a drive-attribute object — it's an inline media
+        # spec instead (a full spec, or a {"size": ...} blank).
         inline = _media(value, register, where=where, allow_anonymous=True)
         return MachineDrive(key=key, medium=medium, slot=slot,
                             media=inline.name, inline=inline)
@@ -1171,7 +1212,7 @@ def _machine(value, register, *, where=_MACHINE):
             rule_id="value.not-an-object")
 
     def at(key, text=None):
-        """This machine's field, under the breadcrumb it has always had."""
+        """This machine's field, using the same breadcrumb wording as before positions were added."""
         return where.at(value, key, text if text is not None else key)
 
     unknown = set(value) - _MACHINE_FIELDS
@@ -1247,14 +1288,16 @@ def _spec_type(value, where):
 def parse_document(value, *, stem=None):
     """Parse one ``.rlqb`` document into its named specs.
 
-    The root is an array of specs; a lone spec object is sugar for the
-    array of one, under the same rules — so an untyped lone object is a
-    *media*, ``type`` defaulting to media everywhere. A bare string is a
-    media desugaring to ``{"location": ...}``. Two specs of one type and
-    name in this document are an error, identical or not.
+    The root is normally an array of specs. A single spec object is
+    accepted as shorthand for a one-element array, following the same
+    rules — so an untyped lone object counts as a *media* spec, since
+    ``type`` defaults to media everywhere. A bare string is shorthand
+    for a media spec of ``{"location": ...}``. Two specs of the same
+    type and name in one document are always an error, even if
+    they're identical.
 
-    ``stem`` is accepted and ignored: the ``.rlqb`` file's own stem is
-    never an identity.
+    ``stem`` is accepted but ignored: the ``.rlqb`` file's own filename
+    stem is never used as an identity.
     """
     del stem
     root = _rooted(value, "blueprint")
@@ -1275,9 +1318,9 @@ def parse_document(value, *, stem=None):
             f"got {type(value).__name__}", rule_id="blueprint.not-a-document")
 
     buckets = {"machine": {}, "media": {}}
-    # The site of the spec being parsed, so a clash raised from inside
-    # `register` -- which sees names and not fields -- still points at
-    # the spec that tried to claim the name.
+    # Tracks the spec currently being parsed. `register` only sees
+    # names, not field breadcrumbs, so it uses this to point a
+    # name-clash error at the spec that tried to claim the name.
     site = root
 
     def register(kind, name, spec):
@@ -1297,9 +1340,11 @@ def parse_document(value, *, stem=None):
 
     for index, entry in enumerate(entries):
         text = f"spec[{index}]" if len(entries) > 1 else "spec"
-        # The lone-object sugar puts the spec in a list this function
-        # made, which carries no positions -- so the lookup misses and
-        # falls back to the root, which *is* that spec.
+        # When the root was a lone spec object, `entries` is a
+        # one-element list this function built, not the original
+        # parsed document, so it has no position data. The lookup on
+        # it misses and falls back to root's own position, which is
+        # correct here since root *is* that one spec.
         where = root.at(entries, index, text)
         site = where
         if isinstance(entry, str):
@@ -1328,16 +1373,18 @@ def _bare_string_spec(entry, where, register):
 def load_document(path):
     """Load and parse one ``.rlqb`` document.
 
-    This is the entry point that has a *file* to point into, so it is
-    the one that asks for positions and hands the diagnostic its source
-    line. ``parse_document`` on a bare value stays exactly as it was:
-    there is nothing to cite, and citing nothing is honest.
+    This function has an actual file to point errors at, so it's the
+    one that asks the JSON5 reader for positions and attaches the
+    source line to any error. ``parse_document``, called on a value
+    that didn't come from a file, still works exactly as before: with
+    no file to cite, it just doesn't cite one.
 
-    Having the file also makes this the anchor point: every relative
-    ``local`` location is made absolute against the file's own
-    directory, which is what "relative to the referencing file" means.
-    A bare value parsed through ``parse_document`` keeps its paths as
-    authored — there is no file to anchor to.
+    Having a file also means this function can anchor relative paths:
+    every relative ``local`` location is made absolute against the
+    directory the file is in, which is what "relative to the
+    referencing file" means. A value parsed through ``parse_document``
+    directly keeps its paths exactly as written — there's no file to
+    anchor them to.
     """
     path = os.path.abspath(os.fspath(path))
     if not os.path.exists(path):
@@ -1357,12 +1404,13 @@ def load_document(path):
 def _anchored_document(doc, base):
     """The document with every relative ``local`` path made absolute.
 
-    Anchoring happens at load, before any cross-document work, so
-    downstream layers only ever see what a spec actually points at.
-    That includes the namespace's identity dedup: two same-named specs
-    carrying one relative spelling in two directories are different
-    media, and they collide instead of silently resolving through
-    whichever file was read first.
+    This happens right when the document is loaded, before any
+    cross-document work runs, so every later step sees exactly what a
+    spec actually points at. That matters for name deduplication too:
+    two specs with the same name but the same relative path written in
+    two different directories are actually different media, and this
+    ensures they're treated as a name collision rather than silently
+    resolving to whichever file happened to load first.
     """
     media = {name: _anchored_media(spec, base)
              for name, spec in doc.media.items()}

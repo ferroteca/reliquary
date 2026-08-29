@@ -97,9 +97,10 @@ def test_the_plan_is_cwd_independent(root, tmp_path, monkeypatch):
 
 
 def test_one_relative_spelling_in_two_directories_collides(root):
-    """Anchored, the two specs name different bytes: different
-    media, so they collide rather than silently resolving through
-    whichever file was read first."""
+    """Once anchored to their own directories, the two specs name
+    different files on disk -- different media -- so they collide
+    instead of silently resolving to whichever file was read
+    first."""
     spec = '[{"name": "iso", "location": "x.iso"}]'
     os.mkdir(os.path.join(root, "a"))
     os.mkdir(os.path.join(root, "b"))
@@ -207,7 +208,7 @@ def test_unsupported_container_names_its_format():
 
 
 def test_property_location_fails_closed_naming_properties():
-    """Never a milestone number: name the channel it waits on."""
+    """The error names the property that's missing, never an internal milestone number."""
     ns = _namespace([{"name": "win", "location": "${windows.iso}"}])
     with pytest.raises(PreflightError) as caught:
         resolve.resolve_media_plan(ns.media["win"], ns)

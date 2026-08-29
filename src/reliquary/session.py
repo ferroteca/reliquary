@@ -1,34 +1,39 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The session: ambient state carried once, behind one door.
+"""Session: reliquary's working-directory and properties-file config,
+resolved once and reused by every call made through it.
 
-P26 pledges that all consumer API interaction passes through a
-``Session`` opened on — at the minimum — a home directory. The
-session pins the ambient state every call is otherwise handed per
-call — the six placeable working directories and the selected
-properties file, one :class:`~reliquary.home.Context` record — at
-construction, from the record it was opened on alone, and every
-method is a veneer: one thin method per ambient-state verb,
-forwarding to the engine function of the same name with the
-stored record and carrying no logic of its own. Behavior lives in
-the engine modules, and a veneer's contract is its engine
-function's.
+P26 requires that every API call that touches reliquary's state goes
+through a ``Session``, opened on at least a home directory. When a
+``Session`` is constructed, it resolves and stores the six placeable
+working directories plus the selected properties file — one
+:class:`~reliquary.home.Context` record — from whatever it was opened
+on. Every method on ``Session`` is a thin wrapper: it forwards to the
+matching function of the same name in one of the engine modules,
+passing along the stored ``Context``, and adds no logic of its own.
+The actual behavior lives in the engine modules; a ``Session``
+method's contract is whatever its underlying engine function's
+contract is.
 
-The boundary is ambient state, and it is named (P26): whatever
-resolves a working directory, touches machine or media state, or
-reads ambient configuration takes a veneer; pure data-in/data-out
-work — parsing and validating a document or script handed to it —
-stays a free function, so tooling never invents a home to parse a
-string. The codex verbs take no veneer either: reaching the
-shipped library is a human act, CLI-only under P6's named
-exception (D87).
+Only functions that touch reliquary's state — resolving a working
+directory, reading or writing machine or media state, or reading
+config — get a ``Session`` method (P26). Functions that only take
+input and produce output, like parsing and validating a document or
+script that's handed to them, stay standalone functions instead, so a
+tool calling them never needs a home directory just to parse a
+string. The codex functions (for the built-in blueprint library)
+don't get a ``Session`` method either — using the shipped library is
+something only a human does directly from the CLI, which is a named
+exception in P6 (D87).
 
-``Session`` is deliberately **unexported** while the module-level
-surface stands: the package root exports none of this today, and
-the public surface will move once, coherently, when the door
-closes. Two sessions in one process are unremarkable —
-construction reads and writes no module-global state, and the
-pinned record means no later call reads any either.
+``Session`` is not currently exported from the package root, even
+though it's meant to be the primary interface: the root currently
+exports the older, function-based surface, and the public surface
+will switch over to ``Session`` all at once, later. Using two
+separate ``Session`` objects in the same process is fine: constructing
+one reads and writes no shared global state, and because each one
+stores its own resolved ``Context``, later calls on one don't read
+anything from the other.
 """
 
 from . import (authoring, binding, library, machines, media,
@@ -38,16 +43,17 @@ from .home import as_context, pinned
 
 
 class Session:
-    """Ambient state carried once: the six working directories and
-    the selected properties file, pinned at construction, with one
-    thin method per ambient-state verb forwarding to its engine
+    """Holds the six working directories and the selected properties
+    file, resolved once when constructed, with one thin method per
+    state-touching call, each forwarding to its matching engine
     function.
 
-    Opened on what ``context=`` accepts today — a bare home string
-    or a ``Context`` — and refusing construction without a home:
-    the same fail-closed safety as ``dir.unassigned``, moved to the
-    door. An assigned home reaches all six directories by
-    derivation, so nothing a session does can find a directory
+    Can be constructed from either a bare home-directory string or a
+    ``Context``, and refuses to construct at all without a home
+    directory — the same "dir.unassigned" check that would otherwise
+    happen later, moved up to construction time instead. Because an
+    assigned home directory lets all six working directories be
+    derived, no ``Session`` method can ever find a directory
     unassigned.
     """
 
@@ -56,9 +62,12 @@ class Session:
     def __init__(self, context):
         record = as_context(context)
         if record.home_dir is None:
-            # The same condition first-use ``dir.unassigned`` names,
-            # noticed at the door: one rule, one id (the tier is
-            # never the subject — docs/spec/script-spec.md).
+            # This is the same "no home directory assigned" condition
+            # that would otherwise be caught later, on first use;
+            # catching it here means it's checked in exactly one
+            # place, under one rule_id, regardless of which error
+            # class would apply to the eventual use
+            # (docs/spec/script-spec.md).
             raise StaticError(
                 "a session requires a home\n"
                 "  open it on a home directory path, or a Context "
@@ -102,9 +111,10 @@ class Session:
                         cancelled=None):
         """Stop a machine if it is running, then start it.
 
-        One act rather than two: the per-machine lock is held across
-        both halves, so nothing can start the machine or change its
-        media in between. A machine that is already stopped is simply
+        This happens as one operation, not two separate calls: the
+        per-machine lock is held across both the stop and the start,
+        so nothing else can start the machine or change its media in
+        between. If the machine is already stopped, it's simply
         started.
         """
         return machines.restart_machine(
@@ -124,8 +134,11 @@ class Session:
             properties=properties, events=events)
 
     def get_machine_dir(self, *, machine=None, blueprint=None):
-        """Return the selected machine's directory; the out-of-band
-        door."""
+        """Return the selected machine's directory.
+
+        For inspecting a machine's files directly, outside the normal
+        API.
+        """
         return machines.get_machine_dir(
             machine=machine, blueprint=blueprint, context=self._context)
 
@@ -147,7 +160,7 @@ class Session:
         return machines.machine_dir_path(machine_id, self._context)
 
     def mark_stopped(self, machine_id):
-        """Return a machine whose VM is gone to the ready phase."""
+        """Move a machine whose VM process is gone back to the ready phase."""
         return machines.mark_stopped(machine_id, self._context)
 
     def insert_media(self, machine_id, slot, media=None, *, file=None,
@@ -183,10 +196,10 @@ class Session:
             machine=machine, blueprint=blueprint, timeout=timeout,
             prompt=prompt, context=self._context)
 
-    # The machine-variable family. Read-only by design: the script
-    # `set` verb is the channel's only writer (docs/spec/cli.md,
-    # "the host side only reads"), so the session carries no
-    # setter.
+    # Machine variables: reading only, by design. A script's `set`
+    # statement is the only thing that ever writes a machine variable
+    # (docs/spec/cli.md, "the host side only reads"), so Session has
+    # no method for setting one.
 
     def get_machine_var(self, key, *, machine=None, blueprint=None):
         """Read a machine variable a script ``set``."""

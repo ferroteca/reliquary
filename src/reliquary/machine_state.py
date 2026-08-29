@@ -2,23 +2,26 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Where a machine lives, what serializes it, and how one is named.
 
-The substrate the machine layer stands on: the ids
-and directories a machine is addressed by, the locks that serialize
-work against it, its ``machine.json``, and the selector resolution
-that turns ``--blueprint`` / ``--machine`` into one id.
+This module is the foundation the rest of the machine code is built
+on: the ids and directories a machine is addressed by, the locks
+that serialize work against it, its ``machine.json`` file, and the
+selector resolution that turns ``--blueprint`` / ``--machine`` into
+one machine id.
 
-**It stayed a separate module after its second consumer left.**
-``drives.py`` was the other half — the drive report and the in-band
-file family — and D108 deleted it, so ``machines.py`` is the only
-caller of most of what is here. What keeps the split worth having is
-``machine_handle.py``, which needs ``read_vm_state`` and would be
-back in an import cycle with the lifecycle without it. Phase
-transitions have one consumer and stay with the lifecycle: this
-module is a substrate, not a place for whatever is shared by
-nothing.
+This stayed a separate module even after one of its two callers went
+away. ``drives.py`` used to be the other caller — it held the drive
+report and the "in-band file" family of features — and D108 deleted
+it, so ``machines.py`` is now the only caller of most of what is
+here. The reason to keep the split is ``machine_handle.py``, which
+needs the ``read_vm_state`` function; without this split,
+``machine_handle.py`` would be back in an import cycle with
+``machines.py``. Phase-transition code has only one caller and stays
+in ``machines.py`` instead of moving here: this module holds the
+shared foundation, not just anything that happens to have no other
+home.
 
 Nothing here knows what a machine *is*. No backend, no adapter, no
-drive, no media — a machine id, a directory, a lock, and a JSON
+drive, no media — just a machine id, a directory, a lock, and a JSON
 document.
 """
 
@@ -37,22 +40,25 @@ def machine_dir_path(machine_id, context=None):
 
 
 def machine_disks_dir(machine_id, context=None):
-    """Per-machine materialized-image directory, keyed by media item.
+    """Per-machine directory for materialized images, keyed by media
+    item.
 
-    Images are named for the media (``<media-name>.<ext>``), not the
-    slot, so media swapping through one removable slot each keep their
-    own materialization and a re-insert reuses the existing image.
+    Images are named after the media (``<media-name>.<ext>``), not
+    the slot, so different media passing through one removable slot
+    each keep their own image, and re-inserting a medium reuses the
+    image already built for it.
     """
     return os.path.join(machine_dir_path(machine_id, context), "disks")
 
 
 def backend_dir(machine_id, backend, context=None):
-    """The backend's own-artifacts subdirectory (``<backend>/``).
+    """The backend's own subdirectory for its files (``<backend>/``).
 
-    reliquary quarantines each backend's files in a backend-named
-    subdir so the machine root holds only ``machine.json`` and the
-    ``disks/`` and ``screenshots/`` directories. For QEMU it holds
-    just the captured ``qemu-stderr.log``.
+    Reliquary keeps each backend's own files in a subdirectory named
+    after that backend, so the machine's root directory holds only
+    ``machine.json`` plus the ``disks/`` and ``screenshots/``
+    directories. For QEMU, this subdirectory holds just the captured
+    ``qemu-stderr.log``.
     """
     return os.path.join(machine_dir_path(machine_id, context),
                         backend or "qemu")
@@ -176,12 +182,15 @@ def read_vm_state(machine_dir):
     """Return a machine's recorded live-VM identity, or ``None``.
 
     The identity lives in the ``vm`` section of the machine's own
-    ``machine.json``, written atomically with the ``phase``. Its
-    generic core is the backend, that backend's own machine
-    identifier, the per-start token and the endpoint; what the
-    endpoint *is* belongs to the adapter, which validates it when it
-    opens a session. A state file with no ``vm`` section (a stopped
-    machine) reads as ``None``; a malformed section fails closed.
+    ``machine.json``, written atomically together with the ``phase``
+    field. The fields every VM identity has are: which backend it
+    runs on, that backend's own id for the machine, a token generated
+    at each start, and an endpoint; what the endpoint actually
+    contains is up to that backend's adapter, which checks it is
+    valid when it opens a session. A state file with no ``vm``
+    section means the machine is stopped and this returns ``None``; a
+    ``vm`` section that is malformed raises an error instead of
+    returning something invalid.
     """
     path = os.path.join(machine_dir, "machine.json")
     try:
@@ -296,14 +305,15 @@ def _resolve_by_id(selector, context):
 def machines_for_blueprint(name, context=None):
     """Machines of blueprint ``name`` scoped to this invocation's source.
 
-    Selection scoping (instance model): a machine matches when its
-    recorded ``blueprint-source`` equals the invocation's own
-    resolution of ``name``, so same-named blueprints in different
-    projects never select each other's machines — and ``apply`` never
-    adopts them. A machine with no recorded source matches by name
-    alone (there is nothing to scope it against); when ``name`` does
-    not resolve in this invocation, only such sourceless machines can
-    match. Ordered like :func:`list_machines`.
+    Under the instance model, a machine matches only when its
+    recorded ``blueprint-source`` equals what this invocation itself
+    resolves ``name`` to, so identically-named blueprints in
+    different projects never select each other's machines, and
+    ``apply`` never adopts one of them by mistake. A machine with no
+    recorded source matches by name alone, since there is nothing to
+    compare it against; when ``name`` does not resolve at all in this
+    invocation, only such sourceless machines can match. Ordered the
+    same way as :func:`list_machines`.
     """
     matches = list_machines(context, blueprint=name)
     try:

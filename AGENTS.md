@@ -4,763 +4,832 @@ This is the canonical, agent-agnostic guidance for working on Reliquary. Human u
 in [README.md](README.md); keep this file focused on repository structure, engineering constraints, verification, and
 maintenance context.
 
+## Write plain English
+
+Write every document, comment, and commit message in plain English: short sentences, concrete nouns, say
+what actually happens. Do not write dense, metaphorical prose — invented images like "a door that trusts a
+recorded phase," or unexplained jargon like "the seam," "fails closed naming itself," "the number retired."
+If a sentence needs decoding before it says anything, rewrite it.
+
+**Much of this repository's own existing prose (this file included) is written in exactly that dense
+style, built up by agents each imitating the last. That existing text is not a model to follow — it is
+the problem.** Do not treat "match the surrounding style" as a reason to write more of it, here or
+anywhere else in the project. When you touch a section written that way, rewrite it in plain English
+rather than extending its voice.
+
 ## Project state and layout
 
 Reliquary is an OS installation scripter built on its own generic QEMU
 runner, with DOS as the default and currently only complete platform
 workflow:
 
-- `src/reliquary/` contains the library and CLI. `__init__.py` preserves the root import surface; `errors.py` owns the
-  error taxonomy — `ReliquaryError` the root every deliberate error subclasses, with
-  `StaticError` (exit 2) / `PreflightError` (3) / `RunFailure` (4) / `RunCancelled` (5, a sibling of `RunFailure`,
-  never a subclass) and the `exit_code` / `outcome` mapping both the CLI and the terminal event read. **Those four
-  describe every surface, not a script run** (D58): what decides one never mentions a script — settled by the
-  authored input alone, the world not satisfying that input, the work itself failing — so a malformed blueprint is
-  a `StaticError` and a machine that does not exist is a `PreflightError`. Exit `1` is a fault and never a caller's
-  mistake, with two populations: a deliberate `InternalError` (an invariant reliquary caught in its own state) and
-  an accident that never was a `ReliquaryError`. **A deliberate raise is never a bare builtin** — `test_errors.py`
-  walks every `raise` in the package and fails on one, because `except ReliquaryError` is contracted as the
-  catch-all. `events.py` owns the run event stream — the `Event` envelope
-  (`seq` / `time` / `elapsed` / `kind` plus the kind's own fields, flattened at serialization), the `EventStream`
-  that records and renders as it goes (redacting every string through the run's secret set, ticking a live display
-  without recording the tick), and `note()`, the emit-or-say-it-on-stderr helper media movement uses so a fetch
-  outside a run is still honest; `progress.py` owns the renderings — `resolve_mode` (`auto` by stderr tty),
-  `describe` (the one human line per event both human modes share), and the `pretty` / `plain` / `jsonl` renderers,
-  with the output discipline enforced there: human modes render everything to stderr and leave stdout empty, `jsonl`
-  owns stdout alone; `home.py` owns the six placeable working
-  directories — the derivation cascade, the fail-closed unassigned error, and the
-  `Context` record every path-resolving engine function accepts, which also carries the selected
-  properties file (P26's cargo); `session.py` is the exported **`Session`**, P26's one door —
-  opened on a bare home string or a `Context`, refusing construction
-  without a home (`dir.unassigned`, the first-use rule moved to the door), pinning the record
-  once at construction from that record alone (no module-global state exists, so two
-  sessions in one process are unremarkable), and forwarding one thin veneer method per
-  ambient-state verb to the engine modules; the codex verbs (CLI-only, D87) and the pure
-  parsers take no veneer, and
-  the CLI is its first consumer; `assets.py` owns authored-asset residency: one resolution
-  source (`DirectorySource`, reading each kind's own placeable directory walked recursively by extension, and no
-  seeding axis behind it), `source_for`, and the
-  name-field-else-stem identity with its within-source conflict guard (`index_by_name`); the embedding API assigns no
-  directory, so it fails closed rather than reading a home or CWD, and an `ObjectSource` of
-  JSON-imported objects is the planned third
-  source, `json5reader.py` is the JSON5 document reader (D102 — the published
-  grammar, `NaN`/infinities refused so values stay ordinary JSON, source
-  positions on request), `document.py` is the `.rlqb` parser (normative spec: `docs/spec/blueprint-model.md`) —
-  `parse_document` / `load_document` build a `Document` of `machines` / `media` from a root array of specs (a lone
-  spec object is sugar for the array of one; `type` defaults to `media`, so an untyped object is a media and the
-  media branch's unknown-field error carries a did-you-mean when machine vocabulary appears), dataclasses `Machine`,
-  `Media`, `MachineDrive`, `Location`, `Reference`, `Deferred` (a value still carrying `${…}` references, finished at
-  resolution — validation is two-phase, shape here and value at resolve); `children` desugars to
-  child-declares-parent containment, names are explicit or content-derived under the media-name charter (repaired
-  with a `BlueprintWarning`, failing closed when it cannot be), identity is `(name, type)` colliding
-  case-insensitively, and the reference grammar is closed at two productions — the character class screens, the
-  productions decide — refusing references in identity/graph positions and the closed vocabularies; it validates the
-  full field reference (`platform`, `backend`, `memory`, `cpus`,
-  `drives` — a media name, `null`, `{media, controller, enabled}`, or an inline media (the anonymous blank included) —
-  `boot`, `name` (the id-safe identity, not a
-  display label), `description`, `scripts`, `control-planes`, `pointing-device` (F66), `backend-settings`,
-  `parameters`),
-  `authoring.py` is **the counterpart of `assets.py`** — `assets` resolves and reads what a user owns, `authoring`
-  writes and removes it — and is authoring-only: it scaffolds (`new_blueprint`), writes a media declaration for a
-  file already
-  on disk (`add_media(name, file)`: computes the sha256, writes `blueprints/<name>.rlqb` locating the media at
-  that path, copies nothing, refuses to overwrite — the supply seam for pinned-but-unlocated codex media, D41),
-  and removes both authored kinds — `delete_blueprint`, which fails closed while any machine of that blueprint
-  exists, and `delete_script`, which fails closed while any blueprint in the source references the script.
-  **Both removals refuse while something still refers to the file, and that shared order is why the two kinds sit
-  together** — who refers to this, does the file exist, remove it — while the answers come from entirely different
-  places (the machine list; every blueprint parsed for its `scripts` map), which is why it is a shape kept aligned
-  by adjacency and not a helper. `resolve.py` builds the merged `(name, type)` resolution
-  namespace from every `.rlqb` in the active source (`load_namespace` / `build_namespace`, cross-file collision
-  detection), resolves a media by name (`resolve_media`), and lowers it to a nested fetch plan
-  (`Download` / `LocalFile` / `Extract`), `acquire.py` executes that plan — `fetch_media(media, namespace, context,
-  on_mismatch)` downloads (mirrors), extracts recursively, and sha-verifies into the one `cache/media/`
-  cache, keyed by the name of the media each file is, and attaches a `local` payload in place. The cache is
-  wholly regenerable — every payload arrived by download or extraction, so no verb asks where a file came from
-  before reclaiming it and nothing records provenance (D41 deleted the identity ledger),
-  `media.py` is acquisition-only — `fetch_media(name,
-  context, on_mismatch)` and `list_media` over the namespace, plus the cache family — `clean_media(name=None)`
-  (blunt, skipping running attachments; targeted when named) and `prune_media(dry_run=)` (the
-  attachment closure: a container goes once its children are cached) — with no `delete_media`: removing a media
-  is editing the `.rlqb` that declares it (D30), and no `add_media`: supplying a file is authoring a
-  declaration, which is `blueprint.py`'s (D41),
-  `properties.py` owns the user properties file — the line-based
-  `<home>/user.properties` (`key = value`, `#` comments, dotted
-  letter-initial keys with the `rlq`/`reliquary` namespaces reserved,
-  values verbatim to end of line, a leading `@` naming a value kind:
-  `@secret` the marker, `@@` a literal `@`), parsed whole before any
-  edit so a malformed file is never partly rewritten (`PropertiesError`
-  naming path and line), edited surgically line by line — comments,
-  blanks, and ordering preserved — and written atomically;
-  `get_property` / `set_property` / `unset_property` /
-  `list_properties(prefix)` are the verbs, a secret reading as the
-  marker `{"secret": True}` and never a value; every verb takes
-  `properties_file=` (CLI `--properties`, env `RELIQUARY_PROPERTIES`),
-  which *replaces* the home's file rather than layering over it.
-  `credentials.py` owns the host credential store — a three-method
-  provider seam (`keyring`'s own shape, so the default provider is
-  `keyring` and a test double is three functions; `_set_provider`
-  installs one, which is how the suite never touches the real store),
-  secrets scoped by the selected properties file's absolute path, and
-  no plaintext fallback anywhere: an absent or unusable store raises
-  `CredentialError`. Updates are fail-safe ordered — credential before
-  marker, marker before credential — so the only recoverable leftover
-  is an orphaned credential, which an ordinary set refuses to
-  overwrite and `unset_property` clears. Property *binding* into a run
-  (the layered sources, the derivation, the runtime secret rules) is
-  the rest of milestone 8,
-  `library.py` owns the codex — the built-in seed library
-  (`src/reliquary/codex/` package data: copy-out **on request only**, never overwriting home files;
-  `seed_blueprint`/`seed_script` copy a closure by default or the single file with `only=`; `list_codex`
-  names what the library holds and reports nothing of yours, `codex_blueprint_available` is the question a
-  refusal asks so it can name the seed command), `machines.py` owns machine materialization under
-  `cache/machines/<blueprint>-<n>/` — where **backend assignment** happens, before any image work: the
-  blueprint's whole demand (control planes, media kinds, controllers, materialization modes, the
-  `pointing-device` — F66, resolved by `_resolve_pointing_device`, defaulting to `mouse`) becomes a
-  `backends.Requirements`, and a declared `backend` pins the choice — as does `backend-settings` for exactly
-  one backend, which **narrows** the walk to it (`_backend_choice`: declared, else a lone section, else the
-  walk; presence narrows, not content) — while an absent one walks the priority
-  order (`backends.PRIORITY`, D66) and takes the first backend both available and capable. A requirement no
-  candidate can honor fails closed naming the backend and the requirement, rather than recording a policy
-  nothing can honor (P11). **The dry run is the same evaluation with nothing committed** —
-  `create_machine(dry_run=True)` returns a `DryRun` (`operation` / `report` / `plan`, the type F25's script
-  variant shares) and writes nothing at all: no machine directory, no `machine.json`, no image, no fetched
-  payload, no lock file and no seeded blueprint, a codex-only blueprint being read where it lies as a
-  read-only check reads it. It resolves media without fetching them (`acquire.residency` reports
-  `cached` / `would-download` / `would-extract` / `local-present` / `local-missing`, hashing nothing —
-  `cached` is presence, not verification) and describes location properties without binding them
-  (`binding.describe_keys`), because it must never prompt. It refuses what a create would refuse where a
-  create would refuse it, with two deliberate exceptions, each a thing it *cannot do* rather than a
-  severity judgement: an unbound location is reported unevaluated, and under `backend=` an absent backend
-  is reported rather than raised — that flag asks whether the blueprint would work *there*, so capability
-  alone decides (`backends.evaluate`), and it is legal only under `dry_run` because P10 gives the blueprint
-  authority over what a machine is. Missing local payloads are the one class collected and raised together,
-  so a validator pass names them all — plus lifecycle (`create` / `start` / `stop` / `destroy` /
-  `recreate_machine` (destroy+create under the same id) / `apply_blueprint` (adopt blueprint edits into a
-  stopped machine, reconciling absorbable diffs and failing closed on a changed size/materialize of an
-  already-materialized media image) / `get_machine_dir` (the out-of-band door) /
-  `list_machines` /
-  `resolve_machine` / the exec-run family — `wait_ready` (`exec`'s
-  precondition as its own twin, D114: the shared `_running_guest`
-  preflight — selector, DOS, running, VM identity on record — then
-  the adapter's readiness wait — a prompt held as a candidate until
-  `screen_stability` says the screen under it settled, as `execute`
-  holds its completion, D115 — whose expiry is `WaitExpired`),
-  `exec`, `get_machine_var`
-  (the script→host scalar channel: a `machine.json` `variables`
-  map under the op lock, cleared at `start` so a variable always
-  reports the current boot, the `rlq`/`reliquary` key namespaces
-  reserved; the script `set` verb is the channel's only writer —
-  the host side only reads, per the CLI spec);
-  where a machine lives, what serializes it and how one is named is
-  `machine_state.py`'s (below); each mutating op carries an
-  operation generation and writes the transitional phases
-  `creating` / `stopping` / `destroying`, so an interrupted operation is
-  reconciled at the next op — `stopping` completes, `creating` /
-  `destroying` roll forward to removal) and persistent machine-state mutations
-  (`insert_media` / `eject_media` / `set_boot_order` /
-  `mark_stopped` — insert/eject are floppy and cdrom only and work
-  running-or-stopped (a running change is applied live over the
-  identity-verified QMP session by drive id, then persisted to state;
-  `insert_media(slot, media=None, file=None)` takes exactly one of a
-  declared media — fetched and verified — or `file=`, an anonymous
-  `local`+`use` image mounted in place, mutable, unverified, never
-  copied: U20's live-iteration transport)
-  or stopped (persisted for the next start); `set_boot_order` is
-  stopped-only (a launch-time firmware order); boot-order keys may name
-  any declared drive; all three persist and survive stop/start — and **a
-  script's `with` scope is a second caller of exactly these three**,
-  capturing before it changes and calling them again to put the value
-  back, under the same rules: a boot restore is refused on a running
-  machine like any other write of that order, and the run fails naming
-  what it could not undo rather than the state document gaining a
-  writer under a different rule, D104),
-  **There is no drive layer and no file family** (D108): reliquary
-  declares a machine's drives, materializes them and moves their
-  media, and reaches inside no volume — no `describe_drives`, no
-  `put_file`/`get_file` family, no drive-letter map, no at-rest
-  disk access, and no `remanence` dependency. What is inside a
-  volume is the caller's, reached with the caller's own tools
-  against `get_machine_dir`'s directory, which makes P16's
-  file-content carve-out the boundary rather than a gap. Two
-  Reliquary-supplied routes stay in-band and neither opens a
-  filesystem: a directory-source media attaching a host directory
-  through vvfat, and `insert_media(file=)` swapping a whole image
-  live. `test_old_surface_purge.py` keeps the seven command words
-  retired, and `test_command_manifest.py` catches a twin coming back
-  as an unclassified session method.
-  `machine_state.py` is **the substrate the machine layer stands on** —
-  where a machine lives (`machine_dir_path`, `machine_disks_dir`,
-  `backend_dir`), how one is named (`machine_id_for` /
-  `split_machine_id`, ids `<blueprint_name>-<machine_number>` with
-  lowest-free reuse, `allocate_machine_id`), what serializes work
-  against it (`blueprint_alloc_lock` for numbering, and the exclusive
-  per-machine operation lock `machine_lock`, `.locks/<id>.op.lock`,
-  taken by every mutating op), its `machine.json`
-  (`write_state` / `load_machine_state` / `read_vm_state`), and the
-  selector resolution `--blueprint` / `--machine` reach it by
-  (`resolve_machine` / `list_machines` / `machines_for_blueprint`).
-  It knows nothing of what a machine *is*: no backend, no adapter, no
-  drive, no media. **It stayed a separate module after its second
-  consumer left** — `drives.py` was the other half and D108 deleted
-  it — because `machine_handle.py` needs `read_vm_state` and would
-  otherwise be back in a cycle with the lifecycle. Phase
-  transitions have one consumer and stay with the lifecycle above,
-  and `machines.py` remains the layer's **front door**, re-exporting
-  these names so a consumer above it reaches them in one place,
-  `backends.py` is **the backend adapter seam** — the provider contract behind the semantic surface
-  (design: `planning/design/backend-adapter.md`), deliberately *not* one of the application surfaces:
-  the `BackendAdapter` contract (discovery, capability report, image materialization, start/stop, and the
-  carrier session), the `Availability` / `Capabilities` / `Requirements` vocabulary the report and the demand
-  share (`pointing_devices` / `pointing_device` the newest axis, F66, judged in `unmet()` exactly as `drives`
-  is), `capture_format(plane)` and its sibling `pointer_capable(plane)` — two separate per-plane
-  capabilities (F66: a plane can capture a framebuffer without being wired to deliver a pointer event on it,
-  VirtualBox today), each defaulting to the honest "nothing" (`None` / `False`), the `backend-settings` contract (`settings_keys` — the keys an adapter's section may carry, empty
-  being the honest default — and `validate_settings`, the shared unknown-key refusal an argv-shaped adapter
-  extends with its own overlap rule; only the *assigned* backend's section is ever judged, no adapter being
-  able to speak for another's vocabulary), `identity()` (the recorded-VM-identity record every adapter writes: backend, `backend-id`,
-  per-start `token`, and an adapter-shaped `endpoint`), the registry (`adapter(name)`, `discover()`), and
-  `assign()` — built over `evaluate(name, requirements)`, which reports availability and unmet
-  requirements as **two answers rather than one verdict**, because whether this host has a backend and
-  whether that backend could build this machine are two questions and a dry run asks only the second.
-  `_set_adapter` is the test seam, as `credentials._set_provider` is for the keyring.
-  `backend_qemu.py` is **everything that knows QEMU** — binary discovery, `qemu-img` image work, the drive
-  and boot rendering a machine's state lowers into (the `pointing-device: tablet` field renders alongside
-  them, `-usb -device usb-tablet,id=pointer0`, F66), the `backend-settings.qemu` hatch (`SETTINGS_KEYS` = `machine` /
-  `args`, `RESERVED_ARGUMENTS` = what a blueprint field or the VM identity owns — case-sensitively, `-m`
-  being memory and `-M` the machine type, and deliberately *not* `-device` or `-cpu`, with
-  `RESERVED_DRIVE_PROPERTIES` the `-drive` properties `drives` renders and so refuses through
-  `-set drive.<slot>.<property>` too — QEMU's own per-drive addressing, every drive carrying `id=<slot>`, is the
-  route to one drive's options and the reason no drive-scoped section exists, D118; `settings_args` both
-  validates and renders, which is what makes a section a create accepted one a start applies, and it renders
-  last so a caller's own arguments are the tail of the logged command line), the owned launch with its identity verification, `Qmp`,
-  the carriers (`send_keys`, `text_screen`, `screenshot`, `change_medium`, `pointer_event` — F66, refused on
-  the base session for lacking a coordinate space to aim into, real on the VNC session via RFB's own
-  `PointerEvent`, no scaling) plus the named native escape
-  hatch `QemuSession.native()`. **It serves two display planes over
-  the one carrier seam** (F63): the agentless default scrapes VGA
-  text memory over QMP, and the VNC plane (`control-planes:
-  ["vnc"]`, the first declared plane driving the session) launches
-  `-vnc 127.0.0.1:<display>` — loopback, no VNC auth, the port and
-  the driving plane recorded in the identity's endpoint beside the
-  QMP port — and reads the RFB framebuffer through the shared
-  recognizer with `guest_glyph_banks`, sending keys through the
-  qcode → X11 keysym table (`keysym_for`, D103's adapter-side
-  layer, VirtualBox's `scancodes_for` twin). Identity stays QMP's
-  job: `query-vnc` cross-checks the recorded endpoint after the
-  ordinary verification, at launch and again before any session
-  opens the RFB socket, and `change_medium` rides QMP whatever
-  plane drives the screen. `rfb.py` is the wire — an in-tree
-  minimal RFB 3.8 client (security None, forced 32bpp true colour,
-  Raw-only updates full and incremental, `KeyEvent` and
-  `PointerEvent`, D110's no-new-dependency ruling) that knows no
-  machine and verifies no identity, which is why it stays a
-  separate module below the
-  adapter. **No adapter opens a disk's
-  contents**: an adapter creates the images a machine runs on and
-  exposes nothing that reads inside one (D108).
-  `backend_virtualbox.py` is the VirtualBox adapter (F50 lifecycle
-  and VDI; F52 agentless-display carriers and FreeDOS parity).
-  `backend_stubs.py` holds the two unbuilt adapters (VMware
-  Workstation, Hyper-V): their host probe is real, they claim **no
-  capability**, so assignment passes over them even where the
-  backend is installed, and a pinned one fails preflight naming the
-  gap.
-  `control_display.py` is the **agentless-display control plane** — character-to-key mapping (`char_keys`),
-  text-screen composition and
-  the cursor-menu machinery, written once over the seam's text-screen contract (character rows plus opaque,
-  equality-comparable per-cell attribute tokens) and never per adapter. **Key mapping is three layers, not
-  one, and only the middle one is here** (D103): the language's portable `press` names are
-  `script_validation.PORTABLE_KEY_NAMES`, `script_runner.resolve_key` maps those onto **the seam's key
-  vocabulary — which is QEMU's qcode set**, and each adapter translates that into its own input events
-  (identity on QEMU, `scancodes_for` on VirtualBox). So `char_keys` spells `spc` and `ret`, and VirtualBox's
-  table has no entry for `space` or `enter`; the seam is named for the reference backend rather than carrying
-  a third vocabulary no backend speaks.
-  `text_recognize.py` is the **shared fixed-font recognizer** (F51) backends without VGA text memory
-  use over a screenshot — same contract, one algorithm. **The glyph bank is the guest's, not
-  Reliquary's**, and an adapter reading a live screen passes `bank=` its own host's font.
-  **The axis is BIOS-drawn versus guest-drawn, and not which emulator** (T20). Both emulators
-  install the *same* font on a text mode set — QEMU's vgabios merges its 19-glyph
-  `vgafont16alt` into the bank it ships, VirtualBox ships the raw bank and applies the same 19
-  at runtime from `vgabios.c`'s `load_text_patch`, and merged-VirtualBox equals QEMU's bank byte
-  for byte. What differs is *who painted the screen*: the BIOS uses that merged set, while a DOS
-  guest that loads its own CP437 font (FreeDOS does) paints the **unpatched** design, `W`, `m`
-  and `T` among the 19 — enough to miss a wait on any word carrying one. So **no single bank
-  reads a whole run, and nothing in a framebuffer says which font painted it** — which is why
-  the recognizer takes *every* font a host offers and matches each cell against all of them,
-  rather than choosing. `bank=` accepts one bank or many (`as_banks`); `_all_glyph_bits` unions
-  them per code, so shapes the fonts agree on are scored once and the cost is proportional to
-  how much they actually differ — 275 entries against 256 for a stock VirtualBox, about 5% on a
-  read. Ties go to the first bank, which keeps two runs on one host agreeing. QEMU's VNC plane
-  (F63) *does* recognize QEMU framebuffers, and survives QEMU offering only the merged bank
-  because the 19 patched glyphs sit close to the classic designs they replaced: measured
-  pairwise (diff the two banks a stock VirtualBox yields, which are the merged and unpatched
-  sets), every ASCII pair is within the recognizer's 24-bit match threshold — `W` the worst at
-  22 — and only `₧` (0x9E, at 39) falls outside it, so a guest-drawn screen reads correctly
-  through the host's one font at a slimmer margin, not by a second bank. A QEMU build whose
-  fonts drift would move that margin; re-measure before reasoning about one. Each backend answers the font question the same way — `guest_glyph_banks(cache)` on
-  `backend_virtualbox` and `backend_qemu` alike — with `banks_from_files` / `banks_from_binary`
-  collecting every bank in the installation's binaries **plus every variant an override table
-  behind one would install**, anchored on the classic `A` every CP437 bank shares and failing
-  closed by name where the install holds none. That extraction is structural, not a table
-  Reliquary knows by name: a run of `(code, rows...)` entries whose codes ascend, closed by a
-  zero code byte, with runs for other glyph heights stepped over — so a build carrying a
-  different set is read on its own terms. QEMU's own plane never needs any of this (it scrapes
-  text memory, where the guest already resolved its characters); it exists so the question is
-  answered identically for both rather than only where it bit, and a stock QEMU yields one font
-  because its bank ships already merged. **The fonts are extracted on demand and cached, never
-  vendored** — `cache/support/<backend>/cp437-8x16-banks.bin` via `text_recognize.cached_banks`,
-  every bank concatenated so the count stays the backend's business, wholly regenerable
-  like everything under that root, so a truncated cache file is re-extracted rather than raised
-  on. The cache root reaches the adapter as `Machine(cache=)` → `adapter.session(vm, cache=)`, a
-  plain resolved directory and **not derivable from the machine directory** (`machines` is
-  independently placeable); `None` simply re-extracts, since this is a speed concern and never a
-  correctness one. Not vendoring is the licensing policy (CONTRIBUTING.md) as much as the
-  engineering: the glyphs belong to whatever emulator the host installed. The shipped
-  `fonts/cp437_8x16.bin` remains **only** as `recognize`'s default and what `render` draws
-  fixtures with, so the suite needs no hypervisor — and it is **drawn rather than dumped**
-  (`tools/gen_cp437_font.py`, D82: the incoming test is *could this ship inside a proprietary
-  product?*). Its ASCII and box-drawing shapes are authored; every code nobody drew gets a
-  computed Reed–Muller codeword, 64 of 128 pixels from any other, because the one thing the bank
-  must be is **all 256 codes distinct** — an undrawn code came out blank, collided with the
-  space, and could never be recognized. It is not a VGA face and does not have to be, which is
-  why `CLASSIC_A` — the anchor `bank_from_binary` locates a *real* bank by — is deliberately
-  **not** in it; a test wanting a findable bank says so via `tests/vga_bank.py`.
-  **Whether a screen has stopped changing
-  is not decided here** (F49): `_settled_screen` and `_menu_baseline` are callers of `screen_stability` rather
-  than owners of a copy. What stays is what was never about settling — whether a keypress changed anything at
-  all (`None` reads as a dead key) and which row the highlight moved to, both classification.
-  `screen_stability.py` answers whether the guest has **stopped drawing** — the frame-level question
-  `stable=` cannot ask, a condition being able to hold perfectly on a screen that is still painting. It
-  compares **cells, not rows** (row granularity cannot separate a blinking cursor from an arriving line of
-  text) with the **text+attribute pair as identity** (a cursor menu moves its selection by attribute alone),
-  and measures both halves over **wall-clock windows rather than sample counts** — otherwise a denser poll
-  reaches a different verdict on the same guest, and a recorded run and a production run could take different
-  paths through one script. Stability is the unmasked fraction that held still over the last 200ms, judged
-  against 0.99: 20 cells of 2000, a quarter row, which is the gap between furniture (a cursor 1 cell, a clock
-  8) and content (a row of text, 80). Decoration is **recurrence** — a cell changing 3+ times within 1s —
-  excluded from that fraction, with `_menu_baseline`'s majority-churn bail-out carried over (mask nothing,
-  compare raw). A window never observed answers `stability=None` rather than a verdict the cadence produced
-  (P11). Delivered as F47, and **the only implementation of the measure in the tree** (F49): its three consumers
-  are `exec`'s completion test (F45, below), the script language's `stability=` (F48, below), and the menu
-  machinery, whose own hold-for-two-reads and learned animation mask were special cases of it and were deleted
-  rather than kept beside it. One interaction the cut exposed and `control_display._BASELINE_READS` now records:
-  **settling and recognizing decoration want different amounts of looking** — a clock moves two cells and is
-  settled on sight, but nothing can know it is a clock until it has ticked repeatedly, so a baseline that stops
-  at the first settled frame hands back an empty mask. **The contract generalizes from cells
-  to pixels** (F65): `observe` also takes a Pillow image, for the landmark compares where
-  there are no cells, and measures the same fraction over the same window at the same
-  default; a `Reading` carries the unit it counted so a diagnostic says "pixel" where it
-  counted pixels. A monitor stays on the kind it was first handed — mixing them would read
-  every sample as a total repaint.
-  `landmarks.py` is the **image-match asset and its matcher** (F65; normative spec:
-  `docs/spec/landmarks.md`) — the `.rlql` authored kind beside `.rlqb` / `.rlqs` / `.rlqf`,
-  stem-identified like a script and a font, with its variant renderings attached as plain
-  `<name>.<n>.png` files by stem-and-number adjacency so an asset refresh is file *creation*
-  and never file rewriting. It resolves out of `home.landmarks_dir` — `<home>/landmarks`, a
-  fixed leaf like `fonts` and not a seventh placeable root — and its name is checked against
-  the one collision-checked `@` pool media and fonts already share, which `assets.guard_pool`
-  now serves for all three. **The metric is pixel-equal fraction, judged per region** (never
-  one pooled score, which would let a small failing region drown in a large matching screen's
-  average): an `ignore` region excludes its pixels and wins overlaps, a `fuzzy` region judges
-  its own surviving pixels against its own declared percent, and the residual demands 100%. A
-  variant matches when its residual is clean and every fuzzy region clears its bar; the
-  landmark matches when any variant does; a miss reports the **nearest** variant with its
-  failing regions and their achieved percentages. The reference side is normalized through the
-  capture plane's stated pixel format first — the seam point `hyperv-screen.md` settled, an
-  identity on every plane built today and costing nothing until one quantizes.
-  **`spots` are read by `click`** (F66): a named point, or the lone spot a spotless-of-ambiguity
-  declaration carries, is where a pointer event lands. `park_position(width, height)` resolves
-  every pointer verb's post-delivery park move per landmark — bottom-right, scaled to that
-  landmark's own pinned size rather than a bare global pixel, since content commonly anchors
-  top-left — and `_park_region` folds the matching built-in `ignore` region into every match
-  unconditionally, clamped to a quarter of the pinned size so a small landmark's residual is
-  never swallowed whole. This is host-side masking, not a cursor-free capture: nothing
-  negotiates an RFB pseudo-encoding to keep the cursor out of the framebuffer in the first place.
-  **What decides whether a machine can watch a landmark is the plane's screen carrier, not the
-  backend**: `BackendAdapter.capture_format(plane)` reports the pixel format a plane captures
-  in, or `None` where it captures none (the honest default, as `settings_keys` is empty by
-  default), and a session whose plane states a format offers the `framebuffer()` carrier
-  beside `text_screen()`. QEMU's agentless-display plane scrapes characters the guest already
-  resolved and states nothing, so a landmark condition on it is a named preflight refusal
-  (`machine.plane-no-framebuffer`); QEMU's VNC plane and VirtualBox's display plane both
-  interpret a captured framebuffer and state `rgb`. `screendump` / `screenshotpng` stay a
-  *diagnostic* carrier on every plane and are not a screen a landmark is matched against.
-  `interaction.py` defines capability protocols, `interaction_agentless.py` contains the concrete agentless DOS
-  adapter (prompt-based readiness and command completion — **the echo and the prompt are identified by
-  provenance, never by shape alone**: the echo is the row the command was typed at with the rows that were above
-  the prompt still above it, and the prompt is back when it is the standard shape or exactly the one the guest
-  was at, D111 and D112; and **a prompt is a candidate, not an answer**, held
-  until `screen_stability` says the screen under it settled, because one arriving mid-scroll would otherwise
-  slice the output at a boundary that never existed, F45; the poll ramp gains a third rung for that rather
-  than losing its second — `_ECHO_POLL` catches the echo, `_PROMPT_POLL` waits a prompt out cheaply, and
-  `_SETTLE_POLL` confirms one, dense reads being spent only where the question has become "is this screen
-  finished?"), `machine_handle.py` is the backend-neutral machine handle — **singular, and named for what it
-  holds**: the package spells its collective engine modules in the plural (`media.py`, `properties.py`,
-  `backends.py`, `machines.py`), and this one is a handle type rather than a family engine:
-  a machine is addressed by its materialization directory, the adapter named in the recorded identity supplies
-  the session (`Machine.session()` / `console()`), and `Machine.qmp()` is the QEMU-scoped escape hatch that
-  refuses any other backend,
-  `platform_dos.py` owns DOS provisioning and facades, and is down to `program_name` alone — the letter map
-  and the guest-address grammar went with the volume mapping (D108), so nothing here translates a host path
-  into a drive letter. The
-  `.rlqs` language is four layers: `script_nodes.py` (the lexer and its diagnostics),
-  `script_parser.py` with `script_grammar.lark` (the typed tree, node signatures, `parse_script` /
-  `load_script`), `script_validation.py` (the V-numbered static rules, each diagnostic citing its id),
-  and `script_timing.py` (durations, and the timing plan resolved at parse time: every observation's
-  effective timeout and quiescence gate, and every guest-input verb's effective `pacing` — the settling gap
-  before its first
-  key event, D60 — each with the scope that supplied it (`INPUT_VERBS` gained `click` at F66, and
-  `click` joins `select` as the only two verbs appearing twice in the resolved plan — an
-  `Observation` for the search, carrying the landmark name, and an `Input` for the delivery).
-  **`stability=` is `pacing`'s opposite number** (F48):
-  a proportion rather than a duration, resolved over the ladder statement > branching wait > phase > header >
-  built-in 0.99, sitting on observations where pacing sits on the five input verbs — each guard on exactly the
-  statement kind whose hazard it addresses, so neither needs position-sensitive semantics. It sits where
-  `stable` cannot, and the divergence is principled: `stable` qualifies a match, so one must exist, while
-  `stability` qualifies the frame a compare runs on, and a frame exists at every sample — which is also what
-  makes a default possible at all. A sample below the gate is not one any condition is judged on, and in a
-  branching `wait` an unsettled frame evaluates **none** of the handlers. **The gate never causes a failure on
-  its own**: where it never got to measure the condition is judged on what is there, so the "a timeout means
-  samples were taken, never that nobody looked" invariant survives; where it measured and the screen was
-  moving, the expiry names it. `stability=0` turns it off and costs nothing — the escape for a screen the
-  default refuses; `format_plan` and
-  `run_script(dry_run=True)` / `rlq run-script --dry-run` report it without running,
-  with `script_validation.reach` counting the statements no static pass can promise
-  will run — a handler body is the guest's decision, not the plan's).
-  **The script dry run is the same `DryRun` the create half returns** and the same
-  rule: read-only throughout, seeding nothing and never prompting, stopping before
-  the machine starts and before any statement reaches a guest. Two things are its
-  own. **The selector is optional there alone** — its presence chooses which of
-  script-spec.md's two checkable tiers applies, which is what keeps the
-  selector-less mode the respelling would otherwise have deleted in silence. And
-  `--dry-run` flips the command from a stream to a **document**: `--json` becomes
-  legal (it prints exactly what the twin returns) while `--progress` and
-  `--display` are refused, a plan having no stream to render and no window to
-  show. **The whole check family is deleted rather than aliased** (P9): its
-  command, its twin, its result type, and the property-key predicate that went
-  private with them — a public predicate on a string with no CLI twin was a
-  standing P6 residue. `test_old_surface_purge.py` holds the spellings and keeps
-  them retired, which is why they are not written out here.
-  `binding.py` resolves declared script properties before a run —
-  the flattened source order (explicit `--property`, blueprint
-  parameter with its `{"property": ...}` redirect, `RELIQUARY_PROPERTY_*`
-  environment with collision preflight, the properties file, the
-  declared `default=` derivation, then an
-  interactive ask), the text/media/secret kind rules, secret values
-  pulled from the credential store, and `describe_sources` the dry
-  twin that names each key's source for a dry run without
-  binding or prompting; declarations bind in topological order so a
-  derivation's referents resolve first. `facts.py` owns the `rlq.*`
-  run facts a derivation may reference (`rlq.host.username`
-  login-normalized, `rlq.host.full-name`, `rlq.env.<NAME>` verbatim),
-  each an unanswerable-when-empty host value. `bind_keys` binds the
-  bare keys a media `location`/`sha256` references (no `property`
-  node behind them) through the same order minus the derivation;
-  `resolve.py` substitutes them (`location_property_keys` collects
-  the closure, `resolve_media_plan(..., properties)` binds them),
-  and `machines.create` / `apply_blueprint` bind at materialization
-  so the state records the resolved location, never a `${key}` — a
-  bound value that is itself a reference is refused (no chaining).
-  **The one construct added since the vocabulary was set is `with`** (F54, D104), the scoped
-  machine-state change: a block whose head is `boot`, `insert` or `eject` and whose exit puts
-  the target back to what it held on entry, on every outcome the runner reaches. Three things
-  about it are load-bearing across the layers. **`boot` states a prefix and is deliberately not
-  `set-boot`** — the drives named come first and the machine's own order follows, so a stage says
-  what it boots without restating an order it is not changing, and the two spellings keep two
-  meanings. **The scope is dynamic**: it holds while control is *inside* the group, so the
-  parser flattens the phases out (`Script.phases` stays the one flat namespace `goto` and `entry`
-  address) and records only `phase_scopes`, the chain around each phase — which is the whole of
-  what a transition needs, and is why every layer above the parser is unchanged by the construct.
-  **The grammar can no longer split the two script shapes**, a `with` head saying nothing about
-  which shape follows it, so the body is one permissive unit list and V10 and V2 decide it where a
-  diagnostic can name the shape. **V17 is the one static rule that is a *flow* analysis** (T27): where the
-  machine is — from the `machine` header, `start`, `stop`, and a completed
-  `wait machine=stopped` — carried to a fixed point over the transition graph, so a `set-boot` or a
-  boot scope's edge the plan promises is reached with the machine up is refused at parse time rather
-  than five minutes into an install. It is bounded by exactly what `reach` bounds: a handler body is
-  walked for its effect and never judged, and two paths that disagree refuse nothing — a false
-  refusal being far worse than the late failure it replaces, which is why the run-time check stays. `script_runner.py` executes that tree against
-  cached machines — the phase graph, branching-wait and reactive dispatch over samples and episodes,
-  the clocks the plan resolved — and wires `run-script <label>` (resolve via blueprint map,
-  create-if-none, the machine-state header, static preflight of insert/eject/set-boot drive keys
-  (a `ScriptPreflightError`, exit 3 — it is caught before the first guest input; `click`'s own
-  three join it under the same class — `machine.pointing-device-not-tablet`,
-  `machine.plane-no-pointer-input`, `landmark.spot-required`/`landmark.spot-unknown` — F66, checked
-  in `_preflight_landmarks`'s existing walk since `click` carries a `conditions` tuple like `wait`
-  does, needing no second walk for the three landmark refusals both share).
-  **`_click` reuses `wait`'s search machinery verbatim** — `_observation`/`_arm`/`_observe` — rather
-  than `select`'s opaque `cursor_menu_select`, because a `click`'s target is a real landmark
-  pixel-match and not a text scan; only once that search matches does delivery pay `pacing` and
-  compose the click through `DisplayConsole.click`, which parks the cursor as its last event.
-  property binding before the machine starts, secret redaction, and
-  the run **returning its output** to the caller — no run-record
-  persistence, milestone 9's return model; the `runs/` archive is
-  async-backlog work, D36). Everything it reports goes through the
-  one event stream, so no surface can report what the stream does not
-  carry; it keeps the failure report's raw material as it goes (the
-  pending condition or action, the route with its per-phase revisit
-  counts, the last sample) and emits `failure` before the terminal
-  event, naming the expired clock and its scope, the nearest miss on
-  the last screen read, an automatic screenshot (suppressed for the
-  rest of a run once a secret reaches the guest), and the next
-  command to try. Ctrl-C installs a handler that sets a cancel flag
-  the boundary checks read (`_check_clocks`, at statement starts and
-  dispatch samples), so a cancellation ends the run at a boundary
-  with an input delivery already in flight completed — never
-  wherever the interrupt happened to land.
-  `transcript.py` is screen-transcript capture and reconstruction,
-  and **the module is not an application surface** (D98): the
-  `.rlqt` format carries no stability guarantee and no `docs/spec/`
-  entry, so changing it is housekeeping — while the *invocation* is
-  surface and lands on S1/S2 in the same change (`--record <path>`
-  on `run-script`, `run_script(record=)` on the session). The
-  capture wraps the **carrier seam** — the adapter session's
-  `text_screen` / `send_keys` / `screenshot` / `change_medium` / `pointer_event` (F66, passed
-  through on record and refused on replay for the same reason `framebuffer` already is: a
-  transcript holds no pixels, so a `click`'s search is already unreplayable before its delivery
-  would be reached) —
-  so it is backend-neutral by construction: `RecordingSession` is
-  that wrapper, and `ReplaySession` stands a fake session at the
-  same seam, which is what lets the whole interpretation layer
-  above run unmodified over a recording. Every frame carries a
-  sha256 of its canonical `(rows, attributes)` pair, checked at
-  reconstruction, so a bug or a hand-edited fixture fails loudly
-  rather than yielding a screen that never existed — and it covers
-  the screen **expanded**, while the file writes each attribute row
-  as runs (`pack_attributes`), so how the file spells a screen is
-  never what a fixture asserts. The header states the capture's
-  pace and **what it is a capture of** — the script's stem and the
-  sha256 of its text — because a replay stands that same script
-  back up, and a script edited since is named as stale rather than
-  reported as a divergence partway through. **A frame carries the
-  moments its absorbed reads were taken at, not only how many there
-  were**: reconstruction runs on the capture's own timeline, every
-  measure in the layer above is a window over wall-clock, and
-  spreading a held frame's reads evenly — the obvious guess — moved
-  the menu machinery by one read and changed which key it pressed. For
-  the same reason a read arriving where the capture's next entry is a
-  **call** is an error (`transcript.read-before-call`) rather than a
-  step over it: a swallowed keypress surfaces as a mismatch much
-  later, against a screen neither run was looking at. **The file ends
-  with what the run concluded** — `write_outcome`, the rows a command
-  returned or the phase a script finished in, or the rule either
-  refused with — because two runs over the same screens make the same
-  carrier calls and which rows are "the output" is decided above the
-  seam; it is what a reconstruction is asserted against, and what
-  makes a capture of a *failing* run assertable at all. **The pace is a ceiling
-  on the poll interval and never a floor**: no independent sampler
-  can exist (QEMU admits one QMP client), so the run's own polls
-  *are* the capture, and taking the larger of the two — which is
-  what it did — left the two-second idle hole the mechanism exists
-  to close. It is not free: a QEMU sample is a 4000-byte HMP dump,
-  and a recorded install runs two to three times longer than an
-  unrecorded one. Two things reach the transcript from **above** the
-  seam, both because the seam cannot say them. Every carrier call
-  goes through the engine's one `_machine()` handle — a caller that
-  builds its own is a call the transcript never sees, which is
-  exactly what the `screenshot` verb did — and a **`vm-gone`** entry
-  records the machine going away, since identity is verified while
-  a session is being opened and a guest that powered itself off
-  refuses the session before the wrapper exists; reconstruction
-  raises the adapter's own `machine.vm-unreachable` for it, which is
-  what answers the `wait machine=stopped` both codex scripts end on.
-  **A bound
-  secret reaching the guest stops the recording** for the rest of
-  the run — the same rule that suppresses the automatic failure
-  screenshot above, applied to the other artifact a run can leave
-  behind. `cli.py` owns command parsing, exit codes
-  (`errors.exit_code` over one `ReliquaryError` arm), and the
-  output discipline. `_build_parser()` registers the 42 commands
-  through nine family builders and returns `(parser, commands)`, and
-  **`_COMMANDS` is derived from that rather than declared** — it was
-  a hand-kept frozenset, which is one more list of the same words to
-  keep in step; do not restore it. **Builder call order is `--help`
-  order**, so the groups follow the blocks this module has always
-  carried rather than a tidier taxonomy: `fetch-media` sits alone
-  between the script and authoring families, and `add-media` sits
-  with cache reclamation. `_dispatch` routes on literal command
-  words and is the one list still kept by hand; `test_cli.py` walks
-  its source and pins it to the registered set in both directions,
-  and an unrouted command reaching the fall-through is an
-  `InternalError` (exit 1) rather than the silent `0` it once
-  returned. It is the session layer's first
-  consumer — one `Context` built per invocation (flags, then
-  environment, then the default home), one `Session` opened on it,
-  every command driven through session methods, the codex and
-  locate seam taking the record directly (D87) — and
-  `__main__.py` preserves `python -m reliquary` execution.
-- `pyproject.toml` packages `reliquary` as the `reliquary` command. **The two artifacts carry different things**: the
-  wheel is the runtime alone, the sdist is the runtime plus what verifies it. The src-only package search keeps the
-  repository-root suite out of the wheel; `MANIFEST.in` grafts `tests` into the sdist (D105) and prunes `planning`,
-  `docs` and `tests/source_tree`. The suite is grafted whole rather than left to setuptools' default rules, which take
-  top-level `tests/*.py` and none of the fixture trees beneath it — `tools/check_dist.py` names those trees one by one
-  for that reason, and names the three pruned trees as forbidden.
-- `tests/` is the suite, and **pytest is the runner** (D106) — **pytest-native throughout** now that the sweeps have
-  finished (F56–F60), covering core helpers, guest program runs, lifecycle ownership,
-  media acquisition, blueprints, machines, and scripts. Its shared machinery is named where it is used: the two
-  conformance corpora and the recognizer's golden PNGs read through `tests/corpus.py`; the script language's static
-  rules are one parametrised case table; the two backend adapters answer one parametrised seam contract; and the
-  command manifest, the session veneer and the documented examples each report a node per declared item.
-  `tests/conftest.py` is the suite-wide configuration: the
-  `integration` marker's `--integration` option, the deselection that keeps the tier out of a default run, and the
-  home those runs work in. **`tests/source_tree/` is the exception that ships nowhere**:
-  the tests that read the *repository* rather than the package — prose documents, the maintainer records, the
-  open-problem catalogue. Shipped, a sweep over `docs/` and `AGENTS.md` would find neither and report success on a
-  fraction of its job, so it is kept where it cannot run at all instead. Nothing there needs a `skipUnless`, and a new
-  test belongs there exactly when it reads something a released artifact does not carry.
+- `src/reliquary/` contains the library and CLI.
+  - `__init__.py` re-exports the package's public names.
+  - `errors.py` defines the error classes. `ReliquaryError` is the base class every deliberate error subclasses.
+    Four subclasses map to exit codes: `StaticError` (2), `PreflightError` (3), `RunFailure` (4), and
+    `RunCancelled` (5 — a sibling of `RunFailure`, not a subclass of it). `errors.py` also defines the
+    `exit_code` / `outcome` mapping that the CLI and the terminal event both read.
+    These four exit codes describe every surface, not just a script run (D58): which one applies depends only on
+    whether the authored input was malformed, the world didn't satisfy that input, or the work itself failed —
+    never on whether a script was involved. So a malformed blueprint is a `StaticError`, and a machine that
+    doesn't exist is a `PreflightError`.
+    Exit code `1` always means a bug in Reliquary, never a mistake by the caller. There are two ways to get it: a
+    deliberate `InternalError` (an invariant Reliquary caught itself violating) or an accident — an exception
+    that was never wrapped as a `ReliquaryError`. Every deliberate `raise` in the package must raise a
+    `ReliquaryError` subclass, never a bare builtin exception: `test_errors.py` checks every `raise` in the
+    package for this, since callers are expected to catch everything with `except ReliquaryError`.
+  - `events.py` owns the run event stream: the `Event` envelope (`seq` / `time` / `elapsed` / `kind`, plus fields
+    specific to that kind, flattened when serialized), the `EventStream` that records and renders events as they
+    happen (redacting every string through the run's set of secrets, and updating a live display without
+    recording each tick), and `note()` — a helper that emits an event if a run is in progress or prints to
+    stderr otherwise, so a media fetch outside a run still reports honestly.
+  - `progress.py` owns how events are rendered: `resolve_mode` (defaults to `auto`, which checks whether stderr
+    is a tty), `describe` (produces the one human-readable line per event that both human-facing modes share),
+    and the `pretty` / `plain` / `jsonl` renderers. The output rule is enforced here: the human modes (`pretty`,
+    `plain`) render everything to stderr and leave stdout empty; `jsonl` is the only mode that writes to stdout.
+  - `home.py` owns the six working directories that can each be placed independently — the cascade that derives
+    unset ones from the ones that are set, the error raised when a directory is still unassigned (fails closed),
+    and the `Context` record that every path-resolving engine function accepts. `Context` also carries the
+    selected properties file, which is part of what P26 requires a `Context` to carry.
+  - `session.py` exports `Session`, the single entry point P26 requires. It's opened on either a plain home
+    directory string or a `Context`, and refuses to be constructed without a home (raising `dir.unassigned` —
+    the "resolve the home on first use" rule now lives here, at construction). Once constructed, `Session` pins
+    its `Context` for good — there's no global state, so nothing stops two `Session`s existing in one process —
+    and it forwards one thin wrapper method per stateful operation to the underlying engine modules. The codex
+    verbs (CLI-only, see D87) and the pure parsers bypass this wrapper. The CLI is `Session`'s first user.
+  - `assets.py` owns finding assets a user has authored. Right now there is one source, `DirectorySource`, which
+    reads each asset kind's own placeable directory, walking it recursively by file extension — there's no
+    "seed on read" behavior behind it. It also provides `source_for` and the identity rule for these assets: the
+    declared `name` field if present, else the filename stem, with collisions within a source caught by
+    `index_by_name`. The embedding API is never given a directory to fall back on, so a caller who doesn't
+    supply one gets a fail-closed error rather than Reliquary quietly reading the home directory or the current
+    working directory. A planned third source, `ObjectSource`, will hold assets imported directly as JSON
+    objects.
+  - `json5reader.py` reads JSON5 documents (see D102 for the published grammar). It rejects `NaN` and infinities
+    so values stay ordinary JSON, and can report source positions on request.
+  - `document.py` is the `.rlqb` blueprint parser (normative spec: `docs/spec/blueprint-model.md`).
+    `parse_document` / `load_document` build a `Document` holding `machines` and `media` from a root array of
+    specs — a single spec object is shorthand for an array of one, and `type` defaults to `media`, so an object
+    with no `type` is treated as media (and the media branch's "unknown field" error suggests a fix when it sees
+    machine-only field names). The dataclasses are `Machine`, `Media`, `MachineDrive`, `Location`, `Reference`,
+    and `Deferred` (a value that still contains unresolved `${…}` references, resolved later) — validation
+    happens in two phases: shape is checked here, values are checked at resolution. `children` is sugar for a
+    child declaring its own parent. Names are either given explicitly or derived from content, following the
+    media-naming rules (an invalid derived name is repaired, with a `BlueprintWarning`, or fails closed if it
+    can't be repaired). Identity is the pair `(name, type)`, compared case-insensitively. The reference grammar
+    (`${…}`) is restricted to exactly two forms — a character class does a first screen, then the two
+    productions decide — and references are refused in identity positions, in the dependency graph, and in
+    fields with a closed set of allowed values. `document.py` validates the full set of machine fields:
+    `platform`, `backend`, `memory`, `cpus`, `drives` (a media name, `null`, `{media, controller, enabled}`, or
+    an inline media definition, including an anonymous blank one), `boot`, `name` (the id-safe identity, not a
+    display label), `description`, `scripts`, `control-planes`, `pointing-device` (F66), `backend-settings`, and
+    `parameters`.
+  - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,
+    `authoring` writes and removes it. It's authoring-only: it scaffolds a new blueprint (`new_blueprint`), and
+    writes a media declaration for a file already on disk (`add_media(name, file)` — computes the sha256, writes
+    `blueprints/<name>.rlqb` pointing the media at that path, copies nothing, and refuses to overwrite; this is
+    how a codex media entry that's pinned but not yet located on disk gets supplied, D41). It also removes both
+    authored kinds: `delete_blueprint` fails closed if any machine of that blueprint still exists, and
+    `delete_script` fails closed if any blueprint in the source still references the script. Both removals follow
+    the same three-step order — check who refers to this, check the file exists, remove it — even though the
+    answer to "who refers to this" comes from different places for each (the machine list for a blueprint; every
+    blueprint's parsed `scripts` map for a script). That's why the two live in the same module, side by side,
+    rather than sharing a helper function.
+  - `resolve.py` builds the merged `(name, type)` resolution namespace from every `.rlqb` file in the active
+    source (`load_namespace` / `build_namespace`, which detects collisions across files), resolves a media by
+    name (`resolve_media`), and turns it into a nested fetch plan (`Download` / `LocalFile` / `Extract`).
+  - `acquire.py` executes that fetch plan. `fetch_media(media, namespace, context, on_mismatch)` downloads (with
+    mirror support), extracts archives recursively, verifies each file's sha256, and stores results in the one
+    `cache/media/` cache, keyed by the media's name — then attaches a `local` payload pointing at the cached
+    file. The cache is entirely regenerable: every file in it arrived by download or extraction, so nothing
+    checks where a file came from before deleting it, and nothing records where it came from either (D41 removed
+    the ledger that used to track that).
+  - `media.py` only handles acquisition: `fetch_media(name, context, on_mismatch)` and `list_media` work over the
+    namespace, plus the cache-cleanup functions `clean_media(name=None)` (a blunt clear-everything, skipping
+    anything currently attached to a running machine, unless a specific name narrows it) and
+    `prune_media(dry_run=)` (removes a container once all its children are cached). There is no `delete_media`
+    function — removing a media means editing the `.rlqb` file that declares it (D30) — and no `add_media`
+    function either — supplying a file is `authoring.py`'s job (D41).
+  - `properties.py` owns the user properties file, `<home>/user.properties`. It's a line-based format: `key =
+    value` lines, `#` comments, dotted keys that start with a letter (with the `rlq`/`reliquary` namespaces
+    reserved), values taken verbatim to the end of the line, and a leading `@` marking a value's kind (`@secret`
+    marks a secret, `@@` escapes a literal `@`). The whole file is parsed before any edit, so a malformed file is
+    never partially rewritten (`PropertiesError` names the path and line). Edits are surgical, line by line,
+    preserving comments, blank lines, and ordering, and are written atomically. The functions are `get_property`
+    / `set_property` / `unset_property` / `list_properties(prefix)`; reading a secret returns the marker
+    `{"secret": True}`, never the actual value. Every one of these functions takes `properties_file=` (set via
+    the CLI's `--properties` flag or the `RELIQUARY_PROPERTIES` environment variable), which *replaces* the
+    home's properties file rather than adding to it.
+  - `credentials.py` owns the host credential store. It has a three-method provider interface shaped like the
+    `keyring` package's own interface, so the default provider is `keyring` and a test double just needs to
+    implement those same three methods; `_set_provider` installs one, which is how the test suite avoids
+    touching the real credential store. Secrets are scoped by the absolute path of the selected properties file.
+    There is no plaintext fallback: if the credential store is missing or unusable, `CredentialError` is raised.
+    Updates happen in a fail-safe order — the credential is written before its marker property, and the marker
+    is removed before the credential — so the only state an interrupted update can leave behind is an orphaned
+    credential with no marker; an ordinary `set` refuses to overwrite that, and `unset_property` clears it.
+    Binding a property into a run — layering the sources, deriving values, applying the runtime secret rules —
+    is separate work, the rest of milestone 8.
+  - `library.py` owns the codex, Reliquary's built-in seed library (the package data under
+    `src/reliquary/codex/`). Copying out of it only happens on request, and it never overwrites files already in
+    the user's home. `seed_blueprint` / `seed_script` copy either the full closure of files by default or a
+    single file when `only=` is given. `list_codex` lists what the library holds — nothing about what the user
+    already has — and `codex_blueprint_available` is the check a refusal makes so it can name the right seed
+    command in its error message.
+  - `machines.py` owns machine materialization, under
+  `cache/machines/<blueprint>-<n>/`.
+
+    Backend assignment happens here, before any image work. The blueprint's full set of requirements — control
+    planes, media kinds, controllers, materialization modes, and the `pointing-device` field (F66, resolved by
+    `_resolve_pointing_device`, which defaults to `mouse`) — becomes a `backends.Requirements` object. A
+    declared `backend` field pins the choice. So does a `backend-settings` section for exactly one backend: its
+    presence alone narrows the search to that backend, regardless of what settings it contains
+    (`_backend_choice`: use the declared backend if there is one, else the one backend with a settings section if
+    there's exactly one, else search). With no `backend` and no single `backend-settings` section, Reliquary
+    walks the priority order (`backends.PRIORITY`, D66) and picks the first backend that's both available and
+    capable of meeting the requirements. If no candidate can meet a requirement, machine creation fails closed,
+    naming both the backend and the unmet requirement — Reliquary never records a machine it knows can't work
+    (P11).
+
+    A dry run does the same evaluation but commits nothing. `create_machine(dry_run=True)` returns a `DryRun`
+    (with `operation` / `report` / `plan` fields — the same type the script-side dry run in F25 uses) and writes
+    nothing at all: no machine directory, no `machine.json`, no image, no fetched payload, no lock file, and no
+    seeded blueprint (a codex-only blueprint is read in place, the same way any read-only check reads it). It
+    resolves media without fetching them — `acquire.residency` reports `cached` / `would-download` /
+    `would-extract` / `local-present` / `local-missing` without hashing anything, so `cached` here means "the
+    file is present," not "the file was verified." It describes which location properties would be needed
+    without binding them (`binding.describe_keys`), because a dry run must never prompt. It refuses everything an
+    actual create would refuse, at the same point a create would refuse it — with two deliberate exceptions,
+    each a case where a dry run genuinely *can't* answer rather than a judgment call: an unbound location is
+    reported as unevaluated rather than resolved, and, when `backend=` is given explicitly, a backend that isn't
+    available is reported rather than raised as an error — because that flag is asking "would this blueprint
+    work on that specific backend," so only its capabilities matter (`backends.evaluate`), and this leniency is
+    legal only in a dry run because P10 gives the blueprint authority over what a machine is. Missing local
+    payloads are collected and reported together as one list, so a single validation pass names all of them at
+    once, not just the first one found.
+
+    The lifecycle functions are `create`, `start`, `stop`, `destroy`, `recreate_machine` (destroy followed by
+    create, reusing the same id), `apply_blueprint` (applies blueprint edits to a stopped machine — it can
+    absorb some kinds of change, but fails closed if a media image that's already been materialized would need
+    to change size or materialization mode), `get_machine_dir` (a direct path to the machine's directory, outside
+    the normal API), `list_machines`, `resolve_machine`, and the exec-run family:
+
+    - `wait_ready` is `exec`'s precondition, factored out as its own function (D114). It runs the shared
+      `_running_guest` preflight check (selector resolves, platform is DOS, machine is running, VM identity
+      matches the record) and then the adapter's own readiness wait: a prompt is only accepted as a candidate
+      once `screen_stability` confirms the screen underneath it has stopped changing — the same rule `execute`
+      uses to decide a command has finished (D115) — and a wait that never gets there raises `WaitExpired`.
+    - `exec` runs a command.
+    - `get_machine_var` is the one channel a script can use to send a value back to the host: it reads a
+      `variables` map inside `machine.json`, guarded by the same lock as other operations, cleared every time the
+      machine starts (so a variable always reflects the current boot). The `rlq`/`reliquary` key namespaces are
+      reserved. The script's `set` verb is the only thing that writes to this map — per the CLI spec, the host
+      side only ever reads it.
+
+    Where a machine lives, how its state is serialized, and how it's named are handled by `machine_state.py`
+    (described below). Every mutating operation carries an operation generation number and writes one of the
+    transitional phases `creating` / `stopping` / `destroying`, so an operation interrupted partway is reconciled
+    the next time something touches that machine: an interrupted `stopping` is completed, and an interrupted
+    `creating` or `destroying` is rolled forward to removal.
+
+    `machines.py` also owns the persistent machine-state mutations: `insert_media`, `eject_media`,
+    `set_boot_order`, and `mark_stopped`. `insert_media` and `eject_media` only apply to floppy and cdrom drives,
+    and work whether the machine is running or stopped — on a running machine the change is applied live, over
+    an identity-verified QMP session, addressed by drive id, and then persisted to state; on a stopped machine
+    it's just persisted, for the next start. `insert_media(slot, media=None, file=None)` takes exactly one of a
+    declared media (which gets fetched and verified) or `file=` — an anonymous image, mounted in place, that's
+    mutable, unverified, and never copied (this is U20's transport for iterating on a disk live). `set_boot_order`
+    only works on a stopped machine, since it sets the firmware's launch-time boot order; its keys can name any
+    declared drive. All three persist their change and it survives a stop/start cycle. A script's `with` scope
+    (see below) is a second caller of these same three functions: it captures the current value before making its
+    change, then calls the same function again on exit to restore it, under the same rules as any other call — so
+    restoring a boot order on a running machine is refused just like setting one is, and if the restore can't be
+    done the run fails, naming what it couldn't undo, rather than letting the state file gain a second way to be
+    written (D104).
+
+    There is no drive layer and no file-access family in Reliquary (D108). Reliquary declares a machine's drives,
+    materializes them, and moves their media — but it never reaches inside a volume: there's no
+    `describe_drives`, no `put_file`/`get_file` pair, no drive-letter mapping, no access to a disk at rest, and no
+    dependency on `remanence`. Whatever is inside a volume is the caller's business, reached with the caller's
+    own tools against the directory `get_machine_dir` returns — which is what makes P16's carve-out for file
+    content a real boundary rather than a gap. Two routes Reliquary does supply stay in-band and neither one
+    opens a filesystem: a directory-source media that attaches a host directory as a vvfat drive, and
+    `insert_media(file=)`, which swaps a whole image live. `test_old_surface_purge.py` checks that the seven old
+    command words for file access stay gone, and `test_command_manifest.py` catches one coming back disguised as
+    an unclassified session method.
+  - `machine_state.py` is the foundation the machine layer is built on. It knows where a machine lives
+    (`machine_dir_path`, `machine_disks_dir`, `backend_dir`), how a machine is named (`machine_id_for` /
+    `split_machine_id` — ids look like `<blueprint_name>-<machine_number>`, reusing the lowest free number,
+    via `allocate_machine_id`), what serializes concurrent work against it (`blueprint_alloc_lock` for
+    numbering, and the exclusive per-machine operation lock `machine_lock`, backed by
+    `.locks/<id>.op.lock`, which every mutating operation takes), how `machine.json` is read and written
+    (`write_state` / `load_machine_state` / `read_vm_state`), and how a `--blueprint` / `--machine` selector on
+    the CLI resolves to a machine (`resolve_machine` / `list_machines` / `machines_for_blueprint`). It knows
+    nothing about what a machine actually *is* — no backend, no adapter, no drive, no media. It stayed a
+    separate module even after its sibling module, `drives.py`, was deleted by D108, because `machine_handle.py`
+    needs `read_vm_state` and would otherwise end up in an import cycle with the lifecycle code. Phase
+    transitions have only one consumer, so they stayed with the lifecycle code in `machines.py`, which remains
+    the front door for this layer — it re-exports these names so anything above it reaches them all in one
+    place.
+  - `backends.py` defines the backend adapter interface — the contract each backend provider (QEMU, VirtualBox,
+    ...) must implement underneath Reliquary's semantic surface (design doc: `planning/design/backend-adapter.md`).
+    This interface is deliberately not itself one of Reliquary's application surfaces. It includes: the
+    `BackendAdapter` contract (discovery, a capability report, image materialization, start/stop, and the
+    carrier session); the `Availability` / `Capabilities` / `Requirements` types shared between what a backend
+    reports and what a blueprint demands (`pointing_devices` / `pointing_device` is the newest field here, F66,
+    checked in `unmet()` the same way `drives` is checked); `capture_format(plane)` and its sibling
+    `pointer_capable(plane)`, two separate per-plane capabilities (F66 — a display plane can capture a
+    framebuffer without being able to deliver a pointer event to it, which is true of VirtualBox today), each
+    defaulting honestly to "nothing" (`None` / `False`) when unknown; the `backend-settings` contract
+    (`settings_keys`, which lists the keys an adapter's settings section may contain, empty by default, and
+    `validate_settings`, the shared rule that refuses unknown keys, which an argv-style adapter extends with its
+    own overlap check — only the assigned backend's settings section is ever checked, since no adapter can speak
+    for another's vocabulary); `identity()`, the record every adapter writes down once a VM exists (backend
+    name, that backend's own `backend-id`, a per-start `token`, and an adapter-specific `endpoint`); the adapter
+    registry (`adapter(name)`, `discover()`); and `assign()`, built on `evaluate(name, requirements)`, which
+    reports two separate answers rather than one verdict — whether the backend is available on this host, and
+    separately, which requirements it can't meet — because those are two different questions, and a dry run
+    only needs the second one. `_set_adapter` is the test hook that lets tests substitute a fake adapter, the
+    same way `credentials._set_provider` substitutes a fake keyring.
+  - `backend_qemu.py` contains everything that's specific to QEMU: finding the QEMU binary, running `qemu-img`
+    for image work, rendering a machine's drives and boot order into QEMU arguments (the `pointing-device:
+    tablet` field renders as `-usb -device usb-tablet,id=pointer0`, F66), the `backend-settings.qemu` escape
+    hatch (`SETTINGS_KEYS` = `machine` / `args`; `RESERVED_ARGUMENTS` lists what a blueprint field or the VM
+    identity already owns, checked case-sensitively — `-m` is memory and `-M` is the machine type, but
+    deliberately not `-device` or `-cpu`; `RESERVED_DRIVE_PROPERTIES` similarly reserves the `-drive` properties
+    that `drives` already renders, and so also refuses them via `-set drive.<slot>.<property>` — QEMU addresses
+    each drive's own options through `id=<slot>`, which is why there's no separate drive-scoped settings section,
+    D118; `settings_args` both validates and renders the settings, which is what makes a settings section that a
+    `create` accepts the same one a `start` applies, and it renders last so a caller's own arguments appear at
+    the end of the logged command line), the actual launch with its identity verification, `Qmp`, the carrier
+    methods (`send_keys`, `text_screen`, `screenshot`, `change_medium`, and `pointer_event` — F66, which is
+    refused on the base session because it has no coordinate space to aim a pointer into, but works on the VNC
+    session via RFB's own `PointerEvent`, unscaled), and the named native escape hatch `QemuSession.native()`.
+
+    `backend_qemu.py` serves two display planes over the same carrier interface (F63): the agentless default,
+    which scrapes VGA text memory over QMP, and the VNC plane (turned on with `control-planes: ["vnc"]`, the
+    first plane declared drives the session), which launches QEMU with `-vnc 127.0.0.1:<display>` — loopback
+    only, no VNC authentication, with the port and the active plane recorded in the identity's endpoint
+    alongside the QMP port — and reads the framebuffer over RFB through the same recognizer used elsewhere,
+    via `guest_glyph_banks`, sending keys through a qcode-to-X11-keysym table (`keysym_for`, the adapter-side
+    layer from D103; VirtualBox has its own equivalent, `scancodes_for`). Identity checking is still QMP's job
+    even on the VNC plane: `query-vnc` cross-checks the recorded endpoint after the normal verification, both at
+    launch and again right before a session opens the RFB socket, and `change_medium` always goes over QMP
+    regardless of which plane is driving the screen.
+
+    `rfb.py` is the wire protocol: an in-tree, minimal RFB 3.8 client (no security, forced 32-bit true colour,
+    only full and incremental Raw updates, `KeyEvent` and `PointerEvent` — this is D110's "no new dependency"
+    decision). It knows nothing about machines and verifies no identity, which is why it's a separate module
+    sitting below the adapter.
+
+    No adapter, for any backend, ever opens a disk's contents: an adapter creates the images a machine runs on
+    and exposes nothing that reads inside one (D108).
+  - `backend_virtualbox.py` is the VirtualBox adapter (lifecycle and VDI images from F50; agentless-display
+    carriers and FreeDOS parity from F52).
+  - `backend_stubs.py` holds the two adapters that aren't built yet: VMware Workstation and Hyper-V. Their host
+    probes are real — they genuinely check whether the backend is installed — but they claim no capabilities at
+    all, so backend assignment always skips them, even on a host where the backend is installed, and pinning one
+    explicitly fails preflight, naming what's missing.
+  - `control_display.py` is the control plane for agentless-display backends: character-to-key mapping
+    (`char_keys`), building up text screens, and the cursor-menu machinery. It's written once, against the
+    shared text-screen contract (character rows plus per-cell attribute tokens that can be compared for
+    equality but not otherwise inspected), rather than once per adapter.
+
+    Key mapping happens in three layers, and this module is only the middle one (D103). The scripting language's
+    portable key names (like `spc`, `ret`) are listed in `script_validation.PORTABLE_KEY_NAMES`.
+    `script_runner.resolve_key` maps those onto the shared key vocabulary, which is QEMU's own qcode set. Each
+    adapter then translates a qcode into its own input events — QEMU uses qcodes directly, VirtualBox translates
+    them via `scancodes_for`. That's why `char_keys` spells things `spc` and `ret` rather than `space` and
+    `enter`: the shared vocabulary is named after the reference backend (QEMU) rather than inventing a third
+    vocabulary that no backend actually speaks.
+  - `text_recognize.py` is the shared fixed-font character recognizer (F51), used by backends that don't offer
+    VGA text memory and so have to work from a screenshot instead. It's one contract and one algorithm, shared
+    across backends.
+
+    The font bank it matches against belongs to the guest, not to Reliquary — an adapter reading a live screen
+    passes its own host's font as `bank=`. What actually determines the font is whether the BIOS or the guest
+    painted the screen (T20), not which emulator is in use. Both QEMU and VirtualBox install the *same* font
+    when a text mode is set: QEMU's vgabios merges a 19-glyph replacement set (`vgafont16alt`) into the font it
+    ships, and VirtualBox ships the unmerged font but applies the same 19-glyph patch at runtime, in
+    `vgabios.c`'s `load_text_patch` — so a merged VirtualBox font is byte-for-byte identical to QEMU's font.
+    What differs is who paints the screen: the BIOS always uses the merged font, but a DOS guest that loads its
+    own CP437 font — FreeDOS does — paints the *unpatched* glyphs instead, and `W`, `m`, and `T` are among the 19
+    that differ, which is enough to make a wait miss on any word containing one of them.
+
+    So no single font bank can read an entire run, and nothing in a captured framebuffer says which font painted
+    it. That's why the recognizer takes every font the host offers and matches each screen cell against all of
+    them, rather than picking one up front. `bank=` accepts either one bank or several (`as_banks`);
+    `_all_glyph_bits` unions the bit patterns per character code, so a shape every font agrees on is only scored
+    once, and the extra cost is proportional to how much the fonts actually differ — about 5% more work on a
+    read, for a stock VirtualBox's 275 entries versus 256. Ties are broken by preferring the first bank, so two
+    runs on the same host agree with each other.
+
+    QEMU's VNC plane (F63) recognizes QEMU's own framebuffers even though QEMU only ever offers the merged font,
+    because the 19 patched glyphs are visually close to the classic designs they replaced. Measured directly (by
+    diffing the merged and unpatched fonts a stock VirtualBox installation provides), every ASCII character pair
+    falls within the recognizer's 24-bit match threshold — `W` is the worst case at 22 — except for `₧` (code
+    0x9E), which measures 39 and falls outside it. So a guest-drawn screen on QEMU still reads correctly through
+    the one font QEMU offers, just with a smaller margin — not because a second font bank is available. If a
+    future QEMU build changes its fonts, this margin should be re-measured rather than assumed.
+
+    Each backend answers "what font does this host have" the same way, through `guest_glyph_banks(cache)`,
+    implemented identically in `backend_virtualbox` and `backend_qemu`. `banks_from_files` /
+    `banks_from_binary` collect every font bank in the backend's installed binaries, plus every variant that an
+    override table would install on top of one, anchored on the classic `A` glyph that every CP437 font shares,
+    and failing closed (naming the problem) if the installation has none. This extraction works structurally
+    rather than off a table Reliquary hand-maintains: it looks for runs of `(code, rows...)` entries with
+    ascending codes, terminated by a zero code byte, skipping over runs for other glyph heights — so an
+    installation with a different font set is still read correctly. QEMU's own agentless plane never needs any
+    of this, since it scrapes text memory where the guest has already resolved its characters into text; this
+    machinery exists so the font question is answered the same way for every backend, not just where it caused a
+    bug — and a stock QEMU installation ends up yielding a single font bank anyway, since its font ships already
+    merged.
+
+    Fonts are extracted on demand and cached — never vendored into the repository — at
+    `cache/support/<backend>/cp437-8x16-banks.bin`, via `text_recognize.cached_banks`; every bank found is
+    concatenated into that one file, so how many there are is the backend's own business. Like everything else
+    under the cache root, this file is fully regenerable, so a truncated cache file is just re-extracted rather
+    than raising an error. The cache root reaches the adapter through `Machine(cache=)`, which is passed to
+    `adapter.session(vm, cache=)` — a plain resolved directory, not derived from the machine directory (since
+    `machines` can be placed independently); passing `None` just means it will always re-extract, which only
+    costs time, never correctness. Not vendoring these fonts is both a licensing decision (see
+    CONTRIBUTING.md) and an engineering one: the glyphs belong to whichever emulator the host has installed, not
+    to Reliquary.
+
+    The `fonts/cp437_8x16.bin` file that ships with Reliquary itself is only used as `recognize`'s default and to
+    render test fixtures with — this is what lets the test suite run without a hypervisor. It's drawn by a script
+    (`tools/gen_cp437_font.py`) rather than copied from anywhere (D82 — the test for anything included this way
+    is "could this ship inside a proprietary product?"). Its ASCII and box-drawing shapes are hand-authored;
+    every character code nobody drew gets a computed Reed–Muller codeword instead — a pattern that differs from
+    any other glyph in at least 64 of its 128 pixels — because the one requirement for this font is that all 256
+    codes must be visually distinct. An undrawn code that came out blank would collide with the space character
+    and could never be recognized. This font doesn't need to look like real VGA text, and deliberately isn't
+    built to: `CLASSIC_A`, the reference glyph that `bank_from_binary` uses to locate a genuine font in a binary,
+    is deliberately absent from it. A test that needs a font the recognizer can actually locate uses
+    `tests/vga_bank.py` instead.
+  - Whether a screen has stopped changing is *not* decided in `control_display.py` (F49): `_settled_screen` and
+    `_menu_baseline` call `screen_stability` for that rather than implementing their own copy of the logic. What
+    stays here is classification that was never about settling in the first place — whether a keypress changed
+    anything at all (`None` means a dead key) and which row a highlight moved to.
+  - `screen_stability.py` answers a question `stable=` can't: has the guest stopped drawing at all, as opposed
+    to whether a specific condition currently holds — a condition can hold perfectly true on a screen that's
+    still actively painting. It compares individual cells rather than whole rows, because row-level comparison
+    can't tell a blinking cursor apart from an arriving line of text, and it treats a cell's text-plus-attribute
+    pair as its identity, since a cursor menu moves its highlight purely by changing attributes. Both
+    comparisons are measured over wall-clock time windows rather than a fixed number of samples — using sample
+    counts instead would mean a denser poll reaches a different verdict on the same guest, so a recorded run and
+    a live run could take different paths through the same script.
+
+    Stability is the fraction of (unmasked) cells that held still over the last 200ms, checked against a
+    threshold of 0.99 — that's 20 cells out of 2000, about a quarter of a row, which sits between the size of
+    small moving furniture (a blinking cursor is 1 cell, a clock is about 8) and actual content (a row of text is
+    80 cells). A cell that changes 3 or more times within one second counts as decoration and is excluded from
+    that fraction — this carries over `_menu_baseline`'s old majority-churn bail-out logic (mask nothing, compare
+    the raw cells). A time window with no samples in it reports `stability=None` rather than inventing a verdict
+    the actual sampling never produced (P11).
+
+    This was delivered as F47, and it's the only implementation of this measurement anywhere in the codebase
+    (F49): its three users are `exec`'s completion check (F45, described below), the scripting language's
+    `stability=` (F48, described below), and the cursor-menu machinery — whose own older "wait for two
+    consecutive stable reads" logic and learned animation mask were special cases of the same idea, and were
+    deleted rather than kept as a separate implementation. Doing that surfaced one real tension, now recorded in
+    `control_display._BASELINE_READS`: recognizing that a screen has *settled* and recognizing that a cell is
+    *decoration* need different amounts of observation — a clock only moves two cells, so it looks settled after
+    one glance, but nothing can tell it's a clock until it's been watched tick more than once, so a baseline that
+    stops looking as soon as the screen looks settled ends up with an empty decoration mask.
+
+    The same contract generalizes from character cells to pixels (F65): `observe` also accepts a Pillow image,
+    for landmark matching where there are no character cells to compare, and measures the same fraction over the
+    same time window with the same default threshold. A `Reading` records which unit it counted, so a diagnostic
+    message correctly says "pixel" when it counted pixels. A single monitor instance sticks to whichever kind it
+    was first given — mixing cells and pixels in the same monitor would make every sample look like a total
+    repaint.
+  - `landmarks.py` is the image-matching asset kind and its matcher (F65; normative spec:
+    `docs/spec/landmarks.md`). A `.rlql` file is an authored asset kind alongside `.rlqb` / `.rlqs` / `.rlqf`,
+    identified by its filename stem the same way a script or a font is. Its variant images are attached as plain
+    `<name>.<n>.png` files, matched to it by stem and number, so refreshing the images just means creating new
+    files — never rewriting an existing one. It resolves out of `home.landmarks_dir` (`<home>/landmarks`), a
+    fixed subdirectory like `fonts` rather than a seventh independently-placeable root. Its name is checked for
+    collisions against the same shared `@`-prefixed name pool that media and fonts already use, now served for
+    all three by `assets.guard_pool`.
+
+    The match metric is the fraction of pixels that match exactly, computed separately per region — never one
+    combined score across the whole image, which would let a small failing region get lost in a large mostly-
+    matching screen's average. An `ignore` region excludes its own pixels from matching entirely and takes
+    priority where regions overlap; a `fuzzy` region checks its remaining pixels against its own declared match
+    percentage; everything left over (the "residual") must match 100%. A variant matches when its residual is
+    clean and every one of its fuzzy regions clears its bar; the landmark as a whole matches if any of its
+    variants does. A miss reports the *closest* variant, along with which regions failed and what percentage
+    they actually achieved. Before comparing, the captured screen is normalized through whatever pixel format the
+    capturing plane reports — a detail settled in `hyperv-screen.md` — which today is the same for every plane
+    that's actually built, so it costs nothing until some plane starts reporting a different format.
+
+    `spots` are read by the `click` script verb (F66): a click lands on a named point, or on the single spot a
+    landmark declares if it has exactly one (no ambiguity to resolve). `park_position(width, height)` computes
+    where the pointer parks after every pointer-verb delivery, relative to the specific landmark matched — the
+    bottom-right corner scaled to that landmark's own pinned size, rather than an arbitrary fixed pixel position,
+    since real content tends to be anchored at the top-left. `_park_region` always folds in the matching landmark's
+    built-in `ignore` region as well, clamped to at most a quarter of the landmark's pinned size, so that a small
+    landmark's non-ignored area is never entirely swallowed by the park zone. This is masking done on the host
+    side, after capture — it is not a way to keep the cursor out of the framebuffer in the first place; nothing
+    here negotiates the RFB option that would exclude the cursor at the source.
+
+    What decides whether a machine can watch for a landmark at all is the display plane's screen carrier, not the
+    backend in general: `BackendAdapter.capture_format(plane)` reports the pixel format a given plane captures
+    in, or `None` if it doesn't capture a framebuffer at all (the honest default, matching how `settings_keys` is
+    empty by default). A session whose plane reports a format offers a `framebuffer()` carrier in addition to
+    `text_screen()`. QEMU's agentless-display plane, which just scrapes characters the guest has already
+    resolved, reports no format at all, so a landmark condition against it is refused up front with a named
+    preflight error (`machine.plane-no-framebuffer`); QEMU's VNC plane and VirtualBox's display plane both
+    interpret a captured framebuffer and report `rgb`. `screendump` / `screenshotpng` remain diagnostic-only
+    carriers on every plane — they are not screens a landmark is ever matched against.
+  - `interaction.py` defines the capability protocols (interfaces).
+  - `interaction_agentless.py` contains the concrete agentless DOS adapter: prompt-based readiness and command
+    completion. The echoed command and the returned prompt are identified by where they came from, never by
+    their shape alone — the echo is the row the command was typed on, with the rows that were above the prompt
+    still above it, and the prompt is recognized as having returned when it's either the standard shape or
+    exactly the one the guest was showing before (D111 and D112). A detected prompt is treated as a candidate,
+    not a final answer, until `screen_stability` confirms the screen underneath it has actually settled —
+    otherwise a prompt that appears mid-scroll would cut the command's output off at a point that was never a
+    real boundary (F45). To support this, the polling schedule has three stages rather than two:
+    `_ECHO_POLL` catches the echo, `_PROMPT_POLL` cheaply waits for a prompt to appear, and `_SETTLE_POLL`
+    confirms it's stable — so the more expensive, denser reads only happen once the question has narrowed down
+    to "is this screen actually finished?"
+  - `machine_handle.py` defines `Machine`, the backend-neutral machine handle. It's named in the singular
+    (unlike the plural-named engine modules — `media.py`, `properties.py`, `backends.py`, `machines.py`)
+    because it's a handle type, not a family of functions: a machine is addressed by its materialization
+    directory, the adapter named in its recorded identity supplies the session (`Machine.session()` /
+    `console()`), and `Machine.qmp()` is a QEMU-only escape hatch that refuses to work for any other backend.
+  - `platform_dos.py` owns DOS provisioning and facades, and today it's down to just `program_name` — the
+    drive-letter mapping and the guest-path grammar it used to hold were removed along with volume mapping
+    (D108), so nothing in this module translates a host path into a DOS drive letter any more.
+  - The `.rlqs` scripting language is implemented in four layers:
+    - `script_nodes.py` — the lexer and its diagnostics.
+    - `script_parser.py`, with the grammar file `script_grammar.lark` — builds the typed parse tree, defines
+      node signatures, and exposes `parse_script` / `load_script`.
+    - `script_validation.py` — the static validation rules, each numbered with a V-id that its diagnostic cites.
+    - `script_timing.py` — resolves durations and builds the timing plan at parse time: every observation's
+      effective timeout and quiescence gate, and every guest-input verb's effective `pacing` (the settling gap
+      before its first key event, D60), each recorded together with the scope it came from. `INPUT_VERBS` gained
+      `click` in F66; `click` and `select` are the only two verbs that appear twice in the resolved plan — once
+      as an `Observation` for the search (carrying the landmark name), and once as an `Input` for the delivery.
+  - `stability=` is the counterpart to `pacing`, but for observations instead of input verbs (F48). Where
+    `pacing` is a duration attached to each of the five input verbs, `stability=` is a proportion (a threshold,
+    not a time) attached to observations, and is resolved by checking, in order, the statement itself, then a
+    branching `wait`, then the phase, then the header, and finally falling back to the built-in default of 0.99.
+    Each of `pacing` and `stability=` only guards the one statement kind whose risk it addresses, so neither one
+    needs to know where in the script it's being used.
+
+    `stability=` exists because `stable` can't do this job: `stable` qualifies a match, so a match has to exist
+    first, whereas `stability` qualifies the screen frame a comparison runs against, and a frame exists at every
+    single sample — which is also what makes a default value possible at all. A sample that doesn't clear the
+    stability threshold isn't used to judge any condition; in a branching `wait`, an unsettled frame causes none
+    of the handlers to be evaluated on that sample. The stability gate never causes a failure by itself: if it
+    never got the chance to measure the condition, the timeout is judged only on the samples that did happen,
+    preserving the rule that a timeout always means samples were taken (never that no one looked); if it did
+    measure the condition and the screen kept moving, the timeout error says so. Setting `stability=0` turns the
+    gate off entirely, at no cost — this is the escape hatch for a screen the default threshold would otherwise
+    refuse to read. `format_plan` and `run_script(dry_run=True)` (i.e. `rlq run-script --dry-run`) report the
+    resolved timing plan without actually running it; `script_validation.reach` counts the statements no static
+    pass can promise will run, since whether a given handler body runs is the guest's decision, not something the
+    plan can predict.
+  - The script dry run returns the same `DryRun` type the machine-create dry run returns, and follows the same
+    rule: read-only throughout, seeding nothing, never prompting, and stopping before the machine starts or any
+    statement reaches the guest. Two things are unique to the script dry run. First, the machine selector is
+    optional only here — whether it's given picks which of the two checkable tiers described in script-spec.md
+    applies, which is what keeps the selector-less mode from being silently lost when this feature was reworked.
+    Second, `--dry-run` turns the command from something that streams events into something that returns one
+    document: `--json` becomes legal (and prints exactly what the equivalent API call returns), while
+    `--progress` and `--display` are refused, since a plan has no event stream to render and no window to show.
+    The entire older "check" command family was deleted outright rather than kept as an alias (P9) — its
+    command, its API twin, its result type, and the property-key predicate function that went private along with
+    them (a public predicate over a bare string, with no CLI equivalent, was a leftover violating P6).
+    `test_old_surface_purge.py` records the old command spellings and checks they stay gone, which is why they
+    aren't written out here.
+  - `binding.py` resolves a script's declared properties before a run starts. Values are looked up in this
+    order: an explicit `--property` flag, a blueprint parameter (redirected via its `{"property": ...}` field),
+    the `RELIQUARY_PROPERTY_*` environment variables (checked up front for collisions), the properties file, the
+    property's own declared `default=` expression, and finally an interactive prompt. It applies the rules for
+    each property kind (text, media, secret), pulls secret values from the credential store, and provides
+    `describe_sources`, the read-only counterpart that reports which source would supply each key, for a dry run
+    that must neither bind values nor prompt. Declarations are bound in topological order, so that whatever a
+    `default=` derivation refers to is resolved first.
+  - `facts.py` owns the built-in `rlq.*` values a `default=` derivation can reference: `rlq.host.username`
+    (normalized the way a login name is), `rlq.host.full-name`, and `rlq.env.<NAME>` (taken verbatim from the
+    environment) — each one simply has no answer if the underlying host value is empty.
+  - `bind_keys` binds the bare keys referenced by a media's `location` or `sha256` fields (the ones with no
+    `property` declaration behind them), using the same source order as above minus the `default=` step.
+    `resolve.py` substitutes the bound values in (`location_property_keys` collects every key referenced this
+    way, and `resolve_media_plan(..., properties)` binds them), and `machines.create` / `apply_blueprint` bind
+    them at materialization time, so the machine's recorded state stores the actual resolved location, never an
+    unresolved `${key}` placeholder. A bound value that is itself a reference is refused — references can't
+    chain.
+  - The one language construct added since the rest of the vocabulary was settled is `with` (F54, D104): a
+    scoped machine-state change. Its block starts with `boot`, `insert`, or `eject`, and whatever it changed is
+    put back to its original value when the block exits, on every possible outcome the script runner reaches.
+    Three details about it matter across every layer that touches it:
+    - `boot` inside a `with` block states only a *prefix* of the boot order, and is deliberately spelled
+      differently from `set-boot` — the drives it names come first, and the machine's existing order follows
+      after them, so a stage can say what it boots without having to restate an order it isn't changing. The two
+      different spellings mark two different meanings.
+    - The scope is dynamic: it's in effect only while control is actually inside the block. So the parser
+      flattens phases out normally (`Script.phases` stays one flat namespace that `goto` and phase entry points
+      address directly) and separately records `phase_scopes`, the chain of enclosing `with` blocks around each
+      phase — which is all a phase transition needs to know, and is why no layer above the parser had to change
+      to support this construct.
+    - The grammar can no longer tell the two shapes of script apart just from a `with` head, since a `with` head
+      doesn't say which shape follows it. So the body of a `with` block is parsed as one permissive list of
+      units, and validation rules V10 and V2 are the ones that decide which shape it actually is, at the point
+      where a diagnostic can name the shape involved.
+
+    V17 is the one static validation rule that's a flow analysis rather than a local check (T27): it tracks
+    whether the machine is running — starting from the `machine` header, then `start`, `stop`, and a completed
+    `wait machine=stopped` — forward to a fixed point over the whole transition graph. That lets it refuse, at
+    parse time, a `set-boot` or a boot-scope edge that the plan implies would be reached while the machine is
+    already running, instead of only discovering that five minutes into an install. It's bounded exactly the way
+    `reach` (mentioned above) is bounded: a handler body is walked only for its effect, never judged as
+    definitely running or not, and if two paths through the script disagree, V17 refuses nothing — a false
+    refusal would be far worse than the later runtime failure it would be trying to prevent, which is why the
+    runtime check stays in place regardless.
+  - `script_runner.py` executes the parsed script tree against already-materialized machines: the phase graph,
+    branching-wait and reactive dispatch over samples and episodes, and the clocks the timing plan resolved. It
+    wires up the `run-script <label>` command — resolving the machine via the blueprint map, creating one if
+    none exists, writing the machine-state header, and running a static preflight check of the drive keys used
+    by `insert`/`eject`/`set-boot` (raised as `ScriptPreflightError`, exit 3, caught before the first guest
+    input). `click`'s own three preflight checks join that same error class —
+    `machine.pointing-device-not-tablet`, `machine.plane-no-pointer-input`, and
+    `landmark.spot-required`/`landmark.spot-unknown` (F66) — checked inside the existing `_preflight_landmarks`
+    walk, since `click` carries a `conditions` tuple the same way `wait` does, so no second walk is needed for
+    the three landmark-related refusals the two share.
+
+    `_click` reuses `wait`'s own search machinery directly — `_observation`/`_arm`/`_observe` — rather than
+    `select`'s opaque `cursor_menu_select` function, because a `click`'s target is matched against a real
+    landmark image, not scanned as text. Only once that search finds a match does delivery pay the `pacing`
+    delay and perform the click through `DisplayConsole.click`, which parks the cursor as the last step.
+
+    `script_runner.py` also handles property binding before the machine starts, secret redaction, and returning
+    the run's output directly to the caller rather than persisting a run record (this is milestone 9's return
+    model — the `runs/` archive is separate, not-yet-built work, D36). Everything it reports goes through the
+    one event stream, so nothing can report information the stream itself doesn't carry. As it runs, it keeps
+    the raw material a failure report would need — the condition or action currently pending, the route taken so
+    far with per-phase revisit counts, and the last sample read — and it emits a `failure` event just before the
+    terminal event, naming the clock that expired and its scope, the nearest miss found on the last screen read,
+    an automatic screenshot (suppressed for the rest of the run once a secret has reached the guest), and the
+    next command to try. Ctrl-C installs a handler that just sets a cancel flag, which is checked only at
+    boundaries (`_check_clocks`, checked at the start of each statement and at each dispatch sample) — so a
+    cancellation always ends the run at a clean boundary, with any input delivery already in flight allowed to
+    finish, rather than wherever the interrupt happened to land.
+  - `transcript.py` handles screen-transcript capture and reconstruction. This module is not itself an
+    application surface (D98): the `.rlqt` file format carries no stability guarantee and has no `docs/spec/`
+    entry, so changing the format is ordinary housekeeping — but the *option to record a transcript* is a
+    surface change and belongs to S1/S2, since it's exposed as `--record <path>` on `run-script` and
+    `run_script(record=)` on the session, and must be changed on both together.
+
+    Capture wraps the carrier interface — the adapter session's `text_screen` / `send_keys` / `screenshot` /
+    `change_medium` / `pointer_event` methods (`pointer_event` is F66; it's passed through when recording and
+    refused during replay, for the same reason `framebuffer` already is: a transcript holds no pixel data, so a
+    `click`'s search step is already impossible to replay before its delivery step would even be reached). This
+    makes the module backend-neutral by construction: `RecordingSession` is the wrapper that captures at this
+    interface, and `ReplaySession` is a fake session standing in at the same interface, which is what lets the
+    entire interpretation layer above run unmodified over a recorded transcript.
+
+    Every captured frame carries a sha256 hash of its canonical `(rows, attributes)` form, checked during
+    reconstruction, so a bug or a hand-edited fixture fails loudly instead of quietly reconstructing a screen
+    that never existed — the hash covers the screen in its expanded form, even though the file itself stores each
+    attribute row compactly, as runs (`pack_attributes`), so how the file happens to encode a screen is never
+    what a fixture actually checks. The header records the capture's pace and what script it's a capture of — the
+    script's filename stem and a sha256 of its text — because replaying a transcript re-loads that same script,
+    and if the script has since been edited, that's reported as staleness rather than as a mysterious divergence
+    partway through the replay.
+
+    A frame records the actual moments its underlying reads happened at, not just how many reads there were:
+    reconstruction runs on the capture's own recorded timeline, since every stability/quiescence measurement
+    above this layer is a window over wall-clock time — spreading a frame's reads out evenly (the obvious
+    simplification) was tried and it shifted the menu machinery by one read, which changed which key it pressed.
+    For the same reason, a read that arrives where the next entry in the capture is actually a *call* is an error
+    (`transcript.read-before-call`) rather than something silently skipped over — a swallowed keypress would
+    otherwise surface as a mismatch much later, against a screen that neither the original run nor the replay was
+    ever looking at.
+
+    The file ends with what the run concluded: `write_outcome` records the rows a command returned, or the phase
+    a script finished in, or the error either one failed with. This is necessary because two runs that make
+    identical carrier calls over identical screens don't automatically agree on what counts as "the output" —
+    that's decided above the carrier interface — so this is what a reconstruction is checked against, and it's
+    what makes a capture of a *failing* run something a test can actually assert on.
+
+    The capture's recorded pace is a ceiling on the poll interval, never a floor: there's no way to sample
+    independently of the run itself (QEMU only allows one QMP client at a time), so the run's own polls *are* the
+    capture. An earlier version took the larger of the pace and the poll interval, which left a two-second idle
+    gap that this mechanism exists specifically to close. This isn't free — a single QEMU sample is a 4000-byte
+    HMP dump — and a recorded install run takes two to three times as long as an unrecorded one.
+
+    Two kinds of entries reach the transcript from above the carrier interface, because the interface itself has
+    no way to represent them. Every carrier call has to go through the engine's single `_machine()` handle — a
+    caller that builds its own machine handle makes a call the transcript never sees, which is exactly the bug
+    the `screenshot` verb used to have. And a `vm-gone` entry records the machine disappearing: since identity is
+    verified while a session is being opened, a guest that has powered itself off refuses the session before the
+    session wrapper even exists, so reconstruction raises the adapter's own `machine.vm-unreachable` error for
+    it — which is what answers the `wait machine=stopped` statement both codex scripts end on. A bound secret
+    reaching the guest stops the recording for the rest of the run, the same rule that suppresses the automatic
+    failure screenshot, applied to this other artifact a run can leave behind.
+  - `cli.py` owns command-line parsing, exit codes (`errors.exit_code`, over the one `ReliquaryError` hierarchy),
+    and the output discipline described elsewhere in this file. `_build_parser()` registers all 42 commands
+    through nine family-specific builder functions and returns `(parser, commands)`; `_COMMANDS` is derived from
+    that return value rather than declared separately — it used to be a hand-maintained `frozenset`, which was
+    just one more list of the same command names to keep in sync, so don't bring that back. The builders are
+    called in the same order they appear in `--help` output, which follows this module's traditional grouping
+    rather than a cleaner reorganization: for example, `fetch-media` sits alone between the script family and the
+    authoring family, and `add-media` sits with cache-reclamation commands. `_dispatch` routes on the literal
+    command word and is the one part of this still kept by hand; `test_cli.py` walks its source and checks it
+    against the registered command set in both directions, and a command that isn't routed anywhere but reaches
+    the fallback case is treated as an `InternalError` (exit 1) rather than the silent success (exit `0`) it used
+    to return.
+
+    `cli.py` is the session layer's first user: it builds one `Context` per invocation (from flags, then
+    environment variables, then the default home), opens one `Session` on it, and drives every command through
+    `Session` methods — except the codex family and the "locate" command, which take the `Context` record
+    directly (D87). `__main__.py` is what makes `python -m reliquary` work.
+- `pyproject.toml` packages `reliquary` as the `reliquary` command. The wheel and the sdist carry different
+  things: the wheel is the runtime alone, and the sdist is the runtime plus what verifies it (the test suite).
+  Setuptools' src-only package search keeps the repository-root test suite out of the wheel automatically;
+  `MANIFEST.in` explicitly adds `tests` into the sdist (D105) and explicitly excludes `planning`, `docs`, and
+  `tests/source_tree`. The suite is grafted into the sdist as a whole, rather than relying on setuptools'
+  default rules, which would only grab top-level `tests/*.py` files and skip the fixture directories underneath
+  them — that's why `tools/check_dist.py` names each of those fixture trees individually as required, and names
+  the three excluded trees as forbidden.
+- `tests/` is the test suite. Pytest is the test runner (D106), and the suite is pytest-native throughout, now
+  that the conversion sweeps described below (F56–F60) are finished. It covers core helpers, guest program runs,
+  lifecycle ownership, media acquisition, blueprints, machines, and scripts. Shared test machinery lives where
+  it's used: the two conformance corpora and the recognizer's reference PNGs are read through `tests/corpus.py`;
+  the scripting language's static validation rules are driven from one parametrized table of cases; the two
+  backend adapters are checked against one shared parametrized contract; and the command manifest, the session
+  wrapper methods, and the documented examples each report one test node per item they cover.
+
+  `tests/conftest.py` holds the suite-wide configuration: the `--integration` option that turns on the
+  `integration` marker, the rule that deselects that tier by default, and the home directory those integration
+  runs use.
+
+  `tests/source_tree/` is the one exception that ships nowhere: it holds tests that check the *repository*
+  itself rather than the installed package — prose documents, maintainer records, the catalogue of open
+  problems. If it shipped, a check that scans `docs/` or `AGENTS.md` would find neither directory in an
+  installed package and report success without actually checking anything — so instead, these tests live
+  somewhere that never runs from an installed package at all. None of these tests need a `skipUnless` guard,
+  and a new test belongs in this directory exactly when it reads something a released package doesn't include.
 - `README.md` is the human guide.
 - `CHANGELOG.md` records release-facing changes.
-- `planning/README.md` is the map of the maintainer-facing planning machinery, and the place to start. The
-  directories are the classification, and they hold the **same three filenames** — `USE-CASES.md`,
-  `ARCHITECTURE.md`, `FEATURES.md` — because they hold the same three artifacts in two states:
-  `planning/proposed/` is argued but not pledged, and nothing is worked from there; `planning/pledged/` is
-  approved but not yet delivered. Promotion is by *moving* a document or an entry, and the commit is the
-  pledge record. The **planning root** holds what never moves and so has no state — the map, the vetting
-  rule (`SURFACES.md`), the adjudication record (`DECISIONS.md`, which spans open, pledged, refused and
-  retired alike), the task queue, and the sequence ledger (`SEQUENCES.md` — the high-water marks every
-  handle sequence issues against, one file on `main` because a search sees only the branch it
-  stands on). Design sits with what it serves: `planning/proposed/design/` and
-  `planning/pledged/design/` for a feature's own design, `planning/design/` for open design problems serving
-  no single feature — the whole-system view itself (the seams model and the P-numbered principles) is root
-  `ARCHITECTURE.md`. Once a surface ships, its normative spec moves to `docs/spec/` — current truth does not
-  live under `planning/`.
-- **There is no roadmap** (D42): `pledged/` says the project will do it and nothing about when, so the absence
-  of order in `TASKS.md` holds equally for pledged features, the only binding order running inside a feature.
-  **Features carry F-numbers and tasks carry T-numbers** — the handle a dependency, commit or decision points
-  at — which unlike U-, P-, S- and D-numbers **evaporate on delivery**, retiring unreused, gaps being history
-  rather than a promise. A T-number is issued at entry to `TASKS.md` (a task has no proposed state), and every
-  handle sequence issues against `planning/SEQUENCES.md`'s high-water marks, a struck task or an unmerged
-  branch leaving the searchable record incomplete. Designs take
-  no number. **A feature must fit in one sprint**, here minutes to hours, so a pledged feature is far smaller
-  than "milestone" suggests; the bound bites at the pledge. References between items run **down the lifecycle or
-  sideways, never up**. Full rules: `planning/README.md`.
-- **Search the record before a governed act.** Before drafting a proposal, pledging one, or changing a norm,
-  search `planning/DECISIONS.md` for what bears on it and report what you found — including finding nothing.
-  Anything recorded as killed, declined, or superseded is not revisited without new evidence, so re-raising one
-  unknowingly wastes the argument; an entry that *supports* the change is worth citing. The trigger is the act,
-  not a feeling of uncertainty — most entries carry a refusal, and what was declined is recorded nowhere else.
-- `planning/TASKS.md` is the third work input queue, beside GitHub issues and `planning/proposed/`: small,
-  **pre-approved** work — entering it is approving it — with no scheduled order, so anyone may pick up
-  anything. Work that only makes sense as part of one pledged feature lives with that feature in
-  `planning/pledged/FEATURES.md` instead. Small one-offs are really just issues, and work small and obvious
-  enough needs no entry at all (housekeeping, D38). In theory every issue points to a use case or principle;
-  small ones may be deemed obvious. **Writing anywhere under `planning/` is a governed act** (D43): one gate
-  covers entering a document in `proposed/`, promoting one to `pledged/`, and entering work in `TASKS.md`,
-  with the issue tracker the one open door. Authority is the owner alone today. **Agents do not add tasks on
-  their own initiative and ask before editing that file at all**; the gate is at entry only, so anyone may pick
-  up what is already there.
-- `planning/SURFACES.md` is the surface-change rule: how every surface-changing decision is weighed. The
-  **application surface** inventory it scopes over (CLI, embedding API, scripting language, and machine blueprints — media,
-  source, and archive are components inside the blueprint — plus the script properties, recorded outputs, and
-  the working-directory layout) lives in root `ARCHITECTURE.md` "The application surfaces", S-numbered S1–S8, where the housekeeping lookup answers by
-  checklist. The use cases, the architectural principles, and the specs are together the project's **vision** —
-  the standing statement of what Reliquary is and is for. The numbered use cases — the decision
-  surface that rule weighs against — live in root `USE-CASES.md` (implemented-only: every use case there is
-  met by the code today, no placeholders). Use cases run through **three** locations, because pledging and
-  delivery are different events: drafted in `planning/proposed/USE-CASES.md`, pledged in
-  `planning/pledged/USE-CASES.md` (the move is the pledge), and current at the root on full delivery — one
-  global U-sequence throughout, no placeholder left by either move. Every pledged item cites the use case — in
-  force, pledged, or proposed — or the architectural principle that demands it: principles drive tasks and features
-  just as use cases do. The architectural
-  principles are itemized as P-numbers in root `ARCHITECTURE.md` — standing-only, every entry honored by the code
-  today, with `planning/proposed/ARCHITECTURE.md` and `planning/pledged/ARCHITECTURE.md` the same three-state
-  ladder; promotion to the root list is what *arms* a principle, since only there does a divergence become a
-  bug. Decisions in `planning/DECISIONS.md` carry
-  permanent D-numbers, generally support use cases or principles, and are the citation handle for design choices
-  and code commits — overruled decisions sit in that file's Retired list.
-- The worked FreeDOS example is the shipped codex itself (`src/reliquary/codex/`): the `freedos.rlqb` blueprint with
-  its media and archive components, and the install and verify scripts. It is the live, tested copy — seeded into
-  a user's home on first reference — so there is no second copy to keep synchronized.
-- `docs/` describes the live situation. `docs/spec/` holds the
-  **normative specifications** of every application surface — the CLI, the
-  embedding API, the scripting language, the blueprint model, media,
-  properties, asset resolution, the instance model, the codex, and
-  the answer-file server. A spec is the authority
-  the implementation answers to, not a report on it: where a spec and
-  the code disagree, the spec is right and the code has a bug, unless
-  the spec is changed first through the surface-change rule. The
-  rest of `docs/` is descriptive — user-facing references and guides,
-  and a reference that contradicts a spec is the reference's bug.
-  **The banner is the marker, the directory is shelving**: every
-  spec declares its standing in its own banner, and every
-  descriptive document names the norm it defers to. One norm is
-  split across artifact kinds: the blueprint's structure is normed
-  by the published schema and its semantics by
-  `docs/spec/blueprint-model.md`, so the blueprint guide, field
-  reference, and cookbook are descriptive `docs/`.
-  Design lives under `planning/` instead: with its feature in
-  `planning/proposed/design/` or `planning/pledged/design/`, or in
-  `planning/design/` when it serves no single feature.
-- **Machine-readable schemas ship inside the package**, at
-  `src/reliquary/schemas/`, because code consumes them:
-  `blueprint-schema-v1.json` (versioned v1 so editors can bind it
-  today) and `machine-state.schema.json`. `docs/spec/` refers to
-  them rather than holding them. Both must stay synchronized with the
-  prose specs, **which are normative** — a schema captures only the
-  structural subset JSON Schema can express, and schema validity
-  never implies document validity. The shared valid/invalid
-  conformance corpus (`tests/fixtures/conformance/blueprint/`,
-  `test_conformance_corpus.py`) runs every fixture against both the
-  parser and the schema so the two cannot drift. Placement rules
-  live with the documents they govern: `planning/README.md` for the
-  planning machinery, `docs/spec/README.md` for spec, reference,
-  and guide.
-- **Three conformance corpora, and each answers something the last
-  one could not.** `fixtures/conformance/script/` (`test_script_corpus.py`)
-  does for `.rlqs` what the blueprint corpus does for `.rlqb`, and
-  adds the assertion the first cannot make: an invalid fixture
-  declares the V-id that must reject it, and the harness checks the
-  diagnostic cites it — so a fixture failing for the *wrong* reason
-  is caught by the suite rather than by a reviewer. Where an id does
-  not exist yet the fixture carries `# cites: no`, asserted in both
-  directions so it retires itself when the id lands; that count is
-  the live measurement behind D55. **The third is captured rather
-  than written** (F43): `fixtures/conformance/transcript/`
-  (`test_transcript_corpus.py`, over `tests/replay.py`) holds `.rlqt`
-  captures of real FreeDOS runs, taken by the integration tier
-  against QEMU and promoted by hand, and a fixture **asserts by being
-  replayable** — the shipped interpretation layer runs over
-  `ReplaySession` at the carrier seam, and a call the capture never
-  covered is an error naming it. Three claims sit beside that, because
-  a run that ends early replays without complaint: every recorded
-  carrier call must be made (`remaining_calls()`), the header's
-  script digest must still match the script in the tree, so a stale
-  capture is named rather than reported as a divergence, and **the
-  replay must reach the conclusion the capture recorded** — the rows
-  a command returned, the phase a script finished in, or the rule it
-  refused with, none of which the seam can show. **Fixtures come in
-  two kinds because the layer has two front doors**: a `script`
-  capture drives the phase graph, the cursor menus and the stability
-  gates, while a `command` capture drives the **exec** adapter's
-  prompt detection and echo scanning, which no script run touches.
-  And a capture of a run that *failed* is a fixture like any other —
-  three of the four pathological captures pin a wrong answer `exec`
-  gives an ordinary screen today, so closing one of those gaps
-  retires its fixture loudly. Each corpus
-  has its own README, which is where its findings live — that one's
-  records the six defects the first real captures found, every one of
-  them in the recorder rather than in the layer under test.
-- **A corpus is worth what its harness can prove ran**, which is why
-  both read through one helper — `tests/corpus.py` (F56). Every
-  fixture is a **collected node named for its file**, in every check
-  that judges it, and each bucket's count is **pinned where the
-  fixtures are gathered**, so a bucket that stops loading is a
-  collection error rather than a green run over nothing. That is the
-  defect D106 was decided on: the blueprint corpus ran against the
-  parser and *not* the schema while claiming the two cannot drift,
-  because a loop of fixtures inside one `subTest` test reports the
-  same single pass whether it checked all of them or half. A check
-  that partitions a bucket by a marker is the same failure in
-  miniature, so `// warns:` and `// schema: rejects` are each asserted
-  in both directions by **one** check over the whole bucket rather
-  than by two over its halves. The transcript corpus inherited all of
-  it by calling the same two functions, which is what that helper was
-  written for.
+- `planning/README.md` maps out the maintainer-facing planning machinery, and is the place to start. The
+  directories are what classifies a document, and `planning/proposed/` and `planning/pledged/` each hold the
+  same three filenames — `USE-CASES.md`, `ARCHITECTURE.md`, `FEATURES.md` — because they hold the same three
+  kinds of document at two different stages: `planning/proposed/` holds something argued for but not yet
+  approved, and nothing is actively worked on from there; `planning/pledged/` holds something approved but not
+  yet delivered. Moving on to the next stage means *moving* the document (or an entry within it), and the commit
+  that does the move is the record of that approval.
+
+  The planning root itself holds things that never move and so have no "stage": the map (this README), the
+  surface-change rule (`SURFACES.md`), the record of every past decision (`DECISIONS.md`, covering open,
+  pledged, refused, and retired decisions alike), the task queue, and the sequence ledger (`SEQUENCES.md` — the
+  highest number issued so far for each kind of numbered handle; it's a single file kept on `main` because a
+  search only ever sees the branch it's run on).
+
+  Design documents live alongside whatever they serve: a feature's own design lives in
+  `planning/proposed/design/` or `planning/pledged/design/`, and a design problem that doesn't belong to any
+  single feature lives in `planning/design/`. The one exception is the system-wide architectural view itself
+  (the module/seam model and the numbered principles), which is the root `ARCHITECTURE.md`. Once a surface
+  actually ships, its normative spec moves to `docs/spec/` — `planning/` never holds the current, authoritative
+  description of something already built.
+- There is no project roadmap (D42): being in `pledged/` means the project will do the work, but says nothing
+  about when. `TASKS.md` has no ordering for the same reason — pledged features have no ordering either, and the
+  only ordering that's binding is the ordering of steps *inside* one feature. Features are numbered with
+  F-numbers and tasks with T-numbers — these are handles other things (a dependency, a commit, a decision) can
+  point at — but unlike U-, P-, S-, and D-numbers, F- and T-numbers are retired once the feature or task is
+  delivered and never reused; a gap in the numbering is just history, not a sign of something still pending. A
+  T-number is issued the moment a task is added to `TASKS.md` (there's no "proposed" stage for a task), and every
+  numbered handle is issued against the high-water marks recorded in `planning/SEQUENCES.md` — a task that gets
+  struck, or a branch that never gets merged, is why the searchable record can have gaps. Design documents don't
+  get a number at all. A feature has to be small enough to fit in one sprint — here, that means minutes to hours
+  of work, so a "pledged feature" is much smaller than the word "milestone" usually implies; that size limit is
+  enforced at the point something is pledged. References between planning items only ever point down the
+  lifecycle (from a task to the feature it's part of) or sideways, never back up. The full rules are in
+  `planning/README.md`.
+- Before doing anything that requires approval — drafting a proposal, pledging one, or changing a project norm —
+  search `planning/DECISIONS.md` for anything relevant first, and report what you found, even if you found
+  nothing. Anything already recorded as killed, declined, or superseded shouldn't be revisited without new
+  evidence — re-raising it without realizing it was already settled just wastes everyone's time re-arguing it —
+  and an entry that supports the change you're proposing is also worth citing. Do this search whenever you're
+  about to take one of these actions, not just when you happen to feel uncertain: most entries in that file
+  record something that was declined, and that's the only place that decision is written down.
+- `planning/TASKS.md` is the third source of work, alongside GitHub issues and `planning/proposed/`. It holds
+  small work that's already pre-approved simply by being entered there, with no particular order, so anyone can
+  pick up anything in it. Work that only makes sense as part of one specific pledged feature belongs with that
+  feature, in `planning/pledged/FEATURES.md`, instead of here. Truly small one-off work is really just a GitHub
+  issue, and sufficiently small, obvious work (housekeeping) needs no entry anywhere at all (D38). In principle
+  every issue should point to a use case or a principle it serves; small items may be treated as self-evidently
+  fine. Writing anything under `planning/` at all requires approval (D43) — one gate covers adding a document to
+  `proposed/`, promoting one to `pledged/`, and adding an entry to `TASKS.md`, with the GitHub issue tracker
+  being the only place that doesn't require this approval. Right now, the owner (Paul) is the only one with this
+  authority. Agents must not add tasks to `TASKS.md` on their own initiative, and must ask before editing that
+  file at all — the approval gate only applies to adding new entries, so anyone is free to pick up work that's
+  already there.
+- `planning/SURFACES.md` is the rule for how any surface-changing decision gets weighed. The application
+  surfaces it applies to — the CLI, the embedding API, the scripting language, and machine blueprints (media,
+  source, and archive are components inside a blueprint, not surfaces of their own), plus script properties,
+  recorded run output, and the working-directory layout — are listed and numbered S1–S8 in root
+  `ARCHITECTURE.md`, under "The application surfaces", where routine housekeeping decisions can be checked
+  against a checklist. Together, the use cases, the architectural principles, and the specs make up the
+  project's vision: the standing statement of what Reliquary is and is for.
+
+  The numbered use cases — what `SURFACES.md`'s rule actually weighs a proposed change against — live in root
+  `USE-CASES.md`. That list only ever contains use cases the code already fully implements today; there are no
+  placeholders in it. A use case passes through three locations over its life, because being pledged and being
+  delivered are two different events: it's drafted in `planning/proposed/USE-CASES.md`, pledged by being moved
+  to `planning/pledged/USE-CASES.md`, and finally moved to the root once it's fully delivered — one single
+  U-number sequence runs across all three locations, and neither move leaves a placeholder behind. Every pledged
+  item must cite either the use case that justifies it (whether that use case is already in force, pledged, or
+  still only proposed) or the architectural principle that demands it — principles justify work exactly the way
+  use cases do.
+
+  The architectural principles are the P-numbered entries in root `ARCHITECTURE.md`. Like the use cases, this
+  list only contains principles the code already honors today; `planning/proposed/ARCHITECTURE.md` and
+  `planning/pledged/ARCHITECTURE.md` follow the same three-stage promotion as use cases do, and promoting a
+  principle to the root list is what makes it binding — only once it's there does a divergence from it count as
+  a bug. Decisions recorded in `planning/DECISIONS.md` carry permanent D-numbers; they generally exist to
+  support a use case or a principle, and are the reference other design choices and code commits cite. A
+  decision that's later overruled stays in that file, moved to its Retired list.
+- The worked FreeDOS example is the codex Reliquary actually ships (`src/reliquary/codex/`): the `freedos.rlqb`
+  blueprint, its media and archive components, and the install and verify scripts. This is the live, tested
+  copy — it gets copied into a user's home directory the first time it's referenced — so there's no separate
+  second copy that has to be kept in sync with it.
+- `docs/` describes how Reliquary currently works. `docs/spec/` holds the normative specification for every
+  application surface — the CLI, the embedding API, the scripting language, the blueprint model, media,
+  properties, asset resolution, the instance model, the codex, and the answer-file server. A spec is the
+  authority the implementation has to match, not a description written after the fact: if a spec and the code
+  disagree, that means the code has a bug, unless the spec itself is changed first, through the surface-change
+  rule. The rest of `docs/` is descriptive: user-facing references and guides. If one of those contradicts a
+  spec, that's a bug in the reference document, not in the spec.
+
+  Which document is normative is marked in that document's own banner, and every descriptive document names the
+  norm it defers to — the directory something lives in is just filing, not the marker of its status. One case
+  splits across document kinds: a blueprint's structure is normed by the published JSON schema, while its
+  semantics are normed by `docs/spec/blueprint-model.md` — so the separate blueprint guide, field reference, and
+  cookbook documents are all descriptive `docs/` content, not normative specs. Design documents live under
+  `planning/` instead, as described above: with their feature in `planning/proposed/design/` or
+  `planning/pledged/design/`, or in `planning/design/` if they don't serve one single feature.
+- The machine-readable schemas ship inside the installed package, at `src/reliquary/schemas/`, because code
+  actually reads them: `blueprint-schema-v1.json` (versioned as v1 so editors can already bind to it) and
+  `machine-state.schema.json`. `docs/spec/` links to these schemas rather than duplicating them. Both schemas
+  have to stay in sync with the prose specs, which remain the actual authority — a JSON Schema can only capture
+  the structural subset of what a spec says, so a document being valid against the schema doesn't mean it's a
+  valid document overall. The shared corpus of valid and invalid example documents
+  (`tests/fixtures/conformance/blueprint/`, checked by `test_conformance_corpus.py`) runs every example against
+  both the parser and the schema, so the two can't silently drift apart. Where a document like this belongs is
+  decided by what governs it: `planning/README.md` covers the planning machinery, `docs/spec/README.md` covers
+  specs, references, and guides.
+- There are three conformance corpora (collections of example fixture files used as tests), and each one checks
+  something the previous ones can't. `fixtures/conformance/script/` (checked by `test_script_corpus.py`) does
+  for `.rlqs` scripts what the blueprint corpus does for `.rlqb` blueprints, and adds a check the blueprint
+  corpus can't make: an invalid fixture states which validation rule (V-id) must reject it, and the test harness
+  checks that the actual error message cites that same id — so a fixture that fails for the *wrong* reason gets
+  caught by the suite instead of only by a human reviewer. Where a rule doesn't exist yet, its fixture is marked
+  `# cites: no`, and that's checked in both directions too, so the marker automatically stops being needed once
+  the rule actually lands; the count of such markers is the live measurement behind decision D55.
+
+  The third corpus is captured rather than hand-written (F43): `fixtures/conformance/transcript/` (checked by
+  `test_transcript_corpus.py`, using `tests/replay.py`) holds `.rlqt` recordings of real FreeDOS installs,
+  captured by the opt-in integration test tier against real QEMU and then promoted into the suite by hand. A
+  fixture here proves itself by being replayable: the normal interpretation layer runs against a `ReplaySession`
+  standing in at the carrier interface, and any carrier call the capture didn't originally record is reported as
+  a named error. Beyond just replaying, three more things are checked, because a run that ended early would
+  otherwise replay without complaint: every carrier call recorded in the capture must actually be made
+  (`remaining_calls()`), the script digest stored in the header must still match the script currently in the
+  tree (so an edited script is reported as a stale fixture, not a mysterious divergence), and the replay has to
+  reach the same conclusion the capture recorded — the rows a command returned, the phase a script finished in,
+  or the error it failed with — none of which the carrier interface itself can express.
+
+  Fixtures come in two kinds because there are two ways into this layer: a `script` capture drives the phase
+  graph, the cursor menus, and the stability gates, while a `command` capture drives the `exec` adapter's prompt
+  detection and echo scanning specifically, which no script run ever touches. A capture of a run that *failed*
+  is a perfectly normal fixture like any other — three of the four fixtures capturing a pathological case
+  currently pin down a wrong answer that `exec` gives on an ordinary screen, so fixing one of those bugs will
+  retire its fixture loudly (the fixture will start failing, on purpose). Each corpus has its own README file,
+  where its findings are written up — the transcript corpus's README records six defects the very first real
+  captures uncovered, every one of them a bug in the recorder itself rather than in the code under test.
+- A corpus of fixtures is only as trustworthy as what its test harness can actually prove ran, which is why both
+  the script and blueprint corpora are read through one shared helper, `tests/corpus.py` (F56). Every fixture
+  becomes its own collected test node, named after its file, in every check that judges it, and the expected
+  count of fixtures in each bucket is pinned at the point the fixtures are collected — so if a bucket somehow
+  stops loading its fixtures, that shows up as a collection error, not as a suite that reports green while
+  silently checking nothing. This is exactly the defect that led to decision D106: the blueprint corpus was
+  running its fixtures against the parser but not against the schema, despite claiming the two couldn't drift
+  apart, because looping over fixtures inside one `subTest` reports a single pass regardless of whether it
+  actually checked all of them or only half. A check that splits a bucket by some marker has the same failure
+  in miniature, so both `// warns:` and `// schema: rejects` markers are checked, in both directions, by one
+  single check over the whole bucket, rather than by two separate checks each covering half of it. The
+  transcript corpus inherited all of this for free, just by calling the same two functions — which is exactly
+  what this shared helper was written to make possible.
 
 Keep these modules deep: add behavior to the module that owns its invariant, and introduce another module only when a
-real interface or maintenance seam justifies it. The package root exposes the intended embedding surface but owns no
-implementation.
+real interface boundary or maintenance need justifies it. The package root exposes the intended embedding surface but
+owns no implementation.
 
 ## Required invariants
 
@@ -781,17 +850,19 @@ proper are defined no earlier than 1.0.
 
 ### Surface changes are vetted
 
-The CLI, the embedding API, the scripting language, and the machine blueprint (media, source, and archive
-components included) are
-Reliquary's primary **application surfaces** (S1–S4); the script properties, the run's returned output (the live
-event stream, `--json` documents, exit codes — persistence dropped with D36), and the working-directory layout are
-the supporting ones (S5–S8), covered equally. Any decision that
-changes one follows the rule in [planning/SURFACES.md](planning/SURFACES.md): requests triage by their impact on the
-numbered use cases ([USE-CASES.md](USE-CASES.md)) — no impact or strong alignment is an easy approval, adding a new use case is more work but still
-easy, and a change misaligned with the use cases must win the argument for amending the list itself, with
-work starting only after the amendment lands — then the change is named across every surface it touches
-and landed coherently on all of them. Where a docs/spec/ specification and planning/SURFACES.md or
-USE-CASES.md disagree, the principles and use cases govern; the design is realigned to them.
+The CLI, the embedding API, the scripting language, and the machine blueprint (including its media, source, and
+archive components) are Reliquary's primary application surfaces, numbered S1–S4. The script properties, the run's
+returned output (the live event stream, `--json` documents, exit codes — persistence itself was dropped with D36),
+and the working-directory layout are the supporting surfaces, numbered S5–S8, and are covered by the same rule.
+
+Any decision that changes one of these surfaces follows the rule in [planning/SURFACES.md](planning/SURFACES.md):
+first, the request is triaged by its impact on the numbered use cases ([USE-CASES.md](USE-CASES.md)) — a request
+with no impact, or one that clearly aligns with the use cases, gets easy approval; adding a new use case is more
+work, but still easy; a change that doesn't align with the existing use cases has to win the argument for amending
+the use-case list itself first, and only starts once that amendment lands. Once approved, the change is identified
+across every surface it touches, and landed on all of them together, coherently. Where a `docs/spec/` specification
+disagrees with `planning/SURFACES.md` or `USE-CASES.md`, the principles and use cases win, and the design is
+brought in line with them.
 
 ### CLI–API parity
 
@@ -826,7 +897,7 @@ A blueprint may instead drive the same machine over the VNC plane
 (`control-planes: ["vnc"]`, QEMU only today): RFB key events for
 input, the framebuffer read through the shared fixed-font
 recognizer for output. It is equally agentless — nothing changes
-in the guest — and everything above the carrier seam runs
+in the guest — and everything above the carrier interface runs
 unmodified over either plane.
 
 Never make a feature depend on guest cooperation. A future guest-agent transport may be optional, but agentless behavior
@@ -834,153 +905,164 @@ must remain the default and fallback.
 
 ### Placeable working directories, and what containment now means
 
-**Six working directories, every one placeable** (`home.py`; normative:
+There are six working directories, and each one can be placed independently (`home.py`; normative:
 docs/spec/asset-resolution.md "The working directories"): `home`, `blueprints`, `scripts`, `cache`, `media`,
-`machines`. Each starts **unassigned**; a value arrives in the `Context` record a session is opened on — the CLI's
-`--<name>-dir` flags and `RELIQUARY_<NAME>_DIR` variables land there through its construction step — and the rest
-**derive** — `home` gives default locations to `blueprints`/`scripts`/`cache`,
-and `cache` (assigned or derived) gives them to `media`/`machines`. Derivation reaches only what is still unassigned,
-so `cache` alone conjures no home and `machines` alone leaves `media` where the rest of the resolution puts it.
-**A record with no home is a fail-closed `StaticError` (`dir.unassigned`) at the session's door**, naming the home —
-an assigned home reaches all six by derivation, so nothing a session does can find a directory unassigned; a bare
-`Context` may still be built and filled before a session is opened on it.
+`machines`. Each one starts out unassigned. A value reaches one of them through the `Context` record a `Session` is
+opened on — set via the CLI's `--<name>-dir` flags and `RELIQUARY_<NAME>_DIR` environment variables when `Context`
+is constructed — and the rest are then derived: `home` supplies default locations for `blueprints`, `scripts`, and
+`cache`, and `cache` (whether assigned directly or derived from `home`) supplies default locations for `media` and
+`machines`. Derivation only ever fills in a directory that's still unassigned, so assigning `cache` alone doesn't
+invent a `home`, and assigning `machines` alone leaves `media` to be resolved by the normal rules. A `Context` with
+no home at all makes `Session` raise a fail-closed `StaticError` (`dir.unassigned`) naming `home`, right when the
+session is opened — once a home is assigned, all six directories are reachable through derivation, so nothing a
+session does afterward can ever find a directory still unassigned. (A bare `Context` can still be built and filled
+in before a `Session` is opened on it.)
 
-The surfaces differ only in whether an assignment is made for the caller. **The CLI** gives `home` its default
-(`Documents/reliquary`, falling back to `~/reliquary`) whenever neither a flag nor the environment named one, so one
-assignment reaches all six and the refusal is unreachable at the keyboard — **a property of that default, not an
-exemption from the rule**, which is what keeps it true if the default ever changes. **The embedding API** assigns
-nothing — the session demands its home at the door; that is the whole safety of the design. Honouring the environment
-is likewise the CLI's private construction step and never the library's: the engine reads no environment at all.
+The CLI and the embedding API differ only in whether they make an assignment on the caller's behalf. The CLI gives
+`home` a default (`Documents/reliquary`, falling back to `~/reliquary`) whenever neither a flag nor an environment
+variable named one — so at the command line, that one default reaches all six directories by derivation, and the
+"no home" error can never actually happen. That's a property of the default, not an exception carved out of the
+rule — which is exactly what keeps the rule true even if the default location ever changes. The embedding API makes
+no such assignment: a `Session` demands its home directory up front, and that's the entire safety mechanism behind
+this design. Reading environment variables is likewise something only the CLI does, as part of its own private
+setup — the underlying engine itself never reads the environment at all.
 
-`Context` is a **plain record** of the six optional directory paths plus the selected properties file (P26's cargo
-ruling) and nothing else — no methods, all resolution in `home.py`'s module functions — because a handful of nullable
-strings binds cleanly from C or Java where keyword arguments would not
-(P7). There is no process-global assignment: the session pins the whole record once at construction, from that record
-alone, so two sessions in one process are unremarkable; the engine functions underneath take the record as their
-`context=` (a bare string is shorthand for `Context(home_dir=...)`), which is the seam the veneer forwards over. The
-CLI builds **one `Context` per invocation** — flags, then the environment, then the default home — and opens one
-`Session` on it, driving only session methods (the codex family and the locate seam, veneerless by D87, take the same
-record directly). `machine_handle.py`'s and the adapters' own `home=` parameters are a different,
-narrower concept — an already-resolved plain directory (sometimes a machine's own materialization directory standing
-in for one), not a `Context`; they were deliberately left alone.
+`Context` is a plain record: the six optional directory paths, plus the selected properties file (which P26
+specifies it should carry), and nothing else — no methods, with all the actual resolution logic living in
+`home.py`'s functions. It's kept this plain because a handful of nullable strings binds cleanly to languages like C
+or Java, where Python's keyword arguments have no equivalent (P7). There's no global state involved: a `Session`
+pins its whole `Context` once, at construction, from that record alone, so nothing prevents two separate `Session`s
+existing in the same process. The engine functions underneath take this record as a `context=` argument (a bare
+string is shorthand for `Context(home_dir=...)`), and that's the interface `Session`'s wrapper methods forward to.
+The CLI builds one `Context` per invocation — from flags, then environment variables, then the default home — and
+opens one `Session` on it, driving everything through `Session` methods (except the codex family and the "locate"
+command, which bypass the wrapper by D87 and take the `Context` record directly). `machine_handle.py`'s and the
+backend adapters' own `home=` parameters are a different, narrower thing — an already-resolved plain directory path
+(sometimes a specific machine's own materialization directory standing in for one), not a `Context` — and were
+deliberately left as they are.
 
-**Containment is no longer topology.** With six independent roots, "under the home" is not a claim Reliquary can make;
-what P12 now requires is that Reliquary **writes only where it was told to** — never beside the module and never into
-a source repository during normal use.
+Containment is no longer a matter of file-tree position. With six independent roots, Reliquary can no longer claim
+that everything lives "under the home directory" — what P12 actually requires now is that Reliquary only ever
+writes to a location it was explicitly told to use: never next to its own installed module, and never into a
+source-code repository during normal use.
 
-**Nothing resolves out of the codex** (D88), on either surface and under no flag: the directories are the sole
-sources, a miss fails closed, and the refusal names `rlq seed-blueprint <name>` where the library holds that name.
-The seeding axis that once decided this — autoseeding, the surviving half of the retired asset-root knob — was
-deleted rather than defaulted, because a knob that can be turned on is one CI will turn on and a silently supplied
-blueprint is a bug that surfaces on someone else's machine. That restores **P4 to an absolute** and retires D59's
-amendment of it. `assets.py` is correspondingly one source
-(`DirectorySource`) reading each kind's own directory, walked recursively by extension, and carrying no seeding
-property at all. An asset's identity is its declared `name` (id-safe) else its filename stem;
-within-source effective-name collisions are errors. Selection scoping: `--blueprint <name>` matches only machines
-whose recorded `blueprint-source` equals this invocation's resolution (a sourceless machine matches by name alone).
-**Seeding is the one way the library reaches a tree**: `seed-blueprint` / `seed-script` (there is no `seed-media`) write
-into the assigned `blueprints` / `scripts` directory wherever it is, project tree or home alike — copy a first draft,
-commit the copy. All three codex verbs — those two plus `list-codex` — are **CLI-only under P6's named exception**
-(D87): a library that changes in a point release is not something a program may bind against, so `src/reliquary/__init__.py`
-exports none of them and the parity test reads the exception from `docs/spec/api.md`'s codex-family row.
+Nothing is ever resolved out of the built-in codex library directly (D88), on either the CLI or the API, and there's
+no flag to change that: the placeable directories are the only sources Reliquary reads from, a miss fails closed,
+and the resulting error names the exact command to fix it, `rlq seed-blueprint <name>`, using whatever name the
+library holds. The setting that used to control this — "autoseeding," the surviving half of an older, since-removed
+option — was deleted outright rather than just changed to a safer default, because a setting that *can* be turned
+on is a setting CI will eventually turn on, and a blueprint that gets silently supplied this way is a bug that only
+shows up later, on someone else's machine. Removing it makes P4 an absolute rule again, overriding the earlier
+decision (D59) that had softened it. Correspondingly, `assets.py` has exactly one source, `DirectorySource`, which
+reads each asset kind's own directory, walking it recursively by file extension, with no seeding behavior of any
+kind. An asset's identity is its declared `name` field (which must be id-safe) or, failing that, its filename
+stem; a collision between two assets that resolve to the same effective name within one source is an error.
+Machine selection is scoped the same way: `--blueprint <name>` only matches machines whose recorded
+`blueprint-source` equals what this invocation resolves to (a machine recorded with no source at all matches by
+name alone).
 
-Default layout, with only the home assigned. A machine is wholly its materialization directory — there is
-no root-home machine model (the legacy root-home machine surface — a
-root-level `drives/`, a root `machine.json`, a root `vm.json` — was
-absorbed and deleted; the per-machine `machine.json` below is the new,
-unrelated cache state file):
+Seeding is the one way the codex library's contents reach an actual working tree: `seed-blueprint` and
+`seed-script` (there is no `seed-media`) copy files into whichever directory is currently assigned as `blueprints`
+or `scripts`, whether that's inside a project's own tree or inside the home directory — the idea being to copy a
+first draft and then commit that copy. All three codex verbs — those two plus `list-codex` — are CLI-only, under
+P6's one named exception (D87): a library whose contents can change in a point release isn't something a program
+should bind against directly, so `src/reliquary/__init__.py` doesn't export any of them, and the CLI/API parity
+test reads this specific exception from the codex-family row in `docs/spec/api.md`.
 
-- `blueprints/` — composed blueprints, media components included (`blueprints_dir`)
+Here's the default layout, assuming only `home` was assigned. A machine is entirely defined by its materialization
+directory — there's no separate "root-home machine" model any more. (The old root-home machine layout — a
+root-level `drives/`, a root-level `machine.json`, a root-level `vm.json` — was absorbed into the per-machine model
+below and deleted. The per-machine `machine.json` described below is a new, unrelated cache state file, not a
+successor to that old root-level one.)
+
+- `blueprints/` — composed blueprints, including their media components (`blueprints_dir`)
 - `scripts/` — automation scripts (`scripts_dir`)
-- `cache/media/` — every cached payload (`media_dir`), keyed by media name, under the cache root; each
-  file is named `<media-name>.<ext>`, which is the whole of its identity — no sidecar record (D41)
-- `cache/machines/<name>-<n>/` — machine materializations (`machines_dir`;
-  parent via `cache_dir`), under the cache root, each with `machine.json` (the
-  resolved state; while running its `vm` section carries the live VM identity,
-  port, PID; and a `variables` map holding the machine variables a
-  script `set`s, cleared on start — D36. **The recorded snapshot is the
-  machine's *shape* and only that**: `parameters` and `scripts` are blueprint
-  fields deliberately outside it, read from the blueprint file at each
-  invocation, absent from the digest, and needing no `apply` to take effect —
-  they name what to run against a machine and what to bind into it, never what
-  it is, D101),
-  `media/` (the machine's per-machine images and vvfat directories,
-  named by media), `screenshots/` (where a script's `screenshot` verb
-  and an automatic failure capture land, now that there is no run
-  directory), and a `<backend>/` subdir
-  (e.g. `qemu/qemu-stderr.log`). A run stores nothing here — it
-  returns its output to the caller (D36); the `runs/` archive is
-  async-backlog work.
+- `cache/media/` — every cached payload (`media_dir`), under the cache root, keyed by media name; each file is
+  named `<media-name>.<ext>`, and that filename is its entire identity — there's no separate sidecar record
+  (D41)
+- `cache/machines/<name>-<n>/` — machine materializations (`machines_dir`, whose parent is `cache_dir`), under
+  the cache root. Each one has:
+  - `machine.json` — the machine's resolved state. While the machine is running, this includes a `vm` section
+    holding the live VM's identity, port, and PID, and a `variables` map holding the variables a script has
+    `set` (cleared every time the machine starts, D36). This recorded snapshot only covers the machine's
+    *shape* — its `parameters` and `scripts` fields are deliberately excluded from it, and are instead read
+    fresh from the blueprint file on every invocation. They're excluded from the state digest and need no
+    `apply` step to take effect, because they describe what to *run* against a machine and what to *bind* into
+    it — never what the machine *is* (D101).
+  - `media/` — the machine's own per-machine images and vvfat directories, named by media.
+  - `screenshots/` — where a script's `screenshot` verb and an automatic failure-capture screenshot are saved,
+    now that there's no separate run directory.
+  - a `<backend>/` subdirectory (for example, `qemu/qemu-stderr.log`).
+
+  A run doesn't store anything else here — it returns its output directly to the caller (D36); a `runs/`
+  archive directory is planned but not yet built.
 
 ### VM ownership
 
-Never send a control command to a backend object until its identity is verified.
-**No code outside an adapter opens a backend connection**, and every adapter operation
-verifies before it commands.
+Never send a control command to a backend object until its identity is verified. No code outside an adapter opens a
+connection to a backend, and every adapter operation verifies the connection's identity before sending it a
+command.
 
-The identity is generic (`backends.identity()`): the **backend**, that backend's own
-machine identifier (**`backend-id`** — QEMU's readable `-name`, and later a VirtualBox
-machine UUID, a `.vmx` path, a Hyper-V VM Id), a per-start **`token`**, and the
-adapter-shaped **`endpoint`**. The token is not decoration: an addressable endpoint
-outlives its owner (a QMP port is reusable by strangers, and same-numbered machines of
-one blueprint in different homes share their readable name), so the name alone must
-never authorize a command. `machines.py` persists the record the adapter returns into
-the `vm` section of `machine.json`, atomically with `phase`; adapters own no state file.
-Identity mismatches fail closed; in particular, an adapter's `stop()` must never reach
-its backend's quit path with an unverified object.
+The identity record has the same shape for every backend (`backends.identity()`): the backend name, that backend's
+own machine identifier (`backend-id` — QEMU's readable `-name` today; eventually a VirtualBox machine UUID, a
+`.vmx` path, or a Hyper-V VM Id), a `token` generated fresh each time the machine starts, and an adapter-specific
+`endpoint`. The token isn't decoration: an addressable endpoint can outlive the thing that created it — a QMP port
+can get reused by an unrelated process, and two machines from the same blueprint with the same number, in
+different homes, would share the same readable name — so the name by itself must never be enough to authorize a
+command. `machines.py` persists the identity record an adapter returns into the `vm` section of `machine.json`,
+atomically together with `phase`; adapters themselves don't own any state file. An identity mismatch always fails
+closed; in particular, an adapter's `stop()` must never reach the point of actually telling its backend to quit
+without first verifying the identity of the object it's talking to.
 
-On QEMU that is `launch_owned_qemu()` assigning the readable `-name` plus a fresh
-per-start `-uuid`, and every later session checking `query-name` **and** `query-uuid`
-against the record. When no port is given it selects an available local one; an explicit
-port must be free. Startup failure and timeout paths must terminate the child so they
-cannot leave an untracked QEMU process.
+On QEMU, this is `launch_owned_qemu()`: it assigns the readable `-name` plus a fresh `-uuid` on every start, and
+every later session checks both `query-name` and `query-uuid` against the recorded identity. When no port is given,
+it picks an available local port; an explicitly requested port must be free. Both the startup-failure path and the
+timeout path must terminate the child process, so a failed or timed-out launch never leaves an untracked QEMU
+process running.
 
-`Machine.session()` is the carrier seam every control plane uses, and `Machine.qmp()` is
-the **named native escape hatch** — explicitly backend-scoped, refusing a machine that is
-not QEMU's rather than approximating a monitor it does not have. Interaction adapters
-receive a `Machine` and use these seams rather than opening connections directly.
+`Machine.session()` is the one interface every control plane uses to talk to a backend, and `Machine.qmp()` is a
+named escape hatch for talking to QEMU directly — it's explicitly scoped to QEMU and refuses to work on a machine
+that isn't QEMU's, rather than trying to approximate a QMP monitor for a backend that doesn't have one. Interaction
+adapters are handed a `Machine` and are expected to use these two methods rather than opening their own
+connections.
 
-`machines.read_vm_state(machine_dir)` reads the recorded identity and validates its
-generic core; what the endpoint *is* belongs to the adapter, which validates it when it
-opens a session. Nothing above the seam reads a port — `start_machine()` returns the
-machine id, and the CLI selects a machine by `--blueprint` / `--machine`.
+`machines.read_vm_state(machine_dir)` reads the recorded identity and validates the parts of it that are the same
+for every backend; what the `endpoint` field actually means is up to the adapter, which validates it itself when it
+opens a session. Nothing above this layer ever reads a port directly — `start_machine()` just returns the machine's
+id, and the CLI selects a machine using `--blueprint` / `--machine`.
 
 ### DOS boot and scripting
 
-A machine's drives are declared in its blueprint (the field reference,
-`docs/blueprint-reference.md`), each naming a media
-component; per-machine images are materialized into
-`cache/machines/<id>/media/`, named for the media.
-`backend_qemu.drive_args()` renders them from the machine
-state: floppies first (slots 0–1, A: and B:), hard disks next (slots
-0–3, the IDE bus), then cdroms placed on the IDE slots after the hard
-disks; each removable drive carries a stable QMP `id=<key>` so a running
-`insert`/`eject` can target it. An image path's extension declares the
-format (`format_options()`): `*.img` / `*.iso` are pinned to
-`format=raw` (avoiding QEMU's format-probing warning), any other
-extension is handed to QEMU to identify; a directory-source media (its
-`source` a directory, `materialize: use`) renders as a vvfat drive
-(vvfat emulates no ISO9660, so a directory source on a cdrom is rejected
-at resolution). Memory and boot order
-resolve into the state at `create` (boot best-guess: the slot-0 floppy,
-else the slot-0 hard disk, else the first cdrom).
+A machine's drives are declared in its blueprint (see the field reference, `docs/blueprint-reference.md`), each one
+naming a media component. Per-machine images are materialized into `cache/machines/<id>/media/`, named for the
+media they hold. `backend_qemu.drive_args()` renders these into QEMU arguments from the machine's state: floppies
+first (slots 0–1, drives A: and B:), then hard disks (slots 0–3, on the IDE bus), then cdroms, placed on the IDE
+bus after the hard disks. Each removable drive gets a stable QMP `id=<key>`, so a running `insert`/`eject` can
+target it later. An image's file extension decides its format (`format_options()`): `*.img` and `*.iso` are pinned
+to `format=raw` (this avoids a format-probing warning QEMU would otherwise print), and any other extension is left
+for QEMU to identify itself. A directory-source media (one whose `source` is a directory and whose `materialize`
+is `use`) renders as a vvfat drive — vvfat can't emulate ISO9660, so a directory-source media on a cdrom is
+rejected at resolution time. Memory size and boot order are resolved into the machine's state at `create` time
+(the best-guess boot order is: the floppy in slot 0, else the hard disk in slot 0, else the first cdrom).
 
-`AgentlessGuestExec.wait_ready()` only waits out the boot process to a native DOS prompt, detected generically as a
-bare prompt on the bottom-most non-blank screen row. Do not add special boot parameters for ordinary DOS commands. Drive changes, directory changes,
-environment variables, and program invocations belong in `AgentlessGuestExec.execute()` scripting.
+`AgentlessGuestExec.wait_ready()` only waits for the boot process to reach a native DOS prompt, detected generically
+as a bare prompt on the bottom-most non-blank row of the screen. Don't add special boot parameters for ordinary DOS
+commands — drive changes, directory changes, environment variables, and program invocations all belong in
+`AgentlessGuestExec.execute()` scripting instead.
 
 ### Virtual FAT behavior
 
-QEMU snapshots a vvfat staging directory when the drive is attached. Host changes require a stop/start cycle. Guest
-writes should be read after QEMU stops so write-back has completed. A
-directory-source media attaches its directory as vvfat (`hdd` as a vvfat
-hard disk, `floppy` as a vvfat 1.44M FAT12 floppy).
+QEMU takes a snapshot of a vvfat staging directory the moment the drive is attached. Any change made on the host
+side after that requires a stop/start cycle to be picked up. Guest writes should only be read back after QEMU
+stops, since that's when the write-back to the host directory actually completes. A directory-source media attaches
+its directory as a vvfat drive (`hdd` renders it as a vvfat hard disk, `floppy` renders it as a vvfat 1.44M FAT12
+floppy).
 
 ### Script dispatch
 
-The `.rlqs` runtime's semantics are defined over **samples** (discrete readings of the machine) and the
-**episodes** a condition's consecutive holding samples form — docs/spec/script-spec.md, "Execution
-model". Preserve these when touching `script_runner.py`:
+The `.rlqs` runtime's semantics are defined in terms of **samples** (discrete readings of the machine) and
+**episodes** (the run of consecutive samples where a condition holds) — see docs/spec/script-spec.md, "Execution
+model". Preserve these rules when touching `script_runner.py`:
 
 - Dispatch is single-threaded and run to completion: no sample is taken while a statement list executes, so
   a screen that appeared and vanished inside a handler action never happened.
@@ -999,107 +1081,85 @@ model". Preserve these when touching `script_runner.py`:
 
 ## The embedding surface
 
-**The session is the only door** (P26): the exported `Session`,
-opened on a home (a bare path or a `Context`), carries one thin
-veneer method per ambient-state verb — the machines lifecycle with
-its exec, file and variable families, the media family, blueprint
-authoring, asset resolution, properties/credentials/binding, and
-`run_script` (whose `dry_run=` returns a `DryRun` rather than a
-`ScriptRun`) — over the engine modules, which are internal. Beside
-it the root exports the vocabulary: the types, the errors,
-`Context`, `default_home_dir()`, the free parsers, the
-guest-console family at the carrier stratum, and the backend seam's
-read-only vocabulary. The
-milestone-1 root-home runner surface — `workflows.py`'s
-`Runner` / `MachineConfig` / `run_guest_program` / `run_task` / `start`,
-the old root-home state files (a root `machine.json`, `drives/`,
-`vm.json` — distinct from the per-machine cache `machine.json` this
-model writes), and the legacy `drives.py` auto-discovery — was absorbed
-into this model and deleted, as the module-level verb exports later
-were when the door closed (no backward compatibility before 1.0). The user-facing reference is
-`docs/api-reference.md`; the end-goal API design (settled twin names,
-conventions, handles) is `docs/spec/api.md`.
+`Session` is the only entry point into Reliquary's engine (P26): it's the exported class, opened on a home (either a
+bare path or a `Context`), and it carries one thin wrapper method per stateful operation — the machine lifecycle
+with its exec, file, and variable families; the media family; blueprint authoring; asset resolution;
+properties/credentials/binding; and `run_script` (whose `dry_run=` argument returns a `DryRun` rather than a
+`ScriptRun`) — all wrapping engine modules that are otherwise internal. Alongside `Session`, the package root also
+exports supporting vocabulary: the types, the errors, `Context`, `default_home_dir()`, the free-standing parsers,
+the guest-console family at the carrier layer, and the backend interface's read-only vocabulary.
 
-Doctrine to preserve:
+An older, milestone-1 runner surface built around a single root-level home — `workflows.py`'s `Runner` /
+`MachineConfig` / `run_guest_program` / `run_task` / `start`, the old root-level state files (`machine.json`,
+`drives/`, `vm.json` — distinct from the per-machine `machine.json` this current model writes), and the old
+`drives.py` auto-discovery logic — was absorbed into the current model and deleted, the same way later module-level
+verb exports were deleted once `Session` became the one entry point (there's no backward compatibility before
+1.0). The user-facing reference for the API is `docs/api-reference.md`; the target API design — settled naming
+pairs, conventions, handle types — is `docs/spec/api.md`.
 
-- Reliquary attaches no meaning to guest program output —
-  test-framework semantics (command-line flags, result parsing) belong
-  to consuming projects. A CppUTest adapter that once lived here was
-  removed to enforce that boundary; do not reintroduce
-  framework-specific code.
-- Refer to consumers only in the general instructional sense ("the
-  caller", "consuming projects", generic usage examples) — never name
-  specific downstream projects; the machine layer stays ignorant of who
-  builds on it.
-- The media layer (`media.py`, `library.py`) and the script runtime
-  (`script_runner.py`) are in-repo consumers of this surface and
-  drive the same engine seam the session's veneer drives, nothing
-  deeper — the flat engine functions with their `context=`, exactly
-  what a session method forwards to, never a private helper below
+Rules to preserve:
+
+- Reliquary attaches no meaning to a guest program's output — test-framework semantics (command-line flags,
+  parsing results) belong to whatever project is consuming Reliquary. A CppUTest adapter used to live here and
+  was removed to enforce this boundary; don't reintroduce framework-specific code.
+- Refer to consumers only in a general, instructional way ("the caller", "consuming projects", generic usage
+  examples) — never name a specific downstream project. The machine layer stays ignorant of who's building on
+  top of it.
+- The media layer (`media.py`, `library.py`) and the script runtime (`script_runner.py`) are themselves
+  in-tree consumers of this surface. They drive the same flat engine functions, with the same `context=`
+  argument, that `Session`'s wrapper methods forward to — nothing deeper, and no private helper underneath
   them.
-- The project is pre-release; prefer a coherent interface over
-  compatibility shims when its architecture changes. The embedding API
-  expects native bindings beyond Python (planning/SURFACES.md;
-  docs/spec/cli.md): never adopt a design that would be
-  difficult to express in a common binding language such as C or Java,
-  and hold the CLI to the same constraint as the fallback binding for
-  unbound languages — never make it difficult to drive from a program.
+- The project is pre-release; prefer a coherent interface over adding compatibility shims when its architecture
+  changes. The embedding API is expected to eventually get native bindings in languages other than Python
+  (planning/SURFACES.md; docs/spec/cli.md), so never adopt a design that would be hard to express in a common
+  binding language like C or Java — and hold the CLI to that same constraint, since it's the fallback binding
+  for any language without a native one: never make it hard to drive the CLI from a program.
 
 ## Dependencies and style
 
-- Runtime dependencies are welcome when they pull their weight; declare
-  them under `[project].dependencies` in `pyproject.toml`. Prefer the
-  stdlib only when it serves the need equally well.
-- **A test-only dependency is a hard requirement of the suite.** It goes
-  in `[dependency-groups].dev` and is imported at module top like any
-  other — never behind a `try`/`except ImportError` feeding a
-  `skipUnless`. That pattern turns an incomplete dev environment into
-  quiet skips, which is how the blueprint corpus came to run against
-  the parser and *not* the schema while claiming the two cannot drift.
-  A missing dev dependency should stop the suite and name itself.
-  `skipUnless` is for a resource that genuinely may be absent in a
-  supported configuration, and **the bar is high**. The suite runs
-  from two places — the repository, and an unpacked sdist (D105) —
-  and **a missing document is not one of the cases**: a test that
-  reads what a released artifact does not carry goes in
-  `tests/source_tree/` and ships nowhere, rather than carrying a
-  guard that turns "cannot do its job here" into a quiet pass.
+- Runtime dependencies are welcome when they earn their keep; declare them under `[project].dependencies` in
+  `pyproject.toml`. Prefer the standard library only when it serves the need equally well.
+- A test-only dependency is a hard requirement of the test suite. It goes in `[dependency-groups].dev` and is
+  imported at the top of a module like any other import — never behind a `try`/`except ImportError` that feeds a
+  `skipUnless`. That pattern turns an incomplete dev environment into a quiet skip, which is exactly how the
+  blueprint conformance corpus ended up running only against the parser and not against the schema, while still
+  claiming the two couldn't drift apart. A missing dev dependency should stop the suite outright and say what's
+  missing. `skipUnless` is reserved for a resource that could genuinely be absent even in a fully supported
+  setup, and the bar for using it is high. The suite is run from two places — the repository itself, and an
+  unpacked sdist (D105) — and a missing *document* isn't one of the legitimate reasons to skip: a test that
+  reads something a released package doesn't include belongs in `tests/source_tree/`, which ships nowhere, rather
+  than being guarded by a check that quietly turns "can't do its job here" into a pass.
 
-  **The default run skips nothing, in both places**, and that is the
-  assertion — no count stands in for it any more (F57). The opt-in
-  FreeDOS integration runs, one per backend (QEMU and VirtualBox),
-  carry `@pytest.mark.integration` and are **deselected** unless
-  `pytest --integration` asks for the tier: a marker says the tier
-  was chosen, where a skip could not say whether it was chosen or
-  suffered. So **any** skip is a defect to fix, not a configuration
-  to tolerate. That the two runs differ — 2,293 tests from the
-  repository, 2,236 from an sdist, four deselected in each — is the
-  isolation working; neither skips. Selecting the tier on a host
-  without the backend is a **failure naming the gap** (P11) and not a
-  skip either: the run was asked for.
-- Pillow is the image library: screenshot conversion uses it, the
-  landmark assets do their decode normalization and pixel comparison
-  through it (`landmarks.py`, F65), and the pixel half of the
-  quiescence measure differences its frames with `ImageChops` rather
-  than pixel by pixel in Python. Nothing here hand-writes an encoder.
-- Support Python 3.12 and newer, and **check it** — the floor run in
-  "Required checks" is what makes that a claim rather than a hope. It was
-  `>=3.9` until the check was first run and 3.9, 3.10 and 3.11 all failed
-  (D95).
-- **Windows is the delivered host platform.** It is the only one
-  developed on, tested on, and claimed in the packaging classifiers.
-  Write host code portably — the paths for other hosts exist and
-  should stay correct (the Documents lookup, the credential-store
-  backends) — but they are *unexercised*, so never state or imply
-  support the project has not tested. Under P11 an untested platform
-  is an unclaimed capability, not a quiet promise. Claiming another
-  host means running the suite there, in CI or on real hardware —
-  the three gating jobs are itemized in proposed/FEATURES.md "Horizon" under
-  host portability (U18 is the drafted case for reaching one from
+  The default test run skips nothing, in either of those two places, and that's an assertion the suite makes
+  directly rather than something inferred from a test count (F57). The two opt-in FreeDOS integration test
+  runs — one for QEMU, one for VirtualBox — are marked `@pytest.mark.integration` and are deselected (excluded
+  from the run entirely) unless `pytest --integration` explicitly asks for that tier. A deselected test and a
+  skipped test aren't the same thing: a marker records that the tier was deliberately not chosen, where a plain
+  skip can't tell you whether it was chosen and failed or just never ran. So any actual skip in the suite is
+  treated as a bug to fix, never as something to tolerate. The repository's run collects 2,293 tests and an
+  unpacked sdist's run collects 2,236, four deselected in each case — that difference is `tests/source_tree/`
+  correctly not being present in the sdist, and neither run has any skips. Explicitly selecting the integration
+  tier on a host that doesn't have the backend installed is a failure that names the missing capability (P11), not
+  a skip either — the tier was asked for, so it has to actually run or fail.
+- Pillow is the project's image library: it's used for screenshot conversion, for the landmark assets' image
+  decoding and pixel comparison (`landmarks.py`, F65), and for the pixel half of the quiescence measurement,
+  which diffs frames using `ImageChops` rather than comparing pixels one at a time in Python. Nothing in this
+  codebase hand-writes an image encoder.
+- Support Python 3.12 and newer, and actually verify it — the floor-version test run described under "Required
+  checks" is what makes that a tested claim rather than just a hope. The stated floor used to be `>=3.9`, until
+  that check was first run and 3.9, 3.10, and 3.11 all turned out to fail (D95).
+- Windows is the only host platform Reliquary is actually delivered on — the only one it's developed on, tested
+  on, and claims support for in its packaging classifiers. Host-specific code should still be written portably —
+  the code paths for other hosts exist and should stay correct (the Documents-folder lookup, the
+  credential-store backends) — but they are never actually exercised, so never state or imply support the
+  project hasn't actually tested. Under P11, an untested platform is a capability Reliquary simply doesn't
+  claim, not a quiet promise it's making anyway. Claiming support for another host means running the test suite
+  there, either in CI or on real hardware — the three gating jobs this would require are listed in
+  `proposed/FEATURES.md`, under "Horizon" / host portability (U18 is the drafted use case for getting there from
   here).
-- Keep lines near 79 columns and match existing formatting.
-- Prefer small public interfaces with lifecycle complexity kept behind them.
-- Preserve useful exception context and actionable diagnostics.
+- Keep lines near 79 columns and match the existing formatting style.
+- Prefer small public interfaces, with lifecycle complexity kept behind them rather than exposed.
+- Preserve useful exception context and write actionable diagnostic messages.
 
 ## Licensing
 
@@ -1119,104 +1179,108 @@ Use the appropriate comment syntax for the file type. Files that cannot or shoul
 
 ### The relicensing reservation, and what it constrains
 
-Paul holds copyright in the whole work and **reserves the right to relicense the project on any terms**. Nothing is
-planned; the reservation exists so the option is not lost by default. Two consequences bind everything below, and
-neither is negotiable at the level of an individual change:
+Paul holds copyright in the whole work, and reserves the right to relicense the project on any terms he chooses.
+Nothing is currently planned — the reservation exists purely so that option isn't lost by default. Two things follow
+from this, and neither is negotiable for an individual change:
 
-- **The project must own every line it ships.** Relicensing is only available to a party holding rights in the whole
-  work, and enforcing copyleft requires standing that only an owner has. One file the project cannot account for
-  forecloses both, permanently and silently.
-- **Assignability, not licence compatibility, is the test for incoming code.** GPL-compatible is not good enough. Code
-  the project cannot acquire *title* to cannot enter, whatever its licence.
+- The project must own every line it ships. Only a party that holds rights to the whole work can relicense it, and
+  enforcing copyleft against a violator also requires that kind of standing. A single file the project can't
+  account for the rights to would permanently and silently rule out both.
+- For incoming code, the test is whether the project can acquire ownership of it, not whether its license is
+  GPL-compatible. Being GPL-compatible isn't good enough on its own — code the project can't acquire title to
+  can't come in, no matter what license it carries.
 
-**Vet against a commercial dual licence, and say only "relicensing" out loud.** These are two different jobs and the
-difference between them is deliberate. What the project *states* — in README.md, CONTRIBUTING.md, and CLA.md — is that
-relicensing is reserved and nothing is planned, which is true and is all the disclosure the reservation needs. What the
-project *vets against* is the strictest realistic outcome, which is a commercial dual licence, because vetting to a
-weaker bar would forfeit the reserved option invisibly.
+Vetting a dependency and describing the project's policy in public documents are two different jobs, and they use
+two different standards on purpose. What the project *states* — in README.md, CONTRIBUTING.md, and CLA.md — is
+simply that relicensing is reserved and nothing is currently planned. That's true, and it's all the disclosure the
+reservation requires. What the project *vets against* when considering a dependency, however, is the strictest
+realistic outcome: a future commercial dual license. Vetting against a weaker standard would quietly give up the
+reserved option without anyone noticing.
 
-So the question to ask of any external source is **"could this ship inside a proprietary product?"** — never "is this
-GPL-compatible?" The second question has a comfortable answer far more often than the first, which is exactly why it is
-the wrong one. Reliquary's own GPL arm could absorb a great deal that a commercial arm never could, and the difference
-between those two sets is precisely what the reservation is holding open.
+So the question to ask about any external source is "could this ship inside a proprietary product?" — never "is
+this GPL-compatible?" The second question is much easier to answer yes to, which is exactly why it's the wrong one
+to ask: Reliquary's GPL side could absorb a lot of code that a future commercial side never could, and the gap
+between those two sets is exactly what the reservation is meant to protect.
 
-The asymmetry is what makes this worth the discipline: judging correctly costs nothing at the moment a dependency or a
-reference is first considered, and cannot be revisited afterwards at any price. By the time it matters the code is
-load-bearing, and the upstream author is under no obligation to sell anything.
+This asymmetry is why the discipline matters: judging a dependency correctly costs nothing at the moment it's first
+considered, but can't be revisited later at any price. By the time it would matter, the code is already
+load-bearing, and whoever wrote it is under no obligation to negotiate.
 
-Contributions are therefore accepted only under the copyright assignment in `CLA.md`, with an automatic fallback to an
-exclusive sublicensable licence where a jurisdiction bars assignment. Once assigned, a contributor's files carry Paul's
-copyright notice, because he is then the actual owner — the REUSE record states ownership, not authorship, and
-authorship credit lives in the git history. Keep the human submission terms in `CONTRIBUTING.md` synchronized with this
-policy.
+Because of this, contributions are only accepted under the copyright assignment in `CLA.md`, with an automatic
+fallback to an exclusive, sublicensable license in any jurisdiction where assignment itself isn't legally possible.
+Once a contribution is assigned, the contributor's files carry Paul's copyright notice, since he then genuinely
+owns them — the REUSE metadata records ownership, not authorship; authorship credit lives in the git history
+instead. Keep the contributor-facing terms in `CONTRIBUTING.md` in sync with this policy.
 
-**Never merge third-party source.** Not permissively licensed source, not public-domain-looking snippets, not vendored
-files. The contributor cannot assign what they do not own, and neither can the project. Third-party code enters as a
-declared dependency or not at all.
+Never merge third-party source code into the project — not permissively licensed source, not snippets that look
+public-domain, not vendored files. A contributor can't assign rights they don't own, and neither can the project.
+Third-party code can only enter as a declared dependency, never any other way.
 
 ### Dependency licence tiers
 
-Every runtime dependency sorts into exactly one tier, and the tiers are drawn against the commercial-dual-licence bar
-above rather than against GPL compatibility. Adding a dependency in a lower tier than it belongs is the single change
-most likely to cost the project something it cannot get back.
+Every runtime dependency sorts into exactly one of three tiers below, judged against the commercial-dual-license
+standard described above, not against plain GPL compatibility. Placing a dependency in a lower tier than it
+actually belongs in is the single change most likely to cost the project something it can never get back.
 
 | Tier | What qualifies | Standing |
 |---|---|---|
-| **1 — Sublicensable** | MIT, BSD-2/3-Clause, Apache-2.0, ISC, PSF, MIT-CMU/HPND, Zlib | Freely dependable. Attribution obligations carry into any redistribution. |
-| **2 — Arm's length only** | LGPL as an unmodified, separately installed dependency; GPL invoked as a **separate process** | Permitted, never combined. Vendoring, forking, patching, or bundling it into a frozen executable demotes it to tier 3. |
-| **3 — Refused** | Any GPL/AGPL code that would be linked, imported, or copied into the project | Never. Compatible with the GPL arm and fatal to the reservation, which is the whole point of the tier. |
+| **1 — Sublicensable** | MIT, BSD-2/3-Clause, Apache-2.0, ISC, PSF, MIT-CMU/HPND, Zlib | Freely dependable on. Attribution obligations carry into any redistribution. |
+| **2 — Arm's length only** | LGPL as an unmodified, separately installed dependency; GPL invoked as a **separate process** | Permitted, but never combined into the project. Vendoring it, forking it, patching it, or bundling it into a frozen executable demotes it to tier 3. |
+| **3 — Refused** | Any GPL/AGPL code that would be linked, imported, or copied into the project | Never accepted. It's compatible with Reliquary's own GPL license, but it would be fatal to the relicensing reservation — which is the entire reason this tier exists. |
 
-Build-time and development dependencies are **out of scope entirely** — they are not distributed, so their licences
-impose nothing. The tiers govern what a `pip install reliquary` pulls in.
+Build-time and development dependencies are entirely out of scope for these tiers — they're never distributed, so
+their licenses don't impose anything on Reliquary. The tiers only govern what `pip install reliquary` actually
+pulls in.
 
-**A first-party dependency would sit outside the tiers**, and the rule is kept written down because the project
-has used it and will again. A GPL-3.0-only package the project *imports* is what the table refuses — but the tiers
-exist to protect the relicensing reservation from code the project cannot acquire title to, so the owner's own
-work qualifies: copyright held whole by Paul Galbraith, contributions assigned under that project's own CLA.
-Exercising the reservation relicenses both works together, so nothing is forfeited. The qualifying test is
-**ownership, not licence**, and it is conditional: first-party standing holds only while the dependency's
-copyright stays whole in the same hands, and one that stops qualifying reverts to the table — where GPL-imported
-is tier 3. `remanence` stood here until D108 removed at-rest disk access and the layer that wrapped it; a
-consumer needing that capability now depends on it directly, which is nothing to the tiers.
+There's one case that sits outside these tiers entirely: a dependency that is itself first-party. This rule is
+written down because the project has relied on it before and will again. The table above refuses a GPL-3.0-only
+package the project imports — but the reason the tiers exist at all is to protect the relicensing reservation from
+code the project can't acquire title to, and the owner's own separate work doesn't have that problem: its copyright
+is held entirely by Paul Galbraith, and its own contributions are assigned under that other project's own CLA.
+Exercising the relicensing reservation would relicense both works together, so nothing is given up by depending on
+it. The test for this exception is ownership, not license, and it's conditional: a dependency only keeps
+first-party standing for as long as its copyright stays wholly in the same hands. One that stops qualifying falls
+back to the ordinary table, where an imported GPL package is tier 3. `remanence` used to qualify for this exception,
+until D108 removed the at-rest disk access it supported and the layer that wrapped it; if some future consumer
+needs that capability again, it would depend on `remanence` directly, which has nothing to do with these tiers.
 
-The current runtime closure is tier 1 throughout except `qemu.qmp`, which is
-tier 2 and discussed under prior art
-below. Verify a new dependency's whole transitive closure, not just the package named — a tier-1 package that pulls a
-tier-3 one is a tier-3 problem.
+Right now, every runtime dependency in the project's dependency tree is tier 1, except `qemu.qmp`, which is tier 2
+and discussed under "Architecture and prior art" below. When adding a new dependency, check its *entire* transitive
+dependency tree, not just the package you're naming directly — a tier-1 package that pulls in a tier-3 package is
+still a tier-3 problem.
 
-Two conditions on tier 2 exist only because of the commercial-arm bar, and both are easy to breach by accident:
+Two of tier 2's conditions exist purely because of the commercial-license standard above, and both are easy to
+violate by accident:
 
-- **A frozen single-file executable is not arm's length.** Shipping Reliquary via PyInstaller, Nuitka, or py2exe would
-  bundle `qemu.qmp` in a form the user cannot replace, which is exactly what LGPL's relinking requirement forbids.
-  Decide the LGPL story before building one, not after.
-- **LGPL requires permitting reverse engineering for debugging modifications** to the library. A boilerplate
-  commercial EULA's blanket anti-reverse-engineering clause would breach it. If a commercial licence is ever drafted,
-  carve this out — it is invisible until someone reads both documents together, and by then it is a breach.
+- A frozen single-file executable does not count as "arm's length." Shipping Reliquary via PyInstaller, Nuitka, or
+  py2exe would bundle `qemu.qmp` in a form the end user can't replace — which is exactly what LGPL's "relinking"
+  requirement forbids. Decide how to satisfy LGPL before building an executable like that, not after.
+- LGPL requires that users be permitted to reverse-engineer the library for the purpose of debugging modifications
+  to it. A typical commercial EULA's blanket anti-reverse-engineering clause would violate this. If a commercial
+  license is ever drafted, this needs an explicit carve-out — it's easy to miss until someone reads both documents
+  side by side, and by then it's already a violation.
 
 ## Development environment
 
-**uv provisions and owns the environment** (D94). One command creates
-`.venv`, installs the project editable, and installs the `dev` dependency
-group:
+uv provisions and owns the development environment (D94). One command creates `.venv`, installs the project in
+editable mode, and installs the `dev` dependency group:
 
 ```powershell
 uv sync
 ```
 
-`uv.lock` is committed, and it is what makes "the environment the suite
-passed in" reproducible — which matters here because under P22 the suite
-*is* the gate. `uv sync` reproduces the lock exactly; `uv lock` is what
-deliberately moves it. Do not install development tools globally, and do
-not hand-manage `.venv` — it is uv's.
+`uv.lock` is committed to the repository, and it's what makes "the environment the test suite passed in"
+reproducible — that matters here because, under P22, the test suite is what actually gates a change from landing.
+`uv sync` reproduces the locked environment exactly; `uv lock` is the command that deliberately updates it. Don't
+install development tools globally, and don't manage `.venv` by hand — it belongs to uv.
 
-Runtime dependencies stay under `[project].dependencies`. The `dev` group
-is `jsonschema` and `pytest`: the build frontend and the upload tool both
-left it when uv absorbed their jobs, and pytest arrived as the runner
-(D106). Both are hard requirements of the suite in the sense above —
-imported and invoked, never guarded. The `>=8.4` floor on pytest is the
-release that made `--disable-plugin-autoload` a command-line option, which
-is what lets the project's own configuration turn autoload off rather than
-leaving it to whoever runs the suite.
+Runtime dependencies stay listed under `[project].dependencies`. The `dev` group currently contains `jsonschema`
+and `pytest`: the build frontend and the upload tool that used to be here both dropped out once uv took over their
+jobs, and pytest was added once it became the test runner (D106). Both are hard requirements of the suite, in the
+sense described above — imported and invoked directly, never behind a guard. Pytest's floor version, `>=8.4`, is
+the release that added `--disable-plugin-autoload` as a command-line option, which is what lets the project's own
+configuration turn plugin autoloading off, instead of leaving that decision up to whoever happens to run the
+suite.
 
 ## Required checks
 
@@ -1230,41 +1294,41 @@ uv run --python 3.12 pytest
 uv build
 ```
 
-**The third line is the floor check, and it is not optional.** The
-supported floor is a published claim (`requires-python`), so it is tested
-like any other — the same reading AGENTS.md already applies to host
-platforms, where an untested platform is an unclaimed capability rather
-than a quiet promise (P11). uv installs the interpreter itself, so the
-check costs one line. It was added when the floor turned out to be wrong:
-`>=3.9` was claimed and unexercised, and 3.9, 3.10 and 3.11 all failed
-(D95).
+The third line above is the floor-version check, and it's not optional. The minimum supported Python version is a
+published claim (`requires-python` in `pyproject.toml`), so it needs to actually be tested, the same way this file
+already treats host platforms elsewhere: an untested platform, or an untested Python version, is a capability the
+project doesn't get to claim — not a quiet promise it's making anyway (P11). uv installs the interpreter itself, so
+running this check costs nothing more than one extra command. It was added after the claimed floor turned out to be
+wrong: the project used to claim `>=3.9` without ever testing it, and once this check was added, 3.9, 3.10, and
+3.11 all turned out to fail (D95).
 
-**The suite's own configuration is `[tool.pytest.ini_options]`, and it is
-written for a stranger's environment rather than this one** (D106): the
-suite ships in the sdist (D105), so `--disable-plugin-autoload` means no
-plugin the project did not ask for can change what a run collects,
-`--strict-config` and `--strict-markers` make an unreadable option or an
-undeclared marker an error instead of a silent no-op, `testpaths` lets a
-bare `pytest` find the suite, and `minversion` refuses a pytest too old to
-honour the first of those. Nothing there is a preference — each line is
-there so that a run somewhere else collects what a run here collects. The
-one declared marker is `integration`, the opt-in tier; `tests/conftest.py`
-owns the `--integration` option that selects it, the deselection that is
-its default, and the `integration_home` fixture the runs work in.
+The suite's own configuration, in `[tool.pytest.ini_options]`, is written for a stranger's environment, not just
+this one (D106). Since the suite ships inside the sdist (D105): `--disable-plugin-autoload` means no plugin the
+project didn't explicitly ask for can change what a test run collects; `--strict-config` and `--strict-markers`
+turn an unreadable option or an undeclared marker into an error instead of a silent no-op; `testpaths` lets a bare
+`pytest` command find the suite on its own; and `minversion` refuses to run under a pytest too old to honor the
+first of those settings. None of these are just preferences — each one exists so that a run somewhere else collects
+exactly what a run here collects. The one marker this configuration declares is `integration`, for the opt-in
+tier; `tests/conftest.py` owns the `--integration` option that turns it on, the rule that deselects it by default,
+and the `integration_home` fixture those tests use.
 
-`uv build` builds an sdist and then a wheel from that sdist, which checks that the source archive is complete.
-After packaging metadata changes, inspect `PKG-INFO` for at least the name, version, Python requirement, and runtime
-dependencies in both built artifacts, then run `uv run python tools/check_dist.py`, which asserts what each artifact must
-carry — the grammar, the schemas and the codex in the wheel; the suite and each of its fixture trees in the sdist —
-that the wheel carries no tests, and that the sdist carries none of `planning/`, `docs/` or `tests/source_tree/`. It
-exists because nothing inside a released artifact inspects the artifact: package data is what disappears silently, and a
-missing `.lark` grammar breaks an installed Reliquary while every source-tree test still passes.
+`uv build` builds an sdist and then builds a wheel from that sdist, which checks that the source archive is
+complete. After any packaging-metadata change, check `PKG-INFO` in both built artifacts for at least the name,
+version, Python requirement, and runtime dependencies, then run `uv run python tools/check_dist.py`, which checks
+what each artifact is required to contain: the grammar file, the schemas, and the codex in the wheel; the test
+suite and each of its fixture directories in the sdist; that the wheel contains no tests at all; and that the sdist
+contains none of `planning/`, `docs/`, or `tests/source_tree/`. This check exists because nothing inside a released
+package inspects itself: package data is exactly the kind of thing that can silently go missing, and a missing
+`.lark` grammar file would break an installed copy of Reliquary while every test that only reads the source tree
+would still pass.
 
-For release-facing packaging changes, **two checks, and they answer different questions.** The archive's *completeness*
-is proved by the build itself: `uv build` builds the wheel *from* the sdist, so a source archive missing anything the
-build needs fails there rather than silently — and that holds whether or not the suite ships. What the shipped suite
-buys is the other question, the one only a stranger can ask: **unpack the sdist outside the tree and run it there**,
-which is what a downstream packager does at package-build time on a platform this project never tests.
+For any release-facing packaging change, run two separate checks, because they answer two different questions.
+Whether the source archive is *complete* is proved by the build itself: `uv build` builds the wheel *from* the
+sdist, so a source archive that's missing something the build needs fails right there, instead of silently —
+and that's true whether or not the test suite is included in the archive. What actually including the test suite
+buys you is a different question, one only a stranger can really ask: does it work when unpacked somewhere else
+entirely and run from there? That's what a downstream packager actually does, at package-build time, on a platform
+this project has never tested on:
 
 ```powershell
 tar -xzf dist/reliquary-<version>.tar.gz -C <scratch>
@@ -1272,38 +1336,39 @@ cd <scratch>/reliquary-<version>
 $env:PYTHONPATH = "src"; pytest
 ```
 
-That interpreter needs the dev group — `pytest` and `jsonschema` — which is the cost D106 took deliberately: `python -m
-unittest tests` is no longer the entry point, and with the conversion finished (F60) it collects nothing at all —
-the hook that made it work is gone. It was taken because pytest is packaged everywhere a packager works. Expect
-**2,236 tests, four deselected and none
-skipped**, against the repository's 2,293 ("Test expectations", above): the difference is `tests/source_tree/`, which
-ships nowhere, and a *skip* there is a defect exactly as it is here. `tests/conftest.py` ships with the suite, so the
-integration tier is deselected in a stranger's run exactly as it is here. Install the wheel into a clean environment and check it by using it —
-`rlq --version` and an import — since it carries no suite to run.
+That interpreter needs the `dev` dependency group — `pytest` and `jsonschema` — which is a cost D106 accepted
+deliberately: `python -m unittest tests` is no longer how the suite is run, and now that the conversion to pytest
+is finished (F60), it wouldn't collect anything at all — the hook that used to make it work is gone. Pytest was
+chosen because it's packaged and available wherever a downstream packager works. Expect 2,236 tests, four
+deselected, and none skipped — compare that to the repository's own 2,293 (see "Test expectations" below): the
+difference is exactly `tests/source_tree/`, which never ships, and a *skipped* test in this run is just as much a
+defect as it would be in the repository's own run. `tests/conftest.py` ships as part of the suite, so the
+integration tier is deselected by default here too, the same as in the repository. Check the installed wheel
+itself by actually using it — run `rlq --version` and try importing it — since the wheel carries no test suite of
+its own to run.
 
-**Publishing is `uv publish`** (D94), which uploads `dist/*` to PyPI; with
-no CI (P22) there is no trusted-publishing path, so it takes a token
-(`UV_PUBLISH_TOKEN` or `--token`), and `uv publish --dry-run` walks the
-whole path without uploading. `twine check` is deliberately gone: its
-rendering job is an RST problem and the readme is markdown, the index
-validates and rejects bad metadata itself, a rejected upload does not
-consume the version, and `tools/check_dist.py` is this project's real
-artifact gate. Reopen that if the readme ever stops being markdown.
+Publishing is done with `uv publish` (D94), which uploads everything in `dist/*` to PyPI. Since there's no CI
+(P22), there's no trusted-publishing setup either, so publishing needs an explicit token
+(`UV_PUBLISH_TOKEN` or `--token`), and `uv publish --dry-run` walks through the whole process without actually
+uploading anything. `twine check` was deliberately removed from this process: its job was checking that
+reStructuredText renders correctly, but this project's readme is Markdown; the package index already validates and
+rejects bad metadata on its own; a rejected upload doesn't consume a version number; and `tools/check_dist.py` is
+this project's real check on what gets published. If the readme ever stops being Markdown, reconsider bringing
+`twine check` back.
 
 Run `git diff --check` before handing work back.
 
-Hands-on tests require QEMU. Use `--home-dir` with a scratch or deliberately reused test home rather than polluting the
-default per-user home.
+Hands-on tests require QEMU. Use `--home-dir` pointed at a scratch directory or a deliberately reused test home,
+rather than writing into the default per-user home.
 
-The FreeDOS install+verify integration tests are opt-in (deselected in
-the default suite; need network for the LiveCD on a cold home). `--integration`
-selects the tier, and it is the whole gate — naming the module without it
-deselects it just the same. QEMU is the default backend; VirtualBox (F52) pins
-``backend: virtualbox`` on the seeded blueprint and needs ``VBoxManage`` on
-``PATH``; the VNC run (F63) pins ``control-planes: ["vnc"]`` on it and runs on
-QEMU. Give the three runs *separate* reuse homes — the same machine id cannot
-span backends, and the plane run's seeded blueprint and materialized machine
-carry a different policy than the plain QEMU run's:
+The FreeDOS install-and-verify integration tests are opt-in — they're deselected in the default suite, and need
+network access to fetch the LiveCD on a fresh home directory. `--integration` is what selects this tier, and it's
+the only thing that does — naming the specific test module on the command line without also passing
+`--integration` still deselects it. QEMU is the default backend for these tests. The VirtualBox variant (F52) pins
+`backend: virtualbox` on its seeded blueprint and needs `VBoxManage` on `PATH`. The VNC variant (F63) pins
+`control-planes: ["vnc"]` on its blueprint and runs on QEMU. Use a separate reuse-home for each of the three runs:
+the same machine id can't span two different backends, and the VNC run's seeded blueprint and materialized machine
+carry different settings than the plain QEMU run's does:
 
 ```powershell
 # optional: reuse a home so cache/media survives reruns
@@ -1325,34 +1390,34 @@ Lifecycle changes need focused tests, especially for failure paths. Preserve cov
 - a stop refused on identity mismatch leaves the machine phase `running`
 - stale state produces clear diagnostics and cannot target another VM
 
-Adapter-seam guarantees, which the suite exercises against a **double** rather than a
-hypervisor (`tests/fake_backend.py`, installed with `backends._set_adapter`) —
-no unit test may probe or launch a real backend:
+Guarantees about the backend adapter interface, which the suite tests against a fake adapter rather than a real
+hypervisor (`tests/fake_backend.py`, installed with `backends._set_adapter`) — no unit test may probe or launch a
+real backend:
 
-- a requirement no candidate can honor fails closed naming the backend *and* the
-  requirement, before any image work
-- the priority walk takes the first backend both available and capable, so availability
-  alone never wins and the order never stands in for a capability check
-- a `backend-settings` key the assigned adapter does not define is refused at
-  materialization, an argument restating a first-class field or the VM identity is
-  refused naming its owner, and an inert section (another backend's) is preserved
-  without being judged
-- a declared `backend` skips the walk, and an unavailable or incapable one fails closed
-- a stub adapter claims no capability even where its backend is installed
-- the machine model hands the adapter a resolved state and gets an identity back: no
-  backend argument is composed above the seam, and no port is read there
+- a requirement no candidate backend can honor fails closed, naming both the backend and the requirement, before
+  any image work happens
+- the priority walk picks the first backend that's both available and capable, so being merely available never
+  wins on its own, and the priority order never substitutes for an actual capability check
+- a `backend-settings` key the assigned adapter doesn't define is refused at materialization; an argument that
+  restates a first-class field or the VM identity is refused, naming which field or identity piece owns it; and
+  a settings section belonging to a different, inactive backend is kept as-is without being checked
+- a declared `backend` field skips the priority walk entirely, and an unavailable or incapable declared backend
+  still fails closed
+- a stub adapter claims no capability at all, even on a host where its backend is actually installed
+- the machine model hands the adapter a resolved state and gets an identity record back — no backend argument is
+  ever built above this interface, and no port number is ever read there either
 
-**What every *built* adapter owes the seam is one parametrised contract**
-(`tests/test_backend_contract.py`, F59) rather than a near-identical method in each
-backend's own module: the name it answers to everywhere, the capability report, its
-image extension, discovery found and absent, the host font it reads and caches, and the
-refusal to command a VM whose recorded identity does not match. Each check is a node per
-backend, so a requirement cannot be honored by QEMU's tests and quietly missing from
-VirtualBox's (**P25**). A **driver** is all a backend contributes — where its executable
-is found, where its font lives, how a mismatched stop is aimed — so a third adapter
-inherits the contract by adding one rather than by copying a file. What stays in
-`test_backend_qemu` / `test_backend_virtualbox` is what only that backend knows: qcow2
-against VDI, argv against `VBoxManage` verbs, QMP against scancodes.
+Every backend adapter that's actually built is required to satisfy one shared, parametrized contract
+(`tests/test_backend_contract.py`, F59), rather than each backend's module having its own near-duplicate test:
+the name it answers to everywhere, its capability report, its image file extension, whether discovery correctly
+finds it and correctly reports it absent, the host font it reads and caches, and its refusal to command a VM whose
+recorded identity doesn't match. Each of these checks becomes a separate test node per backend, so a requirement
+can't be satisfied by QEMU's tests while quietly missing from VirtualBox's (P25). All a backend actually
+contributes on top of this shared contract is a "driver" — where its executable is found, where its font lives,
+how it aims a stop command at a mismatched identity — so a third adapter inherits the whole contract just by
+adding its own driver, rather than by copying a test file. What stays in `test_backend_qemu` /
+`test_backend_virtualbox` individually is only what's genuinely specific to that one backend: qcow2 images versus
+VDI images, building an argv list versus calling `VBoxManage` verbs, QMP versus scancodes.
 
 Milestone-9 guarantees needing the same care:
 
@@ -1366,63 +1431,54 @@ Milestone-9 guarantees needing the same care:
 
 ### The test idiom
 
-**Every test is pytest-native** (D106), and the policy now has nothing
-to exempt: a bare `assert`, a fixture where `setUp` would have been, and
-`parametrize` where a loop or a `subTest` would have been. The last is
-the point rather than a style note — a parametrised case is a collected
-node whose count is an assertion, and a `subTest` is not, which is how
-the conformance corpus came to run against the parser and not the schema
-while claiming the two cannot drift. **No `unittest.TestCase` and no
-`subTest` survives anywhere in the suite**; either arriving in a new test
-is a regression, not a style preference.
+Every test is written in pytest-native style (D106), and this policy now has no exceptions: a bare `assert`
+statement, a fixture where `setUp` would previously have been used, and `parametrize` where a loop or a `subTest`
+would previously have been used. That last one matters for a real reason, not just style: a parametrized test case
+becomes its own collected test node, so its count is itself something the suite checks — a `subTest` doesn't give
+you that. That gap is exactly how the blueprint conformance corpus ended up running only against the parser and
+not the schema, while still claiming the two couldn't drift apart. No `unittest.TestCase` and no `subTest` should
+survive anywhere in the suite; either one showing up in a new test is a regression, not a style choice someone made.
 
-`unittest.mock` **stays**, and is not what changed: it is the mocking
-library, the runner is what pytest replaced, and nothing supersedes it.
-The stdlib preference stands everywhere else — pytest is one dependency
-judged compelling, not the bar lowered.
+`unittest.mock` stays — this conversion didn't touch it. It's the mocking library, not the test runner; pytest
+replaced the runner (`unittest`'s own test-running machinery), and nothing has replaced `unittest.mock`. The
+general preference for the standard library over third-party dependencies still holds everywhere else — pytest is
+one dependency the project judged worth adding, not a sign that the bar for adding dependencies has been lowered.
 
-The conversion ran as five sweeps — F56 took the two conformance
-corpora, which is where the shared parametrisation helper
-(`tests/corpus.py`) lives; F57 the two integration runs, which needed a
-fixture the older idiom cannot be given; F58 the seven script-language
-modules; F59 the ten machine and backend ones; F60 the remaining twenty.
-`python -m unittest tests` went with the last of them: with nothing left
-for it to collect it would report success over an empty run, so
-`tests/__init__.py` no longer carries the `load_tests` hook that made it
-work.
+The conversion to pytest happened in five separate sweeps. F56 covered the two conformance corpora, which is where
+the shared parametrization helper `tests/corpus.py` was introduced. F57 covered the two integration test runs,
+which needed a fixture that the older `unittest`-based style couldn't provide. F58 covered the seven
+script-language test modules. F59 covered the ten machine- and backend-related modules. F60 covered the remaining
+twenty. `python -m unittest tests` stopped working as an entry point once the last sweep landed: with nothing left
+for it to collect, it would have reported success over a completely empty run, so `tests/__init__.py` no longer
+has the `load_tests` hook that used to make it work.
 
-**A sweep keeps the count except where it deliberately raises it**, and
-the exceptions are the reason for converting: a `subTest` loop becomes
-one node per case, and a table becomes one node per row. F58 is the
-worked example — the script-language cluster's 350 tests became 426,
-every one of the 76 either the V-rule table or a `subTest` loop that
-stopped hiding its cases, with no assertion added or dropped; F59's
-460 became 575 the same way, the veneer roster and the fixture
-directory among the tables that stopped reporting one pass for all
-their rows; F60's 470 became 594, mostly the command manifest, whose
-thirty-seven declared capabilities each report for themselves now. A
-count that moved for any *other* reason is a lost test.
+Each sweep kept the same test count, except where it deliberately increased it — and those increases are exactly
+why the conversion was worth doing: a `subTest` loop becomes one node per case, and a table of cases becomes one
+node per row. F58 is a good worked example: the script-language test modules' 350 tests became 426, and every one
+of those 76 new tests came from either the V-rule case table or a `subTest` loop that stopped hiding its individual
+cases — no assertion was added or removed. F59's 460 became 575 the same way, with the wrapper-method roster and
+the fixture directory among the tables that stopped reporting a single pass for every row they covered. F60's 470
+became 594, mostly from the command manifest, whose thirty-seven declared capabilities now each report their own
+result. A test count that changed for any *other* reason means a test was lost somewhere.
 
-**A flattened module's function names are its collision surface.** Two
-`TestCase` classes may each hold a `test_a_running_machine_is_refused`;
-at module level the second silently replaces the first and the count
-drops by one. A sweep checks the count per module for exactly this,
-and a name that has to differ says what it is about rather than
-gaining a suffix.
+A flattened test module is at risk of function-name collisions. Two separate `TestCase` classes could each safely
+contain a method named `test_a_running_machine_is_refused`, but once flattened to module level, the second
+definition silently replaces the first, and the test count quietly drops by one. Each sweep checked the test count
+per module specifically to catch this; where two tests genuinely needed the same name, the fix was to give one a
+name that actually describes what it's testing, not just to tack a numeric suffix onto it.
 
-**A static rule is exercised from a case table, not a method per rule**
-(`test_script_validation.py`): each case names the rule it drives and is
-a collected node named for it, and one parametrised check walks
-`script_nodes.RULE_OF`'s range so a rule the language gains with no case
-fails as a named missing rule. The table carries a case for the tiers
-below it — the lexer's, the placement matrix's — so that check needs no
-list of exemptions, which would be one more list to keep in step.
+A static validation rule is tested from a table of cases, not one test method per rule (`test_script_validation.py`):
+each case in the table names which rule it exercises and becomes its own collected test node, named accordingly.
+One parametrized check walks the full range of `script_nodes.RULE_OF` and fails, naming the specific missing rule,
+if the language ever gains a new rule with no case covering it. The table also includes cases for the layers below
+validation — the lexer's own rules, the placement matrix — so this check needs no separate list of exemptions,
+which would just be one more list to keep in sync by hand.
 
-**A corpus of fixture files reads through `tests/corpus.py`** rather
-than growing its own glob: `fixtures` pins the bucket's count at
-collection and `parametrize` names each node for its file. A check over
-a vocabulary the *package* declares — a schema's phase enum — is not a
-corpus and parametrises directly.
+A corpus of fixture files is read through the shared `tests/corpus.py` helper, rather than each test module
+growing its own file-globbing logic: `fixtures` pins down the expected count for a bucket of fixtures at the point
+they're collected, and `parametrize` names each resulting test node after its file. A check over a fixed
+vocabulary the package itself declares — for example, a schema's enum of phase names — isn't a corpus of files and
+is parametrized directly instead.
 
 ## Documentation maintenance
 
@@ -1431,106 +1487,125 @@ task-oriented. Do not move agent instructions, implementation constraints, roadm
 it.
 When Packer and Vagrant are mentioned together in prose, name Packer first and Vagrant second.
 
-After changing commands, flags, paths, behavior, or Python interfaces, update README.md, CHANGELOG.md, and this file
-wherever affected. The CHANGELOG is history, not documentation: everything under a released version header records
-what was true at release time and stays byte-for-byte as released — stale paths, broken links, renamed concepts, and
-superseded wording included; they are the historical record, and "fixing" them falsifies it. Corrections and
-follow-ups get new entries under the unreleased section, never edits to released text. The one exception is removing
-private or legally problematic content: redact minimally — replace or drop the problematic text, never reword or
-modernize around it — and record the redaction as an entry of its own release. The unreleased section is freely
-editable until it ships. Validate documented CLI syntax with `reliquary --help` and subcommand help.
+After changing commands, flags, paths, behavior, or Python interfaces, update README.md, CHANGELOG.md, and this
+file wherever they're affected. The CHANGELOG is a historical record, not documentation of the current state:
+everything written under a released version's header records what was true at release time, and stays exactly as
+released, byte for byte — including stale paths, broken links, renamed concepts, and wording later superseded
+elsewhere. That's the historical record, and "fixing" it after the fact would falsify it. Corrections and
+follow-ups get new entries under the unreleased section instead — never edits to already-released text. The one
+exception is removing content that's private or legally problematic: redact as little as possible (replace or
+drop only the problematic text, never reword or modernize anything around it), and record that redaction as its
+own entry under the current release. The unreleased section, by contrast, can be freely edited until it actually
+ships. Validate any documented CLI syntax against `reliquary --help` and the relevant subcommand's `--help`.
 
 ## Architecture and prior art
 
-**Every project named in this section is a concept reference. None is an implementation source.** The rule is doctrine
-and it predates the licence change: designs are studied and reimplemented, code is never read for reimplementation,
-ported, or translated. What the GPL-3.0-only move and the relicensing reservation add is a second, independent reason
-the answer can never be yes — the project cannot acquire title to another author's code, so adopting it would forfeit
-the reservation permanently. **Where the two reasons ever appear to diverge, the doctrine governs.** A close
-translation is a port whatever a licence permits.
+Every project named in this section is a reference for its concepts and designs only — none of them is a source
+Reliquary implements from. This has been the rule since before the license change: study a design and reimplement
+it independently; never read another project's code with the intent of reimplementing, porting, or translating it.
+The move to GPL-3.0-only and the relicensing reservation add a second, independent reason this can never change:
+the project can't acquire ownership of someone else's code, so adopting it would give up the reservation
+permanently. If these two reasons ever seem to disagree, the "study and reimplement" rule wins — a close
+translation of someone else's code is still a port, no matter what any license would technically permit.
 
-Vet these the way dependencies are vetted, against the commercial-dual-licence bar rather than GPL compatibility. For
-every project named below the doctrine already settles it, so the licence question is never the one doing the work —
-but **record both reasons anyway**, because they fail differently. A licence argument can be falsified by a licence
-change, and this section has already had that happen once: the os-autoinst reasoning below was true under BSD and
-false the day the project became copyleft, while the doctrine it sat beside did not move an inch. A boundary resting
-on one reason is one licence change away from having none.
+Every project named below should be vetted the way a dependency is vetted: against the commercial-dual-license
+standard, not against plain GPL compatibility. For each project named below, the "study and reimplement" rule
+already settles the question on its own, so the license analysis is never actually what's doing the work — but
+it's recorded anyway, because a license argument and the "study and reimplement" rule can fail independently of
+each other. This section has already seen that happen once: the reasoning below about os-autoinst was true while
+Reliquary was BSD-licensed, and became false the day Reliquary switched to copyleft — while the "study and
+reimplement" rule sitting right next to it didn't move at all. A boundary that rests on a license argument alone
+is one license change away from having no boundary at all.
 
-Reliquary uses QEMU's published `qemu.qmp` library for protocol handling and implements the machine-lifecycle role
-locally.
+Reliquary uses QEMU's published `qemu.qmp` library for protocol handling, and implements the machine-lifecycle
+logic itself.
 
-`qemu.qmp` is **tier 2**, and stays there by being left alone: an unmodified, separately installed dependency, imported
-and never vendored, forked, patched, or frozen into a bundled executable. Most of it is LGPL-2.0-or-later, which the
-tier permits. **`qemu/qmp/legacy.py` (`QEMUMonitorProtocol`) is GPL-2.0-only and must never be imported** — it sits in
-a package the project already depends on, so nothing but this rule stands between it and an ordinary-looking import.
+`qemu.qmp` is tier 2, and it stays there by being left alone: it's an unmodified, separately installed dependency,
+imported but never vendored, forked, patched, or frozen into a bundled executable. Most of it is licensed
+LGPL-2.0-or-later, which tier 2 permits. One file inside it, `qemu/qmp/legacy.py` (`QEMUMonitorProtocol`), is
+GPL-2.0-only and must never be imported — it sits inside a package the project already depends on, so nothing
+except this explicit rule stops it from being imported by accident, since it would look like an ordinary import.
 
-QEMU itself is **tier 2 by process separation**, and that separation is load-bearing rather than incidental: Reliquary
-invokes `qemu` as a separate program over the documented QMP protocol, which is arm's-length use of a GPL work rather
-than a combination with it. Never link it, never vendor it, never ship a patched build.
+QEMU itself is tier 2 because Reliquary keeps it at arm's length: Reliquary invokes `qemu` as a separate program,
+communicating over the documented QMP protocol, rather than combining it into Reliquary itself — that separation
+is what qualifies it for tier 2 at all, not an incidental detail. Never link against QEMU, never vendor it, and
+never ship a patched build of it.
 
-QEMU's in-tree `QEMUMachine` is not published independently. **If that changes, the answer is still no** unless it is
-published under a permissive or LGPL licence: the in-tree code is GPL-2.0-only, unassignable, and adopting it would
-foreclose the reservation. This supersedes the earlier standing invitation to reassess on maintenance grounds — the
-question is no longer about maintenance.
+QEMU's in-tree `QEMUMachine` helper is not published as an independent, separately installable package. Even if
+that changes, the answer is still no unless it's published under a permissive or LGPL license: as it exists today,
+that in-tree code is GPL-2.0-only, the project can't acquire ownership of it, and adopting it would give up the
+relicensing reservation. This replaces an earlier note in this file that left the door open to reconsider based on
+maintenance concerns — maintenance is no longer the question here.
 
-QEMU's own functional tests validate the broad model of scripting a guest over QMP and asserting on observable state.
-Reliquary adds the DOS-specific layer: keyboard conventions, VGA text scraping, prompt
-completion, and vvfat staging.
+QEMU's own functional tests validate the general model of scripting a guest over QMP and checking observable
+state. Reliquary adds the DOS-specific layer on top: keyboard conventions, VGA text-memory scraping, prompt
+detection, and vvfat staging.
 
-SUSE's os-autoinst (the engine under openQA) is the closest prior art to Reliquary as a whole: it drives OS
-installers by screen matching and key injection over QMP/VNC, with per-operation "consoles" (VNC, serial,
-virtio-terminal, ssh) mirroring Reliquary's control planes, multiple backends (qemu, svirt, bare metal) mirroring the
-adapter seam, command completion over serial via echoed marker strings, per-step screenshot records, and snapshot
-"milestones" for resuming long installs. Use it as a **concept reference only** for control-plane and backend
-implementations — Reliquary learns from its designs (the input event model, needle area types, console seams), never
-from its code. Study the documentation and the ideas; reimplement from scratch. **The bar is doctrine, and it does not
-move with the license** — which this project has now demonstrated the hard way, because the licence moved and the bar
-did not.
+SUSE's os-autoinst (the engine behind openQA) is the closest prior art to Reliquary as a whole. It drives OS
+installers using screen matching and key injection over QMP/VNC, with per-operation "consoles" (VNC, serial,
+virtio-terminal, ssh) that resemble Reliquary's control planes, multiple backends (qemu, svirt, bare metal) that
+resemble Reliquary's backend adapter interface, command completion over a serial connection using echoed marker
+strings, per-step screenshot records, and snapshot "milestones" for resuming long installs partway through. Treat
+it strictly as a reference for its concepts in control-plane and backend design — Reliquary learns from its
+designs (the input event model, its "needle" area types, its console abstractions), never from its actual code:
+study its documentation and its ideas, and reimplement from scratch. The bar here is the "study and reimplement"
+rule, and licensing has no bearing on where that bar sits — this project has now learned that the hard way, since
+its own license changed and the rule did not move with it.
 
-The record is worth keeping straight, since the old reasoning is still quotable and is now wrong. While Reliquary was
-BSD-3-Clause, os-autoinst's GPL-2.0-or-later licence *by itself* barred porting its code, needles, or test modules.
-Under GPL-3.0-only that is no longer true: GPL-2.0-**or-later** may be taken under GPLv3, so licence compatibility
-stopped being the obstacle the moment this project became copyleft. **Nothing about the boundary changed.** What holds
-it now is firmer than what held it before:
+It's worth keeping this record straight, since the project's own earlier reasoning about this is still findable
+and is now wrong. While Reliquary was licensed BSD-3-Clause, os-autoinst's GPL-2.0-or-later license by itself was
+enough to bar porting its code, its "needles," or its test modules. Under Reliquary's current GPL-3.0-only license,
+that particular argument no longer holds: code under GPL-2.0-**or-later** can be brought under GPLv3, so license
+compatibility stopped being the obstacle the moment Reliquary itself became copyleft. But nothing about the actual
+boundary changed — what enforces it now is firmer than what enforced it before:
 
-- **Doctrine, first and regardless.** A close translation is a port whatever any licence permits, and that was always
-  the actual rule.
-- **Assignability, permanently.** The project cannot acquire title to SUSE's code. Merging it would forfeit the
-  relicensing reservation for good — a one-way door, and one that closes silently.
+- The "study and reimplement" rule applies first, regardless of licensing. A close translation of someone else's
+  code is a port no matter what any license permits — that was always the real rule.
+- Ownership matters permanently. The project can't acquire ownership of SUSE's code. Merging it in would give up
+  the relicensing reservation for good — a one-way decision that would happen silently if it weren't watched for.
 
-The same correction applies to `consoles/VNC.pm`, its RFB client and precisely the file a VNC control plane would reach
-for. It is dual-licensed `Artistic-1.0 OR GPL-1.0-or-later`; the earlier note that "copyleft does not reach it" was
-never the point, and both arms are in any case reachable from a GPLv3 project. Artistic-1.0 is additionally too vague
-to build anything on — the FSF's long-standing objection to it stands. It is off limits for the reasons above, which
-apply to it exactly as they apply to the rest of the tree. Deliberate divergences to preserve: VGA text
-scraping instead of image needles for text-mode guests, authored step documents instead of Perl test modules, and a
-local ephemeral-machine tool instead of a testing service (scheduler, workers, and web UI are permanently out of
-scope).
+The same correction applies to `consoles/VNC.pm`, os-autoinst's RFB client — precisely the file a VNC control plane
+implementation would be tempted to reach for. It's dual-licensed `Artistic-1.0 OR GPL-1.0-or-later`. An earlier note
+in this file arguing that "copyleft doesn't reach it" was never actually the reason it's off-limits, and in any
+case both of its license options are things a GPLv3 project can take code under. Artistic-1.0 is also too vague a
+license to build anything on top of, in line with the FSF's long-standing objection to it. This file is off-limits
+for the same reasons as the rest of the os-autoinst codebase, which apply to it exactly as they apply everywhere
+else in that project. Deliberate differences from os-autoinst that Reliquary should keep: VGA text-memory scraping
+instead of image-based "needles" for text-mode guests, authored step documents instead of Perl test modules, and a
+local, ephemeral-machine tool instead of a hosted testing service (a scheduler, worker pool, and web UI are
+permanently out of scope for Reliquary).
 
-Keysight's eggPlant Functional is the closer analogue for the display seam specifically: a commercial GUI test tool
-that drives its system under test over VNC **or** RDP, matches screens by image, and carries the click point inside
-the matched image. Its vocabulary lands almost one-to-one on the settled landmark design
-(`docs/spec/landmarks.md`) — hot spot to spot, image collection to variant, search rectangle to the
-deferred selecting region, tolerance to the similarity percent — and that convergence is the useful part: it says the
-asset model is well-trodden rather than novel. Proprietary, so the concept-reference rule applies by default; the
-public documentation is the whole of what is readable, and it is the *only* thing to be read — no trial binaries
-decompiled, no EULA-gated material, no support-portal content.
+Keysight's eggPlant Functional is the closer analogue specifically for the display control-plane design: a
+commercial GUI testing tool that drives its target system over either VNC or RDP, matches screens by image, and
+carries a click point embedded inside the matched image. Its vocabulary lines up almost one-to-one with
+Reliquary's own settled landmark design (`docs/spec/landmarks.md`) — its "hot spot" corresponds to Reliquary's
+"spot," its "image collection" to Reliquary's "variant," its "search rectangle" to Reliquary's still-deferred
+"selecting region," and its "tolerance" to Reliquary's "similarity percent." That convergence is the useful part
+of this comparison: it shows this general approach to image-based asset matching is well-established, not
+something Reliquary invented from nothing. eggPlant is proprietary, so the general concept-reference rule applies
+here by default: its public documentation is the entirety of what's available to read, and it's also the *only*
+thing that should be read — never decompile a trial binary, never read EULA-gated material, and never read
+support-portal content.
 
-eggPlant is the one reference here where the relicensing reservation *raises* rather than lowers the stakes. A GPL
-hobby project converging on a commercial tool's vocabulary is unremarkable; a project that has publicly reserved the
-right to relicense is a more attractive target for a patent holder in the same space, and the convergence documented
-against `docs/spec/landmarks.md` is a discoverable record. The convergence is genuine and independently
-arrived at, which is exactly why it should stay documented as such — evidence of parallel design, not of borrowing.
-Should the reservation ever be exercised, this is the reference to review first, with advice.
+eggPlant is the one reference in this section where the relicensing reservation *raises* the stakes rather than
+lowering them. A GPL hobby project's design happening to converge with a commercial tool's vocabulary would
+normally be unremarkable — but a project that has publicly reserved the right to relicense is a more attractive
+target for a patent holder working in the same space, and the convergence documented right here against
+`docs/spec/landmarks.md` is a discoverable record of that. The convergence is genuine and was arrived at
+independently, which is exactly why it should stay documented as such — it's evidence of parallel design, not of
+borrowing. If the relicensing reservation is ever actually exercised, this is the reference to review first, with
+legal advice.
 
-Espressif's `pytest-embedded-qemu` is useful prior art for a future
-`pytest-reliquary` plugin: host pytest orchestration around a native guest test framework. It is not directly reusable
-because it assumes Espressif targets, serial output, and Unity result grammar. MIT-licensed, so it is **tier 1** and
-the only reference here that could in principle be depended on — as a dependency, never as copied source, and the
-concept-reference rule governs its designs like any other.
+Espressif's `pytest-embedded-qemu` is useful prior art for a possible future `pytest-reliquary` plugin: it shows
+how to orchestrate pytest on the host around a native test framework running on the guest. It's not directly
+reusable, since it assumes Espressif's own hardware targets, serial output, and the Unity test-result format. It's
+MIT-licensed, so it's tier 1 — the only reference in this section that could, in principle, actually be depended
+on (as a declared dependency, never as copied source), and its designs are governed by the same "study and
+reimplement" rule as everything else here.
 
-FreeRDP is the realistic vendored stack should an RDP display carrier ever be built (see
-`planning/proposed/FEATURES.md`). Apache-2.0, so **tier 1**, with two conditions attached: its NOTICE obligations flow
-into every redistribution, and it was relicensed *from* GPL historically, so per-component licensing must be verified
-at the file level before anything is vendored. A project-level licence statement is not sufficient evidence for a
-relicensed codebase.
+FreeRDP is the realistic choice to vendor if an RDP display carrier is ever built (see
+`planning/proposed/FEATURES.md`). It's Apache-2.0 licensed, so it's tier 1, with two conditions attached: its
+NOTICE-file obligations carry into every redistribution of Reliquary, and since it was historically relicensed
+*from* GPL, each component's actual licensing needs to be verified at the individual file level before anything
+is vendored — a single project-level license statement isn't sufficient evidence for a codebase with that kind of
+relicensing history.

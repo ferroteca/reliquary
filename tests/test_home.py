@@ -164,12 +164,15 @@ def test_the_properties_file_rides_along():
         os.path.join("some", "project.properties"))
 
 
-# There is no seeding axis at all: a miss is a miss (D88).
+# There is no seeding fallback at all any more: a missing name is
+# just missing (D88).
 #
-# The knob these tests used to exercise is deleted rather than
-# defaulted, so what is left to assert is its absence — a context
-# carries the working directories and the selected properties file
-# (P26's cargo) and nothing that decides where a name may come from.
+# The autoseed switch these tests used to exercise was deleted
+# rather than just turned off by default, so what is left to assert
+# is that it is gone: a `Context` carries only the working
+# directories and the selected properties file (what P26's move
+# carried over), and nothing that decides where a name might come
+# from instead.
 
 def test_the_record_carries_no_seeding_slot():
     assert home.Context.__slots__ == (
@@ -183,12 +186,13 @@ def test_no_seeding_switch_survives():
 
 
 def test_the_global_machinery_is_deleted():
-    """The carrier mechanism P26 retired is gone, not dormant.
+    """The old global mechanism P26 retired is gone, not just unused.
 
-    The directory globals, their setters, the environment adoption
-    and the assignment probe were deleted with the surface move; a
-    survivor here would be a second carrier waiting to disagree with
-    the record.
+    The directory globals, their setters, the environment adoption,
+    and the assignment probe were deleted along with the move to
+    `Context`; if any of them still existed, it would be a second
+    place holding this state that could get out of sync with the
+    `Context` record.
     """
     for gone in ("_globals", "_assign", "set_home_dir",
                  "set_blueprints_dir", "set_scripts_dir",

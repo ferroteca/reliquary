@@ -2,24 +2,26 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Authoring the files a user owns: writing them, and removing them.
 
-The counterpart of `assets.py`, which resolves and reads what this
-writes. Four verbs over the two authored kinds — scaffold a
-blueprint, declare a media for a file already on disk, and remove a
-blueprint or a script.
+This is the counterpart of `assets.py`, which resolves and reads
+what this module writes. Four functions cover the two kinds of file
+a user authors: scaffold a new blueprint, declare a media spec for a
+file already on disk, and remove a blueprint or a script.
 
-**Both removals refuse while something still refers to the file**,
-and that shared discipline is why the two kinds sit together rather
-than a shared helper: a blueprint is refused while machines of it
-exist, a script while blueprints reference it, and the two answer
-from entirely different places — the machine list, and every
-blueprint in the source parsed for its `scripts` map. What they have
-in common is the order of the questions (who refers to this, does
-the file exist, remove it), which is a shape to keep aligned by
-sitting side by side, not code to factor.
+Both removal functions refuse to delete while something still refers
+to the file. That's why the blueprint and script code live together
+here instead of behind a shared helper: a blueprint can't be deleted
+while any of its machines exist, and a script can't be deleted while
+any blueprint still references it — and those two checks look in
+completely different places (the machine list, versus every
+blueprint's `scripts` map, parsed one by one). What they share is
+just the order of steps (check who refers to this, check the file
+exists, then remove it) — that's a pattern worth keeping consistent
+side by side, not logic worth factoring into one function.
 
-Parsing and validating a composed `.rlqb` is `document.py`'s;
-nothing here interprets what it writes beyond the one parse that
-keeps `add_media` from leaving an unloadable file behind.
+Parsing and validating a composed `.rlqb` file is `document.py`'s
+job. This module doesn't interpret what it writes, except for the
+one parse `add_media` runs to make sure it isn't leaving behind a
+file that fails to load.
 """
 
 import json
@@ -73,15 +75,15 @@ def new_blueprint(name, *, platform="dos", context=None):
 def add_media(name, path, *, context=None):
     """Write a media spec for a file already on disk. Returns the path.
 
-    The file stays where it is: what this authors is the *declaration*
-    a blueprint was missing, with the one field a person should never
-    have to produce by hand — the ``sha256`` — computed from the file.
-    The result is an ordinary ``blueprints/<name>.rlqb`` the user owns
-    and can edit, not a cache entry (D41).
+    The file itself doesn't move: what this writes is the blueprint
+    *declaration* that was missing for it, with the one field nobody
+    should compute by hand — ``sha256`` — filled in automatically from
+    the file. The result is an ordinary ``blueprints/<name>.rlqb`` the
+    user owns and can edit — not a cache entry (D41).
 
-    Raises :class:`PreflightError` if the file is not there, and again
-    if the blueprint already exists — an existing declaration is
-    edited, never silently rewritten.
+    Raises :class:`PreflightError` if the file doesn't exist, and
+    again if the blueprint already exists — an existing declaration
+    must be edited by hand; this function never overwrites one.
     """
 
     source = os.path.abspath(os.fspath(path))
@@ -104,8 +106,9 @@ def add_media(name, path, *, context=None):
         "location": source.replace("\\", "/"),
         "sha256": sha256(source),
     }
-    # Parse before writing, so a name the charter refuses fails here
-    # rather than leaving an unloadable file behind.
+    # Parse the spec before writing it, so a name that fails
+    # validation is caught here, instead of ending up in a file that
+    # can't be loaded later.
     parse_document([spec])
 
     os.makedirs(os.path.dirname(destination), exist_ok=True)

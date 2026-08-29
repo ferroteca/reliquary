@@ -2,21 +2,24 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The integration tier's selection, and the home it runs in.
 
-**A marker states a deliberate tier where a skip states an accident**
-(D106). The two FreeDOS runs were gated by `RELIQUARY_INTEGRATION` and
-a `skipUnless`, which reported the same "s" a broken environment would
-have — so the suite carried an asserted skip *count* to say which of
-the two it was. The marker says it instead: the tier is **deselected**
-by default and the default run skips nothing at all, so a surviving
-skip is a defect with nothing to hide behind.
+The FreeDOS runs use a pytest marker instead of `skipUnless`, to tell
+a deliberately skipped test apart from an accidental one (D106).
+`skipUnless` reported the same "s" for a broken environment as it did
+for a test that was never meant to run in this configuration, so the
+suite used to assert an exact skip count just to tell the two apart.
+With the marker, the integration tier is deselected by default, so a
+default run has zero skips — any skip that does show up is a real
+defect, not something to explain away.
 
-`--integration` is an option rather than an environment variable
-because it is a property of the run being asked for, not of the host:
-the option appears in `--help`, an unreadable one is an error under
-`--strict-config`, and nothing about it survives in a shell after the
-run. What stays environmental is where the run puts its files —
-`RELIQUARY_INTEGRATION_HOME`, read by `integration_home` below, since
-a media cache worth reusing outlives any one command line.
+`--integration` is a command-line option rather than an environment
+variable, because whether to run the integration tier is a property
+of this run, not of the host machine: the option shows up in
+`--help`, a misspelled one is an error under `--strict-config`, and
+it leaves nothing behind in the shell after the run finishes. Where
+the run stores its files stays an environment variable —
+`RELIQUARY_INTEGRATION_HOME`, read by `integration_home` below —
+because a media cache worth reusing needs to outlive any one command
+line.
 """
 
 import os
@@ -36,9 +39,9 @@ def pytest_addoption(parser):
 def pytest_collection_modifyitems(config, items):
     """Deselect the integration tier unless it was asked for.
 
-    Deselected rather than skipped: a deselected test is one this run
-    was never for, and it leaves no report to read as a failure that
-    was tolerated.
+    Deselected rather than skipped: a deselected test simply is not
+    part of this run, so it produces no skip report that could be
+    misread as a tolerated failure.
     """
     if config.getoption("--integration"):
         return

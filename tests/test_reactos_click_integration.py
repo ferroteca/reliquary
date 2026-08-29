@@ -1,44 +1,41 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Opt-in `click` proof against ReactOS's real GUI setup wizard (F66).
+"""Installs ReactOS for real and clicks through its setup wizard, to
+prove `click` works against an actual graphical (GUI) installer
+(F66).
 
-The `integration` marker is what makes this opt-in: the tier is
-deselected unless `pytest --integration` asks for it, and it is never
-skipped (`tests/conftest.py`), the same discipline
-`test_freedos_vnc_integration.py` runs under.
+Like `test_freedos_vnc_integration.py`, this only runs when you pass
+`pytest --integration` (see `tests/conftest.py`) — it launches a real
+QEMU VM and downloads a real ISO, so it's opt-in, not part of the
+normal test run.
 
-ReactOS's second-stage Setup Wizard is a genuine Win32 GUI application
-— fixed-position Next/Back buttons, not a text-mode menu — which is
-exactly the case the whole pointer-input piece exists to reach (U5,
-the GUI era). FreeDOS's own install never leaves text mode, so it
-cannot exercise `click` at all; this is the real end of that gap.
+Why this matters: ReactOS's second-stage setup is a real Windows GUI
+app with Next/Back buttons at fixed positions, not a text menu.
+FreeDOS's installer never leaves text mode, so it can never test
+`click` at all. This test is the first one that actually does.
 
-**Why this test drives its own keyboard, rather than a `.rlqs`
-install script driving all of it**: ReactOS's text-mode setup paints
-its own font, which the shared recognizer's font-bank library does
-not cover the way it covers FreeDOS's (`text_screen()` reads back
-noise on this guest, confirmed against a live capture — the raw
-pixels are perfect, only the *recognized* text is not). A `wait
-"..."` condition there would be a text condition over a screen the
-recognizer genuinely cannot read, not a script bug, so the
-keyboard-only phase is driven directly over the same raw-pixel
-carrier `click`'s own search already reads
-(`session.framebuffer()`), with stability judged by
-`screen_stability.observe` on those frames — the same measure the
-script language's own quiescence gate uses (F65 generalized it to
-pixels), and not naive frame equality, **which a blinking text
-cursor defeats**: the install-directory screen holds a cursor that
-never yields two identical frames, and an equality-based settle
-stares at it forever (measured 2026-08-26, 38 minutes without a
-press). The codex's own `reactos-install` script stays honestly
-thin for the same reason (see its own header comment).
+Why the first half of this test drives the keyboard itself, instead
+of using a `.rlqs` script with `wait` statements: reliquary reads
+on-screen text by matching each character's shape against a library
+of known fonts. ReactOS's text-mode setup draws a custom font that
+isn't in that library, so reliquary reads garbage there — the actual
+pixels are fine, reliquary just can't turn them into text. So this
+test presses Enter based on the raw screen image settling down
+(`screen_stability.observe`, the same stability check the scripting
+language itself uses — see F65), not on recognized text. This
+matters in practice: naive "did the picture change at all" checks
+never work here, because one screen has a blinking cursor that never
+looks the same twice, so a naive check would wait forever (this
+actually happened during testing: 38 minutes, no progress). The
+codex's own `reactos-install` script is deliberately thin for the
+same reason — see its header comment.
 
-Once the GUI wizard appears, this switches to the real thing: an
-actual `.rlqs` script executing `wait @landmark` / `click @landmark
-spot="..."`, with both landmarks authored live from the plane's own
-captures — exactly as `test_freedos_vnc_integration.py` authors
-`dos-prompt` for F65's own proof. Nothing here is a committed binary
-fixture.
+Once the graphical wizard actually appears, this switches to the
+real thing: an actual `.rlqs` script with `wait @landmark` and
+`click @landmark spot="..."`, with the landmark images captured live
+from the running screen — the same approach
+`test_freedos_vnc_integration.py` uses for its own `dos-prompt`
+landmark. Nothing here is a checked-in image file.
 """
 
 import json
@@ -61,60 +58,74 @@ from tests import live_external_effects
 
 pytestmark = pytest.mark.integration
 
-#: The Next/Back button centers on ReactOS 0.4.15's Setup Wizard, at
-#: its fixed 800x600 GUI-mode resolution — measured once against a
-#: real capture and stable across wizard pages, since every page
-#: shares the same dialog chrome.
+#: Pixel coordinates of the Next and Back buttons on ReactOS 0.4.15's
+#: Setup Wizard, at its fixed 800x600 resolution. Measured once from
+#: a real screenshot; the same coordinates work on every wizard page
+#: because they all share the same button layout.
 _NEXT_SPOT = {"x": 498, "y": 470}
 _BACK_SPOT = {"x": 403, "y": 470}
 
-#: How many clean-slate install attempts this test budgets before
-#: giving up naming the exhausted count. The historical failures
-#: divide into two populations, and only one of them is what this
-#: budget buys (both measured 2026-08-26). **Systematic**: a fixed
-#: press count plus equality-based settling timed out every attempt
-#: identically (30 straight, accelerated and not) — that was the
-#: driver's own defect, fixed below, and no retry count survives a
-#: systematic failure. **Transient**: ReactOS 0.4.15 — "Alpha
-#: stage... not feature-complete", per its own setup screen —
-#: sometimes takes its VM down outright mid-install, at unpredictable
-#: points (observed at 5 and 14 minutes in consecutive cold runs):
-#: QEMU exits silently, its stderr empty, and the next session open
-#: refuses with `machine.vm-unreachable`. That death is what the
-#: retry spends its budget on, which is why the retry loop catches
-#: that refusal specifically and not refusals in general.
+#: How many times this test will retry a failed install before
+#: giving up. There are two different ways an install can fail, and
+#: this retry only helps with one of them (both discovered
+#: 2026-08-26 while writing this test).
+#:
+#: The first way — a bug in this test's own driving code — used to
+#: fail every single attempt the same way, so retrying didn't help
+#: at all; that bug is fixed now (see `_drive_text_mode_setup`).
+#:
+#: The second way is real and still happens: ReactOS 0.4.15 calls
+#: itself "Alpha stage... not feature-complete" on its own setup
+#: screen, and sometimes it crashes its own VM partway through
+#: installing, at no predictable point (seen at 5 minutes in one run
+#: and 14 minutes in another). When that happens, QEMU just exits
+#: with no error message, and the next thing we try to do reports
+#: "machine.vm-unreachable". That's the actual failure this retry
+#: count is for, which is why the retry logic below only retries on
+#: that specific error.
 _INSTALL_ATTEMPTS = 3
 
-#: A frame with at least this many pure-white pixels is the Setup
-#: Wizard, not the bare second-stage desktop: the wizard's dialog
-#: body is a ~500x390 white sheet (~150k pixels), while the desktop
-#: is its wallpaper plus a few thousand white pixels of version
-#: text. The distinction matters because the desktop paints first,
-#: sits **stable** for the seconds the wizard takes to appear, and a
-#: landmark authored from that stable-but-empty frame would aim
-#: `click` at wallpaper.
+#: How many pure white pixels a screen needs to count as "the Setup
+#: Wizard is showing", rather than just the empty desktop behind it.
+#: The wizard's white dialog box covers about 500x390 pixels
+#: (~150,000 pixels); the bare desktop only has a few thousand white
+#: pixels in its version-number text. This distinction matters
+#: because the desktop appears and holds still for a few seconds
+#: *before* the wizard window pops up on top of it — if we captured
+#: a landmark from the bare desktop, every later click would aim at
+#: empty wallpaper instead of a button.
 _WIZARD_WHITE_PIXELS = 50_000
 
 
 def _settled_capture(machine, size=None, timeout=300, poll=0.25,
                      hold=4.0):
-    """Poll the live framebuffer until it reads stable.
+    """Take screenshots until the picture stops changing, then return
+    the last one.
 
-    Ordinary Python polling over the carrier, not a `.rlqs` wait:
-    nothing text-readable survives this guest's own font (see the
-    module docstring), and nothing text-readable exists at all once
-    the video mode changes to a real GUI framebuffer. Stability is
-    `screen_stability.observe` over the pixel frames — the engine's
-    own measure, which excludes recurring decoration — because the
-    text-mode setup's input screens carry a blinking cursor that
-    naive frame equality reads as perpetual motion. The reading must
-    hold for ``hold`` seconds before the frame is returned, so a
-    freeze mid-transition does not read as a settled screen.
-    ``size``, when given, is also a gate — the wrong resolution is a
-    screen mid-transition, never a settled one, so stability at the
-    wrong size never counts. The poll is deliberately dense: the
-    measure recognizes decoration by recurrence, and a sparse poll
-    is blind to it (`Reading.blind`).
+    This uses plain Python polling, not a `.rlqs` script `wait`,
+    because reliquary can't read text off this screen (see the
+    module docstring) and once the video mode switches to a real
+    graphical framebuffer, there's no text to read at all anyway.
+
+    "Stopped changing" is judged by `screen_stability.observe` —
+    the same check reliquary's scripting language uses internally —
+    rather than by simple "are these two screenshots identical?"
+    equality. That matters because some of these screens have a
+    blinking cursor: two screenshots of a truly unchanged screen can
+    still differ because the cursor happened to blink between them,
+    and a plain equality check would wait forever. `screen_stability`
+    knows to ignore that kind of small repeating change.
+
+    Once the screen reads as stable, we keep checking for `hold`
+    more seconds before trusting it — otherwise a screen that's
+    mid-transition and happens to pause for a moment could be
+    mistaken for a finished one. If `size` is given, a screenshot at
+    the wrong resolution never counts as stable, since the wrong
+    resolution means we're mid-transition. We check often (every
+    `poll` seconds) on purpose: this stability check works by
+    noticing which pixels repeat, so if we check too rarely, it
+    can't tell a blinking cursor from real motion (see
+    `Reading.blind`).
     """
     deadline = time.monotonic() + timeout
     monitor = screen_stability.ScreenStability()
@@ -153,28 +164,38 @@ def _white_pixels(capture):
 
 
 def _drive_text_mode_setup(machine, timeout=1500):
-    """Confirm every settled pre-GUI screen until the wizard appears.
+    """Press Enter on every text-mode setup screen, in order, until
+    the graphical Setup Wizard appears. Return the wizard's screenshot.
 
-    Every one of ReactOS's text-mode screens already has the wanted
-    option highlighted, so the whole phase is press-Enter-on-stable;
-    no traversal is needed. **The screen count is deliberately not
-    modeled**: the live sequence runs longer than the eight screens
-    an earlier version of this function counted (the bootloader
-    screens land after the file copy, and the reboot path adds
-    more), and the exact order was observed to differ between runs —
-    a fixed count is a fencepost that times out every install, which
-    is precisely how this function failed before it was measured
-    (2026-08-26). The file-copy and reboot screens never read stable
-    while they are actually working, so they draw no keypress, and a
-    stray Enter on a transiently stable frame is harmless — no
-    pre-GUI screen destroys anything on Enter that the flow was not
-    already about to do.
+    ReactOS's text-mode screens always have the right answer already
+    highlighted, so all we ever need to do is: wait for the screen
+    to stop changing, then press Enter, then repeat.
 
-    Returns the first frame that is both stable at 800x600 and
-    actually shows the wizard (`_WIZARD_WHITE_PIXELS`): the
-    second-stage desktop paints first and sits stable while the
-    wizard loads, and a landmark authored from the bare desktop
-    would aim every later click at wallpaper.
+    We deliberately do NOT count how many screens there are and
+    press Enter that many times. An earlier version of this function
+    did that — it counted 8 screens by hand and pressed Enter 8
+    times — and it was wrong: the real install has more screens than
+    that (some bootloader-related screens only show up after the
+    file copy finishes), and the exact number varies between runs.
+    Counting wrong meant every single install attempt timed out
+    waiting for a wizard that this function had already stopped
+    trying to reach (found 2026-08-26). Pressing Enter on whatever
+    screen is actually showing, instead of counting, fixes that.
+
+    This is safe because the file-copy screen and the reboot screens
+    never sit still long enough to count as "stopped changing" while
+    they're actually working, so we never press Enter on them by
+    mistake. And even if we did press Enter on a screen that
+    happened to pause briefly, nothing here is destructive — every
+    one of these screens is a "press Enter to continue" prompt.
+
+    We check specifically for the wizard's white dialog box
+    (`_WIZARD_WHITE_PIXELS`), not just any 800x600 screen, because
+    the empty desktop appears — and sits still — for a few seconds
+    *before* the wizard window pops up on top of it. If we grabbed a
+    screenshot of the bare desktop instead of waiting for the
+    wizard, every click later in the test would aim at empty
+    wallpaper instead of a button.
     """
     deadline = time.monotonic() + timeout
     monitor = screen_stability.ScreenStability()
@@ -196,8 +217,8 @@ def _drive_text_mode_setup(machine, timeout=1500):
                 if capture.size == (800, 600):
                     if _white_pixels(capture) >= _WIZARD_WHITE_PIXELS:
                         return capture
-                    # the bare desktop: the wizard is still loading,
-                    # so keep watching without pressing anything
+                    # This is the bare desktop, not the wizard yet.
+                    # Keep watching; don't press anything.
                 else:
                     _press_enter(machine)
                     presses += 1
@@ -212,13 +233,15 @@ def _drive_text_mode_setup(machine, timeout=1500):
 
 
 def _install_and_reach_wizard(home):
-    """Drive one full install attempt per try, retrying from a clean
-    machine on a guest-side reset (see `_INSTALL_ATTEMPTS`).
+    """Try installing ReactOS, up to `_INSTALL_ATTEMPTS` times, until
+    it reaches the Setup Wizard. Returns the run, the machine, and
+    the wizard's screenshot.
 
-    A fresh machine each attempt rather than nursing the failed one
-    along: a reset mid-copy leaves a disk that already has *a*
-    partition on it, so resuming in place would silently change what
-    each attempt actually exercises from one try to the next.
+    Each retry starts from a brand-new machine rather than reusing
+    the failed one. If we reused it, a disk that already has a
+    partition on it (left over from the failed attempt) would make
+    each retry start from different disk state than the last one —
+    so a fresh machine keeps every attempt comparable.
     """
     last_error = None
     for attempt in range(1, _INSTALL_ATTEMPTS + 1):
@@ -230,12 +253,12 @@ def _install_and_reach_wizard(home):
             welcome = _drive_text_mode_setup(machine)
             return installed, machine, welcome
         except (AssertionError, PreflightError) as error:
-            # A guest that powers itself off mid-install kills QEMU,
-            # and the next session open then refuses with the
-            # adapter's `machine.vm-unreachable` — which is the very
-            # guest-side death this retry budget exists for, so it
-            # retries exactly like a wizard that never appeared. Any
-            # other refusal is a real defect and propagates.
+            # If the guest crashes its own VM mid-install (this
+            # really happens — see _INSTALL_ATTEMPTS above), QEMU
+            # exits, and the next thing we try to do fails with
+            # "machine.vm-unreachable". That's the one failure this
+            # retry loop exists to handle, so we only retry on it.
+            # Any other error is a real bug and should stop the test.
             if isinstance(error, PreflightError) \
                     and error.rule_id != "machine.vm-unreachable":
                 raise
@@ -251,14 +274,17 @@ def _install_and_reach_wizard(home):
 
 
 def _write_landmark(home, name, capture, spots, similarity="99%"):
-    """Author one landmark from a live screen, as a recorder would.
+    """Save a screenshot as a landmark file reliquary can match
+    against later — this is what a human recording a landmark by
+    hand would produce.
 
-    A full-screen fuzzy region rather than a bare exact match, for
-    the same reason `test_freedos_vnc_integration.py`'s own
-    `_write_landmark` uses one: a captured cursor is furniture on a
-    screen otherwise painted identically every time, and 99%
-    comfortably absorbs one cursor sprite's worth of pixels out of a
-    whole 800x600 frame.
+    We use a "close enough" (fuzzy) match over the whole screen,
+    not an exact pixel match, for the same reason
+    `test_freedos_vnc_integration.py`'s own `_write_landmark` does:
+    the mouse cursor shows up in the screenshot, and it's the only
+    thing that moves on an otherwise identical screen. 99% similarity
+    is loose enough to ignore one cursor-sized blob of different
+    pixels out of the whole 800x600 image.
     """
     root = os.path.join(home, "landmarks")
     os.makedirs(root, exist_ok=True)
@@ -284,7 +310,7 @@ def _write_script(home, name, source):
 
 
 def _matched_landmark(run):
-    """The last landmark description this run's event stream matched."""
+    """Which landmark did the run's last successful match report?"""
     matches = [event for event in run.events
               if event["kind"] == _events.OBSERVATION_MATCH]
     assert matches, "no landmark match event in the run's stream"
@@ -292,19 +318,23 @@ def _matched_landmark(run):
 
 
 def test_click_advances_and_returns_through_reactos_setup(integration_home):
-    """F66's own done-when: a two-spot landmark, clicking each spot to
-    an observable guest effect, on a real GUI installer.
+    """The main proof this test exists for: click one button to move
+    forward through a real GUI installer, click another to go back,
+    and confirm both clicks actually worked.
 
-    Both spots of one landmark declaration are exercised in a single
-    round trip: `next` (welcome -> acknowledgements, a real page
-    change) and `back` (acknowledgements -> welcome again), the
-    second click's effect confirmed against the very landmark
-    authored before any pointer event was ever delivered — proof
-    that the built-in park-zone mask and the fuzzy residual tolerance
-    are enough to survive a real, uncontrolled cursor.
+    We test both buttons on a single landmark: click "next" (moves
+    from the welcome page to the next page — check the screen really
+    changed) and click "back" (returns to the welcome page). The
+    second check is the important one: we re-match the *original*
+    welcome-page landmark, captured before either click ever
+    happened, against the screen we're back on now. If that still
+    matches, it proves the mouse cursor being visible on screen
+    doesn't throw off the match — the landmark system already
+    accounts for it.
     """
-    # QEMU is what this tier *is*, so a host without it fails naming
-    # the gap (P11) rather than skipping: the tier was asked for.
+    # This test needs a real QEMU install on the host. If QEMU isn't
+    # found, fail with a clear error rather than silently skipping —
+    # someone explicitly asked to run this test tier.
     find_qemu()
     find_qemu_img()
     home = integration_home
@@ -340,8 +370,9 @@ def test_click_advances_and_returns_through_reactos_setup(integration_home):
                               context=home)
         assert _matched_landmark(returned) == "@reactos-acknowledgements"
 
-        # The round trip's own proof: the *original* welcome landmark
-        # — authored before either click ever ran — still matches.
+        # This is the actual proof of the round trip: the original
+        # welcome-page landmark, saved before either click ran,
+        # still matches now that we've clicked back to that page.
         _write_script(
             home, "confirm-welcome",
             "platform winnt\nwait @reactos-welcome timeout=15s\n")

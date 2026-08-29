@@ -360,7 +360,9 @@ def test_an_rlq_fact_reference_is_accepted():
     validate(script('property owner default="${rlq.env.USER}"\n'))
 
 
-# The dry twin: which source would answer, without binding.
+# describe_sources is the dry-run version of bind_properties: it
+# reports which source would answer each property, without binding
+# any values or prompting.
 
 def test_reports_each_source_without_prompting_or_values(home, monkeypatch):
     properties.set_property("from-file", "v", context=home)

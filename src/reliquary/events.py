@@ -1,21 +1,25 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The run event stream — live output, never a file.
+"""The run event stream: live output only, never written to a file.
 
-A run emits one normative event stream (docs/spec/script-spec.md,
-"The run event stream"): JSON Lines, each event carrying a sequence
-number, timestamp, elapsed time, and kind. It is **live output**
-rendered to the run's driver and returned to whoever started the run;
-nothing is written to disk (D36). The pretty and plain displays are
-*renderers* of this stream, so no surface reports anything the stream
-does not carry.
+A run produces one official stream of events (docs/spec/script-spec.md,
+"The run event stream"): JSON Lines, one event per line, each one
+carrying a sequence number, a timestamp, elapsed time, and a kind. This
+is **live output only** — it's rendered to the run's display and
+handed back to whoever started the run, but nothing about it is ever
+written to disk (D36). The pretty and plain displays just render this
+same stream, so nothing shown on screen says anything the stream
+itself doesn't already carry.
 
-The same transfer and verification kinds are emitted wherever media
-moves — inside a run they ride the run's stream, and standalone
-``fetch-media`` renders them the same way.
+The same transfer and verification event kinds are emitted everywhere
+media moves: inside a run they travel on the run's stream, and the
+standalone ``fetch-media`` command renders the identical kinds on its
+own.
 
-The stream is a contracted machine surface: from 1.0 it grows
-additively only, and consumers must ignore unknown kinds and fields.
+The stream is a supported interface for other programs to consume:
+starting from version 1.0, new event kinds and fields can be added,
+but nothing already there changes meaning. Consumers should ignore any
+kind or field they don't recognize.
 """
 
 import dataclasses
@@ -25,10 +29,10 @@ import time
 from datetime import datetime, timezone
 
 
-# -- the kind vocabulary -----------------------------------------
+# -- the event kinds -----------------------------------------
 #
-# Dotted names in one namespace. New kinds may appear in any
-# release; an existing kind never changes meaning.
+# Dotted names, all in one namespace. New kinds can be added in any
+# release; an existing kind never changes what it means.
 
 RUN_START = "run.start"
 RUN_PREFLIGHT = "run.preflight"
@@ -48,27 +52,29 @@ TRANSFER_PROGRESS = "transfer.progress"
 TRANSFER_END = "transfer.end"
 VERIFY_START = "verify.start"
 VERIFY_END = "verify.end"
-#: The quiescence guard reporting the cadence it measured and the
-#: window that cadence earned — emitted once, the first time a run
-#: knows them. It is the one thing about the guard a reader cannot
-#: infer: `stability=` is authored, but whether the host can *honor*
-#: it is discovered, and a guard that quietly stood down would
-#: otherwise look identical to one that passed.
+#: Reports the screen-sampling cadence the quiescence guard measured
+#: and the stability window that cadence allows. Emitted once, the
+#: first time a run has these numbers. This is the one thing about the
+#: guard a reader can't work out on their own: the script author
+#: writes `stability=`, but whether the host can actually keep up with
+#: it is only discovered at run time. Without this event, a guard that
+#: silently gave up would look no different from one that succeeded.
 GUARD_CADENCE = "guard.cadence"
-#: A scoped machine-state change taking hold, and being put back. The
-#: pair is the whole of what a `with` block does that a reader cannot
-#: see from the actions themselves: the change is an ordinary
-#: `insert`/`eject`/boot action and reports as one, while *that it was
-#: scoped* — and what the exit returned the machine to — lives only
-#: here (P5).
+#: Reports a scoped machine-state change taking effect, and being
+#: undone again. These two events are the only record that a `with`
+#: block happened: the underlying change is an ordinary
+#: `insert`/`eject`/boot action and is reported as one either way, but
+#: whether it was inside a `with` block, and what state it was
+#: restored to on exit, is recorded only here (P5).
 SCOPE_ENTER = "scope.enter"
 SCOPE_RESTORE = "scope.restore"
 FAILURE = "failure"
 
-#: Every kind above, so a test can compare what is declared with
-#: what is emitted. A kind that is designed but not yet emitted is
-#: *reserved* and named only in the spec — it gets no constant
-#: here, because this tuple is the claim that the stream carries it.
+#: Every event kind defined above, so a test can check that what's
+#: declared here matches what actually gets emitted. A kind that's
+#: designed but not implemented yet is called out only in the spec
+#: document, not listed here — this tuple is a claim that the stream
+#: really does carry each of these kinds.
 KINDS = (
     RUN_START, RUN_PREFLIGHT, RUN_END, PROPERTY_BOUND,
     PHASE_START, PHASE_END, TRANSITION,
@@ -87,18 +93,22 @@ def _utc_now():
 
 
 def _stamp(moment):
-    """ISO-8601 UTC with milliseconds, the stream's time spelling."""
+    """Format ``moment`` as ISO-8601 UTC with milliseconds.
+
+    This is the timestamp format the stream uses for every event.
+    """
     return (moment.strftime(_TIMESTAMP)
             + f".{moment.microsecond // 1000:03d}Z")
 
 
 @dataclasses.dataclass(frozen=True)
 class Event:
-    """One event of a run's stream.
+    """One event in a run's stream.
 
-    ``fields`` are the kind's own; :meth:`as_dict` flattens them
-    beside the envelope, which is the JSON Lines shape a consumer
-    reads.
+    ``fields`` holds the data specific to this event's kind.
+    :meth:`as_dict` merges those fields alongside the envelope fields
+    (seq, time, elapsed, kind) into the flat JSON Lines shape a
+    consumer actually reads.
     """
 
     seq: int
@@ -108,28 +118,29 @@ class Event:
     fields: dict = dataclasses.field(default_factory=dict)
 
     def as_dict(self):
-        """The flat JSON-shaped mapping this event serializes as."""
+        """Return the flat dict this event serializes to as JSON."""
         document = {"seq": self.seq, "time": self.time,
                     "elapsed": round(self.elapsed, 3), "kind": self.kind}
         document.update(self.fields)
         return document
 
     def as_json(self):
-        """One JSON Lines record — no newline."""
+        """Return this event as one JSON Lines record, no newline."""
         return json.dumps(self.as_dict(), default=str)
 
 
 class EventStream:
-    """The live stream of one run, and the output it returns.
+    """The live event stream for one run, and the events it hands back.
 
-    Events are handed to ``sink`` as they happen (the live half) and
-    accumulated for the caller (the returned half). ``redact`` is
-    applied to every string field before an event is recorded, so a
-    bound secret can never reach either half.
+    Every event is sent to ``sink`` as it happens (the live half) and
+    also saved up for the caller to retrieve later (the returned
+    half). ``redact`` runs on every string field before an event is
+    recorded, so a bound secret value can never appear in either half.
 
-    Ticks are live-only: a renderer showing "elapsed / limit" while an
-    observation waits gets them, and the recorded stream stays free of
-    heartbeat noise.
+    Ticks are live-only and never saved: a renderer that shows
+    "elapsed / limit" while an observation is waiting gets them, but
+    they never appear in the saved list of events, keeping it free of
+    that repeating heartbeat noise.
     """
 
     def __init__(self, sink=None, *, redact=None, clock=time.monotonic,
@@ -144,11 +155,11 @@ class EventStream:
 
     @property
     def events(self):
-        """Every event so far, as flat dicts, in order."""
+        """Return every event recorded so far, as flat dicts, in order."""
         return tuple(event.as_dict() for event in self._events)
 
     def emit(self, kind, **fields):
-        """Record and render one event; return it."""
+        """Record one event, send it to the renderer, and return it."""
         self._seq += 1
         event = Event(self._seq, _stamp(self._now()),
                       self._clock() - self._started, kind,
@@ -159,22 +170,22 @@ class EventStream:
         return event
 
     def tick(self, **fields):
-        """Advance a renderer's live display; record nothing."""
+        """Update the renderer's live display; record nothing."""
         if self._sink is not None:
             self._sink.tick(**fields)
 
     def clear(self):
-        """Ask the renderer to retire any in-place live display."""
+        """Tell the renderer to remove any in-place live display."""
         if self._sink is not None:
             self._sink.clear()
 
     def close(self):
-        """Release the renderer; the stream itself keeps its events."""
+        """Release the renderer. The recorded events are kept."""
         if self._sink is not None:
             self._sink.close()
 
     def _clean(self, fields):
-        """Drop empty optional fields and redact every string."""
+        """Drop fields whose value is None, and redact every string."""
         cleaned = {}
         for name, value in fields.items():
             if value is None:
@@ -195,12 +206,15 @@ class EventStream:
 
 
 def note(events, kind, message, **fields):
-    """Emit ``kind`` on ``events``, or print the human line to stderr.
+    """Emit ``kind`` on ``events``, or print ``message`` to stderr if
+    ``events`` is None.
 
-    Media movement happens inside a run (which has a stream) and
-    outside one (``create-machine``'s implicit fetch, which does not).
-    This keeps both honest without giving every machine command a
-    ``--progress`` flag it does not have.
+    Media can move both inside a run, which has an event stream to
+    write to, and outside one — for example ``create-machine``'s
+    implicit fetch of media, which has no stream. This function
+    handles both cases correctly without needing to add a
+    ``--progress`` flag to every machine command that might trigger a
+    media fetch.
     """
     if events is not None:
         events.emit(kind, message=message, **fields)

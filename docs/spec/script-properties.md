@@ -6,49 +6,47 @@ SPDX-License-Identifier: GPL-3.0-only
 # Script properties
 
 > **Status:** normative and **implemented** (milestone 8, complete).
-> The **user properties file** — the line format, the key rules, the
-> `@` value kinds, the surgical comment-preserving edits, and the
-> four maintenance verbs with their API twins; **secret storage** —
-> the credential-store capability behind a provider seam, the entry
-> channels, the fail-safe update order and orphan handling; **file
-> selection** — `--properties` / `RELIQUARY_PROPERTIES` (the CLI's
-> channels, arriving through the record it builds) / the
-> `Context`'s `properties_file` slot (P26's cargo, the API's one
-> channel), credentials scoped by the selected file's
-> absolute path; **binding into a run** — the layered sources (flag,
-> blueprint parameter with its redirect, environment with collision
-> preflight, file, the **declared derivation** with its `rlq.*` host
-> facts, the interactive ask), the kind rules, and the runtime
-> secret rules (transcript and diagnostic redaction; a dry run
-> naming each key's source, never its value); and **`${key}`
-> location references** binding at `create` / `apply` through the
-> same order, the resolved location recorded in state and never
-> re-resolved at `start`, chaining refused. Windows is the
-> only host whose credential backend is exercised (planning/proposed/FEATURES.md,
-> "Host portability"). Details may still change before
-> first release.
+> This document covers: the **user properties file** — its line
+> format, the key-naming rules, the `@` value kinds, how edits
+> preserve comments, and the four maintenance verbs with their API
+> equivalents; **secret storage** — the credential-store interface
+> that different backend providers implement, the ways a secret
+> value can be entered, the fail-safe order for updates, and how
+> orphaned credentials are handled; **file selection** —
+> `--properties` / `RELIQUARY_PROPERTIES` (the CLI's two ways to set
+> it, both feeding into the record it builds) and the `Context`
+> object's `properties_file` field (the API's one way to set it,
+> part of what P26 requires a `Context` to carry), with credentials
+> scoped by the selected file's absolute path; **binding into a
+> run** — the ordered list of sources (flag, blueprint parameter and
+> its redirect, environment with a collision check, file, the
+> **declared derivation** with its `rlq.*` host facts, then an
+> interactive ask), the rules for matching declared kinds, and the
+> runtime rules for secrets (redacted from transcripts and
+> diagnostics; a dry run names each key's source but never its
+> value); and **`${key}` location references**, which bind at
+> `create` / `apply` through that same source order, get recorded in
+> state, are never re-resolved at `start`, and cannot be chained.
+> Windows is the only host whose credential backend has been
+> exercised so far (planning/proposed/FEATURES.md, "Host
+> portability"). Details may still change before first release.
 
-Script properties carry the values scripts consume without
-embedding them:
-machine-independent values that recur
-across installations — a registered owner, a preferred login
-name, product
+Script properties hold values a script consumes without embedding
+them directly in the script text: values that stay the same across
+installations — a registered owner, a preferred login name, product
 installation keys, organization names, initial passwords — and
-run-specific answers. A script [declares its
-properties](script-spec.md#properties); every source that can
-answer speaks the same keys: the caller's explicit `--property`
-values, the blueprint's designed parameters, the environment, the
-user properties file, the script's declared derivation, and
-finally an interactive ask (the
-flattened order is
-normative in the [script
-spec](script-spec.md#the-property-sources)). This document owns
-the operator-side mechanics of those sources, and among them the
-*person's* source — the durable **user properties file** — while
-the ephemeral
-sources let
-automation inject the values it may not check in without
-touching a personal file.
+values specific to one run. A script [declares its
+properties](script-spec.md#properties). Several sources can supply
+an answer for the same key: an explicit `--property` value on the
+command line, the blueprint's designed parameters, the environment,
+the user properties file, the script's own declared derivation, and
+finally an interactive ask. The order these sources are tried in is
+fixed, and normative in the [script
+spec](script-spec.md#the-property-sources). This document covers
+the operator-facing mechanics of those sources. One of them is the
+durable **user properties file**, which belongs to a person; the
+other sources are ephemeral — they let automation supply a value for
+one run without writing it into that personal file.
 
 Each Reliquary home has one user properties file:
 
@@ -65,10 +63,11 @@ creates it; reading or running an unrelated script does not.
 
 ## Property names and values
 
-The file is line-based (owner, 2026-07-21 — the format round):
-one `key = value` per line, `#` full-line comments, and blank
-lines. Dotted names provide human-chosen
-namespaces without giving dots traversal or inheritance semantics:
+The file is line-based — decided on 2026-07-21 as part of settling
+the file format (owner): one `key = value` per line, `#` full-line
+comments, and blank lines. Dotted names give a human-chosen way to
+namespace keys; the dots don't imply any traversal or inheritance
+behavior:
 
 ```properties
 # reliquary user properties
@@ -93,10 +92,11 @@ entries may not use `rlq`, `rlq.*`, `reliquary`, or any
 
 Whitespace around `=` is trimmed; the value is the trimmed
 remainder of the line, verbatim — no quoting, no escapes, no line
-continuations. Despite the familiar extension, the format is
-deliberately *not* Java properties: none of its unicode escapes
-or continuation rules apply — the named caveat of the
-editor-friendly name (owner, 2026-07-21).
+continuations. Despite the familiar `.properties`-style name, this
+format is deliberately *not* Java's properties format: none of
+Java's Unicode escapes or line-continuation rules apply here. That's
+the one trade-off of picking a name editors already recognize
+(owner, 2026-07-21).
 
 There are two value kinds:
 
@@ -104,10 +104,10 @@ There are two value kinds:
 - A secret property is exactly `@secret`. Its value is stored
   separately in the host credential store.
 
-A value starting with `@` is reserved for value-kind tokens:
-`@secret` is the first, and the reserved prefix is the seam
-through which future value kinds are introduced deliberately; a
-literal leading `@` is spelled `@@`. Every ordinary value is
+A value starting with `@` is reserved for value-kind tokens.
+`@secret` is the first one; the reserved prefix is how future value
+kinds can be added later without breaking existing files. A literal
+leading `@` is written as `@@`. Every ordinary value is
 text — input declarations provide the useful type. Duplicate
 keys, invalid property names, and unparseable lines fail
 validation naming the file and line.
@@ -120,29 +120,32 @@ file is preserved — the reason the format is line-based, and what
 the earlier strict-JSON shape (whose canonical rewrites had to
 ban comments) could not offer. Writes are atomic; an invalid file
 is reported with its path and line and is never partly rewritten.
-In the API and the `--json` rendering a secret still serializes
-as the JSON marker `{"secret": true}` — returns stay JSON-shaped
-under the value-union rule; `@secret` is file syntax only.
+In the API and the `--json` rendering, a secret still serializes as
+the JSON marker `{"secret": true}` — a returned value is always
+either the actual value or that marker object, never the literal
+text `@secret`, which is file syntax only.
 
 ## Property sources
 
-Everything that can answer for a property key is a source, in one
-flattened order — an explicit `--property` value, the target
+Anything that can answer for a property key is a source, tried in
+one fixed order: an explicit `--property` value, the target
 blueprint's parameters, the environment, this file, then an
 interactive ask (owner, 2026-07-21; the order is normative in the
 [script spec](script-spec.md#the-property-sources)). The blueprint
-side belongs to the [blueprint
-reference](../blueprint-reference.md#parameters); this
-document owns the operator-side mechanics:
+side is covered in the [blueprint
+reference](../blueprint-reference.md#parameters); this document
+covers the operator-facing mechanics of the rest:
 
 - **Command line** — a repeatable `--property <key>=<value>`
-  supplies one explicit value for one invocation (API: the
-  `properties=` mapping under parity). It is the caller's answer
-  and beats every other source, the blueprint included; a key
-  given twice is an error, and each explicit key must be declared
-  by the running script. It never satisfies a secret-typed key:
-  argv enters process listings and shell history — the
-  `set-property` rule.
+  supplies one explicit value for one invocation (the API's
+  equivalent is the `properties=` mapping, which works the same
+  way). It is the caller's answer, and it overrides every other
+  source, including the blueprint. Giving the same key twice is an
+  error, and each explicit key must be declared by the running
+  script. It can never satisfy a secret-typed key, for the same
+  reason `set-property --secret` refuses a command-line value:
+  command-line arguments show up in process listings and shell
+  history.
 - **Environment** — `RELIQUARY_PROPERTY_<KEY>` supplies a
   standing value for the process: the injection path for CI
   harnesses and other automation (U14, U4), sitting below the
@@ -153,11 +156,12 @@ document owns the operator-side mechanics:
   `RELIQUARY_PROPERTY_PRODUCTS_WINDOWS_98_INSTALL_KEY`. That
   mapping can collide; when two keys a run actually consults
   mangle to the same variable, preflight fails naming both
-  keys. An environment value may satisfy a secret-typed key —
-  the CI secret-injection path — but it is plaintext in the
-  process environment, a warned protection class; the credential
-  store remains the durable home
-  for secrets.
+  keys. An environment value may satisfy a secret-typed key — this
+  is the path CI systems use to inject secrets — but it sits as
+  plain text in the process environment, which gives it weaker
+  protection than the credential store; this document calls that
+  out explicitly. The credential store remains the safer, lasting
+  place to keep secrets.
 - **The properties file** — `user.properties` in the Reliquary
   home, or the file named by `--properties <path>` (environment
   `RELIQUARY_PROPERTIES`; API: the record's `properties_file`
@@ -206,81 +210,88 @@ derivation is part of its contract:
   name (display name on Windows, the GECOS field on POSIX);
   frequently empty, and an empty fact makes a derivation
   unanswerable by design.
-- `rlq.env.<NAME>` — the named host environment variable,
-  verbatim: the raw escape hatch beside the curated facts, in
-  exactly the sense `backend-settings` is the escape hatch
-  beside the portable machine fields — a derivation that
-  reaches for it is host-specific by construction, and says so
-  on its face. Lookup follows the platform's own case rules; an
-  unset or empty variable is an unanswerable fact; a name
-  outside the property-segment grammar cannot be referenced.
-  Env facts are ordinary text only — a secret routed through
-  one would bypass protected handling, and secrets keep their
-  own channels. Distinct from the environment *tier*:
-  `RELIQUARY_PROPERTY_*` lets the session push a value at any
-  declared key, while an env fact is pulled, by name, only
-  where a declaration's derivation says so.
+- `rlq.env.<NAME>` — the named host environment variable, read
+  verbatim. It exists as a raw fallback beside the curated facts
+  above, playing the same role `backend-settings` plays beside the
+  portable machine fields: a derivation that reads a raw
+  environment variable is host-specific by construction, and the
+  reference itself makes that obvious. Lookup follows the
+  platform's own case rules. An unset or empty variable makes the
+  fact unanswerable. A name outside the property-segment grammar
+  cannot be referenced at all. Env facts are always ordinary text —
+  routing a secret through one would bypass its protected handling,
+  so secrets use their own channels instead. This is different from
+  the environment *tier* described above: `RELIQUARY_PROPERTY_*`
+  lets a session push a value in for any declared key, while an env
+  fact is pulled by name, only where a declaration's derivation
+  explicitly asks for it.
 
-Growth of the catalog is a design decision like any new tier
-(`rlq.host.hostname` and a raw, unnormalized username are
-the parked candidates); transforms in derivation syntax are
-permanently out — normalization lives in a fact's definition,
-arbitrary computation in the embedding API's provider seam.
+Adding to this catalog is a design decision, the same as adding a
+new tier — `rlq.host.hostname` and a raw, unnormalized username are
+candidates being held for later. Adding transform functions to the
+derivation syntax itself is permanently off the table: normalizing
+a value belongs in that fact's own definition, and any other
+computation belongs in the embedding API's provider interface, not
+in the script language.
 
-A blueprint [redirect](../blueprint-reference.md#parameters)
-resolves its target key through the non-blueprint sources here: a
-CI run may satisfy a redirect to
-`products.windows-98.install-key` from its own
-secret store via the environment, without pre-provisioning
-a Reliquary home.
+A blueprint [redirect](../blueprint-reference.md#parameters) looks
+up its target key using the sources in this document, other than
+the blueprint itself. For example, a CI run can satisfy a redirect
+to `products.windows-98.install-key` from its own secret store,
+through the environment, without needing to set up a Reliquary home
+first.
 
-### Growth: the order is closed, the seams are named
+### Growth: the order is fixed, but three routes let it grow
 
-The flattened order is semantics, not configuration — each rank
-encodes an adjudicated argument (an ambient variable never
-overrides a designed value; argv never carries secrets; asks are
-invocation-local) — so no end-user surface reorders tiers or
-inserts one. The model still expands, on three designed routes
-(owner, 2026-07-23; planning/DECISIONS.md):
+The order of sources is part of the design, not a setting — each
+rank encodes a deliberate decision (an ambient environment variable
+never overrides a designed value; the command line never carries
+secrets; an interactive answer only applies to that one run) — so
+nothing exposed to end users can reorder the tiers or insert a new
+one. Even so, the model can still grow, through three routes decided
+by design (owner, 2026-07-23; planning/DECISIONS.md):
 
-- **New tiers land by design decision at fixed ranks.** A new
-  source arrives as a one-line change to the normative order,
-  and every existing bundle keeps resolving identically.
-- **Provider plurality lives inside a tier, behind a capability
-  contract.** The credential store is the precedent — Windows
-  Credential Manager, macOS Keychain, a Secret Service provider,
-  one contract; a future corporate-secrets provider joins as
-  another implementation of that capability, invisible to the
-  order.
-- **Programmatic injection belongs to the embedding API.** A
-  future `register_property_source(name, provider,
-  before=/after=<rank>)` seam may let *code* insert a source at
-  a named rank — custody stays with a developer whose artifact
-  versions the choice, never with per-machine operator
-  configuration — and provenance is mandatory: a dry run
-  and transcripts name the injected source like any built-in
-  tier. The provider protocol will be Reliquary-defined and
-  flat (planning/SURFACES.md — a shape every binding language
-  can express), which is also why no existing settings library
-  can own the public seam.
+- **A new tier is added by design decision, at a fixed rank.** A
+  new source is added as a one-line change to the normative order,
+  and every existing property bundle keeps resolving exactly as it
+  did before.
+- **Multiple providers can exist inside one tier, behind a shared
+  interface.** The credential store is the existing example: Windows
+  Credential Manager, macOS Keychain, and a Secret Service provider
+  all implement the same interface; a future corporate-secrets
+  provider would join the same way, as another implementation of
+  that interface, without changing the order at all.
+- **Code-driven insertion belongs to the embedding API.** A future
+  `register_property_source(name, provider, before=/after=<rank>)`
+  call may let *code* insert a source at a named rank. That stays a
+  decision made by the developer who writes and versions that code —
+  never something a per-machine operator can configure — and it must
+  record where the value came from: a dry run and transcripts would
+  name the injected source exactly like any built-in tier. The
+  provider protocol itself will be defined by Reliquary and kept
+  simple enough for any binding language to implement
+  (planning/SURFACES.md), rather than adopting an existing settings
+  library's own interface.
 
-The pattern has strong prior art, and the order matches its
-convergence: Spring's PropertySource model (a fixed documented
-precedence for file-side users, programmatic mutability for
-code, the chain enumerable with per-key provenance), Go's Viper
-(explicit > flag > env > file > remote store > default), and
-.NET's configuration providers with user-secrets. Ansible's
-twenty-two precedence levels bound the accretion this rule
-prevents; PAM and nsswitch.conf mark the other hazard —
-operator-file reordering without provenance. Implementation
-stays bespoke: the resolution loop is trivial, and the tiers
-that define this model — the designed blueprint tier, the
-interactive ask, secret kinds bound to the credential store and
-the run engine's redaction contract, this file's surgically
-editable line format — are Reliquary's own under any library.
-pydantic-settings and Dynaconf were weighed and declined with
-the revisit condition recorded (planning/DECISIONS.md,
-2026-07-23).
+Other configuration systems converge on the same pattern, which
+supports this design: Spring's PropertySource model (a fixed,
+documented precedence for file-based users, with programmatic
+changes reserved for code, and a chain you can list out with
+per-key provenance), Go's Viper (explicit > flag > env > file >
+remote store > default), and .NET's configuration providers with
+user secrets. Ansible shows what this rule is guarding against: its
+precedence order has grown to twenty-two levels. PAM and
+nsswitch.conf show the opposite failure: they let an operator
+reorder their own config files with no record of why. Reliquary's
+own implementation stays simple — the code that resolves a property
+through its sources is small — but the design itself (the designed
+blueprint tier, the interactive ask, secret kinds bound to the
+credential store and the run engine's redaction rules, this file's
+surgically editable line format) is specific to Reliquary and not
+something any existing settings library provides. Two existing
+libraries, pydantic-settings and Dynaconf, were considered and
+turned down; the reasons, and the condition for reconsidering them,
+are recorded in planning/DECISIONS.md (2026-07-23).
 
 ## Maintaining properties
 
@@ -306,36 +317,41 @@ string-prefix search. `get-property` prints an ordinary value; for a secret it r
 only whether the credential exists and never reveals it.
 
 `set-property <key> <value>` creates or replaces an ordinary property.
-`set-property <key> --secret` reads the value from the entry channel the
-context provides (owner, 2026-07-21 — the house tty-detection pattern): on
-an interactive terminal, a no-echo prompt; otherwise it reads stdin to EOF,
-strips one trailing newline, and rejects an empty value — so
-`echo $key | rlq set-property product-key --secret` is the programmatic
-path and the CLI stays a complete binding for unbound languages. Either
-way the value is written to the host credential store and only the secret
-marker is recorded in the properties file. There is no secret-value
-command-line argument because process listings and shell history are not
-credential stores.
+`set-property <key> --secret` reads the value from whichever input the
+context provides (owner, 2026-07-21 — the same approach Reliquary uses
+elsewhere to detect an interactive terminal): on an interactive
+terminal, it shows a prompt that doesn't echo what you type;
+otherwise, it reads stdin to the end, strips one trailing newline,
+and rejects an empty value. So `echo $key | rlq set-property
+product-key --secret` is how a script would do this, and the CLI
+stays a complete way to set a secret from a language that has no
+Reliquary API of its own. Either way, the value is written to the
+host credential store, and only the secret marker is recorded in the
+properties file. There is no command-line argument for a secret's
+value, because process listings and shell history are not credential
+stores.
 
 Replacing a property with another value of the same kind is allowed.
 Changing between ordinary and secret requires `unset-property` first, preventing an
 accidental secret downgrade. Unsetting a secret removes both its marker and
 its credential.
 
-The embedding-API twins are `list_properties(prefix=None)`,
+The embedding API's equivalents are `list_properties(prefix=None)`,
 `get_property(key)`, `set_property(key, value, secret=False)`, and
-`unset_property(key)` (docs/spec/api.md). One named divergence
-(owner, 2026-07-21): `set_property` takes a secret's value as its
-ordinary in-memory `value` parameter — the CLI's entry channels exist
-because argv leaks into process listings and shell history, which an
-in-process value never touches, and a library function never prompts
-or reads stdin. Reading stays the CLI's rule: `get_property` returns
-an ordinary value but only the secret marker for a secret, never the
-value (exactly the `--json` serialization); `list_properties` returns
-the properties projection — key to value-or-marker — of which the
-pretty listing is a rendering; and the kind-change rule
-applies unchanged — `set_property` over a property of the other kind
-fails; `unset_property` first.
+`unset_property(key)` (docs/spec/api.md). There is one deliberate
+difference (owner, 2026-07-21): `set_property` takes a secret's
+value as its ordinary in-memory `value` parameter. The CLI needs its
+own separate entry methods because command-line arguments leak into
+process listings and shell history, which an in-process value never
+does — and a library function should never prompt for input or read
+from stdin on its own. Reading follows the same rule as the CLI:
+`get_property` returns an ordinary value, but for a secret it
+returns only the marker, never the value (matching the `--json`
+serialization). `list_properties` returns the same projection — each
+key mapped to its value or its marker — that the pretty-printed
+listing is rendered from. The kind-change rule applies here
+unchanged too: `set_property` fails if the property already exists
+with the other kind; call `unset_property` first.
 
 The JSON file and a host credential service cannot provide one atomic
 transaction. Reliquary therefore orders updates fail-safely: it stores a new
@@ -402,12 +418,14 @@ Declaration types and stored kinds must agree:
 - `secret` consumes a secret property and otherwise behaves like protected
   text.
 
-A `text` or `media` declaration finding a secret property is an error, as is
-`secret` finding an ordinary stored value. This prevents an accidental
-downgrade from
-protected handling. The ephemeral sources carry their own secret
-rules — never argv, the environment as a warned plaintext class —
-under [Property sources](#property-sources).
+A `text` or `media` declaration that resolves to a secret property is an
+error, and so is a `secret` declaration that resolves to an ordinary
+stored value — this stops a secret from accidentally losing its
+protected handling. The ephemeral sources (command line and
+environment) have their own secret rules, described under
+[Property sources](#property-sources): a secret can never come from
+the command line, and coming from the environment is allowed but
+flagged there as weaker protection.
 
 ## Secret properties at runtime
 

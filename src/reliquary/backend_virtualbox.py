@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The VirtualBox backend adapter: everything that knows VirtualBox.
 
-F50: lifecycle and VDI materialization. Discovery, image creation,
-``createvm`` under the machine's ``virtualbox/`` directory, start /
-stop with identity verification, and dispose. F52: agentless-display
-carriers — ``keyboardputscancode``, ``screenshotpng``, live medium
-change, and ``text_screen`` via ``text_recognize``.
+F50 covers lifecycle and VDI image creation: discovery, image
+creation, running ``createvm`` under the machine's ``virtualbox/``
+directory, start / stop with identity verification, and dispose. F52
+covers the agentless-display carriers: ``keyboardputscancode``,
+``screenshotpng``, live medium change, and ``text_screen`` through
+``text_recognize``.
 """
 
 import contextlib
@@ -29,9 +30,9 @@ from .errors import PreflightError, RunFailure, StaticError
 
 _VBOX_BIN = "VBoxManage.exe" if os.name == "nt" else "VBoxManage"
 
-#: IDE controller name inside every Reliquary-owned VirtualBox VM.
+#: IDE controller name inside every VM Reliquary creates in VirtualBox.
 _IDE = "reliquary-ide"
-#: Floppy controller name (absent when the machine has no floppy).
+#: Floppy controller name. Not added if the machine has no floppy drive.
 _FLOPPY = "reliquary-floppy"
 
 #: ``VBoxManage --bootN`` values for Reliquary media kinds.
@@ -76,9 +77,10 @@ def find_vboxmanage():
         rule_id="machine.backend-not-found")
 
 
-#: Files shipped with VirtualBox that embed its VGA BIOS, most
-#: likely first. The BIOS is not a standalone ROM in current builds,
-#: so the bank is carved out of the module that carries it.
+#: Files shipped with VirtualBox that embed its VGA BIOS, listed in
+#: the order most likely to contain it. Current builds don't ship the
+#: BIOS as a standalone ROM file, so the font bank has to be
+#: extracted from whichever of these modules carries it.
 _BIOS_CARRIERS = ("VBoxDD2.dll", "VBoxDD.dll", "VBoxDDU.dll",
                   "VBoxDD2.so", "VBoxDD.so")
 
@@ -86,24 +88,26 @@ _BIOS_CARRIERS = ("VBoxDD2.dll", "VBoxDD.dll", "VBoxDDU.dll",
 def guest_glyph_banks(cache=None):
     """Every VGA font this host's VirtualBox paints DOS text with.
 
-    **Read off the host, never shipped.** Reading a VirtualBox screen
-    through Reliquary's own bank turns `Welcome` into `Uelcooe` and
-    misses every wait on the word; the right glyphs are the installed
-    emulator's, and taking them from the installation is also what
-    keeps another project's font out of this tree
-    (:func:`text_recognize.cached_banks`).
+    Read directly from the host's VirtualBox install, never shipped
+    with Reliquary. Recognizing a VirtualBox screen with Reliquary's
+    own bundled font instead would turn `Welcome` into `Uelcooe` and
+    miss every wait that depends on that word — the correct glyphs are
+    whatever the installed emulator actually uses, and reading them
+    from the install also keeps another project's font out of this
+    codebase (:func:`text_recognize.cached_banks`).
 
-    **Plural, because one run paints in more than one.** A stock
-    install offers two 8x16 fonts — the bank as stored, which is what
-    a DOS guest ends up drawing with, and the same bank with the
-    BIOS's override table applied, which is what the BIOS draws its
-    own boot messages with. They differ in 19 glyphs, `W` and `m`
-    among them, and no screenshot says which one painted it. Both go
-    to the recognizer.
+    This returns more than one font because a single run can paint
+    text with more than one. A stock install has two 8x16 fonts: the
+    font bank as stored, which is what a DOS guest ends up drawing
+    with, and the same bank with the BIOS's own override table
+    applied, which is what the BIOS uses for its own boot messages.
+    They differ in 19 glyphs, including `W` and `m`, and a screenshot
+    alone can't say which one painted a given cell. Both fonts are
+    passed to the recognizer.
     """
     def extract():
-        # Resolved inside the extractor, so a cache hit answers
-        # without going near the installation at all.
+        # Look up the VirtualBox path inside this function, so a
+        # cache hit can answer without touching the install at all.
         home = os.path.dirname(find_vboxmanage())
         return text_recognize.banks_from_files(
             [os.path.join(home, name) for name in _BIOS_CARRIERS],
@@ -133,9 +137,10 @@ def run_vbox(args, *, action, target=None):
 
 
 def size_megabytes(capacity):
-    """Blueprint size (``\"20M\"``, ``\"2G\"``, or int MiB) → integer MB.
+    """Convert a blueprint size (``\"20M\"``, ``\"2G\"``, or int MiB) to megabytes.
 
-    ``VBoxManage createmedium --size`` takes megabytes.
+    ``VBoxManage createmedium --size`` expects its argument in
+    megabytes.
     """
     if isinstance(capacity, bool) or not isinstance(capacity, (int, str)):
         raise StaticError(
@@ -236,7 +241,7 @@ def create_duplicate_vdi(filename, base):
 
 
 def _machinereadable(vm_id):
-    """``showvminfo --machinereadable`` as a ``{key: value}`` map."""
+    """Run ``showvminfo --machinereadable`` and parse it into a dict."""
     completed = run_vbox(
         ["showvminfo", vm_id, "--machinereadable"],
         action="reading", target=vm_id)
@@ -249,23 +254,25 @@ def _machinereadable(vm_id):
     return info
 
 
-#: ``VMState`` values that mean the guest is no longer executing. The
-#: VM object survives a power-off, so `showvminfo` keeps answering and
-#: only the state tells a live machine from a dead one. Membership is
-#: the safe polarity: every other state — including transitional ones
-#: like ``starting`` and ``restoring`` — counts as live, so a slow
-#: power-on is never mistaken for a power-off.
+#: ``VMState`` values that mean the guest is no longer running. The VM
+#: object itself survives a power-off, so `showvminfo` keeps answering
+#: either way — only the state value tells a running machine from a
+#: stopped one. This list is deliberately conservative: every other
+#: state, including transitional ones like ``starting`` and
+#: ``restoring``, counts as still running, so a slow power-on is never
+#: mistaken for a power-off.
 _STOPPED_STATES = frozenset({
     "poweroff", "aborted", "aborted-saved", "saved", "teleported",
 })
 
 
 def _not_running(vm_id, state=None):
-    """The stopped observation, in the shape the runner reads.
+    """Build the "not running" error, in the shape the runner reads.
 
-    A VM that is registered but not executing is a condition of the
-    world rather than a failure of the work, and `script_runner._read`
-    turns exactly this rule id into `wait machine=stopped`.
+    A VM that's registered but not running describes a real state of
+    the world rather than something going wrong, and
+    `script_runner._read` turns this exact rule id into
+    `wait machine=stopped`.
     """
     detail = f"\n  state: {state}" if state else ""
     return PreflightError(
@@ -274,10 +281,11 @@ def _not_running(vm_id, state=None):
 
 
 def vm_stopped(vm_id):
-    """Whether VirtualBox reports ``vm_id`` as no longer executing.
+    """Whether VirtualBox reports ``vm_id`` as no longer running.
 
-    Unregistered or unanswerable is not stopped: that is a different
-    condition, and the caller's own failure describes it better.
+    An unregistered or unreachable VM does not count as stopped —
+    that's a different condition, and the caller's own error describes
+    it better than this function returning ``True`` would.
     """
     try:
         info = _machinereadable(vm_id)
@@ -287,7 +295,7 @@ def vm_stopped(vm_id):
 
 
 def verify_vm(vm_id, expected_uuid):
-    """Fail closed unless ``vm_id`` resolves to ``expected_uuid``."""
+    """Raise an error unless ``vm_id`` resolves to ``expected_uuid``."""
     try:
         info = _machinereadable(vm_id)
     except RunFailure as error:
@@ -311,7 +319,7 @@ def _vm_name(state):
 
 
 def _boot_order(boot, drives):
-    """Map Reliquary ``boot`` keys onto VirtualBox ``--bootN`` kinds."""
+    """Map Reliquary's ``boot`` keys onto VirtualBox's ``--bootN`` kinds."""
     kinds = []
     for key in boot or []:
         drive = drives.get(key) or {}
@@ -324,7 +332,7 @@ def _boot_order(boot, drives):
 
 
 def _ide_slot(index):
-    """IDE (port, device) for the Nth non-floppy drive (0-based)."""
+    """The IDE (port, device) pair for the Nth non-floppy drive (0-based)."""
     return index // 2, index % 2
 
 
@@ -341,19 +349,21 @@ def _attach_args(vm_name, storagectl, port, device, medium_type, path):
 def drive_attachments(state):
     """Map each drive key to its VirtualBox storage attachment.
 
-    Mirrors :func:`configure_vm`'s placement so a live
-    ``change_medium`` can retarget the same port the guest sees.
+    Matches the placement :func:`configure_vm` uses, so a live
+    ``change_medium`` call can target the same port the guest already
+    sees.
 
-    **Hard disks take the IDE slots before cdroms**, which is the
-    layout the QEMU renderer already documents — floppies, then hard
-    disks, then cdroms after them. Ordering the two kinds together by
-    key instead made slot assignment fall out of the *alphabet*: with
-    the usual `cdrom0` and `hdd0` names, `cdrom0` sorts first and
-    takes the primary master, leaving the boot disk on the slave. A
-    PC BIOS told to boot `disk` does not reliably find one there, so
-    a machine whose disk had become bootable would still stop at
-    `No active partition` — and nothing about the blueprint said to
-    put them in that order.
+    Hard disks are placed on the IDE slots before cdroms, matching the
+    layout the QEMU renderer already uses: floppies first, then hard
+    disks, then cdroms after them. Sorting hard disks and cdroms
+    together by key instead would let slot assignment fall out of
+    alphabetical order by accident: with the usual `cdrom0` and
+    `hdd0` names, `cdrom0` sorts first and takes the primary master,
+    leaving the boot disk on the slave. A PC BIOS told to boot from
+    `disk` does not reliably find one there, so a machine whose disk
+    should have been bootable would still stop at `No active
+    partition` — and nothing in the blueprint says to order them that
+    way.
     """
     drives = state.get("drives") or {}
     attachments = {}
@@ -385,11 +395,11 @@ def drive_attachments(state):
 
 
 def configure_vm(state, vm_name):
-    """Apply Reliquary drive vocabulary to a registered VirtualBox VM.
+    """Apply Reliquary's drive settings to a registered VirtualBox VM.
 
-    Returns the attachment map :func:`drive_attachments` builds — the
-    same placement written into the identity endpoint so a later
-    session can change media without re-deriving the layout.
+    Returns the attachment map built by :func:`drive_attachments` —
+    the same placement is written into the identity endpoint so a
+    later session can change media without recomputing the layout.
     """
     memory = state.get("memory") or 16
     cpus = state.get("cpus") if state.get("cpus") is not None else 1
@@ -402,20 +412,22 @@ def configure_vm(state, vm_name):
          f"--boot3={boot[2]}", f"--boot4={boot[3]}"],
         action="configuring", target=vm_name)
 
-    # Drop controllers we own and rebuild from state, so a restart
-    # after apply_blueprint or insert/eject (stopped) matches the
-    # recorded drives exactly.
+    # Remove the controllers Reliquary created and rebuild them from
+    # the current state, so a restart after apply_blueprint or an
+    # insert/eject while stopped ends up matching the recorded drives
+    # exactly.
     info = _machinereadable(vm_name)
     for key, value in info.items():
         if key.startswith("storagecontrollername") and value in (
                 _IDE, _FLOPPY):
             run_vbox(
-                # `--name` is passed as two tokens here and joined by
-                # `=` everywhere else, which is not a style choice:
-                # VBoxManage 7.2 rejects `--name=X --remove` with
-                # "Too few parameters" and accepts `--name X --remove`.
-                # The joined form works alongside `--add`, so only the
-                # removal is spelled this way.
+                # `--name` is passed as two separate tokens here,
+                # rather than joined with `=` like everywhere else in
+                # this file. That's not a style choice: VBoxManage
+                # 7.2 rejects `--name=X --remove` with "Too few
+                # parameters" but accepts `--name X --remove`. The
+                # joined form does work with `--add`, so only this
+                # removal call needs the two-token form.
                 ["storagectl", vm_name, "--name", value, "--remove"],
                 action="removing controller", target=value)
 
@@ -441,7 +453,10 @@ def configure_vm(state, vm_name):
 
 
 def ensure_vm(state, *, backend_dir):
-    """Register the VirtualBox machine if absent; return UUID + attachments."""
+    """Register the VirtualBox machine if it doesn't exist yet.
+
+    Returns the VM's UUID and its drive attachments.
+    """
     name = _vm_name(state)
     os.makedirs(backend_dir, exist_ok=True)
     try:
@@ -466,15 +481,16 @@ def ensure_vm(state, *, backend_dir):
 
 
 def launch_owned_vm(state, *, backend_dir, display=False, current=None):
-    """Ensure the VM, power it on, return the verified identity."""
+    """Make sure the VM exists, power it on, and return its verified identity."""
     if current:
         try:
             verify_vm(current["backend-id"], current["token"])
         except PreflightError:
-            pass  # stale identity; overwrite below
+            pass  # The recorded identity is stale; overwrite it below.
         else:
             # showvminfo succeeds for a powered-off VM too, so also
-            # refuse when the recorded one is still running.
+            # check whether the recorded VM is actually still running,
+            # and refuse the launch if it is.
             info = _machinereadable(current["backend-id"])
             if info.get("VMState") == "running":
                 raise PreflightError(
@@ -497,7 +513,7 @@ def launch_owned_vm(state, *, backend_dir, display=False, current=None):
 
 
 def stop(vm):
-    """Power off the identified owned VM (no persistence)."""
+    """Power off the identified owned VM. Does not save any state."""
     if not vm:
         raise PreflightError("no recorded reliquary VM to stop",
             rule_id="machine.no-active-vm")
@@ -505,10 +521,11 @@ def stop(vm):
     token = vm["token"]
     info = verify_vm(expected, token)
     if info.get("VMState") in _STOPPED_STATES:
-        # A guest that powered itself off leaves the VM registered and
-        # idle. Stop asks for a machine that is off, and this one is:
-        # `controlvm poweroff` would refuse, and refusing here would
-        # strand the machine as un-stoppable and so un-destroyable.
+        # A guest that powered itself off leaves the VM registered but
+        # idle. Stop is asking for a machine that's off, and it
+        # already is: `controlvm poweroff` would refuse to run again,
+        # and raising an error here instead would leave the machine
+        # stuck — unable to stop, and so unable to be destroyed either.
         return
     run_vbox(
         ["controlvm", expected, "poweroff"],
@@ -517,9 +534,9 @@ def stop(vm):
 
 # -- F52 agentless-display carriers --------------------------------
 
-#: Seam key names (QEMU qcodes today — see ``control_display`` /
-#: ``script_runner``) → PS/2 set-1 make scancodes. Extended keys are
-#: a tuple whose first byte is ``0xe0``.
+#: Maps Reliquary's shared key names (currently QEMU's qcodes — see
+#: ``control_display`` / ``script_runner``) to PS/2 set-1 make
+#: scancodes. Extended keys are a tuple whose first byte is ``0xe0``.
 _SCANCODES = {
     "esc": (0x01,),
     "1": (0x02,), "2": (0x03,), "3": (0x04,), "4": (0x05,),
@@ -553,7 +570,7 @@ _SCANCODES = {
 
 
 def _make_break(make_bytes):
-    """PS/2 set-1 break sequence for a make sequence."""
+    """The PS/2 set-1 break (key-release) sequence for a make sequence."""
     if make_bytes[0] == 0xe0:
         return (0xe0, make_bytes[1] | 0x80)
     return (make_bytes[0] | 0x80,)
@@ -562,17 +579,19 @@ def _make_break(make_bytes):
 def scancodes_for(combo):
     """Expand one simultaneous key combo into make then break bytes.
 
-    ``combo`` carries **the seam's key names, which are QEMU's qcode
-    set** (D103) — so `_SCANCODES` is keyed by `ret`, `spc`, `pgup`
-    and `pgdn`, and has no entry for `enter` or `space`. That is the
-    contract rather than an accident: the seam is named for the
-    reference backend, and this adapter translates from it.
+    ``combo`` uses Reliquary's shared key names, which are QEMU's
+    qcode names (D103) — so `_SCANCODES` is keyed by `ret`, `spc`,
+    `pgup`, and `pgdn`, and has no entry for `enter` or `space`. This
+    is deliberate, not an oversight: the shared vocabulary is named
+    after QEMU, the reference backend, and this adapter translates
+    from those names into its own scancodes.
     """
     makes = []
     for name in combo:
         codes = _SCANCODES.get(name)
         if codes is None:
-            # Single-character letters/digits already use their name.
+            # Single-character letters/digits already use their own
+            # name as the key, so they never reach this branch.
             raise StaticError(
                 f"no VirtualBox scancode for key {name!r}",
                 rule_id="key.no-mapping")
@@ -588,10 +607,10 @@ def scancodes_for(combo):
 class VirtualBoxSession:
     """Identity-verified session with agentless-display carriers (F52)."""
 
-    #: This session's `text_screen` interprets a framebuffer rather
-    #: than reading resolved characters, which costs the better part
-    #: of a second and sets how coarsely a caller may quantize its
-    #: cadence (`screen_stability.GUI_CADENCE_STEP`).
+    #: This session's `text_screen` interprets a captured screenshot
+    #: rather than reading resolved characters, which takes the
+    #: better part of a second and limits how often a caller should
+    #: poll it (`screen_stability.GUI_CADENCE_STEP`).
     recognizes_text = True
 
     def __init__(self, vm_uuid, name, drives=None, cache=None):
@@ -602,20 +621,21 @@ class VirtualBoxSession:
         self._cache = cache
 
     def native(self):
-        """No portable native hatch: VBoxManage is the whole surface."""
+        """No backend-specific escape hatch: VBoxManage is the whole surface."""
         raise PreflightError(
             "VirtualBox has no native escape hatch equivalent to QMP; "
             "drive the machine through the portable carriers",
             rule_id="machine.backend-no-native")
 
     def _carry(self, args, *, action, target=None):
-        """Run one carrier command, reading a vanished guest as stopped.
+        """Run one carrier command, treating a vanished guest as stopped.
 
         The guest can power itself off at any moment — ``fdapm
         poweroff`` is how a DOS script normally ends — and every
-        carrier fails once it has. VirtualBox can say which of the two
-        happened, so ask it rather than reading VBoxManage's message:
-        a stopped VM is a condition of the world, not a failed command.
+        carrier command fails once that's happened. VirtualBox itself
+        can say which of the two happened, so this asks VirtualBox
+        rather than trying to read VBoxManage's error message: a
+        stopped VM is a real state, not a failed command.
         """
         try:
             return run_vbox(args, action=action,
@@ -650,12 +670,13 @@ class VirtualBoxSession:
     def framebuffer(self):
         """The guest display as a Pillow image (F65).
 
-        The landmark matcher's carrier, and the first half of
-        :meth:`text_screen` below: this adapter's screen is a
-        screenshot either way, so a landmark condition costs exactly
-        what a text one costs minus the glyph matching. The image is
-        loaded off the temporary file and detached from it, so the
-        file can be removed while the caller still holds the pixels.
+        This is the carrier the landmark matcher uses, and it's also
+        the first half of what :meth:`text_screen` does below: this
+        adapter's screen is a screenshot either way, so a landmark
+        condition costs exactly what a text one costs, minus the
+        glyph matching. The image is loaded from the temporary file
+        and detached from it (via ``convert``), so the file can be
+        removed while the caller still holds the pixel data.
         """
         with tempfile.NamedTemporaryFile(
                 suffix=".png", delete=False) as handle:
@@ -673,15 +694,17 @@ class VirtualBoxSession:
     def text_screen(self, font_banks=()):
         """Screenshot + shared fixed-font recognizer (F51).
 
-        Read through **this host's** VirtualBox fonts rather than the
-        bundled bank, which is not what drew the screen — and through
-        all of them, since a run paints in more than one.
+        Recognized using **this host's** VirtualBox fonts, not the
+        font bundled with Reliquary, since the bundled one isn't what
+        actually drew the screen — and using all of this host's
+        fonts, since a single run can paint text with more than one.
 
-        ``font_banks`` (F61) are the authored fonts a script's `font`
-        statement named, tried **before** the host's own — labelled
-        ``"host"`` in the failure report's "fonts tried" rather than
-        individually, since a screenshot cannot say which of a host's
-        several installed fonts actually painted a cell.
+        ``font_banks`` (F61) are the fonts a script's `font` statement
+        named explicitly; they're tried *before* the host's own fonts,
+        which are labelled together as ``"host"`` in the failure
+        report's "fonts tried" list rather than individually, since a
+        screenshot alone can't say which of the host's several
+        installed fonts actually painted a given cell.
         """
         with tempfile.NamedTemporaryFile(
                 suffix=".png", delete=False) as handle:
@@ -715,31 +738,34 @@ class VirtualBoxSession:
 
 
 class VirtualBoxAdapter(BackendAdapter):
-    """VirtualBox: lifecycle, VDI, and agentless-display (F50+F52)."""
+    """VirtualBox: lifecycle, VDI images, and agentless-display (F50+F52)."""
 
     name = "virtualbox"
     settings_keys = ()
 
     def discover(self, platform=None):
-        # One host tool whatever the guest is, so the platform the
-        # seam offers is not asked for here.
+        # VirtualBox uses one host tool no matter what the guest
+        # platform is, so the platform argument is ignored here.
         try:
             executable = find_vboxmanage()
         except PreflightError as missing:
             return Availability("virtualbox", False, detail=str(missing))
-        # Availability is the binary on disk — running it is start's
-        # job. Unit tests forbid backend subprocesses, and a path
-        # check is what the former stub did; a broken install fails
-        # closed at create/start with VBoxManage's own message.
+        # Availability just checks that the binary is on disk;
+        # actually running it happens later, at start. Unit tests
+        # forbid launching backend subprocesses, and checking the
+        # path is what the earlier stub adapter did too. A broken
+        # install still fails at create or start time, with
+        # VBoxManage's own error message.
         return Availability(
             "virtualbox", True, executable=executable,
             home=os.path.dirname(executable),
             detail=f"found at {executable}")
 
     def capabilities(self):
-        """What this adapter honors today — including agentless-display.
+        """What this adapter can actually do today, including agentless-display.
 
-        ``vvfat`` stays false: directory-source drives are QEMU-only.
+        ``vvfat`` stays ``False``: serving a host directory as a
+        drive is a QEMU-only feature.
         """
         return Capabilities(
             backend="virtualbox",
@@ -751,14 +777,15 @@ class VirtualBoxAdapter(BackendAdapter):
         )
 
     def capture_format(self, plane):
-        """This plane's screen *is* a framebuffer, so it states one.
+        """This plane's screen is a captured framebuffer, so it reports a format.
 
         VirtualBox has no text-memory readback: the display plane
-        screenshots the guest and hands the pixels to the shared
-        recognizer (F51/F52). The same pixels serve a landmark
-        condition unchanged (F65), and ``screenshotpng`` writes
-        ordinary 8-bit-per-channel colour, which is ``rgb`` and makes
-        the reference-side normalization the identity.
+        takes a screenshot of the guest and hands the pixels to the
+        shared recognizer (F51/F52). The same pixels also serve a
+        landmark condition directly, unchanged (F65).
+        ``screenshotpng`` writes ordinary 8-bit-per-channel colour,
+        which is ``rgb``, so the reference-image normalization is a
+        no-op.
         """
         return "rgb" if plane == "agentless-display" else None
 
@@ -779,16 +806,18 @@ class VirtualBoxAdapter(BackendAdapter):
     def dispose(self, machine_dir):
         """Unregister the VirtualBox machine object, if one exists.
 
-        ``destroy`` deletes the materialization directory afterwards.
-        ``--delete`` clears VirtualBox's own registry entries for the
-        disks we attached; the directory teardown is still required
-        for everything else under the machine home.
+        ``destroy`` deletes the machine's whole directory afterward.
+        ``--delete`` here clears VirtualBox's own registry entries for
+        the disks this adapter attached; deleting the directory
+        afterward is still needed to remove everything else under the
+        machine's home directory.
         """
         backend_dir = os.path.join(machine_dir, "virtualbox")
         if not os.path.isdir(backend_dir):
             return
-        # The VM name is the directory VirtualBox created under
-        # basefolder; any single child directory is that machine.
+        # The VM's directory name is the same as the VM name
+        # VirtualBox created under basefolder, so any single child
+        # directory here is that machine's own directory.
         for entry in os.listdir(backend_dir):
             candidate = os.path.join(backend_dir, entry)
             if not os.path.isdir(candidate):
@@ -827,11 +856,11 @@ class VirtualBoxAdapter(BackendAdapter):
                 rule_id="machine.vm-unreachable") from error
         state = info.get("VMState")
         if state in _STOPPED_STATES:
-            # `showvminfo` answers for a powered-off VM as readily as
-            # for a running one, so identity alone proves nothing about
-            # whether there is a guest to drive. There is no session to
-            # be had here, and saying so is what lets a script wait for
-            # the machine to stop.
+            # `showvminfo` answers just as readily for a powered-off
+            # VM as for a running one, so a matched identity alone
+            # doesn't prove there's a guest to drive. There's no
+            # session available here, and raising this error is what
+            # lets a script wait for the machine to stop.
             raise _not_running(expected, state)
         endpoint = vm.get("endpoint") or {}
         yield VirtualBoxSession(

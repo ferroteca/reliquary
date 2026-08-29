@@ -337,9 +337,10 @@ def test_a_wait_carries_the_stability_written_on_it():
 
 
 def test_stability_is_refused_where_nothing_is_compared():
-    # pacing's opposite number: each guard sits on exactly the
-    # statement kind whose hazard it addresses, so neither needs
-    # position-sensitive semantics
+    # stability is checked the same way as pacing: each guard applies
+    # to exactly the statement kinds whose hazard it addresses, not
+    # to where the statement sits in the tree, so neither needs a
+    # position-sensitive rule
     for source in (_HEAD + 'enter "DIR" stability=0.99\n',
                    _HEAD + "press enter stability=0.99\n",
                    _HEAD + 'select "Install" stability=0.99\n',
@@ -348,8 +349,9 @@ def test_stability_is_refused_where_nothing_is_compared():
 
 
 def test_every_observation_rung_may_carry_it():
-    # the divergence from `stable` is principled: a frame exists
-    # at every sample, so the container rungs are meaningful
+    # `stability` differs from `stable` for a real reason: a frame
+    # exists at every sample, so it is also meaningful on the
+    # container rungs (wait, phase, header), not just the statement
     for source in (_HEAD + "stability 0.98\nstart\n",
                    _HEAD + "entry p\nphase p stability=0.98 {\n"
                            '  wait "x"\n  finish\n}\n',

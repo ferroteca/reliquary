@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Tests for authored-asset residency: the resolution source seam."""
+"""Tests for where authored assets (blueprints, scripts) resolve from."""
 
 import json
 import os
@@ -33,12 +33,12 @@ def root(tmp_path):
     return str(tmp_path)
 
 
-# The extension vocabulary against what the code asks for.
+# This checks KIND_EXTENSIONS against the code, not against the spec.
 #
-# Code against code: `KIND_EXTENSIONS` declares the asset kinds and
+# `KIND_EXTENSIONS` declares the asset kinds, and the
 # `candidate_files(...)` call sites are what actually request them.
-# Whether the spec's prose names the same kinds and home folders is
-# R7's audit (planning/RECURRING.md).
+# Whether the spec's prose names the same kinds and home folders is a
+# separate check, R7's audit (planning/RECURRING.md).
 
 def test_the_kind_table_holds_only_requested_kinds():
     # library.py is the only caller; a kind nothing asks for
@@ -61,17 +61,19 @@ def test_the_kind_table_holds_only_requested_kinds():
 
 # Where each kind resolves from, and nothing else.
 #
-# One axis, where the asset-root knob answered two questions and the
-# autoseed knob that replaced half of it answered the other. The
-# directory decides where a name resolves, and a miss is a miss: the
-# codex is not a tier behind it (D88).
+# This used to be two separate settings: the old asset-root knob
+# answered one question, and the autoseed knob that later replaced
+# half of it answered the other. Now there is one: the directory
+# decides where a name resolves, and a miss is a miss — the codex is
+# not tried as a fallback behind it (D88).
 
 def test_an_unassigned_directory_refuses_at_use():
-    """A bare embedding call with nothing assigned fails closed.
+    """A bare embedding call with nothing assigned refuses to guess,
+    raising an error instead of resolving to something arbitrary.
 
-    Building the source never raises — the directories resolve
-    lazily — so the refusal lands where the resolution is, naming
-    the directory it wanted.
+    Building the source never raises by itself — the directories
+    resolve lazily — so the error appears at the point of resolution,
+    naming the directory it wanted.
     """
     source = source_for(Context())
     with pytest.raises(StaticError):
@@ -103,8 +105,8 @@ def test_a_source_has_no_seeding_axis_at_all(root):
 
 
 def test_a_record_slot_places_the_source(root):
-    # The record is the only assignment there is (P26): a slot
-    # places the source, and nothing ambient stands behind it.
+    # The record is the only way to assign a source (P26): a slot in
+    # the record places it, with no ambient fallback behind it.
     scoped = os.path.join(root, "s")
     assert source_for(
         Context(blueprints_dir=scoped)).describe("blueprint") == (
@@ -188,12 +190,13 @@ def test_rlqb_by_extension_but_json_needs_platform(project):
 
 
 def test_a_codex_name_never_resolves_and_no_listing_shows_it(project):
-    """The directory is the sole source, and the sets never mix.
+    """The directory is the only source, and codex names and project
+    names never mix.
 
-    The refusal names the fix, because a deleted fallback should
-    leave an instruction rather than a silence (P11) — and
-    `list-codex` is the only verb that sees the library, so a
-    listing of yours reports nothing of its (D88).
+    The error names the fix, because removing a fallback should leave
+    an instruction behind rather than silence (P11). And `list-codex`
+    is the only command that sees the codex library, so listing your
+    own blueprints reports nothing from it (D88).
     """
     context, _root = project
     with pytest.raises(PreflightError) as caught:

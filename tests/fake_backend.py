@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""A backend adapter double, and the seam that installs it.
+"""A fake backend adapter, and the function that installs it for tests.
 
-Cross-cutting on purpose (the neutral home the tdd rules allow): the
-machine model, the CLI and the script runtime all need a machine that
-starts and a session that answers, and none of them should need a
+This file is deliberately shared across test modules — the tdd rules
+allow a neutral, shared home for a double like this. The machine
+model, the CLI, and the script runtime all need a machine that starts
+and a session that answers, and none of them should need a real
 hypervisor to be tested. What each of them asserts stays in its own
 test module; QEMU's own adapter is exercised in
 ``test_backend_qemu.py`` against the real rendering and launch code.
@@ -76,12 +77,14 @@ class FakeAdapter(BackendAdapter):
         self.name = name
         self.available = available
         self.extension = extension
-        #: The ``backend-settings`` vocabulary this double defines. The
-        #: seam's own unknown-key refusal is inherited rather than
-        #: reimplemented, and no QEMU key is assumed: a test that wants
-        #: a section accepted says which keys exist, so what is
-        #: asserted here is the machine model calling the seam and not
-        #: QEMU's answer.
+        #: The ``backend-settings`` vocabulary this double defines. Its
+        #: unknown-key refusal comes from
+        #: `BackendAdapter.validate_settings` rather than being
+        #: reimplemented here, and no QEMU key is assumed: a test that
+        #: wants a section accepted says which keys exist. So what
+        #: this asserts is that the machine model calls
+        #: `BackendAdapter.validate_settings` — not what QEMU itself
+        #: would answer.
         self.settings_keys = tuple(settings_keys)
         #: Every section this double was asked to validate, in order.
         self.validated = []
@@ -110,13 +113,14 @@ class FakeAdapter(BackendAdapter):
         self.session_caches = []
         self.session_rows = None
         #: ``{plane: pixel format}`` for the planes this double
-        #: captures a framebuffer on (F65). Empty by default, which
-        #: is the seam's own honest default: a plane that states no
-        #: format is one a landmark condition is refused on.
+        #: captures a framebuffer on (F65). Empty by default, matching
+        #: `BackendAdapter`'s own default: a plane with no format
+        #: listed here is a plane on which a landmark condition
+        #: needing a capture gets refused.
         self.capture_planes = dict(capture_planes or {})
         #: ``{plane: bool}`` for the planes this double can deliver a
-        #: pointer event on (F66). Empty by default, the seam's own
-        #: honest default (`backends.BackendAdapter.pointer_capable`).
+        #: pointer event on (F66). Empty by default, matching
+        #: `backends.BackendAdapter.pointer_capable`'s own default.
         self.pointer_planes = dict(pointer_planes or {})
         #: What a session's framebuffer carrier answers with.
         self.session_image = None
@@ -129,9 +133,10 @@ class FakeAdapter(BackendAdapter):
     # -- discovery and capability ---------------------------------
 
     def discover(self, platform=None):
-        # The seam offers the machine's platform for a backend whose
-        # host tooling differs by guest architecture; this one has a
-        # single fake tool and records what it was asked for.
+        # discover() takes the machine's platform because a real
+        # backend's host tooling can differ by guest architecture;
+        # this fake has one tool regardless, and just records what
+        # platform it was asked for.
         self.discovered_for = platform
         if not self.available:
             return Availability(self.name, False,

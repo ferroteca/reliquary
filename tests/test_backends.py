@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Tests for the backend adapter seam: capability, discovery, assignment.
 
-The seam's own arithmetic, judged without any hypervisor: what a
-requirement means against a capability report, what the priority walk
-picks, and what the unbuilt adapters claim (nothing).
+These test the logic itself, without any real hypervisor involved:
+what a requirement means when checked against a capability report,
+what the priority walk picks, and what the unbuilt adapters claim
+(nothing).
 """
 
 from unittest import mock
@@ -35,7 +36,8 @@ def install():
         backends._set_adapter(name, previous)
 
 
-# Reported, never emulated — and the refusal names the gap.
+# A capability is only ever reported, never faked — and when a
+# requirement is unmet, the error names exactly what's missing.
 
 def test_a_satisfiable_blueprint_leaves_nothing_unmet():
     adapter = fake_backend.FakeAdapter()
@@ -82,23 +84,26 @@ def test_no_declared_pointing_device_asks_nothing():
 
 
 def test_pointer_capable_defaults_to_false():
-    # The honest default, as `capture_format`'s is `None`: nothing
-    # built claims nothing (P11).
+    # The honest default, matching `capture_format`'s default of
+    # `None`: until a backend is actually built, it claims no
+    # capability at all (P11).
     adapter = backends.BackendAdapter()
     assert adapter.pointer_capable("vnc") is False
 
 
-# A section is honored or refused — never carried and ignored.
+# A settings section is either honored or refused — never silently
+# carried along and ignored.
 #
-# The seam's own half: the key set. What an adapter does with the keys
-# it defines is its business (QEMU's is in `test_backend_qemu.py`);
-# what the seam guarantees is that a key no adapter defines never
-# reaches a machine.
+# This covers only the adapter's declared key set. What an adapter
+# does with the keys it defines is its own business (QEMU's is
+# covered in `test_backend_qemu.py`); what this file guarantees is
+# that a key no adapter defines never reaches a machine.
 
 def test_an_adapter_reading_no_settings_refuses_every_key():
-    # The honest default (P11): a section it cannot honor is
-    # refused rather than preserved as configuration nothing will
-    # apply. VirtualBox still reads none (F50); so do the stubs.
+    # The honest default (P11): a settings section the adapter
+    # cannot honor is refused, instead of being silently kept as
+    # configuration that nothing will ever apply. VirtualBox still
+    # reads no settings keys (F50); neither do the stubs.
     adapter = backend_virtualbox.VirtualBoxAdapter()
     assert adapter.settings_keys == ()
     with pytest.raises(StaticError) as caught:
@@ -274,9 +279,10 @@ def test_an_absent_stub_backend_says_what_it_looked_for():
 
 
 def test_the_unbuilt_operations_raise_the_abstract_method_error():
-    # The operations assignment can never reach keep the
-    # language's own invariant; a *reachable* gap is a preflight
-    # failure naming the backend (see the assignment checks above).
+    # Assignment should never actually call these on an unbuilt
+    # backend, but they still enforce Python's own abstract-method
+    # contract; a *reachable* gap is instead a preflight failure
+    # naming the backend (see the assignment checks above).
     adapter = backend_stubs.HyperVAdapter()
     with pytest.raises(NotImplementedError):
         adapter.start({}, machine_dir="x", backend_dir="y")

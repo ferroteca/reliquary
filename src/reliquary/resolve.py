@@ -2,17 +2,19 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Whole-source resolution over composed blueprint documents.
 
-Parses every ``.rlqb`` in the active asset source into one catalog —
-specs identified by ``(name, type)`` — and resolves a media's location
-down to an executable **fetch plan**: a nested download/extract tree the
-acquisition layer runs.
+Parses every ``.rlqb`` file in the active asset source into one
+catalog — specs identified by ``(name, type)`` — and turns a media's
+location into an executable **fetch plan**: a tree of downloads and
+extracts that the acquisition layer runs.
 
-This is the second half of two-phase validation. Shape was checked at
-parse; value is checked here, where references have bound: the
-``sha256``-required-once-remote rule (a referenced rung may resolve to a
-URL, so parse could not know) and every deferred coercion land at this
-layer, as does containment — parents exist, cycles are named, and the
-container-format roster is enforced.
+This is the second half of two-phase validation. `document.py`
+checks each field's shape at parse time; this module checks the
+actual values once references have resolved. That includes: the rule
+that a remote location must carry a sha256 (parse time can't know a
+referenced rung will resolve to a URL, so this has to be checked
+here), finishing every deferred value, and checking containment —
+that a referenced parent media actually exists, naming any cycle
+found, and checking the container format is one this build supports.
 
 Design: docs/spec/blueprint-model.md ("Resolution", "Containment",
 "Two-phase validation").
@@ -26,9 +28,10 @@ from typing import Mapping, Optional, Tuple
 from . import assets, document
 from .errors import InternalError, PreflightError
 
-# Container reading is roster-gated by format: zip this milestone.
-# ISO9660 and its [BOOT] El Torito virtual paths are the recorded
-# follow-on; reading filesystem images is out pre-beta.
+# Only these container formats can be read from. Currently just zip;
+# ISO9660 (including its El Torito [BOOT] virtual paths) is planned
+# as a follow-on. Reading other filesystem image formats is out of
+# scope before beta.
 _CONTAINER_FORMATS = {"zip"}
 
 
@@ -45,10 +48,12 @@ class Namespace:
 def build_namespace(paths):
     """Parse each ``.rlqb`` path and merge into one catalog.
 
-    Identity is ``(name, type)``. Canonically identical specs of one
-    identity **coexist** — which is what lets a self-contained blueprint
-    be pasted around — while differing specs **collide**, naming both
-    files. In-file duplicates were already refused at parse.
+    A spec's identity is its ``(name, type)`` pair. Two specs with the
+    same identity are allowed to coexist if they're identical — that's
+    what lets a self-contained blueprint be copied into another
+    project without conflict — but if they differ, that's an error
+    naming both files. Duplicate specs within a single file were
+    already rejected when that file was parsed.
     """
     buckets = {"machine": {}, "media": {}}
     origin = {}
@@ -132,7 +137,7 @@ class Extract:
 
 @dataclass(frozen=True)
 class Alternatives:
-    """Mirror rungs, tried in order. The hash is the arbiter, not the URL."""
+    """Mirror locations to try in order. Whichever one succeeds must match the hash — the URL itself doesn't need to."""
 
     options: Tuple[object, ...]
 
@@ -149,8 +154,10 @@ def _unbound_failure(where, keys):
 def _render_deferred(deferred, properties, where):
     """Substitute a deferred string's references with bound values.
 
-    A reference resolving to a value that is itself a reference fails
-    closed — a location binds once, it does not chain.
+    If a reference resolves to a value that is itself another
+    reference, this raises an error instead of resolving further — a
+    location can only bind once; it cannot chain through another
+    reference.
     """
     text = deferred.text
     for reference in deferred.references:
@@ -174,8 +181,9 @@ def _chaining_failure(where, key, value):
 def _location_from_value(value, where):
     """Interpret a bound location string as a concrete url/local rung.
 
-    A resolved value naming another media or property is chaining and
-    is refused; a location must bind to bytes, not to another edge.
+    If the resolved value names another media or property, that's
+    chaining, and it's refused: a location has to bind directly to
+    bytes, not point at another reference.
     """
     location = document.location_from_string(value, where)
     if location.kind not in ("url", "local"):
@@ -188,15 +196,19 @@ def _location_from_value(value, where):
 
 
 def _container_format(plan, parent_media):
-    """The parent's container format, or fail naming what was asked.
+    """The parent media's container format (e.g. "zip"), or raise an
+    error naming what format was expected.
 
-    The parent's own declared ``extension`` wins, exactly as it does
-    for the cached payload's name (``acquire.payload_extension``): a
-    URL whose own path does not spell the format — a redirect
-    endpoint, a signed download link with no trailing extension — is
-    still readable as a container through the field that exists
-    precisely for this, rather than only through what the address
-    happens to end in.
+    If the media declares an ``extension`` field, that wins — the same
+    way it does when naming the cached payload file
+    (``acquire.payload_extension``). This matters because a download
+    URL doesn't always end in a recognizable extension: a SourceForge
+    "/download" link, for example, or any other URL with no filename
+    in it. Without a declared ``extension``, the format is guessed
+    from the plan instead: the URL's path (ignoring any "?" query or
+    "#" fragment) for a download, the file path for a local file, the
+    member name for an extracted file, or — for a list of mirrors —
+    by checking the first one.
     """
     extension = (parent_media.extension or "").lower()
     if not extension:
@@ -263,13 +275,14 @@ def _parent_plan(rung, media, namespace, seen, properties):
             f"{media.name!r} to come from",
             rule_id="media.parent-has-no-bytes")
     if rung.path is None:
-        # A bare ${media:X}: the parent's own bytes, which is how a
-        # difference overlay names what it sits on.
+        # A bare ${media:X} with no path means the parent's own bytes
+        # — this is how a difference overlay names the media it's
+        # built on top of.
         return inner
     _container_format(inner, parent)
-    # Each plan node carries the hash of the file *it* produces: this
-    # one yields the child, and the parent's own hash rode down with
-    # ``inner``.
+    # Each plan node's sha256 is the hash of the file it produces.
+    # This Extract node produces the child, so it gets the child's
+    # hash; the parent's own hash is already attached to `inner`.
     return Extract(parent=name, member=rung.path, inner=inner,
                    sha256=_hash_of(media, properties))
 
@@ -302,19 +315,22 @@ def _media_plan(media, namespace, seen=(), properties=None):
 def resolve_media_plan(media, namespace, properties=None):
     """The fetch plan for a media's payload, or ``None`` for a blank.
 
-    ``properties`` binds any ``${key}`` location or ``sha256``
-    reference (milestone 8, T5); without it, a referenced rung fails
-    closed naming the media and the key.
+    ``properties`` supplies the values for any ``${key}`` reference in
+    a location or sha256 field (milestone 8, T5). Without it, a
+    location that has such a reference raises an error naming the
+    media and the missing key.
     """
     return _media_plan(media, namespace, properties=properties)
 
 
 def location_property_keys(media, namespace, _seen=()):
-    """Every property key a media's location/sha256 closure references.
+    """Every property key referenced by a media's location or sha256,
+    including those on any parent it's contained in.
 
-    Walks the containment closure so a create knows which keys to bind
-    before materializing. Qualified ``${media:…}`` edges are structure,
-    not property references, and contribute nothing here.
+    This walks the whole containment chain, so a create command knows
+    every key it needs to bind before it can materialize the media.
+    A qualified ``${media:…}`` reference points at structure (a parent
+    media), not a property, so it doesn't add anything to the result.
     """
     keys = set()
     if media.name in _seen:

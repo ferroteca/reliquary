@@ -232,10 +232,10 @@ def test_a_relative_selection_scopes_by_absolute_path():
 
 
 def test_the_record_slot_selects_the_same_way(store, home, selected):
-    # The selection rides in the record (P26's cargo). The
-    # environment spelling is the CLI's construction step: the
-    # engine reads no environment, so the slot is the one
-    # programmatic channel.
+    # The selection is carried through Context (P26). Env-var-based
+    # selection is handled by the CLI when it builds that Context —
+    # the engine itself never reads environment variables, so the
+    # Context slot is the only programmatic channel.
     context = Context(home_dir=home, properties_file=selected)
     properties.set_property("env-key", "value", context=context)
     assert os.path.exists(selected)

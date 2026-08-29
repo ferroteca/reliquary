@@ -4,30 +4,33 @@
 
 The manifest — ``src/reliquary/schemas/command-manifest.toml``,
 shipped in the package — is the normative inventory of the command
-surfaces (P6): each capability declared once, the dash-separated
-CLI word and the underscored Session twin both derived from the
-one name, so the twin rule is the artifact's shape rather than a
-checked convention. These tests hold the code to it in all four
-directions: everything declared ships both faces, every registered
-command is declared, every public name is classified, and nothing
-declared or classified is absent.
+surfaces (P6): each capability is declared once, and both its
+dash-separated CLI word and its underscored Session twin are derived
+from that one name. So the twin-naming rule comes from the manifest's
+own structure, not from a separate check enforcing it. These tests
+hold the code to that inventory in all four directions: everything
+declared ships both faces, every registered command is declared,
+every public name is classified, and nothing declared or classified
+is missing.
 
-**Every declared capability is a collected node named for itself**,
-so a twin that stops shipping fails as `[create-machine]` rather than
-as one method reporting for all thirty-seven (F60).
+**Each declared capability becomes its own pytest test case**, so if
+a twin stops shipping, the failure names it directly — as
+`[create-machine]` — instead of one test failing for all thirty-seven
+capabilities at once (F60).
 
 The classification is what makes the reverse half of P6 — "no
-capability is unreachable from the CLI" — mechanical for the first
-time. The judgment (is ``resolve_machine`` legitimately not a
-command?) happened once, in the governed edit that classified it;
-here it is only membership. A new export or session method cannot
-arrive unclassified, and an exception whose gap has since closed
-fails as stale rather than lingering as a quiet carve-out.
+capability is unreachable from the CLI" — checkable by machine for
+the first time. The judgment call (is ``resolve_machine`` legitimately
+not a command?) was made once, in the reviewed change that classified
+it; this test only checks membership in that classification. A new
+export or session method cannot arrive unclassified, and an exception
+whose gap has since closed fails as stale instead of quietly
+lingering as an unreviewed carve-out.
 
-The manifest is the norm. When these tests fail, the fix is a
-surface decision, never a test edit: either the code diverged from
-the declared inventory — a bug (P24) — or the inventory itself is
-being changed, which is a surface change vetted under
+The manifest is the source of truth. When these tests fail, the fix
+is a surface decision, never a test edit: either the code diverged
+from the declared inventory — a bug (P24) — or the inventory itself
+is being changed, which is a surface change vetted under
 planning/SURFACES.md before it lands (P23).
 """
 
@@ -64,7 +67,7 @@ EXCEPTIONS = MANIFEST["exceptions"]
 EXCEPTION_IDS = [entry["name"] for entry in EXCEPTIONS]
 
 
-# The artifact's own soundness: one declaration per name.
+# The manifest's own consistency: one declaration per name.
 
 def test_each_command_is_declared_exactly_once():
     declared = (list(MANIFEST["twins"])
@@ -99,9 +102,10 @@ def test_every_exception_is_complete(entry):
         "reason is what makes it a decision.")
 
 
-# Declared but absent — the class the specs could not catch
-# mechanically: a capability the inventory promises and the code
-# never grew, or stopped shipping.
+# Declared but missing — a capability the manifest promises that
+# the code never grew, or later dropped. This is the kind of gap
+# that reading the spec alone cannot catch; only running these
+# tests can.
 
 @pytest.mark.parametrize("command", TWINS)
 def test_every_twin_ships_both_faces(command):
@@ -149,8 +153,9 @@ def test_every_exception_ships_its_present_face_only(entry):
             "the exception is stale.")
 
 
-# Shipped but undeclared — the `fetch_media` class: surface arriving
-# without the inventory hearing about it.
+# Shipped but undeclared — the kind of gap `fetch_media` once was: a
+# capability that arrived in the code without the manifest ever
+# being updated to include it.
 
 def test_every_registered_command_is_declared():
     declared = (set(MANIFEST["twins"])

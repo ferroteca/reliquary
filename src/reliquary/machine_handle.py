@@ -1,12 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Backend-neutral interaction with and diagnostics for a running machine.
+"""Backend-neutral interaction with, and diagnostics for, a running
+machine.
 
-Above the adapter seam: this module names no backend, opens no
-connection, and knows no endpoint. A machine is addressed by its
-materialization directory, which is where its recorded VM identity
-lives; the adapter named in that identity supplies the session, and
-the control plane composes the session's carriers.
+This module sits above the adapter interface: it names no specific
+backend, opens no connection itself, and knows no network endpoint. A
+machine is addressed by its materialization directory, which is where
+its recorded VM identity is stored; the adapter named in that
+identity supplies the session, and the control plane then combines
+that session's carrier methods.
 """
 
 import contextlib
@@ -19,19 +21,22 @@ import time
 from . import backends
 from . import screen_stability
 from . import text_recognize
-# Only the recorded VM identity is wanted here, and it lives in the
-# substrate — so this module no longer imports the lifecycle, and the
-# two stop importing each other.
+# Only the recorded VM identity is needed here, and that lives in
+# machine_state.py directly — so this module no longer imports
+# machines.py (the lifecycle module), and the two no longer import
+# each other.
 from .machine_state import read_vm_state
 from .control_display import DisplayConsole, normalize_row
 from .errors import PreflightError, StaticError, WaitExpired
 from .home import effective_home
 
-#: How often the screen is read while nothing matches, and once a
-#: match is on screen and the question is whether it settled — the
-#: same two rates the readiness wait uses, for the same reason: a
-#: wait is seconds to minutes with nothing to catch along the way,
-#: and dense reads are spent only where the verdict needs them.
+#: How often the screen is read while nothing matches yet
+#: (`_MATCH_POLL`), and once a match is on screen and the only
+#: question left is whether it has settled (`_SETTLE_POLL`) — the
+#: same two rates :mod:`interaction_agentless`'s readiness wait uses,
+#: for the same reason: a wait can take anywhere from seconds to
+#: minutes with nothing to catch along the way, so fast reads are
+#: only spent where the final verdict actually needs them.
 _MATCH_POLL = 2.0
 _SETTLE_POLL = 0.1
 
@@ -51,27 +56,30 @@ def validate_screenshot_name(name):
 def screenshot(name="screen", home=None, directory=None):
     """Save the guest display; `directory` overrides the destination.
 
-    Where the image lands is Reliquary's policy and stays above the
-    seam; capturing the framebuffer is the adapter's carrier. The
-    session identity always resolves through `home` — a caller
-    collecting images somewhere else still verifies the machine it
-    talks to.
+    Where the image is saved is Reliquary's own decision and stays
+    above the adapter interface; capturing the framebuffer itself is
+    one of the adapter's carrier methods. The session identity is
+    always resolved through `home`, though — a caller saving images
+    somewhere else still gets its target machine verified the normal
+    way.
     """
     return Machine(home).screenshot(name, directory)
 
 
 @dataclasses.dataclass(frozen=True)
 class Machine:
-    """A running, reliquary-owned machine passed to generic remote tasks.
+    """A running, Reliquary-owned machine, passed to generic remote
+    tasks.
 
-    ``home`` is the machine's own materialization directory — an
-    already-resolved plain directory, never a :class:`~home.Context`.
-    ``cache`` is the resolved cache root, on the same terms, and it is
-    **not derivable from** ``home``: `machines` is independently
-    placeable, so a machine directory says nothing about where the
-    cache root sits. A caller that has it passes it; one that does not
-    leaves an adapter re-extracting its host support files each time
-    rather than keeping them.
+    ``home`` is the machine's own materialization directory — always
+    an already-resolved plain directory, never a
+    :class:`~home.Context`. ``cache`` is the resolved cache root,
+    resolved the same way, and it cannot be derived from ``home``:
+    `machines` can be placed independently of the cache root, so a
+    machine's directory says nothing about where the cache root
+    actually is. A caller that has the cache root should pass it; one
+    that doesn't leaves an adapter re-extracting its host support
+    files every time instead of reusing them.
     """
 
     home: "str | None" = None
@@ -97,11 +105,13 @@ class Machine:
 
     @contextlib.contextmanager
     def qmp(self):
-        """Yield this machine's QMP session — the QEMU escape hatch.
+        """Yield this machine's QMP session — direct access to QEMU's
+        own control protocol.
 
-        Explicitly backend-scoped, and never generalized: a machine on
-        another backend has no QMP monitor and says so rather than
-        offering an approximation of one.
+        This is deliberately scoped to QEMU only, never generalized:
+        a machine running on a different backend has no QMP monitor,
+        and this says so explicitly rather than trying to offer some
+        approximation of one.
         """
         with self.session() as open_session:
             if open_session.backend != "qemu":
@@ -153,12 +163,14 @@ class Machine:
     def screen_text(self):
         """Return the guest's text screen as character rows.
 
-        Narrates on stderr when part of the screen could not be read.
-        A recognized screen is a *measurement*, and one that reports
-        no confidence cannot be told from a good one: cells matching
-        no known glyph come back as spaces, so a screen drawn in a
-        font this host does not have looks merely sparse. The rows
-        returned are unchanged — this says how much to trust them.
+        Prints a note to stderr when part of the screen could not be
+        read. A recognized screen is a measurement, and a measurement
+        with no confidence reported can't be told apart from a good
+        one: cells that matched no known glyph come back as plain
+        spaces, so a screen drawn in a font this host doesn't have
+        would otherwise just look sparse. The returned rows
+        themselves are unchanged — this note only says how much to
+        trust them.
         """
         with self.console() as console:
             screen = console.screen()
@@ -168,21 +180,25 @@ class Machine:
     def wait_text(self, pattern, timeout=60):
         """Wait until a row of the guest text screen matches ``pattern``.
 
-        **The screen channel of the script language's `wait` verb, at
-        the handle stratum** (D116) — the face `rlq wait` drives, so
-        the semantics are the verb's and not a second definition:
-        ``pattern`` is a regular expression searched in each visible
-        row after normalization (trailing padding trimmed, whitespace
-        runs collapsed — script-spec "Normalized text matching"), and
-        never across rows; a literal spelling lowers to its escaped,
-        normalized text before it reaches here. A match is a candidate
-        until the screen under it has settled (D115), as every other
-        wait in the system holds its evidence. Returns the matching
-        screen as one newline-joined string, as the guest drew it.
+        This is the screen-matching half of the script language's
+        `wait` verb, implemented at the handle layer (D116) — it is
+        what `rlq wait` calls, so the behavior here is the verb's
+        actual behavior, not a second, separate definition.
+        ``pattern`` is a regular expression searched within each
+        visible row after normalization (trailing padding trimmed,
+        runs of whitespace collapsed — see script-spec, "Normalized
+        text matching"); it is never matched across rows. A literal
+        string given as the pattern is escaped and normalized the
+        same way before matching. A match is only a candidate until
+        the screen under it has stopped changing (D115), the same
+        rule every other wait in the system follows before accepting
+        its evidence. Returns the matching screen as one
+        newline-joined string, exactly as the guest drew it.
 
-        Expiry raises :class:`~reliquary.errors.WaitExpired` — a
-        ``RunFailure`` and a ``TimeoutError`` (D90) — saying when a
-        match was seen but never settled.
+        Timing out raises :class:`~reliquary.errors.WaitExpired`,
+        which is both a ``RunFailure`` and a ``TimeoutError`` (D90),
+        and reports when a match was seen on screen but the screen
+        never settled.
         """
         with self.console() as console:
             deadline = time.monotonic() + timeout
@@ -207,17 +223,20 @@ class Machine:
     def wait_stopped(self, timeout=60):
         """Wait until this machine's VM is gone.
 
-        **The machine channel of the `wait` verb** — ``machine=stopped``
-        — at the handle stratum (D116): how a caller waits out a
-        guest-initiated power-off. It *observes* only, exactly as the
-        script runtime's sample does: the backend's session refusing
-        the recorded identity, or the connection failing, is the
-        machine down. Reconciling the machine's phase is the
-        lifecycle's act (``Session.mark_stopped``), which the CLI
-        performs after this returns, as the runtime does after the
-        same observation; this handle knows no lifecycle.
+        This is the machine-state half of the `wait` verb —
+        ``machine=stopped`` — implemented at the handle layer (D116):
+        how a caller waits out a guest-initiated power-off. It only
+        observes, exactly like the script runtime's own sampling: the
+        backend's session refusing the recorded VM identity, or the
+        connection failing outright, both count as the machine being
+        down. Updating the machine's recorded phase is the
+        lifecycle's job (``Session.mark_stopped``), which the CLI
+        performs after this method returns, the same way the script
+        runtime does after making the same observation; this handle
+        itself knows nothing about the lifecycle.
 
-        Expiry raises :class:`~reliquary.errors.WaitExpired` (D90).
+        Timing out raises :class:`~reliquary.errors.WaitExpired`
+        (D90).
         """
         deadline = time.monotonic() + timeout
         while True:
@@ -241,11 +260,12 @@ class Machine:
 
 
 def _narrate_unreadable(screen):
-    """Say how much of a screen matched no glyph, when any did not.
+    """Print how much of a screen matched no glyph, when any cells
+    didn't.
 
-    Silent on a clean read, and silent for a backend that scrapes
-    resolved characters — it recognizes nothing, so it can
-    misrecognize nothing either.
+    Says nothing on a clean read, and says nothing for a backend that
+    reads resolved characters directly — it never recognizes glyphs,
+    so it can never misrecognize one either.
     """
     cells = text_recognize.unreadable_cells(screen)
     if not cells:

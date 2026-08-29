@@ -2,35 +2,36 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The replay harness: the interpretation layer driven off a transcript.
 
-F43's first work item. Cross-cutting on purpose, the neutral home the
-tdd rules allow and for the same reason `fake_backend.py` sits here:
-the corpus module, the harness's own round-trip test, and any future
-regression pinned to a capture all drive the same path, and none of
-them should need a hypervisor.
+F43's first work item. This file is shared across test modules on
+purpose, for the same reason `fake_backend.py` is: the corpus module,
+the harness's own round-trip test, and any future regression pinned
+to a capture all drive the same code path, and none of them should
+need a real hypervisor.
 
-**What replay stands up is the real interpretation layer.** The
-transcript was captured at the carrier seam — `text_screen`,
-`send_keys`, `screenshot`, `change_medium` — so standing
-`ReplaySession` back at that seam leaves `control_display`,
-`interaction_agentless` and the runner's dispatch running unmodified
-above it. That is the whole reason the fixtures are worth having: a
-regression in prompt detection or echo scanning changes what the layer
-asks the carrier for, and the transcript is the record of what it
-asked last time.
+Replay stands up the real interpretation layer. The transcript
+records calls at the carrier level — `text_screen`, `send_keys`,
+`screenshot`, `change_medium` — so putting `ReplaySession` in place of
+the real carrier leaves `control_display`, `interaction_agentless`,
+and the runner's dispatch running unmodified above it. That is why
+the fixtures are worth having: a regression in prompt detection or
+echo scanning changes what the layer asks the carrier for, and the
+transcript is the record of what it asked for last time.
 
-**The transcript is the expectation, and it needs no separate one.**
-`ReplaySession` already refuses a call the capture does not cover
-(P11), so a run that diverges raises `TranscriptError` naming the
-carrier and the moment rather than quietly passing. That is the
-assertion vocabulary: a fixture asserts by *being replayable*, and
-nothing has to be restated in a sidecar that could drift from it.
+The transcript itself is the expected result, so no separate expected
+result needs to be written down. `ReplaySession` already raises if a
+call was not in the capture (P11), so a run that diverges raises
+`TranscriptError` naming the carrier method and the point in the
+transcript, instead of quietly passing. A fixture passes by *being
+replayable* — nothing about what should happen has to be restated
+somewhere else, where it could drift out of sync with the capture.
 
-**Two things stand beside the seam, because the capture deliberately
-holds neither.** The lifecycle is one — a replay creates no machine
-and starts no process, so `MachineLayer` answers what a script asks of
-it. Time is the other: every layer under the runner reads the wall
-clock, so a five-minute install would take five minutes to replay
-against the real one, and `Clock` gives it a virtual one instead.
+Two more things are faked here, because the capture never recorded
+them either. One is the machine's lifecycle: a replay creates no
+machine and starts no process, so `MachineLayer` answers whatever a
+script asks of it, from memory. The other is time: every layer under
+the runner reads the wall clock, so replaying against the real clock
+would make a five-minute install take five minutes again; `Clock`
+gives it a virtual clock instead.
 """
 
 import contextlib
@@ -61,11 +62,12 @@ def entries_of(path):
 def read(path):
     """A transcript's entries and the reader that validated them.
 
-    The reader carries the header, and the pace in it is not
-    decoration: a replayed run must poll at the pace the capture was
-    taken at, or it reads the same screens on a cadence the recorded
-    one never had — and the stability measure judges over wall-clock
-    windows, so a different cadence is a different verdict.
+    The reader carries the transcript's header, including its pace. A
+    replayed run must poll at the pace the capture was taken at — a
+    different cadence reads the same screens at moments the recorded
+    run never had, and the stability measure judges screens over
+    wall-clock windows, so a different cadence gives a different
+    verdict.
     """
     reader = _TranscriptReader(path)
     return reader.read(), reader
@@ -93,24 +95,28 @@ def replay_console(path):
 
 
 class Clock:
-    """Virtual time: the capture's own, and no waiting at all.
+    """Virtual time: replays instantly, but keeps the capture's own timing.
 
-    A capture is minutes long because a guest is slow, not because the
-    interpretation layer is: the run's own poll ramps, the stability
-    windows and the menu machinery are all `time.sleep` against
-    `time.monotonic`. Replaying against the real clock would take as
-    long as the install did, which is the one thing F43's fixtures
-    must not do — they run in the **default** suite.
+    A capture takes several minutes because the guest is slow, not
+    because the interpretation layer is: the poll ramp-up, the
+    stability windows, and the menu-handling code all call
+    `time.sleep` and check `time.monotonic`. Replaying against the
+    real clock would take as long as the original install did — and
+    F43's fixtures run in the default test suite, so they cannot
+    afford that.
 
-    Only the waiting is gone: **the capture's own timestamps drive
-    this clock**, so every frame is read where the guest drew it. That
-    is not a refinement. A reader ticking by its own sleeps puts two
-    frames 100ms apart that the recorded run took a third of a second
-    over — each QEMU sample is a 4000-byte memory dump — and
-    `screen_stability` measures over wall-clock windows precisely so a
-    denser poll cannot reach a different verdict. Left to its sleeps,
-    the install capture replayed to a screen that "never settled
-    enough to compare against" on a boot where it plainly had.
+    Only the waiting is skipped. The capture's own recorded
+    timestamps still drive this clock, so every frame is read at the
+    same virtual moment the guest drew it. That timing matters: a
+    clock that just advanced by however long each `sleep` call asked
+    for would place two frames 100ms apart when the recorded run
+    actually took a third of a second between them (each QEMU sample
+    is a 4000-byte memory dump). `screen_stability` measures how long
+    a screen holds steady over wall-clock time, so a denser poll rate
+    gives a different, wrong verdict. This is not hypothetical:
+    without jumping to the recorded timestamps, a replayed install
+    capture judged a screen as "never settled enough to compare
+    against" on a boot where it plainly had.
     """
 
     def __init__(self, start=0.0):
@@ -120,25 +126,29 @@ class Clock:
         return self._now
 
     def sleep(self, seconds):
-        """A sleep passes, and the reading that follows it lands.
+        """A sleep passes, and the read that follows it lands at the
+        right moment.
 
-        The recorded gap between two samples is the layer's own sleep
-        plus what the read cost, and the two are not
-        interchangeable: the layer samples the clock **before** it
-        reads, so a replay where only reads moved time would hand the
-        caller a moment one read stale. Sleeping here and jumping to
-        the recorded moment at the read reproduces both halves — and
-        the jump is monotone, so a sleep can never carry the clock
-        past the guest's own timeline.
+        In the recorded run, the gap between two samples is the
+        layer's own sleep plus however long the read itself took —
+        the two are not the same thing, because the layer reads the
+        clock *before* it reads the screen. If only reads moved the
+        clock forward, a replay would hand the caller a moment that
+        is one read late. Advancing the clock here on `sleep`, and
+        jumping to the exact recorded moment when the read happens
+        (`advance_to`), reproduces both parts of that gap. The jump
+        only ever moves forward, so a `sleep` call can never push the
+        clock past what the guest's own recorded timeline says.
         """
         self._now += max(0.0, float(seconds))
 
     def advance_to(self, elapsed):
-        """Move to a recorded moment, never backwards.
+        """Move to a recorded moment, but never backwards.
 
-        Monotone because a transcript is read forwards and a clock
-        that went back would make a deadline unexpire; the recording
-        is the floor.
+        A transcript is read forwards, and a clock that moved
+        backwards could make an already-expired deadline look
+        unexpired again. The recorded moment is a floor: the clock
+        only ever advances to it or stays put.
         """
         self._now = max(self._now, float(elapsed))
 
@@ -164,18 +174,20 @@ def virtual_time(clock):
 class MachineLayer:
     """The lifecycle a replayed run drives, answered from memory.
 
-    The capture sits at the carrier seam and holds nothing above it by
-    design (`screen-transcripts.md`), so the machine layer is the
-    harness's to stand up: a replay materializes nothing, starts no
-    process and touches no disk, while a script still asks for the
-    phase it begins in, the boot order a scope captures and puts back,
-    and the slot an insert fills.
+    The capture is taken at the carrier level and, by design, records
+    nothing above that (`screen-transcripts.md`), so the machine
+    lifecycle is left for this harness to fake: a replay creates no
+    machine, starts no process, and touches no disk, but a script
+    under replay still asks for the phase it starts in, the boot
+    order a scope saves and restores, and the drive slot an insert
+    fills.
 
-    It **refuses where the machine layer refuses**: a boot order is a
-    launch-time firmware order and so stopped-only, which is exactly
-    the rule D104 accepted a cost for — a scope's restore can fail —
-    and a double that said yes to it would replay a run the real layer
-    would have stopped.
+    It refuses in the same cases the real machine layer refuses:
+    setting the boot order is a launch-time firmware setting, so it
+    is allowed only while stopped. That is the same rule D104
+    accepted a cost for — a scope's restore-on-exit can fail — and if
+    this fake allowed it anyway, a replay could succeed on a run the
+    real layer would have stopped.
     """
 
     def __init__(self, machine_id="freedos-0", machine_home=None,
@@ -252,12 +264,13 @@ class MachineLayer:
 
 
 class _MachineHandle:
-    """A `Machine` over the replayed session, at the same two doors.
+    """A `Machine` over the replayed session, with the same two entry points.
 
-    The runner reaches the carrier through `_machine()` — the console
-    for every read and input verb, `screenshot` for the verb and the
-    automatic failure capture — so replacing the handle covers both
-    without the harness reaching into either.
+    The runner reaches the carrier through `_machine()` — using
+    `console()` for every read and input verb, and `screenshot()` for
+    the screenshot verb and for automatic failure capture. Replacing
+    the handle with this class covers both, without the harness
+    having to patch either one separately.
     """
 
     def __init__(self, session, home=None, cache=None,
@@ -294,10 +307,11 @@ def machine_handles(session):
 
 @contextlib.contextmanager
 def replaying(path, machines=None):
-    """Stand the whole run on a transcript: seam, lifecycle and clock.
+    """Stand the whole run on a transcript: the carrier, the lifecycle,
+    and the clock.
 
     Yields the `(session, machines, clock)` a replayed run works
-    against, with the pace the capture states already applied by
+    against, with the pace the capture recorded already applied by
     `engine_for` below.
     """
     entries, reader = read(path)
@@ -315,13 +329,13 @@ def replaying(path, machines=None):
 def replaying_exec(path):
     """Stand the agentless exec adapter on a capture of one command.
 
-    The other kind of fixture, and a narrower stand-up than a script's:
-    the adapter reaches the carrier through a machine handle and asks
-    nothing of the lifecycle, so the seam and the clock are the whole
-    of what the harness supplies. Yields the adapter and the session
-    the capture is being read through, with the header beside them —
-    the command it was taken of and the limit it was given, both of
-    which the replay has to use unchanged.
+    This is the other kind of fixture, and a narrower stand-up than a
+    script's: the adapter reaches the carrier through a machine
+    handle and asks nothing of the lifecycle, so the carrier and the
+    clock are the whole of what the harness supplies here. Yields the
+    adapter and the session the capture is being read through, along
+    with the header — the command it was taken of and the limit it
+    was given, both of which the replay has to use unchanged.
     """
     entries, reader = read(path)
     clock = Clock()
@@ -333,11 +347,12 @@ def replaying_exec(path):
 def engine_for(script, home, machine_home, clock, reader, **rest):
     """The engine a replay runs, on the capture's own pace and clock.
 
-    `record_pace` is not about recording here: it is what floored the
-    poll intervals when the capture was taken, so a replay that leaves
-    it out reads the same screens two seconds apart where the recorded
-    run read them a tenth of a second apart — and the stability gate
-    measures over wall-clock windows.
+    `record_pace` is not about recording here — it is what set the
+    minimum poll interval when the capture was taken. A replay that
+    leaves it out reads the same screens two seconds apart where the
+    recorded run read them a tenth of a second apart, and the
+    stability gate measures how long a screen holds steady over
+    wall-clock time, so that difference changes the verdict.
     """
     return _ScriptEngine(script, "freedos-0", home, machine_home,
                          clock=clock.monotonic, sleep=clock.sleep,

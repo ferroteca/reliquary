@@ -1,32 +1,36 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Landmarks: the ``.rlql`` authored kind and the pixel-equal matcher.
+"""Landmarks: the ``.rlql`` authored file format, and the pixel-equal
+matcher.
 
-A landmark is **one declaration and N renderings** (F65; the settled
-design is docs/spec/landmarks.md). The declaration owns the geometry
--- pinned screen dimensions, a region list, a named spot set -- and
-the renderings are plain PNGs beside it, attached by stem-and-number
-adjacency (``<name>.1.png``, ``<name>.2.png``), so refreshing an
-asset is file *creation* and never file rewriting. A screen whose
-layout changed is a different landmark; a variant is the same screen
-painted differently.
+A landmark is one declaration plus N renderings (F65; the settled
+design is in docs/spec/landmarks.md). The declaration owns the
+geometry — pinned screen dimensions, a list of regions, a set of
+named spots — and the renderings are plain PNG files next to it,
+matched by name and number (``<name>.1.png``, ``<name>.2.png``), so
+adding a new rendering is always creating a new file, never rewriting
+an existing one. A screen whose layout has changed is a different
+landmark; a variant is the same screen painted differently (a
+different color scheme, a different loaded translation, and so on).
 
-Matching is **whole-screen exact, with regions as modifiers**. Every
-pixel of a capture is in exactly one regime: an ``ignore`` region
-excludes it -- ignore wins where regions overlap -- a ``fuzzy``
-region judges its own pixels against its own declared percentage, and
-the residual screen requires 100%. A variant matches when its
-residual is clean and every fuzzy region clears its own bar; the
-landmark matches when any variant does. That is the safe failure
-asymmetry (G4): anti-aliasing and palette drift fail toward a visible
-timeout, never toward the wrong screen.
+Matching compares the whole screen exactly, with regions acting as
+modifiers. Every pixel of a capture falls into exactly one of three
+categories: an ``ignore`` region excludes it entirely (and wins
+wherever regions overlap), a ``fuzzy`` region judges its own pixels
+against its own declared percentage, and everything left over — the
+residual screen — requires a 100% pixel match. A variant matches when
+its residual is clean and every fuzzy region clears its own
+percentage bar; the landmark as a whole matches when any one of its
+variants does. This is a deliberately asymmetric failure mode (G4):
+anti-aliasing noise or palette drift causes a visible timeout, never
+a false match against the wrong screen.
 
-``spots`` are read by the `click` verb (F66), which locates one by
-name and delivers a pointer event there. Every pointer verb ends by
+``spots`` are read by the `click` verb (F66), which looks one up by
+name and sends a pointer event there. Every pointer verb ends by
 parking the cursor at :func:`park_position`, and this module excludes
-that zone from every match unconditionally (:func:`_park_region`),
-which is what keeps a capture cursor-free by construction the way it
-was before any pointer verb existed.
+that parked-cursor area from every match unconditionally (see
+:func:`_park_region`), so a capture is always free of the cursor,
+just as it was before pointer verbs existed.
 """
 
 import functools
@@ -50,54 +54,61 @@ _PARK_SIZE = 16
 
 
 def park_position(width, height):
-    """The cursor's park position after a pointer verb, for one screen.
+    """Return the cursor's park position after a pointer verb, for a
+    screen of this size.
 
-    Bottom-right, scaled to the screen's own pinned dimensions rather
-    than a bare constant -- one per-platform rule today because DOS is
-    the only shipped platform (docs/spec/landmarks.md, "The cursor"),
-    but resolved per landmark since screens pin different sizes.
-    Authored content commonly anchors top-left (a title, a menu bar),
-    so the opposite corner is the one least likely to overlap it.
+    This is the bottom-right corner, scaled to the screen's own
+    pinned dimensions rather than a fixed pixel constant. There is
+    only one rule today because DOS is the only shipped platform
+    (docs/spec/landmarks.md, "The cursor"), but it is resolved
+    separately for each landmark since different landmarks pin
+    different screen sizes. Authored content usually anchors things
+    to the top-left (a title, a menu bar), so the opposite corner is
+    the one least likely to overlap it.
     """
     return (max(0, width - 1), max(0, height - 1))
 
-#: The fields a declaration may carry. Unknown keys are refused, as
-#: they are in a blueprint: a mistyped ``similarty`` that softened
-#: nothing would be a landmark that silently demands more than its
-#: author asked for.
+#: The fields a declaration may carry. Unknown keys are refused, the
+#: same as in a blueprint: a typo like ``similarty`` that silently
+#: does nothing would leave a landmark demanding more of a match than
+#: its author actually asked for.
 _FIELDS = ("screen", "regions", "spots")
 _REGION_FIELDS = ("kind", "x", "y", "width", "height", "similarity")
 _SCREEN_FIELDS = ("width", "height")
 _SPOT_FIELDS = ("x", "y")
 
-#: A percent literal with its unit spelled, as durations spell theirs
-#: (G6). The range it is then held to is the **exclusive** (0%, 100%):
-#: ``0%`` is ``ignore`` in a second spelling and ``100%`` is the
-#: region's absence, and the language refuses a second way to say
-#: either.
+#: Matches a percent literal that spells out its % unit, the same way
+#: durations spell out their unit (G6). The value is then required to
+#: fall strictly between 0% and 100%: 0% would just be another way to
+#: write an ``ignore`` region, and 100% would just mean the region
+#: isn't there at all, so the language refuses to let either be
+#: written as a similarity percentage.
 _PERCENT = re.compile(r"(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)%$")
 
-#: The capture pixel formats a plane may state, and what normalizing a
-#: reference rendering through one costs. The **hook** is the point,
-#: not today's table: a plane states its capture format as a
-#: capability and the reference side is normalized through it before
-#: the comparison, so an asset captured on one plane still matches on
-#: another (docs/spec/landmarks.md, "The capture format"). On the VNC
-#: plane the stated format is the forced 32bpp true colour, so the
-#: normalization is the identity and nothing delivered moves.
+#: Maps each capture pixel format a plane may declare to the function
+#: that normalizes a reference rendering into that format. The point
+#: is having this hook at all, not what's in today's table: a plane
+#: declares its capture format as a capability, and the reference
+#: image is normalized through the matching function before
+#: comparison, so a landmark asset captured on one plane still
+#: matches correctly on another (docs/spec/landmarks.md, "The capture
+#: format"). The VNC plane always forces 32bpp true color, so its
+#: normalization is a no-op.
 _NORMALIZERS = {
     "rgb": lambda image: image,
 }
 
 
 class LandmarkError(StaticError):
-    """A landmark declaration diagnostic that can say *where*.
+    """A landmark declaration error that can point at a specific
+    location.
 
-    The legality tier, like every other authored-document diagnostic:
-    decided from the declaration's own text, so it is a STATIC ERROR
-    and exits ``2``, rendered by the same skeleton
-    :class:`document.BlueprintError`, :class:`fonts.FontError` and
-    :class:`script_nodes.ScriptParseError` already use (D70).
+    This is a legality-tier error, like every other authored-document
+    diagnostic: it is decided purely from the declaration's own text,
+    so it counts as a STATIC ERROR and exits with code ``2``. It is
+    rendered with the same format that :class:`document.BlueprintError`,
+    :class:`fonts.FontError`, and :class:`script_nodes.ScriptParseError`
+    already use (D70).
     """
 
     def __init__(self, message, *, rule_id=None, path=None, position=None):
@@ -146,9 +157,10 @@ class Region:
 class Spot:
     """One named point on the landmark, in screen coordinates.
 
-    Declared, validated and carried; **unread until pointer verbs
-    exist** (F65's cut). A landmark with no spots is watchable and not
-    clickable, which is the static refusal the pointer piece owes.
+    Declared, validated, and stored, but not read anywhere until
+    pointer verbs exist (this was cut from the original F65 scope). A
+    landmark with no spots can be watched for but not clicked on, and
+    that refusal is checked statically, before a script runs.
     """
 
     x: int
@@ -303,15 +315,16 @@ _VARIANT = re.compile(r"(.+)\.([0-9]+)\.png$", re.IGNORECASE)
 
 
 def _variants(path, name, width, height):
-    """The renderings beside a declaration, ordered numerically.
+    """Find the renderings next to a declaration, ordered numerically.
 
-    **Numbered from 1, with no contiguity demanded** — deleting a
-    stale rendering stays a file deletion, which is the recorder's
-    file-creation property read in the other direction. Each is
-    checked against the pinned dimensions here, before a machine
-    starts (G3): a rendering off the declared geometry can never
-    match, and saying so at the declaration is the difference
-    between a named refusal and a silent timeout.
+    Numbers start at 1, and there is no requirement that they be
+    contiguous — deleting a stale rendering is just deleting a file,
+    which is the flip side of adding a rendering also being just
+    adding a file. Each rendering's size is checked against the
+    declaration's pinned dimensions here, before a machine even
+    starts (G3): a rendering with the wrong size could never match
+    anyway, and catching that at declaration load time turns it into
+    a named error instead of a silent timeout later.
     """
     directory = os.path.dirname(path) or "."
     found = []
@@ -354,10 +367,12 @@ def _variants(path, name, width, height):
 
 
 def load_landmark_declaration(path):
-    """Parse and validate one ``.rlql`` file, failing closed by name.
+    """Parse and validate one ``.rlql`` file, raising a named error on
+    any problem.
 
-    Every refusal here is decided from the declaration and the files
-    beside it, so all of them land before a machine starts (G3).
+    Every check here is decided just from the declaration and the
+    files next to it, so every one of these errors is caught before a
+    machine even starts (G3).
     """
     with open(path, encoding="utf-8") as handle:
         text = handle.read()
@@ -398,11 +413,13 @@ def load_landmark_declaration(path):
 
 
 def load_landmark_namespace(context=None):
-    """``{name: LandmarkDeclaration}`` for every ``.rlql`` in the source.
+    """Return ``{name: LandmarkDeclaration}`` for every ``.rlql`` file
+    in the source.
 
-    Collision-checked against the one ``@`` pool media and font names
-    already occupy — the pool gaining its third kind (F65) — so a
-    duplicate visible to one script is an error naming both files.
+    Names are checked against the same shared ``@`` namespace that
+    media and font names already share — landmarks are the third kind
+    of thing in that namespace (F65) — so a name reused across two
+    files is an error that names both files.
     """
     source = assets.source_for(context)
     index = assets.index_by_name(
@@ -437,11 +454,12 @@ def resolve_landmark(name, namespace):
 
 @dataclass(frozen=True)
 class RegionMiss:
-    """One judged area a variant failed on, and by how much.
+    """One area a variant failed on, and by how much.
 
-    ``region`` is ``None`` for the residual screen — everything no
-    declared region covers, which requires 100% — so a report names
-    the geography of a miss rather than restating that one happened.
+    ``region`` is ``None`` for the residual screen — everything not
+    covered by a declared region, which requires a 100% match — so a
+    failure report can name exactly where the mismatch was, rather
+    than just saying that one happened.
     """
 
     region: Optional[Region]
@@ -462,8 +480,9 @@ class VariantMatch:
     path: str
     matched: bool
     failing: Tuple[RegionMiss, ...] = ()
-    #: Judged pixels that differed, over every regime — what ranks
-    #: the nearest miss.
+    #: Total pixels that differed, across every region and the
+    #: residual — used to rank which variant came closest to
+    #: matching.
     changed: int = 0
 
     @property
@@ -500,15 +519,17 @@ class LandmarkMatch:
 
 
 def normalize(image, capture_format):
-    """Put a reference rendering through a plane's capture format.
+    """Put a reference rendering through a plane's declared capture
+    format.
 
-    The seam point ``hyperv-screen.md`` settled and this piece lands
-    at zero cost: a plane states the pixel format its capture arrives
-    in, and the *reference* side is normalized through it before the
-    pixel-equal comparison, so a deterministic round trip keeps "97
-    of every 100 pixels identical" meaning the same thing on every
-    plane. ``None`` and the VNC plane's ``rgb`` are both the
-    identity.
+    This is the cross-adapter design settled in ``hyperv-screen.md``,
+    implemented here at no extra cost: a plane declares the pixel
+    format its captures arrive in, and the reference rendering is
+    normalized through that same format before the pixel-equal
+    comparison. That keeps "97 of every 100 pixels identical" meaning
+    the same thing on every plane, as long as the normalization is a
+    deterministic round trip. Both ``None`` and the VNC plane's
+    ``rgb`` are no-ops.
     """
     if capture_format is None:
         return image
@@ -521,15 +542,17 @@ def normalize(image, capture_format):
 
 
 def _park_region(width, height):
-    """The built-in ignore region around :func:`park_position`.
+    """Return the built-in ignore region around :func:`park_position`.
 
-    Never authored and never in a ``.rlql`` file: every match excludes
-    it, exactly as a declared ``ignore`` region would, because the
-    parked cursor is furniture no landmark author asked to describe
-    (F66). Clamped to a **quarter** of the declaration's own pinned
-    size, not merely its full extent: a screen small enough that the
-    plain size clamp still covers all of it would have its residual
-    swallowed whole, and a "match" that compares nothing is not one.
+    This region is never authored and never appears in a ``.rlql``
+    file — every match excludes it automatically, exactly as a
+    declared ``ignore`` region would, because the parked cursor is
+    something no landmark author asked to describe (F66). Its size is
+    clamped to at most a quarter of the declaration's pinned screen
+    size, not just capped at a fixed pixel size: on a screen small
+    enough that the plain pixel cap would still cover the whole
+    thing, the entire residual would be excluded, and a "match" that
+    compares nothing isn't really a match.
     """
     size_x = min(_PARK_SIZE, max(1, width // 4))
     size_y = min(_PARK_SIZE, max(1, height // 4))
@@ -537,22 +560,25 @@ def _park_region(width, height):
 
 
 def _masks(declaration):
-    """The three regimes as Pillow masks over one screen.
+    """Build the three region categories as Pillow masks over one
+    screen.
 
-    ``ignore`` wins where regions overlap, so it is drawn first and
-    subtracted from everything else; each fuzzy region judges only
-    its own surviving pixels; the residual is what no region claims.
-    The built-in park-zone region (above) joins the declared ones
-    unconditionally, on every landmark, whether or not a script in
-    this run ever clicks.
+    ``ignore`` wins wherever regions overlap, so it is drawn first
+    and subtracted from everything else; each fuzzy region then
+    judges only its own remaining pixels; the residual is whatever no
+    region claims at all. The built-in park-zone region (see
+    :func:`_park_region`) is added to the declared ones on every
+    landmark unconditionally, whether or not a script in this run
+    ever clicks anything.
 
-    **Built once per geometry, not once per sample.** A wait reads
-    every ~0.2s and the regimes depend on the declaration alone, so
-    rebuilding a screenful of masks each time would be the dominant
-    cost of watching a landmark. Keyed by what actually decides them
-    — the file, its pinned size, and its regions — so two
-    declarations never share a cache entry and an edited one gets
-    fresh masks on its next parse.
+    These masks are built once per screen geometry, not once per
+    sample. A `wait` re-reads the screen roughly every 0.2 seconds,
+    and the masks only depend on the declaration, so rebuilding a
+    full screen's worth of masks on every read would be the dominant
+    cost of watching a landmark. The cache key is exactly what
+    decides the masks — the file, its pinned size, and its regions —
+    so two different declarations never share a cache entry, and an
+    edited declaration gets fresh masks the next time it is parsed.
     """
     return _regime_masks(
         declaration.path, declaration.size,
@@ -606,13 +632,15 @@ def _changed_mask(reference, capture):
 
 @functools.lru_cache(maxsize=32)
 def _decoded(path, stamp, capture_format):
-    """One rendering, decoded and normalized, kept across samples.
+    """Return one rendering, decoded and normalized, cached across
+    samples.
 
-    A wait decodes every variant at every sample without this, which
-    on a 640x480 PNG is most of what watching a landmark costs.
-    ``stamp`` is the file's modification time and size and is never
-    read here — it is *part of the key*, so an author who re-exports
-    a rendering is never matched against the pixels it used to have.
+    Without this cache, a `wait` would decode every variant on every
+    sample, which for a 640x480 PNG is most of what watching a
+    landmark costs. ``stamp`` (the file's modification time and size)
+    is never read inside this function — its only job is being part
+    of the cache key, so that when an author re-exports a rendering,
+    the cache is never matched against pixels the file used to have.
     """
     del stamp                         # a cache key, not an argument
     with Image.open(path) as opened:
@@ -654,14 +682,17 @@ def _judge(capture, variant, fuzzy, residual, capture_format):
 
 
 def match(declaration, capture, capture_format=None):
-    """Judge one capture against a landmark, variant by variant.
+    """Judge one capture against a landmark, trying each variant in
+    turn.
 
     Returns a :class:`LandmarkMatch`: matched as soon as any variant
-    is clean, and otherwise carrying the **nearest miss** — the
-    variant with the fewest failing pixels, with its failing regions
-    and the percentage each achieved. Per-region and independently,
-    never one pooled score: a small failing region drowns in a large
-    matching screen's average, and the report loses its geography.
+    comes back clean, and otherwise carrying the nearest miss —
+    whichever variant had the fewest failing pixels, along with its
+    failing regions and the percentage each one achieved. Each region
+    is scored independently rather than pooled into one overall
+    score: a small failing region would otherwise get averaged away
+    by a large matching screen, and the report would lose the
+    information about exactly where it failed.
     """
     capture = capture.convert("RGB")
     if capture.size != declaration.size:

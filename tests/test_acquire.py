@@ -66,7 +66,8 @@ def test_nested_local_archive_extraction(root):
     # keyed by name, with no second directory for archives.
     assert os.path.exists(os.path.join(cache, "media", "inner.zip"))
 
-    # idempotent: a second fetch verifies the cache and reuses it
+    # Fetching the same media again checks the cache and reuses it,
+    # instead of downloading it a second time.
     assert acquire.fetch_media(ns.media["payload"], ns,
                                context=context) == path
 
@@ -92,7 +93,8 @@ def test_local_use_media_attaches_in_place(root):
 
 
 def test_a_missing_local_payload_names_the_media_and_the_path(root):
-    """It must not reach the backend as a failure to open a path."""
+    """The missing file must be caught here, not surface later as a
+    generic "failed to open path" error from the backend."""
     gone = os.path.join(root, "moved-away.iso")
     doc = parse_document([{"name": "win98-cd", "location": {"local": gone},
                            "sha256": "a" * 64}])
@@ -106,7 +108,8 @@ def test_a_missing_local_payload_names_the_media_and_the_path(root):
 
 
 def test_a_missing_local_payload_is_caught_without_a_pin(root):
-    """Unpinned, it would otherwise pass a dead path straight on."""
+    """Without a sha256 pin, the missing path would otherwise be
+    passed straight through unchecked."""
     gone = os.path.join(root, "moved-away.img")
     doc = parse_document([{"name": "floppy", "location": {"local": gone}}])
     ns = resolve.namespace_of(doc)
@@ -127,10 +130,11 @@ def test_a_directory_source_is_not_treated_as_missing(root):
 
 
 def test_remote_without_hash_fails_before_network():
-    # A remote location with no sha256 parses — the required-once-
-    # remote rule is a resolution check, since a referenced rung may
-    # resolve to a URL — and resolution refuses it up front, so this
-    # never touches the network.
+    # A remote location with no sha256 still parses fine. The
+    # required-once-remote rule is checked later, during resolution,
+    # because a referenced rung might resolve to a URL that parsing
+    # alone can't see. Resolution refuses it before any download
+    # starts, so this test never touches the network.
     doc = parse_document([{"name": "x",
                            "location": {"url": "https://example/a.iso"}}])
     ns = resolve.namespace_of(doc)
@@ -214,14 +218,14 @@ def _extract_case(root, member_size=1):
     return resolve.namespace_of(doc), payload
 
 
-# A cancelled run aborts a host transfer where it stands.
+# A cancelled run stops a host transfer wherever it currently is.
 #
-# The execution model's severability: input deliveries are atomic,
-# host transfers abort (docs/spec/cli.md, "Cancel ends the run, not
-# the machine"). Before this, cancellation was only observed at
-# statement boundaries, so a Ctrl-C during a large fetch was not seen
-# until the download, its hash, the extraction, and *its* hash had all
-# finished.
+# Input deliveries finish completely once started; host transfers can
+# stop partway through (docs/spec/cli.md, "Cancel ends the run, not
+# the machine"). Before this change, cancellation was only checked
+# between statements, so pressing Ctrl-C during a large fetch did
+# nothing until the download, its hash check, the extraction, and its
+# hash check had all finished.
 
 def test_a_cancelled_run_stops_a_hash_verification(root):
     payload = b"PAYLOAD-BYTES-" * 1000

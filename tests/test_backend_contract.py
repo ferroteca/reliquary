@@ -1,24 +1,27 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""One contract over the adapter seam, driven against every backend.
+"""One contract, tested once, run against every backend adapter.
 
-**P25**: a seam requirement honored by one backend's tests and quietly
-missing from the other's is a requirement nobody holds. These are the
-*shared* expectations — what the seam states rather than what any
-hypervisor knows — written once and parametrised over every built
-adapter, so each check is a collected node named for the backend it
-judged and a third backend inherits the whole contract by adding one
-driver rather than by copying a file (F59).
+**P25**: if a requirement on the backend adapter seam is checked in
+one backend's tests but quietly missing from another's, it is not
+really a requirement. This file holds the *shared* expectations —
+what the adapter interface promises, not what any one hypervisor
+happens to do — written once and run against every built adapter.
+Each check becomes one pytest node per backend, and a third backend
+gets the whole contract for free just by adding a driver here, not by
+copying a test file (F59).
 
-**A driver is how a backend is stood up on a fake host**, and nothing
-more: where its executable is found, where its font lives, and how a
-stop is aimed at a VM whose identity does not match. The mechanics
-differ completely — QMP against `VBoxManage` — which is the point:
-the expectations do not.
+**A driver here is only what is needed to stand a backend up on a
+fake host**: where its executable is found, where its font lives, and
+how a stop command is aimed at a VM whose identity does not match.
+The mechanics are completely different between backends — QMP versus
+`VBoxManage` — and that is the point: the expectations stay the same
+even though the mechanics differ.
 
-What stays in `test_backend_qemu` and `test_backend_virtualbox` is
-what only that backend knows — qcow2 against VDI, the argv or the
-verbs each renders, QMP carriers against scancodes.
+What stays in `test_backend_qemu` and `test_backend_virtualbox`
+instead is whatever only that one backend knows: qcow2 versus VDI,
+the argv or the commands each one renders, QMP message carriers
+versus scancodes.
 """
 
 import contextlib
@@ -62,8 +65,8 @@ class _QemuDriver:
     #: — a property of the management interface, not of the screen.
     pointer_planes = {"agentless-display": True, "vnc": True}
     pointing_devices = ("tablet", "mouse")
-    #: The command that would reach a VM the identity check must stop
-    #: short of.
+    #: The destructive command that must never reach a VM if the
+    #: identity check fails.
     destructive = "quit"
 
     def executable(self, root):
@@ -71,9 +74,10 @@ class _QemuDriver:
 
     @contextlib.contextmanager
     def found(self, root):
-        # The version probe runs the binary, which no unit test does;
-        # what a QEMU that will not report one does is QEMU's own
-        # check rather than the seam's.
+        # The version probe runs the actual binary, and no unit test
+        # does that. Whether a QEMU that won't report a version
+        # behaves correctly is QEMU's own concern, not something this
+        # adapter interface needs to check.
         with mock.patch.object(qemu_module, "find_qemu",
                                return_value=self.executable(root)), \
                 mock.patch.object(qemu_module, "_qemu_version",
@@ -143,9 +147,9 @@ class _VirtualBoxDriver:
     #: VirtualBox has no text-memory readback: its display plane's
     #: screen *is* a framebuffer, so it states one.
     capture_formats = {"agentless-display": "rgb"}
-    #: Not wired yet (F66's own scope): the requirement is portable
-    #: on paper (P25), but only QEMU's carrier delivers a pointer
-    #: event today.
+    #: Not wired up yet (within F66's own scope): the requirement
+    #: applies to both backends in principle (P25), but only QEMU's
+    #: carrier actually delivers a pointer event today.
     pointer_planes = {"agentless-display": False}
     pointing_devices = ()
     destructive = "controlvm"
@@ -232,14 +236,16 @@ def test_the_capability_report_claims_only_what_is_built(driver, adapter):
 
 
 def test_each_plane_states_the_capture_format_it_reads(driver, adapter):
-    """A landmark's gate, and it is per plane rather than per backend.
+    """This is the gate for using a landmark condition, and it applies
+    per plane, not per backend as a whole.
 
-    The matcher compares the pixels a plane's *screen carrier* hands
-    over, so what decides is what that carrier is — resolved
-    characters or a framebuffer — and the two backends disagree about
-    their same-named plane. A backend that quietly widened the claim
-    would be one whose landmark conditions preflight passes and whose
-    runtime cannot honor (P11, P25).
+    The matcher compares the pixels that a plane's *screen carrier*
+    hands over, so what matters is what that carrier actually is —
+    resolved characters, or a framebuffer — and the two backends
+    disagree about their same-named plane. If a backend claimed a
+    capability it does not really have, preflight would accept a
+    landmark condition that the backend could never actually satisfy
+    at runtime (P11, P25).
     """
     for plane in driver.control_planes:
         assert (adapter.capture_format(plane)
@@ -250,9 +256,10 @@ def test_each_plane_states_the_capture_format_it_reads(driver, adapter):
 
 def test_each_plane_states_whether_it_delivers_pointer_events(driver,
                                                                adapter):
-    """The same per-plane honesty as `capture_format`, for pointer
-    delivery (F66) — a separate capability from framebuffer capture,
-    since a plane can hold one without the other (VirtualBox today).
+    """The same per-plane accuracy check as `capture_format`, but for
+    pointer delivery (F66) — a separate capability from framebuffer
+    capture, since a plane can have one without the other (VirtualBox
+    today).
     """
     for plane in driver.control_planes:
         assert (adapter.pointer_capable(plane)
@@ -343,18 +350,20 @@ def test_an_installation_with_no_font_fails_closed(driver, tmp_path):
 
 
 def test_a_stop_never_reaches_a_vm_whose_identity_differs(driver):
-    """The ownership doctrine, stated once for every backend.
+    """The rule that identity must be checked before any command is
+    sent, stated once here for every backend.
 
-    An addressable endpoint outlives its owner, so the recorded
-    identity is verified before any command is sent — and the refusal
-    happens *before* the destructive one.
+    An endpoint (a port, or a VM name) can outlive the VM that
+    originally owned it, so the recorded identity is checked before
+    any command reaches it — and that check happens *before* the
+    destructive command, not after.
 
-    The two adapters raise different ids here today
-    (`machine.identity-mismatch` against
-    `machine.vm-identity-mismatch`), so the contract judges the
-    behavior and the wording rather than the id; whether one rule
-    should keep one id across the seam is a surface question, not this
-    check's.
+    The two adapters currently raise different error ids here
+    (`machine.identity-mismatch` versus
+    `machine.vm-identity-mismatch`), so this contract checks the
+    behavior and the error wording, not the id itself. Whether the
+    two backends should share one id is a separate design question,
+    not something this check decides.
     """
     with driver.mismatched_stop() as (stop, commands):
         with pytest.raises(PreflightError) as caught:

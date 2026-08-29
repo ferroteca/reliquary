@@ -4,10 +4,12 @@
 
 The conformance corpus
 (``fixtures/conformance/blueprint/``, ``test_conformance_corpus.py``)
-covers accept-versus-reject across the whole rule surface. These tests
-cover what a fixture cannot assert: the *shape* parsing produces — that
-sugar desugars to the thing it claims to, that identity lands where the
-model says, and that a repair says what it repaired.
+covers accept-versus-reject decisions across the whole rule surface.
+These tests cover what a fixture cannot check: the *shape* parsing
+produces. That means checking that a shorthand form (sugar) desugars
+to the full form it stands for, that a machine's or media's identity
+ends up where the data model says it should, and that when the parser
+repairs a name, its warning message correctly says what it repaired.
 """
 
 import json
@@ -43,10 +45,11 @@ def _load_file(root, value, name="b.rlqb"):
 
 # Every mode in the parser's closed vocabulary parses.
 #
-# `_MATERIALIZE` is the closed set an author may write, and each member
-# must actually parse — a declared mode the parser then rejects is a
-# vocabulary entry that cannot occur. Whether the spec's table names
-# the same modes is R5's audit (planning/RECURRING.md).
+# `_MATERIALIZE` is the closed set of modes an author may write, and
+# each one must actually parse. If the parser rejected a mode that is
+# in this set, that mode would be listed as legal but never usable.
+# Whether the spec's table names the same modes is R5's audit
+# (planning/RECURRING.md).
 
 @pytest.mark.parametrize("mode", sorted(document._MATERIALIZE))
 def test_every_declared_mode_parses(mode):
@@ -83,7 +86,8 @@ def test_lone_object_is_the_array_of_one():
 
 
 def test_untyped_lone_object_is_a_media_not_a_machine():
-    """The bare-root-machine reading retired with the sections."""
+    """A lone untyped root object used to be read as a machine; that
+    reading was retired along with the old machines/media sections."""
     doc = _parse({"name": "iso", "location": "payload.iso"})
     assert set(doc.media) == {"iso"}
     assert doc.machines == {}
@@ -134,7 +138,8 @@ def test_name_derives_from_the_content_stem():
 
 
 def test_leading_digit_derives_cleanly():
-    """The charter splits from the property key by exactly this."""
+    """The media-name charter differs from the property-key charter in
+    exactly this: it allows a leading digit."""
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         doc = parse_document([{"location": "https://x.test/86Box.zip",
@@ -430,9 +435,10 @@ def test_an_unknown_field_is_located_at_the_field(root):
 
 
 def test_a_comment_above_the_error_shifts_nothing(root):
-    """The gap this closed was structural, and this is why: comments
-    are blanked rather than removed, so the second pass reads the
-    original file's coordinates."""
+    """This guards a real bug: comments are blanked out (replaced with
+    spaces) rather than removed, so the pass that locates each error
+    still reads the same line and column numbers as the original
+    file."""
     error = _diagnostic(
         root,
         '[\n'

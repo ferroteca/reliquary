@@ -69,8 +69,9 @@ def test_screenshot_rejects_names_that_are_paths(root, name):
 
 
 def test_screenshot_lands_under_the_machine_directory(root):
-    # Where the image goes is Reliquary's policy and stays above
-    # the seam; capturing the framebuffer is the adapter's carrier.
+    # Where the screenshot file is saved is decided by Reliquary
+    # itself, not by the backend. Capturing the actual framebuffer
+    # pixels is the backend adapter's job.
     vm = {"backend": "qemu", "backend-id": "reliquary-plain-0",
           "token": "0" * 32, "endpoint": {"port": 54321}}
     expected = os.path.join(root, "screenshots", "release-smoke.png")
@@ -214,12 +215,12 @@ def test_the_console_sends_keys_through_the_session():
 
 
 def _wait_against(frames, pattern, timeout=60):
-    """Wait for ``pattern`` over a guest painting ``frames`` in turn.
+    """Wait for ``pattern`` while the guest paints through ``frames`` one at a time.
 
-    The painting guest and deterministic clock the command path and
-    the readiness wait are tested over (below), so a wait_text test
-    says what the guest drew and when, and reads the same stability
-    verdict (D115, D116).
+    This uses the same fake painting guest and deterministic clock as
+    the command-execution and readiness-wait tests below, so a
+    wait_text test can say exactly what the guest drew and when, and
+    gets judged by the same stability rule (D115, D116).
     """
     guest = _PaintingGuest(frames)
     console = mock.Mock()
@@ -241,8 +242,9 @@ def test_wait_text_returns_the_matching_screen():
 
 
 def test_wait_text_times_out_without_a_match():
-    # an expiry is a wait's (D90): both a RunFailure and the
-    # TimeoutError a caller holding the loop catches
+    # A timeout here is reported as both a RunFailure and a
+    # TimeoutError (D90), so a caller already catching TimeoutError
+    # still catches it.
     with pytest.raises(WaitExpired, match="FreeDOS") as expired:
         _wait_against([[""]], "FreeDOS", timeout=0)
     assert isinstance(expired.value, RunFailure)
@@ -262,9 +264,9 @@ def test_wait_text_matches_one_normalized_row_and_never_spans_rows():
 
 
 def test_wait_text_holds_a_match_until_the_screen_under_it_settles():
-    # the gate every other wait applies (D115), now here (D116): a
-    # matching row on a screen still painting is a candidate, not an
-    # answer
+    # The same quiescence gate every other wait applies (D115) applies
+    # here too (D116): a matching row on a screen that is still being
+    # drawn is only a candidate, not a confirmed match.
     painting = []
     for step in range(12):
         rows = ["Welcome to FreeDOS"] + [""] * 24
@@ -288,9 +290,10 @@ def test_wait_text_says_when_a_match_never_settled():
 
 
 def test_wait_stopped_returns_when_the_vm_is_gone():
-    # the machine channel observes only: the session refusing the
-    # recorded identity, or the connection failing, is the machine
-    # down — marking the phase is the lifecycle's act (D116)
+    # This only observes the machine, it does not change it: the
+    # session rejecting the recorded identity, or the connection
+    # failing outright, both count as the machine being down.
+    # Recording that in the phase is a separate action (D116).
     for gone in (ConnectionRefusedError(), OSError("pipe"),
                  PreflightError("gone", rule_id="machine.vm-unreachable")):
         console = mock.Mock()
@@ -454,21 +457,22 @@ class _PausingLanguageMenu:
 
 
 class _RecognizedLanguageMenu:
-    """The FreeDOS language chooser as a *recognizer* reports it.
+    """The FreeDOS language chooser, as a pixel-based recognizer would see it.
 
-    The other fakes here render VGA attribute bytes, where a row wears
-    one attribute and the selection bar is that row's alone. A
-    screenshot backend has no such bytes: tokens come from each cell's
-    foreground/background pixels, and a blank cell shows only one
-    colour — so nothing can tell its foreground from its background
-    and it cannot carry a lettered cell's token. The bar is painted
-    across the dialog, so its own padding reads as the *backdrop*
-    token, the most common on screen.
+    The other fake menus here render VGA attribute bytes, where each
+    row has a single attribute and the selection bar is that row's
+    only attribute. A screenshot-based backend has no such bytes:
+    tokens come from each cell's foreground/background pixels, and a
+    blank cell shows only one colour, so there is no foreground to
+    tell from the background and no token for a lettered cell to
+    carry. The bar is painted across the whole dialog, so its own
+    padding reads as the backdrop token, the most common one on
+    screen.
 
-    That is the screen the frequency reading cannot classify: the
-    dominant token among the newly highlighted row's changed cells is
-    the backdrop's. Every row is also retranslated per keypress, which
-    is what the real chooser does.
+    That is the case the frequency-based classifier fails on: the
+    most common token among the newly highlighted row's changed cells
+    is the backdrop's, not the bar's. Every row is also retranslated
+    on each keypress, matching what the real chooser does.
     """
 
     BACKDROP = 0xB10CC     # blue on blue: the bar's padding, and the
@@ -497,8 +501,9 @@ class _RecognizedLanguageMenu:
                     attributes[number][column] = (
                         self.BAR_TEXT if highlighted else self.NORMAL_TEXT)
                 else:
-                    # The pathology: a blank cell inside the bar is
-                    # indistinguishable from the backdrop outside it.
+                    # The problem this guards against: a blank cell
+                    # inside the bar looks identical to the backdrop
+                    # outside it.
                     attributes[number][column] = (
                         self.BACKDROP if highlighted else self.DIALOG)
         return rows, attributes
@@ -513,12 +518,13 @@ class _RecognizedLanguageMenu:
 
 
 class _CountdownMenu(_FakeMenu):
-    """Boots its default unless a key arrives within `patience` reads.
+    """Boots the default option unless a key arrives within `patience` reads.
 
-    The installed FreeDOS boot menu: a ticking countdown that selects
-    option 1 on expiry. Any key cancels it, which is what makes
-    pressing before studying the screen the whole fix — the reads a
-    baseline would spend are spent learning the timer running out.
+    This models the real FreeDOS boot menu: a countdown that picks
+    option 1 if it expires. Any keypress cancels it. That is why the
+    fix is to press a key before studying the screen — the reads a
+    baseline measurement would otherwise spend just watch the timer
+    run out.
     """
 
     def __init__(self, items, patience=3):
@@ -731,12 +737,12 @@ def test_a_lone_unhighlight_is_not_a_new_cursor_position():
 
 
 def test_a_menu_that_boots_itself_is_steered_before_it_expires():
-    """T23: press first, study after.
+    """T23: press before studying the screen.
 
-    Learning the animation mask first costs `_BASELINE_READS`,
-    which on a slow reading path outlasts a boot menu's
-    countdown — so the machinery timed out the menu it was
-    preparing to steer.
+    Measuring the animation mask first costs `_BASELINE_READS` reads,
+    and on a slow reading path that outlasts a boot menu's countdown —
+    so the old approach timed out the very menu it was trying to
+    steer, before it ever pressed a key.
     """
     menu = _CountdownMenu(["Load FreeDOS with JEMM386",
                            "Load FreeDOS with JEMMEX",
@@ -750,11 +756,12 @@ def test_a_menu_that_boots_itself_is_steered_before_it_expires():
 
 
 def test_a_screen_without_the_item_still_settles_first():
-    """The fallback: nothing to race when the item is not there.
+    """The fallback path: nothing to skip ahead to when the item is not there yet.
 
-    A screen still arriving needs the baseline, and its absence
-    is what says so — so the cheap path is taken only where a
-    `wait` has already put the item on screen.
+    A screen that is still arriving needs the full baseline
+    measurement, and the item's absence is exactly what signals that.
+    So the cheap, fast path is only taken when a `wait` has already
+    confirmed the item is on screen.
     """
     menu = _PaintingMenu(["First item", "Second item"], frames=6)
     console = display_module.DisplayConsole(None)
@@ -771,8 +778,9 @@ def test_a_screen_without_the_item_still_settles_first():
 
 
 def test_the_bar_is_followed_on_a_recognized_framebuffer():
-    # F52's live failure: cell tokens recovered from pixels rather
-    # than VGA bytes, on a menu that retranslates every row.
+    # This reproduces the failure F52 fixed: cell tokens recovered
+    # from pixels, instead of VGA attribute bytes, on a menu where
+    # every row gets retranslated.
     menu = _RecognizedLanguageMenu([
         ["English", "German", "Esperanto"],
         ["Englisch", "Deutsch", "Esperanto"],
@@ -905,11 +913,12 @@ def test_unselectable_row_raises_when_the_cursor_cannot_reach_it():
 # Booting to a DOS prompt.
 
 def _ready_against(frames, timeout=90, prompt=None):
-    """Wait for readiness over a guest painting ``frames`` in turn.
+    """Wait for readiness while the guest paints through ``frames`` one at a time.
 
-    The same deterministic clock and painting guest the command
-    path is tested over (below), so a readiness test says what the boot
-    drew and when, and reads the same stability verdict.
+    Uses the same deterministic clock and fake painting guest as the
+    command-execution tests below, so a readiness test can say exactly
+    what the boot drew and when, and gets judged by the same stability
+    rule.
     """
     guest = _PaintingGuest(frames)
     console = mock.Mock()
@@ -931,9 +940,10 @@ def test_reaches_an_existing_prompt_without_typing():
 
 
 def test_times_out_without_a_prompt():
-    # an expiry is a wait's (D90): the work did not happen, and the
-    # boot may still finish — so it is both a RunFailure and the
-    # ordinary TimeoutError a caller holding the loop catches
+    # A timeout here (D90) means the expected work did not happen —
+    # the boot may still finish later — so it is reported as both a
+    # RunFailure and an ordinary TimeoutError, for a caller that
+    # already catches TimeoutError.
     with pytest.raises(WaitExpired, match="DOS prompt") as expired:
         _ready_against([[""]], timeout=0)
     assert isinstance(expired.value, RunFailure)
@@ -941,8 +951,9 @@ def test_times_out_without_a_prompt():
 
 
 def test_a_customized_prompt_is_ready_only_when_the_caller_declares_it():
-    # no earlier screen to read it off (D112), so the caller says
-    # what the guest draws (D113) — exactly, as the bottom row
+    # There is no earlier screen to read the prompt off of (D112), so
+    # the caller has to say exactly what the guest draws, as the
+    # bottom row (D113).
     with pytest.raises(RunFailure) as undeclared:
         _ready_against([["[C:\\]>"]], timeout=0)
     console, _ = _ready_against([["[C:\\]>"]], prompt="[C:\\]>")

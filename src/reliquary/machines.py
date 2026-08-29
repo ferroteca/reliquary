@@ -21,16 +21,17 @@ from .errors import (InternalError, PreflightError, ReliquaryError,
                      StaticError, WaitExpired)
 from .home import machines_dir
 from .library import codex_blueprint_available
-# The substrate the machine layer stands on: ids and directories, the
-# locks, machine.json, and selector resolution.
+# machine_state.py is the foundation this module is built on: machine
+# ids and directories, the locks, machine.json, and selector
+# resolution.
 #
-# **This module stays the machine layer's front door.** A consumer
-# above the layer — the session veneer, the script runner, the media
-# family — reaches every one of these through `machines`, which is why
-# the names below that this module does not itself call are imported
-# anyway. The one exception is `machine.py`, which takes
-# `read_vm_state` from the substrate directly because importing this
-# module would put the two back in a cycle.
+# Other code always reaches these through `machines` — the session
+# layer, the script runner, the media-handling code — which is why
+# this module imports names below that it never calls itself; it is
+# just re-exporting them. The one exception is `machine.py`, which
+# imports `read_vm_state` straight from `machine_state` instead,
+# because importing this module from there would create an import
+# cycle between the two.
 from .interaction_agentless import AgentlessGuestExec
 from .machine_handle import Machine
 from .machine_state import (allocate_machine_id, backend_dir,
@@ -46,11 +47,11 @@ from .resolve import (load_namespace, location_property_keys,
 
 
 def _drive_media(drive, namespace):
-    """The media a drive carries: from the catalog, or written in place.
+    """The media a drive carries: from the catalog, or declared inline.
 
-    An inline media declared at the drive is used directly — the
-    anonymous blank has no catalog name to look up, being in no
-    namespace at all.
+    A media declared directly on the drive (inline) is used as-is —
+    an anonymous blank drive has no catalog name to look up, since it
+    was never given one.
     """
     if drive.inline is not None:
         return drive.inline
@@ -60,12 +61,14 @@ def _drive_media(drive, namespace):
 
 
 def _image_stem(media, key):
-    """The per-machine image name: the media, or the slot for the blank.
+    """The per-machine image name: the media's name, or the slot's key
+    for a blank.
 
-    Images are keyed by media so that media moving through a shared
-    removable slot never clobber one another. The anonymous blank is the
-    one exception and the one place a slot names anything: it has no
-    catalog identity to be keyed by.
+    Images are keyed by media name so that different media passing
+    through one shared removable slot never overwrite each other's
+    image. The anonymous blank is the one exception, and the one case
+    where the slot's key is used instead: a blank has no catalog name
+    to be keyed by.
     """
     return media.name or key
 
@@ -91,48 +94,59 @@ _PLATFORM_MEMORY = {
 def _default_control_planes(platform):
     """The platform's default control-plane policy.
 
-    Every current platform defaults to agentless display — the
-    universal, cooperation-free plane (blueprint-reference.md).
-    Richer per-platform defaults arrive with the planes themselves.
+    Every current platform defaults to agentless display — the one
+    control plane that works on any guest without needing anything
+    installed or running inside it (blueprint-reference.md). Richer
+    per-platform defaults will arrive as those other control planes
+    are added.
     """
     return ["agentless-display"]
 
 
 def _resolve_control_planes(machine):
-    """The machine's control-plane policy, defaulted.
+    """The machine's control-plane policy, with the default filled in.
 
-    Whether a plane can be honored is the backend's answer, not this
-    module's: the policy becomes a requirement and the adapter's
-    capability report judges it (P11).
+    Whether a control plane can actually be provided is answered by
+    the backend, not by this module: the policy becomes a
+    requirement, and the backend adapter's capability report judges
+    whether it can meet it (P11).
     """
     return (list(machine.control_planes)
             or _default_control_planes(machine.platform))
 
 
 def _resolve_pointing_device(machine):
-    """The machine's pointer input device, defaulted.
+    """The machine's pointer input device, with the default filled in.
 
-    ``mouse`` is the stock relative device every platform's default
-    machine carries anyway, so the default records reality rather
-    than aspiring to one (F66); a GUI-era platform earns a richer
-    default the way `control-planes` will earn one of its own.
+    ``mouse`` (a standard relative-motion device) is what every
+    platform's default machine already carries anyway, so this
+    default just states what is already true rather than choosing
+    something new (F66). A platform from the GUI era will eventually
+    get a more specific default, the same way `_default_control_planes`
+    will eventually get richer per-platform defaults of its own.
     """
     return machine.pointing_device or "mouse"
 
 
 def _backend_choice(machine):
-    """Where the blueprint says this machine belongs, and how it said it.
+    """Where the blueprint says this machine belongs, and how it said so.
 
-    Three answers, in the order they are consulted. A declared
-    ``backend`` **pins**. Failing that, ``backend-settings`` for
-    **exactly one** backend narrows assignment to it: sections are the
-    one place backend-specific configuration may appear, so a
-    blueprint carrying exactly one has already said which backend it is
-    written for, and walking past it to another that could never honor
-    those settings would be assignment ignoring the blueprint. Two or
-    more sections narrow nothing — each is inert until its backend
-    wins, and the ordinary walk decides. **Presence is what narrows**,
-    not content: an empty section names its backend just as a full one
+    There are three possible answers, checked in this order:
+
+    1. A declared ``backend`` field pins the choice outright.
+    2. Otherwise, if the blueprint has ``backend-settings`` for
+       exactly one backend, that narrows the choice to it: settings
+       sections are the only place backend-specific configuration can
+       appear, so a blueprint with exactly one section has already
+       said which backend it was written for. Picking a different
+       backend that could never use those settings would mean
+       ignoring what the blueprint said.
+    3. Two or more sections narrow nothing — each stays unused until
+       its backend is actually picked, and the normal priority walk
+       decides instead.
+
+    What matters is whether a section is present, not what is in it:
+    an empty section names its backend just as clearly as a full one
     does.
     """
     if machine.backend is not None:
@@ -144,12 +158,12 @@ def _backend_choice(machine):
 
 
 def _requirements(machine, namespace):
-    """What this blueprint asks of a backend, in the seam's vocabulary.
+    """What this blueprint asks of a backend, as a `backends.Requirements`.
 
     Read off the whole machine — its control-plane policy, the media
     kinds and controllers its enabled drives declare, and the
     materialization mode of every media they name — because a backend
-    is chosen for the machine and never for a drive.
+    is chosen for the whole machine, never for one drive at a time.
     """
     planes = _resolve_control_planes(machine)
     media = []
@@ -174,14 +188,15 @@ def _requirements(machine, namespace):
 
 
 def _blueprint_digest(resolved, drives):
-    """Digest the resolved blueprint snapshot (the machine baseline).
+    """Hash the resolved blueprint into the digest `apply` compares
+    against.
 
-    Covers the resolved logical shape only — the per-drive cache
-    ``path`` (environment-specific) and the recorded observation
-    (``launch-size``: the size a floppy drive was *launched* with, not
-    what the blueprint asked for) are excluded — so the same blueprint
-    resolves to the same digest across homes and across boots, which
-    is what ``apply`` compares against.
+    Covers only the resolved logical shape of the machine — the
+    per-drive cache ``path`` (which depends on this environment) and
+    the recorded observation ``launch-size`` (the size a floppy drive
+    was *launched* with, not what the blueprint asked for) are left
+    out — so the same blueprint produces the same digest across
+    different homes and across different boots.
     """
     observed = {"path", "launch-size"}
     snapshot = dict(resolved)
@@ -199,8 +214,9 @@ def _blueprint_digest(resolved, drives):
 def _drive_common(key, drive):
     """The medium/slot/controller fields common to every drive entry.
 
-    A controller the assigned backend cannot wire was already refused
-    at assignment, by name, against that backend's capability report.
+    A controller the assigned backend can't support would already
+    have been refused during backend assignment, by checking its name
+    against that backend's capability report.
     """
     entry = {"medium": drive.medium, "slot": drive.slot}
     if drive.medium != "floppy":
@@ -212,15 +228,17 @@ def _materialize_drive(key, drive, adapter, disks_root, namespace, context,
                        properties=None, events=None, cancelled=None):
     """Materialize one enabled drive, returning its resolved state entry.
 
-    The drive names a media (or is an empty removable slot); the media
-    owns materialization. ``new`` is a fresh blank of its ``size``;
-    ``use`` attaches the fetched payload directly (a directory payload
-    renders as vvfat); ``difference``/``copy`` build a per-machine image
-    over/of the fetched payload. Per-machine images live under
-    ``disks/`` keyed by the media name, not the slot, so a media moving
-    through a removable slot keeps its own image; the adapter names the
-    file, since the native image format is its choice. The entry
-    records the realized ``path`` plus the media name and mode.
+    The drive names a media (or is an empty removable slot); which
+    materialization mode applies is decided by the media, not the
+    drive. ``new`` creates a fresh blank of the given ``size``;
+    ``use`` attaches the fetched payload directly (a directory
+    payload is rendered as vvfat); ``difference``/``copy`` build a
+    per-machine image over, or as a copy of, the fetched payload.
+    Per-machine images live under ``disks/``, keyed by the media name
+    rather than the slot, so a medium moving through a removable slot
+    keeps its own image; the adapter names the actual file, since the
+    native image format is its choice. The returned entry records the
+    resulting ``path`` plus the media name and mode.
     """
     entry = _drive_common(key, drive)
     media = _drive_media(drive, namespace)
@@ -262,20 +280,21 @@ def create(machine, namespace, *, context=None, blueprint_name="",
     """Materialize one machine from a parsed composed machine component.
 
     Assigns the backend (a declared one pins the choice; otherwise the
-    priority walk takes the first available and capable one), creates
-    the machine cache directory under
-    ``cache/machines/<blueprint>-<n>/``, writes ``machine.json`` with
-    the fully resolved configuration and its provenance
-    (``blueprint-source``, ``blueprint-digest``, ``backend-id``), and
-    materializes every enabled drive: a per-machine image under
-    ``disks/`` for ``new``/``difference``/``copy`` media, the fetched
-    payload attached in place for ``use``. ``source`` is the absolute
-    path of the blueprint file this machine resolved from, recorded for
-    selection scoping. The machine number is the lowest free
-    non-negative integer for that blueprint, unless ``number`` pins a
-    specific one (``recreate`` reuses the old id). ``backend``
-    overrides the blueprint's backend field, pinning assignment the same
-    way a declared ``backend`` does. Returns the generated machine id.
+    priority walk picks the first backend that is both available and
+    capable), creates the machine's cache directory under
+    ``cache/machines/<blueprint>-<n>/``, and writes ``machine.json``
+    with the fully resolved configuration plus its provenance
+    (``blueprint-source``, ``blueprint-digest``, ``backend-id``).
+    Every enabled drive is materialized: a per-machine image under
+    ``disks/`` for ``new``/``difference``/``copy`` media, or the
+    fetched payload attached in place for ``use``. ``source`` is the
+    absolute path of the blueprint file this machine resolved from,
+    recorded so machine selection can be scoped to it. The machine
+    number is the lowest free non-negative integer for that
+    blueprint, unless ``number`` pins a specific one (``recreate``
+    reuses the old id). ``backend`` overrides the blueprint's own
+    ``backend`` field, pinning the choice the same way a declared
+    ``backend`` field does. Returns the generated machine id.
     """
     if not isinstance(blueprint_name, str) or not blueprint_name:
         raise StaticError("create requires a non-empty blueprint_name",
@@ -319,10 +338,10 @@ def create(machine, namespace, *, context=None, blueprint_name="",
 def _materialize_machine(machine, namespace, machine_id, blueprint_name,
                          created, disks_root, source, context,
                          properties=None, events=None, backend=None):
-    # Assignment happens before anything is materialized, so a machine
-    # nothing on this host can build costs no image work — and the
-    # backend is fixed before the first image is written in its own
-    # native format.
+    # Backend assignment happens before anything is materialized, so
+    # a machine nothing on this host can build costs no image work —
+    # and the backend is fixed before the first image is written in
+    # its own native format.
     control_planes = _resolve_control_planes(machine)
     if backend is not None:
         declared, narrowed = backend, None
@@ -331,9 +350,10 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
     backend = backends.assign(_requirements(machine, namespace),
                               declared=declared, narrowed=narrowed)
     adapter = backends.adapter(backend)
-    # The section that applies is the assigned backend's, so this
-    # follows assignment; the others are inert and stay unjudged, since
-    # no adapter can speak for another's vocabulary.
+    # Only the assigned backend's settings section applies, so
+    # validation happens after assignment; sections for other
+    # backends are simply ignored, since one backend's adapter has no
+    # way to validate settings meant for a different backend.
     adapter.validate_settings(machine.backend_settings.get(backend))
     resolved_drives = {}
     for key, drive in sorted(machine.drives.items()):
@@ -386,11 +406,12 @@ def _bind_location_properties(machine, namespace, *, parameters=None,
                               context=None):
     """Bind every ``${key}`` a machine's media locations reference.
 
-    Collected across the drives' containment closure and bound through
-    the property source order at create/apply time, so a media located
-    by ``${license-iso}`` materializes from the value a parameter, the
-    environment, the file, or an interactive ask supplies. Returns
-    ``{key: value}`` (empty when no location references any property).
+    Collected across all of the machine's drives, and bound through
+    the usual property-source order at create/apply time, so that a
+    media located by ``${license-iso}`` gets materialized using
+    whichever value a parameter, the environment, the properties
+    file, or an interactive prompt supplies. Returns ``{key: value}``
+    (empty when no location references any property).
     """
     keys = set()
     for drive in machine.drives.values():
@@ -409,42 +430,48 @@ def _bind_location_properties(machine, namespace, *, parameters=None,
 
 # --- the dry run -----------------------------------------------------
 #
-# *A dry run performs every step that costs nothing and commits
-# nothing, stops at the first step that would, and reports what it
-# would have done.* Two invariants carry it. It **leaves no state
-# behind** — no machine directory, no ``machine.json``, no fetched
-# payload, no seeded blueprint, no lock file — and its **return
-# describes the run** rather than impersonating the run's output.
+# A dry run performs every step that costs nothing and commits
+# nothing, stops at the first step that would cost or commit
+# something, and reports what it would have done. Two rules hold
+# throughout. It leaves no state behind — no machine directory, no
+# ``machine.json``, no fetched payload, no seeded blueprint, no lock
+# file — and what it returns describes the run, rather than
+# pretending to be the run's actual output.
 #
-# It raises what a real create would raise, where a real create would
-# raise it: a dry run whose verdict is "this would fail" fails, and
-# the diagnostic is the answer. There are exactly two exceptions, and
-# each is something a dry run specifically *cannot do* rather than a
-# judgement about how bad a finding is:
+# It raises whatever a real create would raise, at the same point a
+# real create would raise it: if a dry run's verdict is "this would
+# fail", it fails, and the error message is the answer. There are
+# exactly two exceptions, and each is something a dry run specifically
+# cannot do, not a judgment call about how bad a finding is:
 #
-#   1. It must not prompt, so a media location no concrete source
-#      answers is reported unevaluated instead of asked for.
-#   2. Under an explicit ``backend=`` the question is what *another*
-#      host would do, so that backend's absence here is reported
-#      rather than raised. Incapability still raises — that is the
-#      answer to the question that was asked.
+#   1. It must never prompt, so a media location that no concrete
+#      source can answer is reported as unresolved instead of being
+#      asked for.
+#   2. Under an explicit ``backend=``, the question being asked is
+#      what *another* host would do, so that backend simply being
+#      unavailable here is reported rather than raised as an error.
+#      The backend being incapable of the request still raises —
+#      that is the actual answer to the question that was asked.
 
 
 @dataclasses.dataclass(frozen=True)
 class DryRun:
     """What an operation would do, having done none of it.
 
-    The return of every ``dry_run=True`` call, and a **distinct type
-    on purpose**: a dry create must not hand back something a caller
-    can mistake for the real return — a machine id naming no machine,
-    or ``None`` — because that makes misuse a confusing failure three
-    layers down, where this makes it a ``TypeError`` at the call site.
+    Returned by every ``dry_run=True`` call. It is a distinct type on
+    purpose: a dry create must not hand back something a caller could
+    mistake for the real return value — a machine id that names no
+    real machine, or ``None`` — because that would turn a misuse into
+    a confusing failure several layers down. Returning this type
+    instead turns misuse into an immediate ``TypeError`` at the call
+    site.
 
-    ``operation`` names the verb described, ``report`` is the
-    printable human rendering, and ``plan`` is the operation's own
-    document, which is the mapping ``--json`` serializes. Three
-    fields are the whole type, so a second operation contributes a
-    plan shape and no new field.
+    ``operation`` names the verb being described, ``report`` is the
+    printable, human-readable rendering, and ``plan`` is the
+    operation's own data, which is the mapping ``--json`` serializes.
+    These three fields are the whole type, so a second kind of
+    dry-run operation only needs its own ``plan`` shape, never a new
+    field.
     """
 
     operation: str
@@ -453,18 +480,21 @@ class DryRun:
 
 
 def _seed_hint(name):
-    """The fix, where the shipped library holds this blueprint name.
+    """The suggested fix, if the shipped library has a blueprint by
+    this name.
 
-    A deleted fallback should leave an instruction rather than a
-    silence (P11, D88): nothing resolves out of the codex any more, so
-    the refusal is where a user learns that seeding is the move. Empty
-    when the library has no such name, since inventing a suggestion
-    that would also fail is worse than saying nothing.
+    Since blueprints are no longer resolved from the codex
+    automatically, this is where a user learns seeding is the fix,
+    when a lookup fails (P11, D88). Empty when the library has no
+    blueprint of this name, since suggesting a fix that would also
+    fail is worse than saying nothing.
 
-    (A dry run needs no namespace of its own now. It used to read a
-    codex blueprint where it lay — the one path by which the library
-    reached an operation unasked — and with that gone the dry and live
-    halves resolve identically, which is what the rule always said.)
+    (A dry run no longer needs its own way to load a namespace. It
+    used to read a codex blueprint directly — the one path by which
+    the codex could affect an operation without being explicitly
+    asked for — and now that's gone, dry runs and real creates
+    resolve blueprints identically, which is what the rule always
+    intended.)
     """
     if codex_blueprint_available(name):
         return f"\nthe codex has one: rlq seed-blueprint {name}"
@@ -475,10 +505,11 @@ def _describe_location_properties(machine, namespace, *, explicit=None,
                                   properties_file=None, context=None):
     """Name each location key's source without asking for any of them.
 
-    The dry twin of :func:`_bind_location_properties`: a create binds
-    these keys, prompting on a terminal for one nothing else answers,
-    and a dry run must not — so it takes what the concrete sources
-    give and reports the rest as the ask a real create would make.
+    The dry-run counterpart of :func:`_bind_location_properties`: a
+    real create binds these keys, prompting at the terminal for any
+    one that nothing else answers, and a dry run must never prompt —
+    so it takes whatever the concrete sources already supply, and
+    reports the rest as the question a real create would have asked.
     """
     keys = set()
     for drive in machine.drives.values():
@@ -525,16 +556,17 @@ def _dry_payload(media, namespace, context, properties, entries):
 
 
 def _refuse_missing(entries):
-    """Refuse a plan whose local payloads are not on the disk.
+    """Refuse a plan whose local payloads are not on disk.
 
-    A missing local file is an error a dry run can and should
-    catch — a create hits it too, and a plan that cannot be executed
-    must not report success (P11). It is raised **after** the whole
-    plan is walked so every such media is named at once: a validator
-    that stops at the first fault costs a fix-and-rerun for each one,
-    and enumerating them is exactly what this pass is good at.
-    Nothing else is collected this way, so every other refusal still
-    lands where a create's would.
+    A missing local file is an error a dry run can and should catch —
+    a real create would hit it too, and a plan that can't actually be
+    executed must not report success (P11). This is raised only
+    after the whole plan has been walked, so every missing media is
+    named at once: stopping at the first one found would cost the
+    user a fix-and-rerun cycle for each missing file, and collecting
+    them all here avoids that. Nothing else is collected this way —
+    every other kind of refusal still happens at the same point a
+    real create would hit it.
     """
     missing = [entry for entry in entries
                if entry["state"] == "local-missing"]
@@ -555,10 +587,11 @@ def _dry_drive(key, drive, adapter, disks_root, namespace, context,
     """One drive's resolved plan, materializing nothing.
 
     Mirrors :func:`_materialize_drive` decision for decision — the
-    same refusals in the same order — recording what it would have
-    written in place of writing it. ``adapter.image_path`` is
-    composition, not creation, so asking where an image would land
-    costs nothing and says exactly what a create would do.
+    same refusals, in the same order — recording what it would have
+    written instead of actually writing it. ``adapter.image_path``
+    only builds a path string, it doesn't create anything, so asking
+    where an image would land costs nothing and matches exactly what
+    a real create would do.
     """
     entry = dict(key=key, **_drive_common(key, drive))
     media = _drive_media(drive, namespace)
@@ -590,13 +623,16 @@ def _dry_drive(key, drive, adapter, disks_root, namespace, context,
 
 
 def _dry_backend(machine, namespace, backend):
-    """The backend a create would land on, and why — plus its probe.
+    """The backend a create would land on, and why — plus the
+    capability check for it.
 
-    With no ``backend`` this is assignment itself: a declared one
-    pins, a lone ``backend-settings`` section narrows, otherwise the
-    priority walk. With one it is the other
-    question — whether the blueprint would work *there* — so
-    availability is reported and only capability decides (P11).
+    With no ``backend`` argument given, this performs backend
+    assignment itself: a declared ``backend`` pins the choice, a lone
+    ``backend-settings`` section narrows it, otherwise the priority
+    walk decides. With a ``backend`` argument given, it answers a
+    different question instead — whether the blueprint would work
+    *there* — so that backend simply being unavailable is reported,
+    and only whether it is capable decides the outcome (P11).
     """
     requirements = _requirements(machine, namespace)
     if backend is None:
@@ -631,9 +667,10 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         numbering = "pinned"
     assigned, chosen, verdict = _dry_backend(machine, namespace, backend)
     adapter = backends.adapter(assigned)
-    # A create would refuse an unhonorable section, so a dry run does
-    # too, and in the same place — the settings are authored input,
-    # judged identically whether or not the backend is on this host.
+    # A real create would refuse a settings section it cannot honor,
+    # so a dry run does too, at the same point — the settings are
+    # user-written input, judged the same way whether or not the
+    # backend is actually available on this host.
     adapter.validate_settings(machine.backend_settings.get(assigned))
     disks_root = machine_disks_dir(machine_id, context)
     entries = []
@@ -677,9 +714,9 @@ def _drive_line(drive):
     if drive.get("controller"):
         where += f" {drive['controller']}"
     if drive["materialize"] is None:
-        # An empty removable slot. The test is the mode and not the
-        # media name, because the anonymous inline blank has no name
-        # either and is emphatically not an empty slot.
+        # An empty removable slot. The check is on the mode, not the
+        # media name, because an anonymous inline blank also has no
+        # name — but it is definitely not an empty slot.
         return f"  {drive['key']} ({where}): empty"
     what = f"{drive['media'] or '(inline)'} {drive['materialize']}"
     if drive.get("size"):
@@ -737,25 +774,29 @@ def create_machine(name, *, context=None, number=None, properties=None,
                    backend=None):
     """Load ``blueprints/<name>.rlqb`` and materialize one machine.
 
-    A blueprint the home does not contain is seeded from the
-    built-in library on this first reference, along with the media
-    definitions and scripts it references (never overwriting user
-    files). ``number`` pins the machine number (``recreate`` reuses
-    the old id); omitted, the lowest free number is allocated.
-    ``properties`` / ``properties_file`` bind any ``${key}`` a media
-    location references, before materialization.
+    A blueprint the home directory does not contain is never seeded
+    automatically — run ``rlq seed-blueprint <name>`` first to copy
+    it (and the media/scripts it references) from the built-in
+    library into the home directory (D88); this raises
+    ``PreflightError`` naming that command if the blueprint is
+    missing. ``number`` pins the machine number
+    (``recreate`` reuses the old id); if omitted, the lowest free
+    number is allocated. ``properties`` / ``properties_file`` bind
+    any ``${key}`` a media location references, before materialization
+    happens.
 
     ``dry_run=True`` materializes nothing and returns a
     :class:`DryRun` describing what a create would do — the machine
     id it would allocate, the backend it would land on, each drive's
     resolved plan, and where every media would come from. It leaves
-    no state behind (nothing is seeded, fetched, locked or written)
-    and never prompts. ``backend`` overrides the blueprint's
-    ``backend`` field, pinning assignment the same way a declared
-    one does: it must be available and capable, and it fails closed
-    on either count. With ``dry_run`` it asks the other question —
-    whether the blueprint would work *there* — so absence is
-    reported rather than raised (P11).
+    no state behind (nothing is seeded, fetched, locked, or written)
+    and never prompts. ``backend`` overrides the blueprint's own
+    ``backend`` field, pinning assignment the same way a declared one
+    does: the backend must be both available and capable, and this
+    raises an error if either is false. With ``dry_run``, it asks the
+    other question instead — whether the blueprint would work
+    *there* — so a backend simply being unavailable is reported
+    rather than raised as an error (P11).
     """
     if dry_run:
         namespace = load_namespace(context)
@@ -771,10 +812,11 @@ def create_machine(name, *, context=None, number=None, properties=None,
                 machine, namespace, explicit=properties,
                 properties_file=properties_file, context=context),
             backend=backend)
-    # The blueprints directory is the sole source: nothing is seeded on
-    # first reference, and the codex reaches a tree only when
-    # `seed-blueprint` is asked to put it there (D88). A name the codex
-    # ships is named in the refusal rather than quietly supplied.
+    # The blueprints directory is the only place searched: nothing is
+    # seeded automatically on first reference, and the codex only
+    # reaches a project's tree when `seed-blueprint` is explicitly
+    # asked to put it there (D88). If the codex ships a blueprint by
+    # this name, the refusal says so instead of silently supplying it.
     namespace = load_namespace(context)
     if name not in namespace.machines:
         raise PreflightError(
@@ -819,8 +861,9 @@ def recreate_machine(*, machine=None, blueprint=None, context=None,
 def get_machine_dir(*, machine=None, blueprint=None, context=None):
     """Return the absolute cache directory of the selected machine.
 
-    The out-of-band door (instance model): a query valid in any
-    phase, touching nothing.
+    Under the instance model, this is a query valid in any phase — it
+    reads the directory path without touching or requiring anything
+    about the machine's state.
     """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
@@ -834,14 +877,16 @@ def _reconcile_drives(machine, namespace, old_drives, adapter, disks_root,
                       context, properties=None, events=None):
     """Reconcile a machine's drives to a re-resolved machine component.
 
-    Absorbable changes are applied: added, removed, enabled/disabled
-    drives, and every ``use``/empty-slot drive (re-fetched or emptied —
-    this also reconciles away a script's divergence). A drive whose
-    image reliquary already materialized (``new``/``difference``/``copy``)
-    is kept only when its media name and mode (and ``new`` size) are
-    unchanged; any change to it fails closed, naming ``recreate`` as the
-    honest alternative. Returns the new drive-state mapping; a removed
-    materialized image is deleted.
+    Changes that can be applied safely are applied: drives added,
+    removed, or enabled/disabled, and every ``use`` or empty-slot
+    drive is re-fetched or emptied to match the blueprint (this also
+    undoes any live media change a script made with insert/eject). A
+    drive whose image reliquary already materialized
+    (``new``/``difference``/``copy``) is kept only when its media
+    name and mode (and, for ``new``, its size) are unchanged; any
+    other change to it raises an error, naming ``recreate`` as the
+    way to make that change. Returns the new drive-state mapping; a
+    materialized image for a removed drive is deleted.
     """
     new_drives = {}
     enabled = {key: drive for key, drive in machine.drives.items()
@@ -850,8 +895,9 @@ def _reconcile_drives(machine, namespace, old_drives, adapter, disks_root,
         old = old_drives.get(key)
         old_owns = old is not None and old.get("materialize") in _OWNED_MODES
         if not old_owns:
-            # No reliquary-owned image here: (re)materialize/re-point
-            # freely (media re-fetch, empty slot, or a new image).
+            # No image here that reliquary already owns: freely
+            # (re)materialize or re-point it (a media re-fetch, an
+            # empty slot, or a brand-new image).
             new_drives[key] = _materialize_drive(
                 key, drive, adapter, disks_root, namespace, context,
                 properties, events)
@@ -892,20 +938,23 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
                     properties=None, properties_file=None, events=None):
     """Adopt the current blueprint into a stopped machine.
 
-    Re-resolves the blueprint the machine was created from (never at
-    ``start``) and reconciles the machine to it: memory, cpus, boot,
-    control-planes, backend-settings, metadata, and the absorbable
-    drive changes are applied; a changed ``size`` or ``base`` on an
-    already-materialized image fails closed (``recreate`` is the
-    alternative). The new resolved snapshot becomes the baseline
-    (``blueprint-digest`` / ``blueprint-source`` re-recorded).
-    ``properties`` / ``properties_file`` bind any ``${key}`` a
-    re-materialized media location references. Returns the machine id.
+    Re-resolves the blueprint the machine was created from (this
+    never happens automatically at ``start``) and reconciles the
+    machine to it: memory, cpus, boot, control-planes,
+    backend-settings, metadata, and any drive change that can be
+    applied safely are all applied. A changed ``size`` or ``base`` on
+    an image reliquary already materialized raises an error instead
+    (``recreate`` is the alternative). The newly resolved snapshot
+    becomes the new baseline (``blueprint-digest`` /
+    ``blueprint-source`` are re-recorded). ``properties`` /
+    ``properties_file`` bind any ``${key}`` a re-materialized media
+    location references. Returns the machine id.
     """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
     with machine_lock(machine_id, context):
-        state = _reconcile_phase(machine_id, context)
+        state = _corroborate_locked(
+            machine_id, _reconcile_phase(machine_id, context), context)
         phase = state.get("phase")
         if phase != "ready":
             raise PreflightError(
@@ -940,9 +989,9 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
                 f"machine {machine_id} is on backend {backend!r}, which "
                 f"cannot provide: {', '.join(missing)}",
                 rule_id="machine.backend-incapable")
-        # Checked here with the capability gate, before any drive is
-        # touched: an edited section this backend cannot honor leaves
-        # the machine exactly as it was.
+        # Checked here, right after the capability check above and
+        # before any drive is touched: a settings section this
+        # backend cannot honor leaves the machine exactly as it was.
         adapter.validate_settings(parsed.backend_settings.get(backend))
 
         bound = _bind_location_properties(
@@ -1010,26 +1059,29 @@ def _clear_vm(machine_id, phase, context=None):
 
 
 def _complete_stop(machine_id, context=None):
-    """Power off the owned VM and reconcile phase + VM identity.
+    """Power off the owned VM and reconcile the phase and VM identity.
 
-    On success the machine returns to ``ready`` and its ``vm`` section
-    is cleared, written together. If the adapter's stop fails closed,
-    the phase is reconciled without lying: a machine whose ``vm``
-    section is already gone becomes ``ready``, while one still recorded
-    (our VM may yet be running — a stuck port or an identity mismatch)
-    restores ``running``; either way the error propagates.
+    On success, the machine returns to ``ready`` and its ``vm``
+    section is cleared, both written together. If the adapter's
+    ``stop`` call raises an error, the phase is still updated to
+    match reality instead of being left stale: if the ``vm`` section
+    is already gone, the machine becomes ``ready``; if it is still
+    recorded (our VM may still be running — a stuck port, or an
+    identity mismatch), the phase is restored to ``running``. Either
+    way, the error is re-raised.
 
-    An **unreachable** VM is the exception, and it is an accomplished
-    stop rather than a failed one: the adapter went looking for this
-    machine's VM and there is none to power off, which is the state
-    stop was asked to produce. `script_runner._read` already reads
-    that rule id as the stopped observation mid-run, so a run
-    self-heals; without the same reading here, a guest that halted
-    itself between runs left the machine un-stoppable and therefore
-    un-destroyable, with no door but deleting its directory by hand
-    (T19). The rule id is the whole test — an identity mismatch or a
-    port that answers wrongly is a different condition and still
-    fails closed.
+    An unreachable VM is the one exception, and counts as a completed
+    stop rather than a failed one: the adapter looked for this
+    machine's VM and found none to power off, which is exactly the
+    state ``stop`` was asked to produce. `script_runner._read`
+    already treats that same rule id as meaning "stopped" when it
+    shows up mid-run, so a run recovers on its own; without the same
+    handling here, a guest that powered itself off between runs would
+    leave the machine impossible to stop, and therefore impossible to
+    destroy, with no way out but deleting its directory by hand
+    (T19). The check is exactly that rule id — an identity mismatch,
+    or a port that answers with something wrong, is a different
+    situation and still raises an error.
     """
     state = load_machine_state(machine_id, context)
     vm = state.get("vm")
@@ -1052,11 +1104,12 @@ def _reconcile_phase(machine_id, context=None):
     """Recover a machine found in an interrupted transitional phase.
 
     Called under the machine lock at the start of each mutating
-    operation (``destroy`` handles its own phases). A resting phase
-    (``ready``/``running``) returns unchanged. ``stopping`` completes
-    the interrupted stop; ``creating`` and ``destroying`` are rolled
-    forward by removing the incomplete materialization, then the
-    caller fails closed with recovery guidance.
+    operation (``destroy`` handles its own phases separately). A
+    resting phase (``ready``/``running``) is returned unchanged.
+    ``stopping`` completes the interrupted stop; ``creating`` and
+    ``destroying`` are finished by removing the incomplete
+    materialization, and then this raises an error that tells the
+    caller how to recover.
     """
     state = load_machine_state(machine_id, context)
     phase = state.get("phase")
@@ -1107,7 +1160,8 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
     re-entrant, so a caller already holding it cannot simply call the
     public function.
     """
-    state = _reconcile_phase(machine_id, context)
+    state = _corroborate_locked(
+        machine_id, _reconcile_phase(machine_id, context), context)
     phase = state.get("phase")
     if phase == "running":
         raise PreflightError(
@@ -1221,22 +1275,23 @@ def restart_machine(machine_id, *, display=False, context=None, events=None,
                     cancelled=None):
     """Stop a machine if it is running, then start it. Returns its id.
 
-    **The lock is held across both halves**, which is the whole
-    difference from typing the two commands. That is not a new kind
-    of claim — it is the same per-machine lock every mutating
-    operation already takes, simply not let go of in the middle. What
-    it buys is that nothing can start the machine, swap its media or
-    apply a blueprint in the gap: a restart that released the lock
-    could come back to a machine someone else had already started and
-    fail with `machine.already-running`, which is a race the caller
-    never asked to run.
+    The lock is held across both halves, which is the whole
+    difference from just running the two commands separately. That
+    isn't a new kind of lock — it's the same per-machine lock every
+    mutating operation already takes, simply not released in between.
+    What that buys is that nothing else can start the machine, swap
+    its media, or apply a blueprint in the gap: a restart that
+    released the lock in the middle could come back to find someone
+    else had already started the machine, and fail with
+    `machine.already-running` — a race the caller never asked for.
 
-    **A stopped machine is started rather than refused.** The end
-    state asked for is *running*, and stop is already satisfied by a
-    machine that is off; refusing here would make the command's
-    answer depend on a phase the caller usually neither knows nor
-    cares about. A machine caught mid-``stopping`` is reconciled by
-    `_reconcile_phase` first, exactly as the two commands would.
+    A stopped machine is started rather than refused. The end state
+    being asked for is *running*, and "stop" is already satisfied by
+    a machine that's already off, so refusing here would make the
+    command's outcome depend on a phase the caller usually neither
+    knows nor cares about. A machine caught mid-``stopping`` is
+    reconciled by `_reconcile_phase` first, exactly as running the
+    two commands separately would do.
     """
     with machine_lock(machine_id, context):
         _stop_locked(machine_id, context)
@@ -1265,9 +1320,9 @@ def _change_media_live(machine_id, slot, path, context):
     """Change a removable drive's medium on a running machine.
 
     The medium is swapped through the machine's identity-verified
-    backend session, against the drive's launch id (the slot key), so
-    the change the guest sees and the change persisted to the state
-    stay one operation.
+    backend session, addressed by the drive's slot key, so the change
+    the guest sees and the change persisted to the state happen as
+    one operation.
     """
     machine_home = machine_dir_path(machine_id, context)
     if read_vm_state(machine_home) is None:
@@ -1292,12 +1347,13 @@ def _medium_size(path):
 def _check_live_geometry(state, slot, drive, path):
     """Refuse a live floppy swap the drive's geometry cannot serve.
 
-    A floppy drive's geometry is fixed when the backend attaches it at
-    launch, and a live ``change`` does not revise it — so a medium of
-    a different size reaches the guest as read and write errors rather
-    than as a new disk. Reliquary did not choose that geometry, so it
-    says what it cannot do instead of producing a broken drive (P11).
-    Proven on QEMU/DOS, milestone 9's transport spike.
+    A floppy drive's geometry is fixed by the backend when it
+    attaches the drive at launch, and a live ``change`` does not
+    revise it — so a medium of a different size reaches the guest as
+    read and write errors, not as a new disk. Reliquary did not
+    choose that geometry, so this reports what it cannot do instead
+    of producing a broken drive (P11). Verified on QEMU/DOS during
+    milestone 9's investigation into floppy-based transport.
     """
     if drive.get("medium") != "floppy":
         return
@@ -1320,13 +1376,14 @@ def _check_live_geometry(state, slot, drive, path):
 
 
 def _anonymous_local(file):
-    """The path an ``insert_media(file=)`` mounts, or fail closed.
+    """The path an ``insert_media(file=)`` mounts, or an error if it
+    can't.
 
-    ``--file`` mounts an **anonymous** ``local`` + ``use`` media (U20):
-    mutable, unverified, attached in place. It has no catalog name, no
-    ``sha256`` to pin, and reliquary never copies it — the consumer
-    owns the image it just built and is free to rebuild it for the
-    next round.
+    ``--file`` mounts an anonymous ``local`` + ``use`` media (U20):
+    mutable, unverified, and attached in place. It has no catalog
+    name, no ``sha256`` to check it against, and reliquary never
+    copies it — the caller owns the image it just built and is free
+    to rebuild it for the next round.
     """
     path = os.path.abspath(os.fspath(file))
     if os.path.isdir(path):
@@ -1364,7 +1421,8 @@ def insert_media(machine_id, slot, media=None, *, file=None, context=None,
             "insert-media takes a media name or --file <path>, "
             "not both and not neither", rule_id="media.name-or-file")
     with machine_lock(machine_id, context):
-        state = _reconcile_phase(machine_id, context)
+        state = _corroborate_locked(
+            machine_id, _reconcile_phase(machine_id, context), context)
         _removable_drive(state, slot)
         path = (_anonymous_local(file) if file is not None
                 else _fetch(media, context, events=events,
@@ -1389,7 +1447,8 @@ def eject_media(machine_id, slot, *, context=None):
     machine the next ``start`` presents it without a medium.
     """
     with machine_lock(machine_id, context):
-        state = _reconcile_phase(machine_id, context)
+        state = _corroborate_locked(
+            machine_id, _reconcile_phase(machine_id, context), context)
         _removable_drive(state, slot)
         if state.get("phase") == "running":
             _change_media_live(machine_id, slot, None, context)
@@ -1411,7 +1470,8 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
     it.
     """
     with machine_lock(machine_id, context):
-        state = _reconcile_phase(machine_id, context)
+        state = _corroborate_locked(
+            machine_id, _reconcile_phase(machine_id, context), context)
         phase = state.get("phase")
         if phase != "ready":
             raise PreflightError(
@@ -1444,40 +1504,86 @@ def set_boot_order(machine_id, boot_keys, *, context=None):
 
 
 def list_machines(context=None, blueprint=None):
-    """Return machine states, corroborating a recorded ``running`` phase.
+    """Return machine states, double-checking a recorded ``running``
+    phase.
 
-    ``machine.json`` records the phase reliquary itself last drove a
-    machine to; only ``stop``/``mark_stopped`` update it, so a guest
-    that powered itself off, a killed process, or a host crash between
-    runs leaves a stale ``running`` behind with nothing to notice. Every
-    machine reported ``running`` here is corroborated live against its
-    backend first (the same identity-verified ``session()`` a script
-    run already opens), and reconciled to ``ready`` on a confirmed
-    ``machine.vm-unreachable`` before being handed back — so the phase
-    this returns is never a blind echo of the last write, regardless of
-    what actually shut the machine down. A check that cannot confirm
-    either way (a different backend refusal) reports the recorded
-    phase unevaluated rather than raising and failing the whole list.
+    ``machine.json`` records whichever phase reliquary itself last
+    set a machine to; only ``stop``/``mark_stopped`` update it, so if
+    a guest powers itself off, its process gets killed, or the host
+    crashes between runs, a stale ``running`` phase is left behind
+    with nothing to notice it. Every machine reported ``running``
+    here is checked against its actual backend first (opening the
+    same identity-verified ``session()`` a script run already opens),
+    and is corrected to ``ready`` if the backend confirms the VM is
+    gone (``machine.vm-unreachable``) before being handed back — so
+    the phase this returns always reflects reality, not just whatever
+    was last written to disk, no matter what actually stopped the
+    machine. A check that can't confirm either way (some other kind
+    of backend error) reports the recorded phase as-is, rather than
+    raising an error and failing the whole list.
     """
     return [_corroborated(state, context)
            for state in _list_machines_state(context, blueprint)]
 
 
-def _corroborated(state, context):
-    """One machine's ``running`` phase, live-checked and reconciled."""
-    vm = state.get("vm")
-    if state.get("phase") != "running" or not vm:
-        return state
-    backend = vm.get("backend") or state.get("backend") or "qemu"
+def _vm_confirmed_gone(vm):
+    """Check ``vm``'s backend without changing anything.
+
+    Returns ``True`` only when the backend raises a confirmed
+    ``machine.vm-unreachable`` — the one error `stop` and
+    `mark_stopped` already treat as meaning "the VM is gone", as
+    opposed to merely unreachable for some other reason (a wrong VNC
+    port, an identity mismatch). Those other cases return ``False``:
+    the check couldn't confirm the VM is actually gone, so it isn't
+    treated as gone.
+    """
+    backend = vm.get("backend") or "qemu"
     try:
         with backends.adapter(backend).session(vm):
             pass
     except ReliquaryError as error:
-        if error.rule_id != "machine.vm-unreachable":
-            return state
-        mark_stopped(state["id"], context)
-        return load_machine_state(state["id"], context)
-    return state
+        return error.rule_id == "machine.vm-unreachable"
+    return False
+
+
+def _corroborated(state, context):
+    """One machine's ``running`` phase, checked against the backend
+    and corrected if needed.
+
+    Used by callers that hold no lock of their own (``list_machines``,
+    and the shared precheck `exec` and `wait_ready` both run): a
+    confirmed-gone VM is corrected through :func:`mark_stopped`,
+    which takes the per-machine lock itself.
+    """
+    vm = state.get("vm")
+    if (state.get("phase") != "running" or not vm
+            or not _vm_confirmed_gone(vm)):
+        return state
+    mark_stopped(state["id"], context)
+    return load_machine_state(state["id"], context)
+
+
+def _corroborate_locked(machine_id, state, context):
+    """The same check and correction, for a caller that already holds
+    the lock.
+
+    ``start``, ``apply``, ``set-boot-order``, and insert/eject-media
+    all check the recorded phase before ever touching the backend,
+    under the per-machine lock — so without this check, a stale
+    ``running`` left behind by a VM that died some other way would
+    make them refuse or misbehave, without reliquary ever actually
+    looking. Calling :func:`mark_stopped` here would deadlock, since
+    it tries to acquire the same per-machine lock the caller already
+    holds and the lock isn't reentrant — so a confirmed-gone VM is
+    instead corrected with the same direct write :func:`_complete_stop`
+    already uses while holding the lock.
+    """
+    vm = state.get("vm")
+    if (state.get("phase") != "running" or not vm
+            or not _vm_confirmed_gone(vm)):
+        return state
+    _clear_vm(machine_id, "ready", context)
+    return load_machine_state(machine_id, context)
 
 
 def mark_stopped(machine_id, context=None):
@@ -1500,8 +1606,9 @@ def mark_stopped(machine_id, context=None):
 
 # -- machine variables -------------------------------------------
 #
-# The script -> host scalar channel (U14/U20): a script `set`s a
-# variable, any process reads it with `get-machine-var`. It lives in
+# The way a script inside the guest passes a single text value back
+# out to the host (U14/U20): a script `set`s a variable, and any
+# process on the host can read it with `get-machine-var`. It lives in
 # `machine.json` under the operation lock, and `start` clears it, so a
 # variable always reports what the current boot produced.
 
@@ -1510,11 +1617,12 @@ _RESERVED_VARIABLE = ("rlq", "reliquary")
 
 
 def check_variable_key(key):
-    """Validate a machine-variable key, or raise ``ValueError``.
+    """Validate a machine-variable key, or raise ``StaticError``.
 
-    The property key rules, for the same reason: the ``rlq`` and
-    ``reliquary`` namespaces stay reliquary's, so a consumer's own
-    names can never collide with one the project later introduces.
+    Same rules as property keys, for the same reason: the ``rlq`` and
+    ``reliquary`` namespaces stay reserved for reliquary's own use, so
+    a caller's own variable names can never collide with one the
+    project introduces later.
     """
     if not isinstance(key, str) or not key:
         raise StaticError("a machine-variable key is required",
@@ -1534,10 +1642,11 @@ def check_variable_key(key):
 def set_machine_var(machine_id, key, value, *, context=None):
     """Record a machine variable on a machine, in any phase.
 
-    Its world-facing spelling is the script ``set`` verb — the
-    scripting language is a primary interface, so this capability is
-    reachable without a command of its own. ``value`` is text;
-    reliquary attaches no meaning to it (G2, P18).
+    The user-facing name for this capability is the script ``set``
+    statement — the scripting language is a primary interface in its
+    own right, so this is reachable that way without needing a CLI
+    command of its own. ``value`` is plain text; reliquary attaches no
+    meaning to it (G2, P18).
     """
     check_variable_key(key)
     if not isinstance(value, str):
@@ -1553,8 +1662,9 @@ def set_machine_var(machine_id, key, value, *, context=None):
 
 
 #: How often :func:`wait_machine_var` re-reads, and how long it waits
-#: by default. The read is a small JSON file under no lock, so the
-#: interval is about not spinning rather than about cost.
+#: by default. The read is of a small JSON file with no lock held, so
+#: the interval exists just to avoid a busy-wait loop, not because the
+#: read itself is costly.
 _VAR_POLL = 1.0
 _VAR_TIMEOUT = 120.0
 
@@ -1564,24 +1674,27 @@ def wait_machine_var(key, value=None, *, machine=None, blueprint=None,
                      context=None):
     """Wait until a machine variable arrives, and return it.
 
-    The polling half of the value channel, for the case
-    ``run_script(expect=)`` cannot serve: **the setter is somebody
-    else.** A blocking run leaves its variables final by the time it
-    returns, so a wait after one can never poll — but a caller running
-    that same blocking form on another thread, or following a run it
-    did not start, has a variable that genuinely arrives later, and
-    the loop it would otherwise write by hand is this (D90).
+    This is the polling counterpart to machine variables, for cases
+    `run_script(expect=)` can't handle: cases where whoever sets the
+    variable is a different caller. A blocking run has all its
+    variables final by the time it returns, so waiting after it
+    finishes would have nothing left to poll for — but a caller
+    running that same blocking form on another thread, or watching a
+    run it did not start, genuinely sees the variable arrive later,
+    and this function is the polling loop such a caller would
+    otherwise have to write by hand (D90).
 
-    ``value`` is the value to wait *for*; omitted, any value will do,
-    so the readiness idiom — a script whose last step is ``set
-    ready``, and a driver that waits for it — says only what it means.
+    ``value`` is the value to wait *for*; if omitted, any value will
+    do, so the readiness idiom — a script whose last step is ``set
+    ready``, and a driver that waits for it — says exactly what it
+    means and nothing more.
 
-    Expiry raises :class:`~reliquary.errors.WaitExpired`, which is a
-    ``RunFailure`` *and* a ``TimeoutError``: the wait not finishing is
-    the work not happening (exit ``4`` at the CLI), while nothing about
-    the machine went wrong and the value may still arrive, so a caller
-    holding the loop catches the ordinary ``TimeoutError`` and asks
-    again (D90).
+    Expiry raises :class:`~reliquary.errors.WaitExpired`, which is
+    both a ``RunFailure`` and a ``TimeoutError``: the wait not
+    finishing means the work didn't happen (exit code ``4`` at the
+    CLI), but nothing about the machine necessarily went wrong and the
+    value may still arrive later, so a caller running its own retry
+    loop can catch the plain ``TimeoutError`` and ask again (D90).
     """
     check_variable_key(key)
     machine_id = resolve_machine(
@@ -1609,9 +1722,9 @@ def wait_machine_var(key, value=None, *, machine=None, blueprint=None,
 def get_machine_var(key, *, machine=None, blueprint=None, context=None):
     """Read one machine variable — ``None`` when it is not set.
 
-    A query: valid in any phase, touching nothing. An unset variable
-    and a machine that never ran read the same, which is what keeps
-    :func:`wait_machine_var` a plain loop over this.
+    A read-only query, valid in any phase. An unset variable and a
+    machine that has never run read exactly the same way, which is
+    what lets :func:`wait_machine_var` be a plain loop around this.
     """
     check_variable_key(key)
     machine_id = resolve_machine(
@@ -1624,37 +1737,42 @@ def exec(command, *, machine=None, blueprint=None, timeout=120,
          check=False, context=None):
     """Run one command in a running guest and return its output.
 
-    The run family's one-shot member: like ``run_script`` it drives
-    the machine and **returns its output** to the caller, storing
-    nothing (D36). The output is the text the command left on the
-    guest's screen, as a tuple of rows — reliquary reads no meaning
-    into it (G2), and a caller wanting structure reads a machine
-    variable instead, or takes the file off a drive of its own
-    (P16's file-content carve-out).
+    The one-shot member of the run family: like ``run_script``, it
+    drives the machine and returns the output to the caller rather
+    than storing it anywhere (D36). The output is the text the
+    command left on the guest's screen, as a tuple of rows — reliquary
+    does not interpret it (G2); a caller that wants structured data
+    should use a machine variable instead, or read a file off a drive
+    directly (an exception P16 carves out for file contents).
 
-    ``check=True`` adds the channel the rows cannot carry: **whether
-    the command worked.** A setup command — load a driver, install a
-    TSR — produces no output worth reading and its success is the
-    whole point, so without this success and failure both come back
-    as rows and a refused loader is discovered later, as every
-    subsequent command failing strangely. With it, a command that
-    signalled failure raises :class:`RunFailure` naming the command
-    (exit ``4`` at the CLI) and the return is unchanged otherwise.
+    ``check=True`` adds something the output rows can't tell you on
+    their own: whether the command actually worked. A setup command —
+    loading a driver, installing a TSR — produces no output worth
+    reading, and its success is the whole point; without
+    ``check=True``, success and failure both come back as ordinary
+    rows, so a driver that failed to load is only discovered later,
+    when every following command starts failing in strange ways. With
+    ``check=True``, a command that reported failure raises
+    :class:`RunFailure` naming the command (exit code ``4`` at the
+    CLI), and the return value is otherwise unchanged.
 
-    How the question is asked belongs to the platform workflow, and
-    on DOS it is an ERRORLEVEL probe reliquary composes and reads
-    back — text of its own, not the guest's, so the no-meaning rule
-    is untouched. Its scope is commands that *ran* and signalled
-    failure: a mistyped one leaves ERRORLEVEL alone and escapes the
-    probe (:meth:`AgentlessGuestExec._refuse_if_failed`).
+    How "did it work" is determined depends on the platform. On DOS,
+    it is an ERRORLEVEL check that reliquary itself types in and
+    reads back — text reliquary generated itself, not something read
+    out of the guest's own output, so this doesn't break the rule
+    above about not interpreting guest output. It only catches
+    commands that actually ran and then reported failure: a mistyped
+    command never runs, so it leaves ERRORLEVEL unchanged and slips
+    past this check (:meth:`AgentlessGuestExec._refuse_if_failed`).
 
-    The platform workflow owns command syntax and completion
-    detection, so anything but DOS fails closed rather than
-    borrowing DOS assumptions.
+    Which command syntax to use, and how to detect completion, is
+    decided by the platform. Any platform other than DOS raises an
+    error rather than incorrectly reusing DOS's own assumptions.
 
     (The name shadows the Python builtin inside this module, which is
-    the price of the twin-name identity rule: the CLI command *is*
-    ``exec``. Nothing here calls the builtin.)
+    the price of keeping the CLI command and this function under the
+    same name — the CLI command really is called ``exec``. Nothing
+    here calls the builtin.)
     """
     guest = _running_guest("exec", machine, blueprint, context)
     return guest.execute(command, timeout, check=check)
@@ -1664,42 +1782,47 @@ def wait_ready(*, machine=None, blueprint=None, timeout=90, prompt=None,
                context=None):
     """Wait until a running guest is ready for commands.
 
-    ``exec``'s precondition, as its own twin (D114): ``start_machine``
-    returns when the backend is up, not when the guest is, and what
-    stands between the two is the boot. This waits it out at the
-    platform's own readiness evidence — on DOS, the standard prompt
-    on the bottom row, or exactly the text ``prompt`` declares for a
-    guest whose ``AUTOEXEC.BAT`` customized it (D113) — so a harness
-    holds one call between ``start_machine`` and its first ``exec``
-    and spells no screen pattern of its own. A workflow whose
-    "ready" means more than a prompt says so in a script and sets a
-    variable; this is the script-free form of the same handoff.
+    The precondition `exec` needs, implemented as its own companion
+    function (D114): ``start_machine`` returns once the backend is
+    up, not once the guest itself is, and the boot process is what
+    stands between the two. This waits for the platform's own
+    evidence of readiness — on DOS, the standard prompt on the bottom
+    row, or exactly the text ``prompt`` declares for a guest whose
+    ``AUTOEXEC.BAT`` customized it (D113) — so a test harness just
+    needs one call between ``start_machine`` and its first ``exec``,
+    without writing its own screen-pattern matching. A workflow where
+    "ready" means more than just a prompt appearing should have its
+    script set a variable instead; this function is the version of
+    that same handoff that doesn't require writing a script.
 
-    Expiry raises :class:`~reliquary.errors.WaitExpired`, a
-    ``RunFailure`` *and* a ``TimeoutError`` (D90): the prompt not
-    arriving is the work not happening (exit ``4`` at the CLI),
-    while the boot may still finish, so a caller holding the loop
-    asks again.
+    Expiry raises :class:`~reliquary.errors.WaitExpired`, both a
+    ``RunFailure`` and a ``TimeoutError`` (D90): the prompt not
+    arriving means the work didn't happen (exit code ``4`` at the
+    CLI), but the boot may still finish, so a caller running its own
+    retry loop can ask again.
 
-    The platform workflow owns readiness, so anything but DOS fails
-    closed rather than borrowing DOS assumptions.
+    Which evidence counts as "ready" is decided by the platform, so
+    any platform other than DOS raises an error rather than
+    incorrectly reusing DOS's own assumptions.
     """
     guest = _running_guest("wait-ready", machine, blueprint, context)
     return guest.wait_ready(timeout, prompt=prompt)
 
 
 def _running_guest(verb, machine, blueprint, context):
-    """The agentless guest of a running DOS machine, or a refusal.
+    """The agentless guest handle for a running DOS machine, or an
+    error.
 
-    What ``exec`` and ``wait_ready`` share before either touches the
-    screen: the selector resolved, the platform one with a delivered
-    workflow, the machine running, and a VM identity on record to
-    verify the connection against. The refusals name the verb that
-    was asked.
+    The checks ``exec`` and ``wait_ready`` share before either one
+    actually touches the guest's screen: the selector resolves to a
+    machine, the machine's platform is one with an implemented
+    workflow (DOS), the machine is running, and there is a recorded
+    VM identity to verify the connection against. The error messages
+    name whichever of the two operations was being attempted.
     """
     machine_id = resolve_machine(
         machine=machine, blueprint=blueprint, context=context)
-    state = load_machine_state(machine_id, context)
+    state = _corroborated(load_machine_state(machine_id, context), context)
     platform = state.get("platform")
     if platform != "dos":
         raise PreflightError(
@@ -1724,16 +1847,17 @@ def destroy_machine(machine_id, context=None):
     """Stop a machine if it is running, then delete its cache directory
     entirely.
 
-    Under the per-machine lock, held across both halves for the same
+    Held under the per-machine lock across both halves, for the same
     reason `restart_machine` holds it across stop and start: nothing
-    else can start the machine, swap its media or apply a blueprint in
-    the gap between the stop and the removal. A ``running`` machine is
-    stopped first (`_stop_locked`); a ``ready`` machine then passes
-    through the transitional ``destroying`` phase; a machine already
-    ``destroying`` or rolled-back-from ``creating`` completes its
-    removal. A deletion interrupted by a host lock can be
-    retried — a failure from ``ready`` restores ``ready`` so it does
-    not strand the machine in ``destroying``.
+    else can start the machine, swap its media, or apply a blueprint
+    in the gap between the stop and the removal. A ``running``
+    machine is stopped first (`_stop_locked`); a ``ready`` machine
+    then passes through the transitional ``destroying`` phase; a
+    machine that is already ``destroying``, or was rolled back from
+    ``creating``, just finishes being removed. If a deletion is
+    interrupted by a host file lock it can be retried — a failure
+    that started from ``ready`` restores ``ready``, so the machine
+    isn't left stranded in ``destroying``.
     """
     with machine_lock(machine_id, context):
         state = load_machine_state(machine_id, context)
@@ -1763,7 +1887,8 @@ def destroy_machine(machine_id, context=None):
             raise
 
 
-# Rendering a machine's drives into backend configuration used to
-# live here as `machine_drive_args`, and is now the adapter's
-# (`backend_qemu.drive_args`): Reliquary drive vocabulary in, backend
-# configuration out, on the far side of the seam.
+# Turning a machine's drives into backend configuration used to live
+# here as `machine_drive_args`, and now lives in the adapter instead
+# (`backend_qemu.drive_args`): it takes reliquary's own drive
+# vocabulary in and produces backend-specific configuration out, on
+# the backend's side of the boundary between the two.

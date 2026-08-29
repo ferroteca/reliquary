@@ -5,2552 +5,3410 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # DECISIONS
 
-The adjudicated design-decision record, and the guard against
-re-litigating: anything recorded here as killed, declined or
-superseded is not revisited without new evidence, argued through
-the surface-change rule ([SURFACES.md](SURFACES.md)).
+This file is the permanent record of every design decision. Its job
+is to stop old arguments from being reopened: once an entry here
+says something was killed, declined, or superseded, that stands
+unless someone brings new evidence, following the process in
+[SURFACES.md](SURFACES.md).
 
-**This is a working file, not an archive.** Every entry must earn
-its place by the value it carries *today*, and an entry is
-rewritten — in current spellings, against the current surface — as
-readily as it is added. Git history holds what each said when it
-was written, so nothing is lost by keeping the live text current,
-and a record too large to search stops being a guard against
-anything.
+**This is a working file, not an archive.** Every entry has to
+still be useful *today*, or it doesn't belong here. We rewrite
+entries — updating names and matching the current codebase — just
+as often as we add new ones. Git history already keeps the old
+wording from when an entry was written, so nothing is lost by
+updating the live text. A file too big to search through stops
+doing its job.
 
-**Ask where the rule's normative home is before asking which
-D-number it takes.** A rule with a home — a principle, a use case,
-a specification, AGENTS.md — is *written there*, and the commit
-that writes it is the record; an entry restating it is the second
-register this machinery refuses to keep. Neither a decision to
-change the vision nor a decision to align with it earns an entry.
-What is left for an entry is the part with no home: a **contested
-call with a rejected alternative**, kept because the guard against
-re-litigating is real, plus the condition that would reopen it.
-That is a paragraph, not a page.
+**Before giving a rule a D-number, ask where it actually belongs.**
+If a rule belongs in a principle, a use case, a specification, or
+AGENTS.md, write it there — the commit that adds it is the record.
+Don't also restate it here; we don't keep the same rule written down
+twice. A decision to change the project's direction doesn't get an
+entry, and neither does a decision to bring something in line with
+that direction. What does get an entry: a **contested call where an
+alternative was considered and rejected**, recorded here so it
+doesn't get re-argued, plus the condition that would justify
+reopening it. Keep each entry to a paragraph, not a page.
 
-A LIFECYCLE ACT ALONE EARNS NO ENTRY. Proposing, pledging,
-promoting, delivering: location states the status and the commit
-that moves the item is the record, so delivery evidence belongs in
-that commit's message. Only a ruling made in the act's course — a
-contested clause reading, a scope call, a withdrawal — is recorded
-here, as the ruling rather than the promotion around it.
+A ROUTINE LIFECYCLE STEP ALONE DOES NOT GET AN ENTRY. Proposing,
+pledging, promoting, or delivering something isn't a decision on its
+own — an item's location already shows its status, and the commit
+that moves it is the record, so evidence that something was
+delivered belongs in that commit's message, not here. Only an actual
+ruling made along the way — resolving a disputed reading, deciding
+scope, withdrawing something — gets recorded, and only the ruling
+itself, not the process around it.
 
-Decisions are numbered in the order first recorded — D1 the
-earliest — and a number is never reused; the list reads
-newest-first, so the top entry carries the highest number and a new
-entry prepends with the next free one. The D-number is the
-decision's citation handle everywhere: a decision generally
-supports use cases (U-numbers), architectural principles
-([ARCHITECTURE.md](../ARCHITECTURE.md), P-numbers) or language
-goals (G-numbers), and names what it supports; it may also cite the
+Decisions are numbered in the order they were first recorded — D1 is
+the earliest — and a number is never reused. The list reads
+newest-first: the top entry has the highest number, and a new entry
+goes at the top with the next free number. The D-number is how a
+decision gets cited everywhere else: a decision usually supports use
+cases (U-numbers), architectural principles
+([ARCHITECTURE.md](../ARCHITECTURE.md), P-numbers), or language
+goals (G-numbers), and it names what it supports. It may also cite
 application surfaces (S-numbers), features (F-numbers), tasks
-(T-numbers) and the script-validation rules (V-numbers). Design
-docs, specs and code commits justify choices by citing D-numbers.
+(T-numbers), and script-validation rules (V-numbers). Design docs,
+specs, and code commits justify their choices by citing D-numbers.
 
-An entry only PARTLY overruled stays where it is, the amending
-entry governing and a bracketed pointer at the affected clause
-naming it. An overruled or no-longer-relevant decision moves to the
-Retired decisions section at the bottom, its note naming what
-overruled it — a retired decision binds nothing but remains the
-record.
+If a later decision only partly overrules an entry, the entry stays
+where it is — the later, amending entry governs, and we add a
+bracketed note at the affected part pointing to it. If a decision is
+fully overruled or no longer relevant, it moves to the Retired
+decisions section at the bottom, with a note saying what overruled
+it. A retired decision no longer binds anything, but we keep it as
+part of the record.
 
-**Retired vocabulary in entries not yet swept.** This decode is
-scaffolding, not policy: it shrinks as entries are brought current,
-and an entry that has been rewritten needs none of it. **Interfaces**
-/ `INTERFACES.md` is what D85 renamed the application surfaces and
-`SURFACES.md`; **PRINCIPLES.md** is root `ARCHITECTURE.md` (D50);
-**ROADMAP** is the roadmap dissolved into these directories on
-2026-07-26; **accepted** is **pledged** (D44); **Milestone N** is the
-numbered arc that ran 1–9 and now schedules nothing (D33). One is a
-genuine ambiguity rather than a dated word: an `S<n>` in an unswept
-entry may be a **script-validation rule**, which D84 renumbered to
-`V<n>` one for one, where today's S1–S8 are the application
-surfaces — so read an S-number by its entry's date until the sweep
-reaches it.
+**Old terminology still used in entries we haven't rewritten yet.**
+This glossary is temporary scaffolding, not policy — it shrinks as
+we rewrite entries, and a rewritten entry doesn't need it at all.
+**Interfaces** / `INTERFACES.md` is what D85 renamed "application
+surfaces" and `SURFACES.md` to. **PRINCIPLES.md** is the old name
+for root `ARCHITECTURE.md` (D50). **ROADMAP** was dissolved into
+these directories on 2026-07-26. **accepted** was renamed to
+**pledged** (D44). **Milestone N** refers to the numbered plan that
+ran from 1 through 9 and no longer schedules anything (D33). One
+term is a genuine ambiguity, not just an old name: in an entry we
+haven't rewritten yet, `S<n>` might mean a **script-validation
+rule** — D84 renumbered those to `V<n>`, one for one — or it might
+mean one of today's S1–S8 application surfaces. Until that entry is
+rewritten, tell which one it means from the entry's date.
 
 ## Open questions
 
-Questions awaiting adjudication — the front of this record rather
-than a separate one, since what settles them is an entry below.
-Nothing here binds anything; a question leaves this section by
-becoming a D-number, and the commit that moves it is the record.
+Questions we haven't ruled on yet. They live at the front of this
+file rather than in a separate one, because the entry that settles a
+question is one of the entries below. Nothing in this section binds
+anything — a question leaves this section by becoming a D-number,
+and the commit that adds that entry is the record.
 
-A question that gates a specific unbuilt feature is **not** here: it
-sits in that feature's own "Decide first" block, in
-[proposed/FEATURES.md](proposed/FEATURES.md) or
-[pledged/FEATURES.md](pledged/FEATURES.md), because it is the design round
-to run before that feature's deliverables start. What follows is
-what gates nothing in particular.
+A question that blocks one specific, not-yet-built feature does
+**not** go here — it goes in that feature's own "Decide first"
+block, in [proposed/FEATURES.md](proposed/FEATURES.md) or
+[pledged/FEATURES.md](pledged/FEATURES.md), because it's a design
+question to settle before that feature's work starts. What's listed
+below doesn't block any one feature in particular.
 
 ### Deferred to 1.0
 
-- **Format versioning**: pre-1.0, user documents carry no
-  version field and no `$schema` field (settled, owner 2026-07-21;
-  the horizon moved from beta to 1.0 with the compatibility rule,
-  D25, on the same argument:
-  a pinned schema reference is a version field in disguise, and a
-  pre-1.0 document has no format vintage — the only schema that
-  matters is the installed Reliquary's, which editors bind by file
-  association; an embedded pin would go stale in seeded files
-  under never-overwrite and let the editor pass what Reliquary
-  rejects). When compatibility guarantees arrive — no earlier than
-  1.0 — the leading candidate spelling for the version field is
-  `$schema` as a versioned URL: one field declaring the document's
-  format version and binding editors to the matching published
-  schema.
+- **Format versioning**: before 1.0, user documents carry no version
+  field and no `$schema` field (settled, owner 2026-07-21; the
+  deadline moved from beta to 1.0 along with the compatibility rule,
+  D25, for the same reason: a pinned schema reference is really a
+  version field wearing a disguise, and a pre-1.0 document doesn't
+  have a format version to record — the only schema that matters is
+  whichever one the installed copy of Reliquary uses, and editors
+  already pick that up through file association. An embedded pin
+  would go stale in seed files, which are never overwritten, and
+  could let an editor accept a document that Reliquary itself would
+  reject). Once compatibility guarantees exist — no earlier than
+  1.0 — the leading candidate for the version field is `$schema` as
+  a versioned URL: one field that states the document's format
+  version and points editors at the matching published schema.
 
-### Watches — re-ask as these harden
+### Open design pressures — revisit as these develop
 
-Standing questions rather than pending decisions: each is a design
-pressure to re-examine as the surface around it firms up, and none
-is waiting on an answer today.
+These aren't questions waiting on an answer today. Each is a design
+pressure worth re-examining once the surrounding area firms up.
 
-- GUI/landmark assets forming a new authored artifact class
-  (hardened 2026-07-21: .rlql is the fourth authored extension —
-  the INTERFACES listing is due at the asset-spec/realignment
-  pass)
-- the adapter API becoming world-facing
-  (design/backend-adapter.md is INTERNAL by decision,
-  owner 2026-07-21 — a real third-party adapter story elevates
-  it into the INTERFACES inventory through the interface-change
-  rule, never by drift)
+- Whether GUI/landmark assets should form a new authored-artifact
+  category (as of 2026-07-21: `.rlql` is now the fourth authored
+  file extension — we still owe it an entry in the INTERFACES
+  listing, to be added during the asset-spec/realignment pass).
+- Whether the adapter API should become world-facing, i.e. something
+  third parties build against (as of 2026-07-21,
+  `design/backend-adapter.md` is marked INTERNAL by decision — if a
+  real third-party-adapter use case shows up, move it into the
+  INTERFACES inventory deliberately, through the interface-change
+  rule, not by letting it happen unnoticed).
 
 ## Decided
 
-- D119 — ONE SEMANTIC SURFACE, THREE NORMS WITH DISJOINT CLAIMS,
-  AND THE CONTRACT HOME GOVERNS — DECIDED (owner, 2026-08-22),
-  closing the "two norms for one semantic surface" watch.
-  Supports P6, P23. Settles what stands *between* api.md, cli.md
-  and the command manifest.
+- D119 — CLI.MD, API.MD, AND THE COMMAND MANIFEST EACH GOVERN A
+  DIFFERENT PART, AND WHOEVER DEFINES SOMETHING WINS ON THAT PART —
+  DECIDED (owner, 2026-08-22), closing the "two norms for one
+  semantic surface" open question. Supports P6, P23. Settles which
+  of api.md, cli.md, and the command manifest governs when they
+  overlap.
 
-  The watch asked which of cli.md and api.md wins when the two
-  disagree on semantics, both being normative for P6's one
-  surface. By the time it was re-asked the labour had divided:
-  the manifest norms the **inventory** (F60), cli.md's status
-  claims **command behaviour** — flags, output, exit codes — and
-  api.md's claims the **conventions and return contracts** and
-  calls itself the *index* into each family's contract home. So
-  the resolution is the third the watch listed — the semantics
-  live in one home each — **plus the tie-break it lacked: a
-  citing passage that disagrees with its home is the bug, and
-  the home governs.** Both status blocks now say so. Naming
-  api.md the single norm — the watch's natural pick — was
-  declined: api.md carries end-goal design that does not ship,
-  and cli.md documents only what exists, so the pick would norm
-  unbuilt capability.
+  The question was: when cli.md and api.md disagree, which one
+  wins? Both were being treated as authoritative for the one
+  command surface P6 covers. By the time we revisited this, the
+  work had already split naturally: the manifest is authoritative
+  for the **list of commands** (F60), cli.md's status section is
+  authoritative for **command behavior** — flags, output, exit
+  codes — and api.md's status section is authoritative for
+  **conventions and return contracts**, describing itself as an
+  index pointing to each command family's real contract-defining
+  document. So the answer is the third option the open question had
+  listed: each kind of rule lives in exactly one home document.
+  We're adding the tie-break the question didn't have before: if a
+  passage that cites a rule disagrees with that rule's home
+  document, the citing passage is wrong, and the home document
+  wins. Both api.md's and cli.md's status sections now say this
+  explicitly. We rejected making api.md the single authority for
+  everything — the obvious-seeming choice — because api.md
+  describes design goals that haven't shipped yet, while cli.md
+  documents only what currently exists; picking api.md as the sole
+  authority would make unbuilt features the official standard.
 
-  WHERE IT HAD BITTEN: four index rows named the blueprint
-  *guide* as a contract home, a document whose own header
-  disclaims the role ("descriptive … this guide has the bug");
-  they now point at instance-model.md and blueprint-model.md.
-  REOPENS if a second binding's reference and the Python one
-  diverge on a return contract, which is the one conflict no
-  contract home yet arbitrates.
+  WHERE THIS CAUSED PROBLEMS: four rows in the index pointed to the
+  blueprint *guide* document as the contract-defining home, but that
+  document's own header says it isn't one ("descriptive … this
+  guide has the bug"). Those rows now point to instance-model.md and
+  blueprint-model.md instead. REOPENS IF a second binding's reference
+  docs and the Python implementation disagree about a return
+  contract — that's the one kind of conflict no home document
+  currently settles.
 
-- D118 — NO DRIVE-SCOPED SETTINGS SECTION; A DRIVE IS ADDRESSED
-  THROUGH THE BACKEND'S OWN HATCH — DECIDED (owner, 2026-08-22)
-  and delivered the same day, closing the "per-drive backend
-  settings" open question. Supports U22; P25. Extends D92's
-  overlap rule.
+- D118 — NO SEPARATE SECTION FOR PER-DRIVE SETTINGS; A DRIVE IS
+  CONFIGURED THROUGH THE BACKEND'S EXISTING SETTINGS ESCAPE HATCH —
+  DECIDED (owner, 2026-08-22) and delivered the same day, closing
+  the "per-drive backend settings" open question. Supports U22;
+  P25. Extends D92's overlap rule.
 
-  The question was whether a drive-scoped section has a case the
-  machine-scoped one cannot serve. **It does not**: every per-drive
-  knob is one backend's spelling (QEMU's `cache=`, `aio=`,
-  `serial=`; VirtualBox's `--nonrotational`), so P25 keeps all of
-  them behind the backend's pin, and the backend's own addressing
-  reaches a drive from there — QEMU's `-set drive.<slot>.<option>=
-  <value>`, verified on the installed QEMU to target a named drive
-  and to refuse unknown options and ids itself. What stood in the
-  way was the adapter's: hard disks rendered without `id=`, and
-  the overlap rule did not see through `-set`. Both close with
-  this — every drive carries `id=<slot>`, and a `-set` on a
-  property `drives` renders is refused naming `drives`, the same
-  second-source rule as `-drive`. No blueprint anywhere uses
-  `backend-settings` yet, so this is settled on the design's terms
-  rather than a case.
+  The question was whether a drive-scoped settings section could do
+  something the existing machine-scoped one can't. **It can't.**
+  Every per-drive setting is really just one backend's own
+  vocabulary — QEMU's `cache=`, `aio=`, `serial=`; VirtualBox's
+  `--nonrotational` — so P25 already keeps all of it behind the
+  backend-settings escape hatch, and the backend's own addressing
+  syntax can reach a specific drive from there. For example, QEMU's
+  `-set drive.<slot>.<option>=<value>` — we confirmed on an
+  installed QEMU that this targets one named drive and refuses
+  unknown options or drive ids on its own. The real obstacle was in
+  the adapter: hard disks were rendered without an `id=`, and the
+  overlap rule (D92) didn't recognize `-set` as a way of touching a
+  drive's settings. Both are now fixed — every drive gets
+  `id=<slot>`, and a `-set` that touches a property the blueprint's
+  `drives` field already renders is rejected, the same rule already
+  applied to `-drive`. No blueprint anywhere actually uses
+  `backend-settings` yet, so this was settled on design grounds, not
+  because of a real case that needed it.
 
-  WEIGHED AND DECLINED: **a drive-scoped section** — two places
-  for one backend's vocabulary, with the overlap rule to restate
-  per scope. REOPENS on a backend whose per-drive configuration
-  has no addressable form from its machine-level hatch;
-  VirtualBox's hatch is empty today and will be judged when it
-  exists.
+  CONSIDERED AND REJECTED: **a separate drive-scoped settings
+  section** — this would mean the same backend vocabulary living in
+  two places, with the overlap rule needing to be restated for each
+  one. REOPENS IF a backend turns out to have per-drive settings
+  that can't be reached from its machine-level settings hatch;
+  VirtualBox's hatch is empty today and will be judged once it has
+  one.
 
-- D117 — NO INCLUDE MECHANISM; THE CORPUS HAS NOT EARNED ONE —
-  DECIDED (owner, 2026-08-22), closing the "cross-script reuse"
-  open question. Supports (none) — a refusal; argued from G2, G3,
-  G6 and D104's construct bar.
+- D117 — NO SCRIPT-INCLUDE FEATURE; THE EXISTING SCRIPTS DON'T
+  JUSTIFY ONE — DECIDED (owner, 2026-08-22), closing the
+  "cross-script reuse" open question. Supports (none) — this is a
+  refusal; argued from G2, G3, G6, and D104's rule for justifying
+  new language constructs.
 
-  The question asked whether repeated behaviour justifies a
-  constrained include, with real scripts to establish the need,
-  and a named desire on record (owner, 2026-07-21): complex
-  scripts split into interacting files, like source files.
-  **Measured, the corpus does not establish it**: seven scripts
-  (four codex, three of the owner's) repeat exactly two idioms —
-  boot to prompt (`start` / `wait "C:\>"`) and power off
-  (`enter "fdapm poweroff"` / `wait machine=stopped`), two lines
-  each at three sites — and the one larger candidate, the owner's
-  install script, is the codex's *diverged* copy (a different
-  loader, an `eject` moved), which P18's copy-out makes the
-  expected pattern. A construct to save two lines fails D104's
-  bar, and G6 makes surface the scarce resource. What "interacting
-  files" can mean here is already served outside the language,
-  where G2 puts composition: a harness runs `ready`, its own
-  steps, then `verify`; `machine` headers state each script's
-  precondition; variables and properties carry data.
+  The question was whether scripts repeat enough behavior to
+  justify adding a constrained include mechanism, checked against
+  real scripts, given a recorded wish (owner, 2026-07-21) for
+  complex scripts to split into files that reference each other,
+  the way source files do. **Measured against the actual scripts,
+  the need isn't there.** Of seven scripts (four shipped with the
+  codex, three of the owner's), only two idioms repeat: booting to
+  a prompt (`start` / `wait "C:\>"`) and powering off (`enter
+  "fdapm poweroff"` / `wait machine=stopped`) — two lines each, at
+  three places. The one larger candidate, the owner's install
+  script, is actually a *diverged* copy of the codex's own install
+  script (a different loader, an `eject` moved) — exactly the
+  pattern P18's copy-out mechanism expects. A language construct to
+  save two lines fails D104's bar for justifying one, and G6 treats
+  added syntax as the scarce resource. What "files that reference
+  each other" would give you is already available outside the
+  language itself: G2 already handles composition — a harness runs
+  a `ready` script, its own steps, then a `verify` script; `machine`
+  headers state each script's precondition; and variables and
+  properties carry data between them.
 
-  WEIGHED AND DECLINED — **`run @script`, script-as-statement**:
-  a verb executing a *linear* script in place, headers checked
-  statically, recursion refused so the graph stays a finite tree
-  (G3), no parameters (G2), every statement keeping its file and
-  line plus the call site. The least-bad shape, recorded so a
-  reopening starts from it rather than from a handler-splicing
-  macro or a phase import (whose `goto` targets couple it to the
-  importer, and whose decoupling is a function). REOPENS on a
-  script in the corpus reusing a unit that is **larger than an
-  idiom, identical across its sites rather than a diverged copy,
-  and self-contained without transition coupling** — evidence,
-  not desire.
+  CONSIDERED AND REJECTED — **`run @script`, treating a script as
+  one statement**: a verb that would run a *linear* script in
+  place, with headers checked statically, no recursion allowed so
+  the call graph stays a finite tree (G3), no parameters (G2), and
+  every statement still keeping its own file, line, and call site.
+  This is the least-bad design, recorded so that if this is
+  reopened, it starts from this shape rather than from a macro that
+  splices in handlers, or a "phase import" (whose `goto` targets
+  would tie it to whatever imports it, and untangling that is a
+  much bigger feature on its own). REOPENS IF a script in actual
+  use repeats a unit that is **bigger than a two-line idiom,
+  identical everywhere it's used rather than a diverged copy, and
+  self-contained without depending on surrounding control flow** —
+  that needs to be evidence of real repetition, not just a wish for
+  the feature.
 
-- D116 — `rlq wait` IS THE VERB, ON EVERY AXIS — DECIDED (owner,
-  2026-08-22) and delivered the same day, striking T31. Supports
-  U14; P6, P11. Completes the script-language-identity exception for
-  one verb.
+- D116 — `rlq wait` NOW MATCHES THE SCRIPT LANGUAGE'S `wait` VERB
+  EXACTLY — DECIDED (owner, 2026-08-22) and delivered the same day,
+  striking T31. Supports U14; P6, P11. Completes, for this one
+  verb, the rule that a CLI command must behave identically to its
+  script-language verb.
 
-  The manifest maps `wait` to `wait_text` as the language's verb
-  spelled on the CLI, and cli.md promised the verb's spellings — yet
-  the command shipped a different wait on four axes: always a
-  regex, across the joined screen, un-normalized, on sight, no
-  machine channel; the references said `REGEX`. T31 filed the gate;
-  the round found the rest. **The whole verb closes**, because S1
-  says the CLI owns no semantics and the Interaction spec says each
-  verb is defined once and referenced: the argument is parsed by
-  `parse_script("wait <text>")` — the grammar by construction, no
-  second condition parser — and lowered to the handle stratum,
-  `wait_text` matching one normalized row under the stability gate
-  and `Machine.wait_stopped` observing the VM gone, the lifecycle
-  marking the phase after, the runtime's own split.
+  The command manifest maps the CLI's `wait` subcommand to the
+  language's `wait_text` verb, and cli.md promised that a CLI
+  command behaves exactly like the verb it maps to. But the shipped
+  `rlq wait` command differed from the script verb on four points:
+  it always treated its argument as a regex, it searched the whole
+  joined screen instead of going through the normal stability
+  check, it didn't normalize the text before matching, it answered
+  the instant it saw a match instead of waiting for the screen to
+  settle, and it had no way to wait on the machine channel — only
+  the screen. The reference docs listed the argument type as
+  `REGEX`. Task T31 had flagged the gate/expiry gap; this decision
+  round found the rest of the mismatches.
 
-  TWO RULINGS THAT RODE ALONG: **the shell eats the language's
-  quotes**, so bare text is the literal spelling and is re-quoted
-  with the language's escapes, a `${key}` keeping the language's
-  meaning (refused: properties are a script's); and **`wait_stopped`
-  is a `Machine` method with no module-level export**, because the
-  family table has one face per command and the family's true twins
-  are the control-plane design's — REOPENS there.
+  **The whole command is fixed to match the verb exactly**, because
+  surface S1 says the CLI must not carry its own semantics, and the
+  Interaction spec says every verb is defined once and referenced
+  everywhere else — never redefined. The `rlq wait` argument is now
+  parsed with the same `parse_script("wait <text>")` call the
+  language itself uses, so there is no second, CLI-only parser for
+  the wait condition. It is then handled exactly the way the
+  language handles it: `wait_text` matches one normalized screen
+  row under the same stability gate other waits use, and
+  `Machine.wait_stopped` watches for the VM to actually stop for
+  the machine-channel case, with the lifecycle machinery marking
+  the phase afterward — this split is how the runtime already
+  works, not something invented for the CLI.
 
-  WEIGHED AND DECLINED: **gate and expiry only** (T31 as filed) —
-  the spec would keep claiming a verb the command was not;
-  **screen channel only, the machine channel refused** — one
-  spelling left script-only for no reason the spec could state.
+  ALSO DECIDED AT THE SAME TIME: **the shell strips the language's
+  quote characters before `rlq wait` ever sees the text**, so the
+  bare text typed on the command line is treated as the literal
+  spelling, and it is re-quoted using the language's own escaping
+  rules; a `${key}` inside it keeps its script-language meaning,
+  except property substitution is refused, since properties belong
+  to a script, not a bare CLI invocation. Also: **`wait_stopped`
+  stays a method on the `Machine` class, with no separate top-level
+  function exported for it**, because the manifest's family table
+  has one CLI-facing name per command, and which methods deserve a
+  true top-level "twin" function is a question for the control-plane
+  design, not this decision — REOPENS there.
 
-- D115 — THE STABILITY RULE BINDS READINESS — DECIDED (owner,
-  2026-08-22) and delivered the same day, striking T30. Supports
-  U14; P11. Extends D75's rule to the readiness wait.
+  CONSIDERED AND REJECTED: **fixing only the gate/expiry problem
+  T31 originally flagged** — this would leave the reference docs
+  still claiming the command behaved like the language's verb when
+  it didn't. **Fixing only the screen-channel behavior and leaving
+  the machine-channel wait unsupported from the CLI** — this would
+  leave one spelling of the wait verb usable only from scripts, for
+  no reason the spec could actually justify.
 
-  `wait_ready` was the one prompt wait in the system that answered
-  on sight: `execute` holds a prompt until the screen under it
-  settles (F45, D75), the script `wait` verb gates every
-  observation by default, and the menu machinery reads twice. T30
-  asked whether the rule binds readiness, the hazard being weaker —
-  nothing sliced, a caller merely early. **It binds**, because the
-  rule is about the screen and not the actor: what the caller does
-  next does not change whether the screen was finished, and the
-  case that needs it is exactly D113's customized guest, whose
-  `AUTOEXEC.BAT` with `ECHO ON` paints the prompt and then the
-  command on one row, the standard shape matching in between.
+- D115 — READINESS WAITS NOW GO THROUGH THE SAME STABILITY CHECK AS
+  EVERY OTHER WAIT — DECIDED (owner, 2026-08-22) and delivered the
+  same day, striking T30. Supports U14; P11. Extends D75's
+  screen-stability rule to the readiness wait.
 
-  WEIGHED AND DECLINED: **a lighter "held for one quiescence
-  window"** — it is the same gate, `ScreenStability`'s default
-  window being that window; no second mechanism exists to build.
-  **A finding that the boot does not need it** — stock FreeDOS
-  runs `@ECHO OFF`, so a hands-on boot reads fine either way, which
-  is why that observation cannot carry the decision. **Tuning on
-  the twin** (`stable=`/`stability=`) — `execute` exposes none; the
-  axis is the language's. OBSERVED, NOT TAKEN: `rlq wait` /
-  `Machine.wait_text` answer on sight while the verb they are the
-  face of gates — filed as **T31**, decided by **D116**.
+  `wait_ready` was the one prompt-detecting wait in the system that
+  answered as soon as it saw a match, instead of waiting for the
+  screen to stop changing. By contrast, `execute` holds off until
+  the screen under a prompt settles (F45, D75), the script
+  language's `wait` verb applies the stability check to every
+  observation by default, and the menu-handling code reads the
+  screen twice to be sure. T30 asked whether the stability rule
+  should also apply to readiness, since the risk here seemed
+  smaller — nothing gets cut off, a caller just proceeds slightly
+  early. **The rule does apply**, because it's about whether the
+  screen has actually finished drawing, not about what the caller
+  does next: what happens afterward doesn't change whether the
+  screen was really done. And there's a real case that needs this —
+  D113's customized guest, whose `AUTOEXEC.BAT` uses `ECHO ON` and
+  draws the prompt and the following command on the same row one
+  after another; the stability check is what tells them apart.
 
-- D114 — READINESS IS A TWIN, NOT THE EMBEDDING-ONLY EXCEPTION —
+  CONSIDERED AND REJECTED: **a lighter rule — hold for one "quiet"
+  window instead of the full stability check** — this is already
+  the same mechanism, since `ScreenStability`'s default window
+  already is that window; there's no separate, lighter check to
+  build. **Deciding the boot doesn't need this at all** — stock
+  FreeDOS runs with `@ECHO OFF`, so watching it boot by hand looks
+  fine either way, which is exactly why that observation isn't good
+  evidence either way. **Letting the caller tune the wait, the way
+  a couple of related settings do** (`stable=`/`stability=`) —
+  `execute` doesn't expose any such settings itself; that's an axis
+  that belongs to the language, not to this call.
+
+  NOTICED BUT NOT ACTED ON: `rlq wait` and `Machine.wait_text`
+  answer as soon as they see a match, even though the verb they
+  represent is supposed to apply the stability gate — filed as
+  **T31**, decided by **D116**.
+
+- D114 — READINESS GETS A CLI COMMAND TOO; IT IS NOT A SPECIAL CASE
+  THAT ONLY WORKS FROM PYTHON — DECIDED (owner, 2026-08-22) and
+  delivered the same day, striking T29. Supports U14; P6. Refines
+  D90 at the adapter layer.
+
+  `AgentlessGuestExec.wait_ready` had no CLI command that did the
+  same thing, and T29 asked whether it needed one, or whether this
+  method could be the kind of exception P6 sometimes tolerates.
+  **It needs one.** P6 says a capability missing from one surface
+  must get added there "unless another principle in force forbids
+  it crossing" — and no principle forbids it here. The one standing
+  exception to that rule, the codex verbs, is backed by P18, and
+  this had nothing backing it. The closest thing the shell already
+  had, `rlq wait "C:\>"`, is a weaker wait — it matches a pattern
+  anywhere on screen — not the same thing spelled differently, so
+  surface S1's promise of a "universal automation path" genuinely
+  had a gap here. `Session.exec` was already a thin CLI-facing
+  wrapper around its sibling Python method, so by the same pattern
+  the new CLI command is `rlq wait-ready`, wrapping
+  `Session.wait_ready`, and it shares `exec`'s preflight checks.
+
+  ALSO DECIDED AT THE SAME TIME: the adapter's timeout error becomes
+  `WaitExpired` (D90) instead of a plain `RunFailure`, since this is
+  a wait and the boot might still complete later. The new class is a
+  subclass of `RunFailure`, so no caller's existing error-handling
+  code needs to change.
+
+  CONSIDERED AND REJECTED: **treating the missing CLI command as an
+  acceptable special case** — this would add a second named
+  exception to P6 with no principle behind it, and would mean adding
+  an exception category to the manifest just for a method on this
+  one type — a category that doesn't actually exist, because this
+  gap only slipped through the test suite due to how
+  `AgentlessGuestExec` happened to be classified. REOPENS once an
+  agent-backed adapter arrives whose readiness is reported to it
+  rather than observed on screen — at that point the `prompt=`
+  argument on the new command means nothing on that platform, and
+  the flag's contract needs to be restated.
+
+- D113 — `wait_ready` NOW ACCEPTS A CUSTOM PROMPT FROM THE CALLER —
   DECIDED (owner, 2026-08-22) and delivered the same day, striking
-  T29. Supports U14; P6. Sharpens D90 at the adapter.
+  T28. Supports U14; P10, P11. Extends D112 to the public API.
 
-  `AgentlessGuestExec.wait_ready` had no CLI face, and T29 asked
-  whether the twin was owed or the method was the carve-out P6
-  tolerates. **The twin is owed**: P6 refuses a capability absent
-  from one surface "unless another principle in force forbids it
-  crossing", and no principle does — the one standing exception,
-  the codex verbs, has P18 behind it and this had nothing. The
-  shell's nearest spelling, `rlq wait "C:\>"`, is a weaker wait
-  (a pattern, anywhere on screen) and not a respelling, so S1's
-  "universal automation path" genuinely lacked the capability.
-  `Session.exec` was already this exact veneer over the sibling
-  method, so the twin is `rlq wait-ready` ↔ `Session.wait_ready`
-  by the identity rule, sharing `exec`'s preflight.
+  `execute` already learns a customized prompt by reading it off the
+  screen it types into (D112). `wait_ready` has no such screen to
+  read from, and it is the readiness pattern the README and
+  `docs/dos-automation.md` teach *before* `execute`, so a guest whose
+  `AUTOEXEC.BAT` sets `PROMPT [$P]$G` failed at the very first
+  documented step (T28). **The fix: the caller now states the
+  custom prompt at the call site.** `wait_ready(timeout=90, *,
+  prompt=None)` — `prompt` is the exact text of the bottom row the
+  guest draws when it's ready, and leaving it as `None` keeps the
+  standard behavior. This matches how the script language already
+  treats this: the codex's own `ready` script states what "ready"
+  means with `wait "C:\>"`, on the principle that what counts as
+  ready is the workflow's own business, not Reliquary's — now
+  applied to the API too: whoever customized the guest states what
+  "ready" looks like, right at the one call that needs to know
+  it. This is declared rather than guessed (P10), an exact row of
+  text rather than a pattern (matching D112's earlier decision
+  against a looser match), a plain string every language binding
+  can pass through (api.md's second principle), and it touches only
+  surface S2. If the wait times out, the error names what it was
+  waiting for.
 
-  THE RULING THAT RODE ALONG: the adapter's expiry becomes
-  `WaitExpired` (D90) rather than plain `RunFailure` — it is a wait
-  and the boot may still arrive; the class subclasses `RunFailure`,
-  so no caller's handler changes.
+  REMAINING GAP: a prompt that includes `$T` (time) or `$D` (date)
+  changes every second and never equals any fixed piece of text —
+  this affects both `wait_ready` and `execute` equally, and this
+  decision doesn't fix it.
 
-  WEIGHED AND DECLINED: **the carve-out** — it would amend P6 with
-  a second named exception resting on no principle, and grow the
-  manifest an exception class for a method on a type, which its
-  shape does not have because the gap escaped the suite only by
-  `AgentlessGuestExec` being classified as a type. REOPENS when an
-  agent-backed adapter lands whose readiness is reported rather
-  than observed: the twin's `prompt=` is then meaningless on that
-  platform and the flag's contract needs restating.
+  NOTICED BUT NOT ACTED ON: `wait_ready` has no matching CLI
+  command, even though api.md's first principle says every public
+  capability needs one — this gap already existed before this
+  decision; `exec`'s CLI command never needed one since its
+  precondition is just "the machine is running." Also, `wait_ready`
+  doesn't apply the screen-stability check under a custom prompt the
+  way `execute` does (F45). Both were filed as separate tasks:
+  **T29** (decided by **D114**) and **T30** (decided by **D115**)
+  (owner, 2026-08-22).
 
-- D113 — READINESS LEARNS A CUSTOMIZED PROMPT FROM THE CALLER —
-  DECIDED (owner, 2026-08-22) and delivered the same day, striking
-  T28. Supports U14; P10, P11. Completes D112 at the public
-  surface.
+  CONSIDERED AND REJECTED:
 
-  `execute` learns a customized prompt from the screen it types
-  into (D112); `wait_ready` has no such screen, and it is the
-  readiness idiom the README and `docs/dos-automation.md` teach
-  before `execute`, so a guest whose `AUTOEXEC.BAT` sets
-  `PROMPT [$P]$G` failed the documented idiom at its first line
-  (T28). **The caller declares it at the call**:
-  `wait_ready(timeout=90, *, prompt=None)`, `prompt` being the
-  exact bottom-row text the guest draws, `None` keeping the
-  standard shape. That is the script language's own stance — the
-  codex `ready` script states its evidence as `wait "C:\>"`, and
-  "what ready means is the workflow's own business, never
-  reliquary's" — moved to the API: the actor who customized the
-  guest says what ready looks like, at the one call that needs
-  it. Declared rather than guessed (P10), an exact row rather than
-  a pattern (D112's refusal of the wider door), a plain string
-  every binding language can carry (api.md's second principle),
-  and S2 alone. The expiry names what it waited for.
+  - **A blueprint field** (`platform-settings.prompt`, surface S4)
+    — heavier-weight, and it would have the blueprint describe the
+    installed system's runtime configuration rather than describing
+    the machine itself; D112's earlier finding that `execute` has
+    no demand for this still holds. This is the fallback if a
+    second call site ever needs the same kind of declaration.
+  - **Treating "ready" as just "the screen has stopped changing"**
+    — rejected because a boot menu, a "Press any key to continue"
+    prompt, and a stalled driver are all screens that stop changing
+    too; this is exactly the false-positive case P11 exists to
+    prevent, and it's the likeliest place for one to happen.
+  - **Removing `wait_ready` in favor of `machine.wait_text`** —
+    rejected: the split between the two is correct as designed. An
+    agent-based adapter (not yet built) will report readiness by
+    the agent checking in, not by reading the screen, while
+    `wait_text` matches text anywhere on screen with no concept of
+    a "prompt." `wait_ready` stays the general-purpose, documented
+    way to wait for readiness, and the guides now explain the
+    difference.
+  - **A regex that must match the whole bottom row** — this would
+    handle `$T`-style prompts, but at the cost of reopening the
+    looser matching D112 already rejected, and would mean passing a
+    Python-flavored value through a supposedly plain API; it would
+    also depart from `execute`'s existing rule of matching the row
+    exactly.
 
-  THE RESIDUE, STATED: a prompt carrying `$T` or `$D` changes
-  every second and equals no text, for `wait_ready` and `execute`
-  alike. OBSERVED, NOT TAKEN: `wait_ready` has no CLI twin, which
-  api.md's first principle says every public capability has —
-  pre-existing, and `exec` never needs it (its precondition is
-  "running"); and `wait_ready` confirms no stability under a
-  prompt where `execute` does (F45). Filed as **T29** (decided by
-  **D114**) and **T30** (decided by **D115**) (owner, 2026-08-22).
+- D112 — `execute` NOW RECOGNIZES TWO PROMPT SHAPES: THE STANDARD
+  ONE, AND WHATEVER THE GUEST WAS SHOWING BEFORE THE COMMAND RAN —
+  DECIDED (owner, 2026-08-22) and delivered the same day. Supports
+  U14; P10, P11. Refines D75, which required evidence that a
+  command actually finished before treating "a prompt" as a match,
+  but left "a prompt" defined as a single fixed pattern.
 
-  WEIGHED AND DECLINED:
+  `exec`'s completion check only recognized one prompt shape,
+  `X:\path>`. So a guest whose `AUTOEXEC.BAT` customizes the DOS
+  prompt would sit out the entire timeout on every single command,
+  because its real prompt never matched that pattern (issue #9,
+  confirmed by a custom-prompt capture in the transcript corpus).
+  **Two sources can now count as "the prompt is back," and no
+  others:** the **standard DOS shape** — what any unconfigured copy
+  of DOS draws, and what lets a `CD` command, which changes the
+  visible prompt text, still be recognized as complete — and
+  **exactly the prompt text the guest was already showing** when
+  the command was sent, whatever shape that text has. The second
+  source is the guest telling us, through its own screen, what its
+  prompt looks like — an actual observation, not a guess based on
+  appearance (D72) — so it needs no declared pattern, and it's what
+  makes a guest with a customized prompt usable from its very first
+  command.
 
-  - **A blueprint field** (`platform-settings.prompt`, S4) —
-    heavier, would have the blueprint describe the installed
-    system's runtime configuration rather than the machine, and
-    D112's no-demand finding for `execute` still stands; the move
-    if a second site ever needs the same declaration.
-  - **Readiness as stability** — any bottom row once the screen
-    stops changing; declined because a boot menu, a "Press any
-    key", and a stalled driver are all stable screens, the false
-    positive P11 refuses at the moment it is likeliest.
-  - **Retiring `wait_ready` for `machine.wait_text`** — declined:
-    the protocol seam is right (an agent adapter answers readiness
-    by the agent reporting in, not by a screen), and `wait_text`
-    matches anywhere on screen with no prompt semantics. It stays
-    the general authored wait and the guides now say so.
-  - **A regex, fullmatch on the bottom row** — would serve `$T`
-    prompts at the cost of the wider door and a Python-flavoured
-    value, and would diverge from `execute`'s exact-row rule.
+  REMAINING GAP (P11): if a command itself changes what a
+  customized prompt looks like — running `PROMPT` itself, or
+  running `CD` under a prompt format like `[$P]$G` — the guest
+  returns to text that neither known source predicted, so the wait
+  times out. When it does, the timeout error names both prompt
+  shapes it was waiting for, so whoever reads the error isn't left
+  confused about a guest that actually ran the command just fine.
+  This is confirmed in the transcript corpus: the `PROMPT [$P]$G`
+  capture still records that timeout as an accepted limitation,
+  while a new capture of running `VER` at the customized prompt
+  shows the success case working. `wait_ready` only recognizes the
+  standard prompt shape — it has no earlier screen to read a
+  customized prompt from. That's a real gap on the **public API
+  surface**, not simply a dead method: nothing inside `src/` calls
+  `wait_ready` itself, but it's exported from the package root, and
+  it's the readiness pattern the README and `docs/dos-automation.md`
+  teach *before* `execute` — so a guest that boots to a customized
+  prompt fails at the very first documented step. This gap is filed
+  as **T28** rather than fixed here (an earlier draft of this note
+  called the method "unused," which was true only inside `src/` and
+  understated the actual, public-facing problem).
 
-- D112 — A PROMPT IS THE STANDARD SHAPE, OR THE ONE THE GUEST WAS
-  AT — DECIDED (owner, 2026-08-22) and delivered the same day.
-  Supports U14; P10, P11. Sharpens D75, which made completion need
-  evidence this command landed and left "a prompt" as one pattern.
+  CONSIDERED AND REJECTED:
 
-  `exec`'s completion detection recognized one shape, `X:\path>`,
-  so a guest whose `AUTOEXEC.BAT` customizes the prompt waited out
-  every command's full timeout (issue #9; the transcript corpus's
-  custom-prompt capture). Two sources may now say the prompt is
-  back, and no third: the **standard DOS shape**, what every
-  unconfigured DOS draws and what lets `CD` — which changes the
-  prompt's *text* — complete; and **exactly the prompt the guest
-  was sitting at** when the command was sent, whatever its shape.
-  The second is the guest's own statement of what its prompt looks
-  like, an observation rather than an inference from appearance
-  (D72), so it needs no pattern and nothing declared, and it is
-  what makes a customized guest usable from its first command.
+  - **A declared prompt pattern in the blueprint** — this would
+    close the gap, and matches P10's general preference for
+    declared configuration over guessed configuration — rejected
+    for now because it would be a change to the blueprint format
+    (surface S4) with no real demand behind it: no use case
+    currently mentions a customized prompt, and the only evidence
+    is this one finding from the transcript corpus. This is the
+    right move if a guest ever actually needs it.
+  - **A declared pattern only, with every other prompt shape
+    refused by name** — the option the original bug report called
+    "honest and cheap" — rejected because it would make every
+    customized guest unusable unless someone explicitly declares
+    its prompt pattern, when the guest's own screen already tells
+    us what the prompt looks like.
+  - **A looser pattern that matches more prompt shapes** — rejected
+    outright: this would turn any row ending in `>` into a signal
+    that the command finished, which is exactly the false positive
+    P11 exists to prevent.
 
-  THE RESIDUE, STATED (P11): a command that changes a customized
-  prompt — `PROMPT` itself, or `CD` under `[$P]$G` — returns to
-  text neither source has evidence for, and the wait expires
-  naming both shapes it waited for, so the reader does not go
-  looking at the guest, which ran the command perfectly well. The
-  corpus pins it: the `PROMPT [$P]$G` capture keeps recording the
-  expiry as a stated limit, and a new capture of `VER` at the
-  customized prompt pins the success. `wait_ready` keeps the
-  standard shape alone — it has no earlier screen to read a
-  customized prompt off. That is a residue on the **public**
-  surface, not a dead method: nothing inside `src/` calls it, but
-  it is exported from the package root and is the readiness idiom
-  the README and `docs/dos-automation.md` teach before `execute`,
-  so a guest that boots to a customized prompt fails the
-  documented idiom at its first line. Filed as **T28** rather than
-  left here (this sentence first called the method uncalled, which
-  was true of `src/` and misleading about the surface).
+- D111 — `exec` NOW FINDS A COMMAND'S ECHO BY WHERE THE PROMPT WAS,
+  NOT BY WHAT THE ROW LOOKS LIKE — DECIDED (owner, 2026-08-22) and
+  delivered the same day. Supports U14; P10 (as sharpened by D72),
+  P11 (as applied by D75).
 
-  WEIGHED AND DECLINED:
+  `exec` used to find a command's echoed line by appearance —
+  scanning upward from the bottom of the screen for "a row ending
+  in `>` that contains the command text." That scan could be
+  fooled: if a file's last line happened to echo back text that
+  looked like the command, `exec` would stop there, throw away the
+  file's real content, and return an **empty** result with no error
+  at all (issue #7; confirmed by an echo-lookalike capture in the
+  transcript corpus) — a real violation of what P11 requires. There
+  is better evidence available than what a row looks like: a
+  command is typed at whatever prompt the screen was already
+  showing before it was sent, so the echo is **that same prompt
+  row, with the command text appended** (wrapped across more than
+  one line if the combined text is longer than the screen is wide —
+  issue #8), and it appears **exactly where the prompt used to
+  be** — the rows above it are the same rows that were above the
+  prompt before, minus anything that has since scrolled off the top
+  of the screen. Everything the command actually prints appears
+  below its echo, so a row that merely happens to contain the same
+  text, but has the command's real output above it, is never
+  mistaken for the echo — and running the same command twice, with
+  the first echo still visible on screen, correctly finds the
+  *second* occurrence for the same reason. The old rule of "a row
+  ending in `>`" is no longer needed, because the echo's location is
+  now known directly, not inferred from its shape.
 
-  - **A declared prompt pattern in the blueprint**, which would
-    close the residue and is the P10-clean shape for configuration
-    — declined for now as a blueprint surface change (S4) with no
-    demand on record: no use case in force names a customized
-    prompt, and the only evidence is this corpus finding. It is
-    the move if a guest ever demands it, on that demand.
-  - **A declared pattern only, refusing every other prompt by
-    name** — the issue's "honest and cheap" option; declined
-    because it leaves every customized guest unusable without a
-    declaration when the guest's own screen already says what its
-    prompt is.
-  - **A wider pattern** — declined outright: any row ending in `>`
-    becomes a completion signal, the false positive P11 refuses.
+  REMAINING GAP: if the output is longer than a full screen, and the
+  very first visible row happens to look like an echo, that row is
+  still accepted as the echo, because there's nothing left above it
+  on screen to prove otherwise. This was also wrong under the old
+  rule; it is now documented in the transcript corpus's README
+  instead of being silently wrong.
 
-- D111 — THE ECHO IS WHERE THE PROMPT WAS — DECIDED (owner,
-  2026-08-22) and delivered the same day. Supports U14; P10 (as
-  D72 sharpened it), P11 (as D75 applied it).
+  CONSIDERED AND REJECTED:
 
-  `exec` located a command's echo by appearance — scanning upward
-  from the bottom for "a row ending with the command that carries
-  a `>`" — and a file whose last line is the echo of the command
-  that types it won that scan: the file's real content was
-  discarded and `exec` returned an **empty** result with no error
-  (issue #7; the corpus's echo-lookalike capture), the spec
-  violation P11 forbids. The run already holds better evidence
-  than looks. The command is typed at the prompt the screen ended
-  with before it was sent, so the echo is **that prompt row with
-  the command appended** (wrapped by the cell when longer than the
-  screen is wide, per issue #8), and it sits **where the prompt
-  was**: the rows above it are the rows that were above the
-  prompt, less whatever scrolled off the top. Everything the
-  command prints lands below its echo, so a row that merely spells
-  the same text has the command's own output above it and is never
-  taken for the echo — and the same command run twice, the first
-  echo still on screen, finds the second for the same reason. The
-  `>`-in-the-row heuristic goes with the scan direction: the prompt
-  is known text now, not a shape.
+  - **Remembering which row the live wait first saw the echo appear
+    on** (a fix suggested in issue #7 itself) — rejected because
+    this depends on the polling loop catching the echo before
+    fast-scrolling output pushes it off screen, whereas reading the
+    screen before typing the command always works and places the
+    echo precisely.
+  - **Scanning downward from the top by appearance instead of
+    upward from the bottom** — rejected: this still just finds the
+    first row that looks right, so running the same command twice
+    would return the *previous* run's output with the new echo
+    embedded somewhere inside it. The actual rule is what's above
+    the echo, not which direction the scan runs in — the scan
+    direction was never the fix.
 
-  THE RESIDUE, STATED: output longer than a screenful whose first
-  visible row is such a lookalike is accepted as the echo, nothing
-  being left above it to contradict it; it was wrong before as
-  well, and it is named in the corpus README rather than hidden.
+- D110 — GUI AUTOMATION IS JUSTIFIED BY USE CASE U5; FEATURE F63 IS
+  SPLIT OUT ON ITS OWN, AND F5 KEEPS ITS NUMBER FOR WHAT'S LEFT —
+  DECIDED (owner, 2026-08-21). Supports U5. Pledging U5 and F63 are
+  themselves routine lifecycle steps and don't get their own entries
+  (D63) — this entry records the actual rulings made while doing
+  that, which is the open question F5's status note had carried
+  since the 2026-07-27 cleanup.
 
-  WEIGHED AND DECLINED:
+  WHY THIS IS NEEDED. The remaining, not-yet-built part of U5
+  (customized installation) is what justifies building GUI
+  automation: a localized installer is really just a different
+  installer that shows different text — and on a graphical
+  installer, different pixels — which is exactly what the video
+  plane, pointer input, and landmark matching exist to handle.
+  CONSIDERED AND REJECTED: reading U10's "the screen is the thing
+  we assert against" as already covering graphical installers — U10
+  is about agentless install-testing and was pledged after F5's
+  open banner note was written, so stretching it to cover this case
+  would be exactly the kind of citation-written-to-fit-the-need this
+  file warns against; this only gets reopened if a GUI
+  install-testing scenario shows up as its own, separate use case.
+  ALSO REJECTED: pledging U6 (screen recording) at the same time —
+  that would commit the whole recording feature (F1) just to serve
+  a video plane that U5 already needs on its own.
 
-  - **Remembering the row the live wait first saw the echo on**
-    (issue #7's own hint) — declined because it depends on the
-    poll catching the echo before fast output scrolls it, where
-    the screen read before typing is always there and places the
-    echo exactly.
-  - **Scanning top-down by appearance** — declined: it finds the
-    first row that looks right, and the same command run twice
-    then returns the previous run's output with the new echo
-    inside it. The rows-above test is the rule; the scan order is
-    incidental.
+  THE SPLIT. Feature F63 (the VNC control plane on QEMU, covering
+  screen and keyboard) is split out as its own feature and pledged.
+  **F5 keeps its number** and covers whatever's left, following the
+  same partial-split pattern already used for U5/U21 (D64), rather
+  than fully splitting F5 into every planned piece up front the way
+  F3 was split. A full split would spend a fresh feature number on
+  every piece, but only one piece is actually being pledged right
+  now — spending numbers on pieces that stay merely proposed would
+  waste the numbering sequence for nothing. The rest of F5 will
+  still get split out piece by piece, at each later pledge, when
+  each piece is actually ready.
 
-- D110 — GUI AUTOMATION'S DEMAND IS U5; F63 IS CUT OUT AND F5
-  KEEPS ITS NUMBER — DECIDED (owner, 2026-08-21). Supports U5.
-  The pledges of U5 and F63 are lifecycle acts and are not
-  recorded here (D63); this is what was adjudicated in their
-  course — the adjudication F5's banner had left open since the
-  2026-07-27 sweep.
+  DESIGN DECISIONS MADE DURING THE SAME ROUND, kept here along with
+  the alternatives we rejected, now that shipping the feature has
+  replaced the design document that first described them (the
+  authoritative spec is now docs/spec/blueprint-model.md; the code
+  is `src/reliquary/rfb.py` and the QEMU adapter):
 
-  THE DEMAND. U5's customized-installation remainder underwrites
-  the GUI half of the era: a localized installer is a different
-  installer showing different text — on a graphical setup,
-  different pixels — which is exactly what the plane, pointer
-  input, and landmarks exist to drive. WEIGHED AND DECLINED:
-  reading U10's "the screen is the assertion surface" as reaching
-  graphical installs — U10 is agentless install-testing, pledged
-  after the banner was written, and stretching it would be the
-  citation-written-to-fit the banner warns against; it reopens
-  only if a GUI install-test scenario arrives as its own demand.
-  ALSO DECLINED: pledging U6 alongside — it commits the whole
-  recorder (F1) for a plane U5 already demands.
+  - **Write a small RFB (VNC) client in-tree, with no new external
+    dependency.** We only need to support a fixed, minimal subset
+    of the protocol, because Reliquary itself launches the VNC
+    server it connects to: the RFB 3.8 handshake, security type
+    "None," a pixel format forced to 32-bit true color, framebuffer
+    updates using only the Raw encoding, and the `KeyEvent` message
+    — no `PointerEvent` yet, until the pointer-input feature is
+    pledged separately. CONSIDERED AND REJECTED: the `vncdotool`
+    library (it would pull in the Twisted framework for a protocol
+    subset we already fully control on both ends) and the
+    `asyncvnc` library (it commits to an asyncio-based API, and its
+    ecosystem is thin, for the same limited subset we need).
+  - **Connect over loopback only, with no VNC-level authentication**,
+    leaving identity verification to QMP, which cross-checks the
+    connection against the endpoint QMP itself recorded via
+    `query-vnc`. CONSIDERED AND REJECTED: adding a per-session VNC
+    password via `set_password` — VNC's built-in password scheme
+    uses single-DES, which is security theater over a loopback
+    connection, and the one real threat it could stop — another
+    local process racing to grab the port first — is already caught
+    by the identity check. Adding a password would just be one more
+    secret to manage, for no real protection gained.
+  - **Treat the blueprint's declared `control-planes` list as an
+    ordered list of preferences.** This doesn't change what's
+    required — the first entry still determines which carriers the
+    session uses, and the default behavior is unchanged.
+    CONSIDERED AND REJECTED: refusing to let a blueprint declare
+    more than one control plane until a proper fallback/preference
+    mechanism exists — that would be an arbitrary restriction on
+    what can be written in a blueprint, needing its own separate
+    change to lift later, and it wouldn't add any protection beyond
+    what the capability check already provides.
 
-  THE CUT. F63 (the VNC control plane on QEMU, screen and
-  keyboard) is cut out and pledged; **F5 keeps its number and the
-  remainder**, the U5/U21 shape (D64) rather than the F3 full
-  split — a full split spends a fresh number per piece, and only
-  one piece is being pledged, so renumbering work that stays
-  proposed would spend the sequence on nothing. The full split
-  still happens where it belongs: piece by piece, at each later
-  pledge.
-
-  THE DESIGN CALLS made in the same round, kept here with their
-  rejected alternatives now that the delivery swept the design
-  document that first carried them (the norm is
-  docs/spec/blueprint-model.md; the mechanism is
-  `src/reliquary/rfb.py` and the QEMU adapter):
-
-  - **An in-tree minimal RFB client, no new dependency.** The
-    subset is pinned because Reliquary launches the server it
-    connects to: the 3.8 handshake, security None, forced 32bpp
-    true colour, Raw-only updates, `KeyEvent` — no `PointerEvent`
-    until the pointer feature pledges. WEIGHED AND DECLINED:
-    `vncdotool` (drags in Twisted for a subset we control both
-    ends of) and `asyncvnc` (an asyncio surface and a thin
-    ecosystem for the same subset).
-  - **Loopback, no VNC auth**, identity staying QMP's job with
-    `query-vnc` cross-checking the recorded endpoint. WEIGHED AND
-    DECLINED: a per-start password via `set_password` — VNC auth
-    is single-DES, security theater on loopback, and the threat it
-    would answer (another local process racing the port) is what
-    the identity verification detects; one more secret with
-    custody rules for no gain.
-  - **The declared `control-planes` list is an ordered
-    preference**: requirement semantics unchanged, the first entry
-    driving the session's carriers, the default unmoved. WEIGHED
-    AND DECLINED: refusing more than one declared plane until a
-    readiness waterfall exists — a vocabulary restriction that
-    would take a second surface change to lift, for no protection
-    the capability check does not already give.
-
-- D109 — THE GUEST'S OWN FONT IS AN AUTHORED ASSET, AND ITS BYTES
-  CROSS ON A DRIVE — DECIDED (owner, 2026-08-19, the U25 pledge
-  round). Supports **U25** and **U27**; P10, P12, P14, P16, S3, S8.
-  Adopts
+- D109 — A GUEST'S OWN FONT CAN BE SAVED AS AN AUTHORED ASSET, AND
+  ITS BYTES LEAVE THE GUEST THROUGH A DRIVE — DECIDED (owner,
+  2026-08-19, during the U25 pledge round). Supports **U25** and
+  **U27**; P10, P12, P14, P16, S3, S8. Applies
   [design/authored-binary-assets.md](design/authored-binary-assets.md)'s
-  shape for its second kind, which is the proposal that document
-  said each adopting kind still owes. Bounded by **D108**, whose
-  file-content carve-out it applies rather than reopens.
-
-  Four calls, and the draft named the two it left open: what a
-  font's declaration states, and how the bytes leave the guest.
-  Both are answered here, because the journey lands with the pledge
-  and a journey names commands.
-
-  **The demand is two use cases, not one with two doors.** U25 as
-  drafted named a font *taken from the guest* and a font *the author
-  supplies*, deliberately, because neither door covers what the
-  other does: asking needs a prompt, and an installer paints before
-  any prompt exists in that boot. But a journey states one path —
-  the fewest steps that reach the goal, options belonging to a guide
-  — so the second door became **U27**, a goal someone pursues in its
-  own right rather than a branch inside U25's steps. Neither half
-  changed in substance, and **F61 delivers both**; only the dump
-  (F62) is U25's alone. This is the U24/U26 shape, one round later
-  and for the same reason.
-
-  **The bytes cross on a drive the author supplied.** A
-  directory-source media attaches a host directory, the guest writes
-  `FONT.BIN` into it, and the author reads it off their own disk —
-  exactly what D108 settled for a file crossing the boundary, and it
-  costs no new mechanism at all. Two prices are accepted and named
-  rather than argued away: directory-source drives are QEMU-only, so
-  the *dump* is bound to QEMU while the asset it produces is
-  portable to every backend; and the file lands once the machine
-  stops, which an authoring act performed once per guest font can
-  afford.
-
-  WEIGHED AND DECLINED: **a UART pointed at a host file.** It is the
-  better transport on the merits — portable across both reference
-  backends, raw bytes, no filesystem tooling — and it is declined
-  for what it drags in rather than for what it does. `serial-console`
-  sits in the control-plane vocabulary (`document.py`) with nothing
-  behind it; a declared serial device is new blueprint surface plus
-  endpoint lifecycle, a feature of its own, and a write-only file
-  sink bolted on for one authoring act would settle the serial
-  plane's shape sideways, before the plane is argued. Also declined:
-  **an image swapped live and opened with the author's own tools** —
-  portable and equally mechanism-free, but getting 4096 bytes out of
-  a FAT image is a step the journey cannot state as one command.
-
-  WHAT WOULD REOPEN IT: the serial plane being designed for its own
-  reasons, or a directory-source drive reaching a second backend.
-  Either makes the dump portable, and the QEMU bound above is the
-  only thing this call is paying.
-
-  **A script names the font with `font @name`, a statement stating a
-  prefix.** From that point in the run forward the fonts named are
-  tried first and the host's follow; a second `font` replaces the
-  prefix rather than appending. It is a new action kind in an
-  existing node shape, which is what G7 prices cheaply.
-
-  WEIGHED AND DECLINED: **a `with font @name { … }` head.** The
-  scoped block is the obvious neighbour, and it is wrong on the
-  construct's own terms: the head vocabulary is closed at three
-  names, every one of them a durable machine change the scope exists
-  to *undo* (D104), and a font changes nothing on the machine, so
-  there is nothing to put back and no reason for the block. Also
-  declined: **a header declaration.** Cheapest of the three and
-  statically obvious, and it cannot express the finding the case
-  rests on — the painting authority changes mid-boot, the firmware
-  paints the earlier screens in a different face, and only the
-  script knows when.
-
-  **The declaration states the codepage, and the match order becomes
-  a priority.** Beyond the cell size — 256 glyphs of 16 rows and 512
-  of 8 being the same 4096 bytes, so geometry is declared and never
-  inferred (P10) — a bank declares what its indices *mean*, and a
-  cell matched in an authored bank decodes through it. The host's
-  own banks keep today's mapping, so nothing already recorded moves.
-  The two halves are one call: the recognizer currently unions every
-  bank's shapes and takes the globally nearest, with order breaking
-  ties alone, and under that rule "the bank that matched" names
-  nothing and a named font could only *add* a chance for a
-  near-match to beat the true glyph. First-bank-inside-the-threshold
-  is what makes both the narrowing and the decode mean anything.
-
-  WEIGHED AND DECLINED: **cell size alone**, leaving matched codes
-  with today's meanings. Materially smaller — nothing in the text
-  pipeline, the transcripts, or the fixtures moves — but it meets
-  the case only for a guest whose face differs while its code points
-  do not, and "a prepared codepage, a localized installer" is the
-  case's own example: the glyph would be found and the wait would
-  still miss.
-
-- D108 — A MACHINE'S FILE CONTENT LEAVES RELIQUARY, AND THE VOLUME
-  MAPPING GOES WITH IT — DECIDED (owner, 2026-08-16). Supports
-  U14, U20; P16, P18. Amends **U14** and **P16**, strikes **P17**
-  and **P27**, and withdraws **F41**.
-
-  Reliquary declares a machine's drives, materializes them and
-  moves their media; it does not read or write what is inside one,
-  and it maps no volume to a guest drive letter. A consumer needing
-  a file across the boundary supplies the drive and moves the file
-  itself — a directory-source media attaching a host directory, an
-  image swapped live with `insert-media --file`, or the machine
-  directory D5's out-of-band door already hands back, opened with
-  the consumer's own tools. **Remanence is the tool named**, and it
-  leaves the runtime closure with the layer that wrapped it: a
-  consumer uses it directly rather than through Reliquary.
-
-  WEIGHED AND DECLINED: **keeping the directory-source half of the
-  file family**, which needs no at-rest access at all. It would
-  have kept the drive-letter map alive to address it — the volume
-  mapping this decision removes — so half the family costs nearly
-  the whole mechanism, and the surviving half would be QEMU-only.
-  Also declined: **a narrowed `describe-drives`** reporting the
-  declared and chosen facts alone. `list-machines --json` already
-  carries them, and a report shaped by what was deleted is a
-  remnant rather than a stated need; a per-machine inspection
-  command is argued on its own merits or not at all.
-
-  WHAT WOULD REOPEN IT: a use case that cannot be completed with
-  values, declared drives and live media swap. **F15 is the
-  pressure point** — it now answers with a drive key rather than a
-  guest letter, and a demand for the letter back is a demand for
-  the mapping back.
-
-
-- D106 — THE SUITE IS PYTEST-NATIVE — DECIDED (owner, 2026-08-13).
-  Supports **P11**'s reading, as D95 read it across: a check that
-  silently does not run is a capability gap failing open. Amends
-  AGENTS.md's stdlib-`unittest` preference, whose normative text
-  lands with the migration.
-
-  **The dependency was never the argument, and it was the one being
-  made.** AGENTS.md already holds that a test-only dependency is a
-  hard requirement of the suite — `jsonschema` is one — so a count
-  settles nothing. What settles it is the failure that very rule was
-  written for: the conformance corpus ran against the parser and
-  *not* the schema while claiming the two cannot drift, and 135
-  fixtures across two checks inside `subTest` is a run whose halved
-  form looks exactly like its whole one. Parametrised, every fixture
-  is a collected node and the count is the assertion. The opt-in
-  integration tier is the same shape — a marker states a deliberate
-  tier where `skipUnless` states an accident, which is why that tier
-  needs an exact skip count asserted around it today.
-
-  WEIGHED AND DECLINED: **pytest as the runner only**, keeping the
-  `TestCase` classes. It is nearly free and keeps `python -m unittest
-  tests` working for anyone unpacking the sdist — and buys none of
-  the above, the corpus staying inside `subTest` and the tier staying
-  a skip, which are the two things the change is for. WEIGHED AND
-  DECLINED: **staying on unittest**, the same position with the
-  dependency saved.
-
-  Two costs taken deliberately. `python -m unittest tests` stops
-  working, so verifying an unpacked sdist needs the dev group — in
-  the same round as **D105**, which is what put the suite in the
-  sdist — taken because pytest is packaged everywhere a packager
-  works. And **plugin autoload is turned off in the project's own
-  configuration** rather than left to whoever runs it: a suite
-  shipped to strangers must not collect differently in their
-  environment than in this one.
-
-  Reopens on nothing here. The stdlib preference stands everywhere
-  else: this is one dependency judged compelling, not the bar
-  lowered.
-
-- D105 — THE SDIST CARRIES THE SUITE, NOT THE GOVERNANCE — DECIDED
-  (owner, 2026-08-13). Supports **P11**'s reading: a claim nobody can
-  check is not a claim. Amends **D96**, whose `planning/` half stands
-  and whose wheel half is untouched.
-
-  **D96 read the ecosystem as neutral on the sdist, and it is not.**
-  An sdist is conventionally the artifact a stranger can build *and
-  verify* from, and downstream packagers run the upstream suite at
-  package-build time — the convention runs the other way from the
-  entry that dropped it, which weighed the wheel's settled rule and
-  the file count without weighing that. And the count argued
-  `planning/`, not the suite: 187 of 280 files was governance and
-  fixtures counted together, and governance alone is what has no
-  business in a stranger's hands.
-
-  WEIGHED AND DECLINED: leaving the suite out and resting on `uv
-  build`'s completeness gate, which was D96's answer to what shipping
-  it bought. The gate is kept, and is still how a source archive's
-  completeness is proved — it simply never argued for *withholding*
-  the suite, only that nothing was lost by doing so. What was lost is
-  the packager's run, on a platform this project never tests.
-
-  WEIGHED AND DECLINED: **moving the script-example catalogue to
-  `docs/`** so the documented-example tests could still read it —
-  taken at first on the reading that a corpus the code is checked
-  against is a norm, and abandoned on reading the catalogue, which
-  holds *unresolved* design problems and deletes them on resolution.
-  That is governance, and shipping it is what this entry's other half
-  refuses. **The test moved instead**, to `tests/source_tree/`, which
-  ships nowhere: a test that reads what no artifact carries should be
-  unable to run outside the repository rather than guarded into a
-  quiet pass. The rule that leaves is AGENTS.md's, where it governs
-  every such test rather than this one catalogue.
-
-  Reopens if the suite acquires a requirement a packager cannot
-  reasonably meet. **D106**'s pytest is not one.
-
-- D104 — A SCOPED MACHINE-STATE CHANGE IS A BLOCK, AND ITS RESTORE
-  OBEYS THE STOPPED-ONLY RULE — DECIDED (owner, 2026-08-13, the U24
-  pledge round). Supports **U24** and **U26**; P14, S3. Bounded by
-  **D15**'s Q1, which it does not reopen.
-
-  **The demand is two use cases, not one with a failure clause.**
-  U24 as drafted carried the run-ends-as-it-began guarantee inside
-  its own path, which the happy-path rule forbids: a use case is one
-  simple path, and a deviation is never a clause in one. Of that
-  rule's two homes the guarantee went to a **use case of its own**
-  (U26), not to a principle. WEIGHED AND DECLINED: P28. The rule
-  genuinely holds on every outcome and every surface — the revert
-  after a *successful* run is the same rule running where nobody
-  looks — but the half a user meets is a goal they pursue, and a
-  principle would have stated the mechanism when what was missing
-  was the demand. Neither half changed in substance, and F54
-  delivers both.
-
-  Two contested calls, both made against the recommendation, and the
-  arguments they beat are recorded because each was strong enough to
-  be raised again.
-
-  **The spelling is a `with` block** wrapping phases in a phased
-  script and statements in a linear one, its head one of `insert` /
-  `eject` / `set-boot` written as it is written today. WEIGHED AND
-  DECLINED: a **`scope=run` modifier** on those three verbs, which
-  costs P14 nothing at all — a `key=value` modifier is the shape
-  `exclude=` and `stability=` already have, so no construct is added
-  and V2/V14 carry it with no new id. It was declined because it can
-  only ever scope to the *run*, and the thing U24 names is a stage;
-  a mechanism that cannot express the unit the demand is written in
-  is cheap for the wrong reason. Also declined: a **header
-  declaration** (`boot cdrom0 hdd0`), which covers the boot order
-  alone — leaving media, half of U24's class, needing a second
-  mechanism — and puts durable-state policy in the one place
-  script-spec.md deliberately keeps it out of.
-
-  **The scoped boot head is `boot` and states a prefix**, not
-  `set-boot` and not a whole order: what a stage has to say is
-  "boot the CD first", and an author should not restate an order
-  they are not changing (owner, same day). The drives named come
-  first in the order given and the machine's own order follows.
-  WEIGHED AND DECLINED: reusing `set-boot` as the head. That verb
-  *replaces* the order, so the scoped form would carry different
-  semantics under an identical spelling — the one thing a closed
-  grammar cannot afford, since a reader has no way to tell which
-  meaning is in front of them. A distinct word costs one name in a
-  vocabulary that has room for it, and `set-boot` keeps its
-  meaning unchanged.
-
-  WEIGHED AND DECLINED, having been raised and withdrawn in the
-  same round: **promoting a whole drive kind**, so that one word
-  moved every CD-ROM at once. The head takes slot keys, and a
-  machine with two optical drives names both. It was withdrawn as
-  more than the demand needs, and the collision it would have had
-  to route around is worth recording — a bare `cdrom` is already
-  the blueprint's alias for `cdrom0`, so the kind could not have
-  taken the obvious spelling, and every remaining one bought a
-  third way to say a drive.
-
-  **The scope is dynamic, not lexical**: it holds while control is
-  inside the group, whichever way control arrived. A lexical reading
-  was declined on mechanics rather than taste — every phase body ends
-  in a transition, so a scope that closed at the end of its text
-  would revert at the first `goto` and express nothing an install
-  could use.
-
-  **A boot restore requires a stopped machine**, and an exit reached
-  with the machine running fails the run naming what it could not
-  undo. WEIGHED AND DECLINED: letting the runtime's own restore write
-  the state document behind a running machine, on the argument that a
-  restore claims no live effect and only sets what the next start
-  reads. Declined because D15's Q1 made the boot order stopped-only
-  as a property of the machine rather than as a courtesy to the
-  author, and a second writer operating under a different rule is
-  exactly how such a guarantee erodes — the next exception argues
-  from this one. The accepted cost is real and named: a run that
-  otherwise succeeded can fail at its last act, and the remedy for an
-  author handing back a live machine is to say so in the script's own
-  shape. **T27 defangs most of it** by moving the same verdict to
-  parse time, which is why F54 depends on that analysis.
-
-  **What reopens the restore rule** is D15's Q1 itself: if the boot
-  order ever gains a live effect, or the stopped-only guard is
-  revisited for its own reasons, this clause is decided again with
-  it and not before.
-
-- D103 — THE ADAPTER SEAM'S KEY VOCABULARY IS QEMU'S QCODE SET —
-  DECIDED (owner, 2026-08-13). Supports P11. Leaves P25 untouched:
-  that governs the blueprint's portable vocabulary, and the script
-  language's `press` names stay portable.
-
-  **The seam was already QEMU's and said it was portable.** Three
-  docstrings and the seam's own design note claimed the vocabulary
-  crossing it was a portable set QEMU happened to match. It was
-  not: `control_display._PLAIN` emits `spc` and `ret`,
-  `script_runner.resolve_key` translates the language's names into
-  QEMU's above the seam, and the VirtualBox adapter's scancode
-  table is keyed by `ret`, `spc`, `pgup` and `pgdn` with no entry
-  for `enter` or `space`. **That table is the evidence**: the one
-  adapter the contract was written for was built against what
-  arrives rather than what was declared, so the claim had already
-  failed its only test.
-
-  WEIGHED AND DECLINED: making the seam genuinely portable —
-  respelling the control plane's tables, moving the QEMU map into
-  its adapter, rekeying VirtualBox. It needs a vocabulary that does
-  not exist: `PORTABLE_KEY_NAMES` covers 31 named keys while the
-  seam also carries punctuation, letters and digits, so the honest
-  version invents a third naming scheme no backend speaks natively,
-  for no behavioural gain on either backend. Naming the seam after
-  the reference backend is the cost paid instead, and it is paid
-  once.
-
-  REOPENS on a backend whose input API cannot express a qcode name,
-  or a second adapter author who needs spellings this set does not
-  reach — at which point the third vocabulary earns its keep and
-  this is the entry to overrule.
-
-- D102 — BLUEPRINTS USE JSON5, NOT JSONC — DECIDED (owner,
-  2026-08-05). Supports U4, U5; G2. Amends D18's input-format
-  choice; its computational-growth rule remains in force.
-
-  **JSON5 is the authored blueprint grammar.** JSONC is an ecosystem
-  label rather than one settled grammar: even its draft specification
-  makes trailing-comma support optional, while Reliquary's former
-  wording had to define a project-specific dialect. A published JSON5
-  grammar gives authors and independent tooling one external contract
-  to implement. The parser still rejects `NaN` and both infinities:
-  blueprint values remain ordinary JSON data after parsing.
-
-  WEIGHED AND DECLINED: retaining the narrow JSONC dialect for editor
-  familiarity. That remains a useful configuration-file convention,
-  but it does not outweigh a specified grammar for Reliquary's own
-  authored format. Reopens only on evidence that the required editor
-  and schema workflow cannot support JSON5 without a material loss of
-  the authoring experience.
-
-- D101 — THE SCRIPTS MAP IS THE BLUEPRINT'S, READ AT INVOCATION —
-  DECIDED (owner, 2026-08-02). Supports U1, U14; P6, P11.
-
-  A label map names which instructions to run, not what a machine
-  is, so it sits outside the shape baseline beside `parameters`
-  rather than inside it: read from the blueprint at each invocation,
-  absent from machine state and from the digest. The normative home
-  is [instance-model.md](../docs/spec/instance-model.md); what is
-  recorded here is the contested call, because the code had drifted
-  the other way and a reader could reasonably take the drift for
-  intent — cli.md already resolved a label against "the blueprint's
-  `scripts` map", and U5's parameters design was written on the
-  premise that the scripts map was read at invocation.
-
-  WEIGHED AND DECLINED: making `parameters` read from state instead,
-  which buys symmetry by breaking the half that was right — a
-  parameter edit would then need an `apply` to reach the run that
-  binds it. Reopens only if a machine is shown to need its label map
-  pinned against blueprint edits, which is the shape argument this
-  call says does not apply to it.
-
-- D100 — F12 AND F44 ARE REJECTED OUTRIGHT — DECIDED (owner,
-  2026-08-02). Supports P8. Retires both numbers (D23, no stub).
-
-  Neither backend earns its cost. **F44** (`replay`) offered cheap
-  hypervisor-free reruns, which hold only while neither the script
-  nor the guest behaviour changes; what survives that caveat is
-  catching reliquary's own interpretation-layer regressions against
-  a frozen capture, and that is F43's job already. **F12**
-  (`simulator`) names one real pain — consumers monkeypatching
-  `start_machine`/`stop_machine`/`exec` — but its own decide-first
-  left the feature undesigned (what shape a guest-output responder
-  takes under P6 and P7), a cost disproportionate to a convenience
-  for test authors.
-
-  WEIGHED AND DECLINED: leaving both parked in `proposed/`. That
-  shelf holds live arguments waiting on demand, not settled maybes.
-  Either capability reopens by winning its own argument from
-  scratch, never by reviving these.
-
-- D99 — A DEMAND DRAFTED TO SATISFY THE GATE IS NOT A DEMAND —
-  DECIDED (owner, 2026-08-02). Supports P8.
-
-  P8 requires demand before a feature so that features answer needs,
-  rather than needs being reverse-engineered from features someone
-  already wanted. Drafting a use case *in order to* clear the
-  citation requirement inverts the rule while appearing to satisfy
-  it: the gate reads as passed, and the thing it exists to prevent
-  happens one level removed. A drafted use case earns its number by
-  describing a need that exists independent of whatever cites it.
-  Found when F44's pledge round drafted U23 for exactly that reason
-  — F44 withdrew, U23 struck, its number spent (D23, no stub).
-
-  WEIGHED AND DECLINED: narrowing U23 to F12's monkeypatch thread
-  instead of striking it. That thread is real but is F12's alone,
-  and a use case kept alive to justify a feature nobody had argued
-  for repeats the error in smaller print.
-
-- D98 — A CAPTURE IS NOT A RUN RECORD, AND ITS FORMAT IS NOT A
-  SURFACE — DECIDED (owner, 2026-08-01, the F13 pledge round).
-  Supports P22; **bounds D36**.
-
-  **The contested call is whether D36 reaches this.** D36 deleted
-  persisted run output outright — `run-events.jsonl`,
-  `transcript.txt`, the `runs/` archive — and S7 now states the
-  contract as "a run drives the machine and returns its output to
-  whoever started it, storing nothing." F42's `--record <path>`
-  writes screens to disk, which looks like exactly that refusal.
-  It is not: what D36 refused was **persistence as async's
-  substrate**, a record written so another process could follow a
-  run, and it refused it for want of demand. A capture is written
-  only where a maintainer names a path, is read by nothing at
-  runtime, and answers a demand D36 never weighed — P22's gate over
-  a heuristic layer that cannot be tested on fabricated input. D36
-  stands untouched for every run that does not ask.
-
-  **The transcript format is deliberately not an application
-  surface**, and that refusal is recorded because it leaves no other
-  trace: a reader who finds `.rlqt` files and goes looking for the
-  `docs/spec/` entry should learn here that none was ever written.
-  No norm, no stability guarantee, no compatibility obligation — a
-  change to it is housekeeping, not a surface change. What *is*
-  surface is the invocation alone (S1 and S2, landing together under
-  P6). The rejected alternative was a maintainer-only
-  `RELIQUARY_RECORD` environment hatch, which would have left D36
-  and S7 untouched by leaving the capability ungoverned — an
-  undocumented spelling behaving like surface without being weighed
-  as any, in a project whose other `RELIQUARY_*` variables are all
-  specified.
-
-  **What reopens it is F44**: the moment a caller runs flows off a
-  transcript, the format becomes something the world depends on, and
-  it takes the vetting rule and a `docs/spec/` norm with it. That is
-  the whole of what F44 defers, and why the format's standing is
-  stated now rather than discovered then.
-
-- D97 — THE LIST FAMILY SHOWS ITS DESCRIPTIONS; THE DROP EXIT IS
-  DECLINED — DECIDED (owner, 2026-08-01). Supports U11; P6, P11.
-  Resolves the deferral D88 parked as T8.
-
-  T8 offered two exits: specify the human display, or drop
-  `description` from every surface, `--json` included. Dropping is
-  **declined while U11 stands** — "read a description" is a
-  use-case clause in force, so that exit is an amendment of the
-  use-case list dressed as a display cleanup, and it reopens only
-  by winning that amendment first. The display settled: **an
-  indented, wrapped description line beneath each entry**, never a
-  column — a fixed-width column of unbounded free text is exactly
-  what D88 refused, and truncation loses the words being read
-  for — applied as a uniform rule wherever a listing's noun
-  carries a description (`list-codex`, both `list-scripts` forms,
-  `list-blueprints`), with `list-blueprints`' record gaining
-  `description` and `platform` so `--json` carries what the human
-  view shows (P6). A `describe-*` detail verb was weighed and
-  declined: full text at one command per entry read is the wrong
-  ergonomics for scanning a library, and a new command family
-  needs a demand a wrapped line already meets. The normative
-  wording lands in docs/spec/cli.md with the implementation that
-  strikes T8.
-
-- D96 — RELEASED ARTIFACTS CARRY NO TESTS — DECIDED (owner,
-  2026-07-30). [Its sdist half is overruled by **D105**: the suite
-  ships in the sdist again, and only the wheel and the `planning/`
-  clauses below still govern.] Supports P21's instinct applied to
-  what is shipped rather than what is depended on. The wheel already
-  excluded the suite; the sdist grafted it deliberately, and **that
-  half was never adjudicated** — it accreted through `MANIFEST.in`,
-  and AGENTS.md and `check_dist.py` then described it as settled,
-  `check_dist` going as far as to *require* it. Two-thirds of the
-  source distribution was tests: 187 of 280 files.
-
-  [Overruled by D105.] **The contested call is what replaces the
-  sdist gate.** Shipping
-  the suite bought one real thing — "unpack the sdist outside the
-  tree and run the suite there," the check that the source package
-  was complete — and dropping it has to answer for that. It is
-  answered structurally rather than replaced: `uv build` builds the
-  wheel *from* the sdist, so an archive missing anything the build
-  needs fails at build time. The gate was never the tests passing;
-  it was the archive being complete, and the build proves that
-  without shipping 187 files to do it.
-
-  `PLANNING/DESIGN` WAS THE TELL (owner: "'planning' docs in
-  published test package is a solution to a problem, it's part of a
-  problem"). It was grafted so the suite could parse the
-  script-example catalogue out of an unpacked sdist — maintainer
-  governance shipped to a stranger to serve a test run nobody
-  performs. It goes with the suite, and `check_dist` now **forbids**
-  both trees in both artifacts rather than requiring them in one.
-  [D105 keeps the `planning/` half of that and drops the other: the
-  suite is required in the sdist and forbidden in the wheel.]
-  `docs/` stays: documentation in a source package is conventional
-  and is not a test.
-
-  Effective from the next release. **The 0.1.0.dev6 sdist on PyPI
-  carries the tests** and cannot be changed — a version is immutable
-  once published — so the record should not read as though this were
-  retroactive.
-
-- D95 — THE SUPPORTED FLOOR IS 3.12, AND IT IS DROPPED RATHER THAN
-  FIXED — DECIDED (owner, 2026-07-30). Supports P11's reading, which
-  AGENTS.md already applies to host platforms: an untested version is
-  an unclaimed capability, not a quiet promise. `>=3.9` was published
-  and had never been run; the first run failed on **3.9 and 3.10**
-  (`keyring` reaches `platform.win32_ver()`, which shells out on those
-  versions and trips the suite's own no-subprocess guard) and on
-  **3.11** (39 errors: a `MappingProxyType` dataclass default, which
-  3.11 rejects as unhashable). 3.12, 3.13 and 3.14 pass.
-  **Fixing rather than dropping was WEIGHED AND DECLINED** (owner:
-  "if there is *any* doubt, just drop"): 3.11 needs a `default_factory`
-  and 3.9/3.10 need the guard taught about `platform`'s internals,
-  both cheap, neither worth a support claim nothing was asking for.
-  Reopen by fixing those two and lowering the floor — the floor run in
-  AGENTS.md "Required checks" is what would keep it honest.
-
-- D94 — TWINE GOES WITH THE UV ADOPTION — DECIDED (owner,
-  2026-07-30). Supports P21, which binds infrastructure as well as
-  packages. The adoption itself needs no entry: uv owning the
-  environment and the release path is stated in AGENTS.md
-  "Development environment" and "Required checks", and the commit is
-  its record. **What earns this entry is one contested call.**
-  Keeping twine for `twine check` was weighed and declined: its
-  rendering job is an RST problem and `readme` is `README.md`, where
-  CommonMark has essentially no failing input; the index validates and
-  **rejects** bad metadata itself; a rejected upload does not consume
-  the version, so the cost of learning at upload is a retry; and
-  `tools/check_dist.py` remains the project's real artifact gate.
-  A pre-flight duplicate of a server-side check, against a format that
-  does not fail, is what P21 refuses. **Reopen if the readme stops
-  being markdown** — an RST description puts `twine check`'s original
-  purpose back in force. Poetry, PDM and Hatch were declined in
-  passing: each gives the lock, none gives interpreter provisioning,
-  and Poetry wants its own `pyproject.toml` dialect where this project
-  already writes PEP 621 and PEP 735.
-
-- D93 — FIRST-CLASS BLUEPRINT VOCABULARY REQUIRES GENERAL
-  APPLICABILITY ACROSS BACKENDS — DECIDED (owner, 2026-07-30),
-  overruling **D91** the day it was delivered and removing its
-  devices axis. Supports P8; adds **P25**.
-
-  THE BAR: a device or adapter name becomes a first-class field
-  only where it applies across multiple backends. What one backend
-  alone provides stays behind that backend's pin in
-  `backend-settings` — reachable, at the price of portability, and
-  that price is the pressure that grows the vocabulary one name at
-  a time. Seeding `virtio-console` and `virtio-net` was declined on
-  the same bar: a vocabulary admitted because one backend exposes
-  it is a vocabulary that records the wrong fact.
-
-- D92 — THE HATCH IS HONORED, THE RENDERER IS THE VALIDATOR, AND A
-  LONE SECTION NARROWS — DECIDED (owner, 2026-07-30) and delivered
-  the same day, retiring F28. Supports U22; P10, P11.
-  `backend-settings` is normative in the blueprint field reference
-  and AGENTS.md.
-
-  Three rulings with no other home:
-
-  - **The renderer *is* the validator.** `settings_args` both
-    validates and renders, which is what makes a section a create
-    accepted one a start applies — two code paths would drift.
-  - **A lone section narrows the backend walk**, but by *presence*
-    and never by content: declaring settings for one backend pins
-    assignment to it without the settings themselves being read as
-    requirements.
-  - **Only the assigned backend's section is judged.** No adapter
-    can speak for another's vocabulary, so an unknown key is
-    refused only where an adapter owns the section.
-
-- D90 — A RUN'S OUTCOME IS A POSTCONDITION, A WAIT IS A POLL, AND
-  AN EXPIRED WAIT IS BOTH A FAILURE AND A TIMEOUT — DECIDED
-  (owner, 2026-07-30) and delivered the same day, retiring F30.
+  general shape to fonts, its second kind of asset — this is the
+  proposal that document said each new kind of asset still had to
+  work out for itself. Builds on **D108**'s rule for how a file's
+  content leaves Reliquary, rather than reopening it.
+
+  The design draft left four questions open, and this entry answers
+  the last two: what a font's declaration in a blueprint actually
+  says, and how the font's raw bytes get out of the guest. Both are
+  settled here because they had to be settled before the feature
+  could ship, and the recorded use-case journey has to name actual
+  commands.
+
+  **This serves two separate use cases, not one use case with two
+  branches.** U25, as originally drafted, named two situations: a
+  font *captured from the running guest*, and a font *supplied
+  directly by the author*. These were kept deliberately separate,
+  because they don't share a path — capturing a font needs to
+  interactively prompt the user, while an installer often draws its
+  first screens before any prompt is even possible. A recorded
+  use-case journey is supposed to describe one path — the shortest
+  route to the goal, with any real choices left to a separate guide
+  — so the second situation became its own use case, **U27**, rather
+  than staying as a branch inside U25. Neither situation's actual
+  requirements changed. **Feature F61 delivers both of them**; only
+  the font-dumping tool (F62) belongs to U25 alone. This mirrors how
+  U24 and U26 were split apart earlier, for the same reason.
+
+  **The font's bytes leave the guest through a drive the author
+  supplies.** A directory-source drive attaches a host directory to
+  the guest; the guest writes a file named `FONT.BIN` into that
+  directory, and the author then reads it straight off their own
+  disk — this is exactly the mechanism D108 already established for
+  getting a file's content out of a guest, so it costs nothing new
+  to build. Two trade-offs are accepted here rather than avoided:
+  directory-source drives currently only work on QEMU, so the
+  dumping tool is tied to QEMU, even though the font asset it
+  produces works with every backend once it exists; and the file
+  only appears once the machine is stopped, which is fine for
+  something an author only needs to do once per guest font.
+
+  CONSIDERED AND REJECTED: **sending the bytes over a serial port to
+  a file on the host.** This would actually be the better transport
+  on its own merits — it works on both reference backends, moves raw
+  bytes, and needs no filesystem tooling — but it's rejected for
+  what it would drag in, not for what it does. `serial-console`
+  already exists as a name in the control-plane vocabulary
+  (`document.py`) but nothing is built behind it; adding a real,
+  declared serial device would mean new blueprint surface (S4) plus
+  a whole endpoint lifecycle — a feature of its own — and bolting on
+  a write-only file sink just for this one use would end up
+  deciding the shape of the serial control plane sideways, before
+  it's actually been designed. Also rejected: **swapping the disk
+  image live and reading it with the author's own tools.** This is
+  also portable and needs no new mechanism, but pulling 4096 bytes
+  out of a live FAT filesystem image isn't something the use-case
+  journey can describe as a single command.
+
+  WHAT WOULD REOPEN THIS: either the serial control plane getting
+  properly designed for its own reasons, or directory-source drives
+  becoming available on a second backend. Either one would make the
+  dumping tool portable — being tied to QEMU is the only cost this
+  decision is actually paying.
+
+  **A script names a font to use with `font @name`, a statement that
+  sets a font-search prefix.** From that point in the script forward,
+  the named fonts are tried first, before falling back to the host's
+  built-in fonts; running `font` a second time replaces the prefix
+  rather than adding to it. This is a new kind of action added to an
+  existing statement shape, which is exactly the kind of small
+  addition G7 says should be cheap to add.
+
+  CONSIDERED AND REJECTED: **a scoped block, `with font @name { … }`.**
+  This is the obvious-looking alternative, but it doesn't fit how
+  scoped blocks work in this language: the set of things a scoped
+  block header can declare is fixed at three, and every one of them
+  is a lasting change to the machine that the block exists to *undo*
+  automatically when it ends (D104). Choosing a font doesn't change
+  anything on the machine, so there's nothing for the block to undo,
+  and no reason to use one. Also rejected: **a font declaration in
+  the script's header, before any statements run.** This is the
+  cheapest of the three options, and it's easy to check statically —
+  but it can't express the actual situation this feature has to
+  handle: which program is responsible for drawing the screen
+  changes partway through booting (the firmware draws early screens
+  in a different typeface than the OS draws later ones), and only the
+  running script knows when that handoff happens.
+
+  **A font's declaration states its codepage, and matching now works
+  by priority order.** Beyond just declaring the glyph cell's
+  dimensions — 256 glyphs of 16 rows and 512 glyphs of 8 rows both
+  add up to the same 4096 bytes, so the geometry has to be declared,
+  never guessed (P10) — a font's declaration also states what its
+  character codes actually mean. When the text-recognition matcher
+  finds a glyph inside a font that was explicitly declared this way,
+  it decodes the matched code using that font's stated meaning. The
+  host's own built-in fonts keep their existing, current meanings —
+  nothing already working changes. These two pieces are really one
+  decision: today's matcher pools every font's glyphs together, picks
+  whichever is the closest visual match across all of them, and only
+  uses declaration order to break exact ties. Under that scheme,
+  "which font matched" doesn't actually mean anything reliable, so a
+  newly declared font could only ever make things worse — adding one
+  more near-match that might beat out the correct glyph. Only by
+  checking fonts in priority order, and stopping at the first one
+  whose match is close enough, do both the narrower search and the
+  codepage-based decoding actually mean something.
+
+  CONSIDERED AND REJECTED: **declaring the cell dimensions only,
+  leaving every matched character code with its existing meaning.**
+  This is a meaningfully smaller change — nothing in the text
+  pipeline, the recorded transcripts, or the test fixtures would need
+  to move — but it only covers a guest whose glyph shapes differ
+  while its underlying character codes stay the same. The case this
+  feature actually has to handle — a specially prepared codepage on a
+  localized installer — is exactly the opposite: the glyph shape
+  would be found, but the wait for specific text still wouldn't
+  match, because the character code meanings wouldn't be tracked.
+
+- D108 — RELIQUARY DOES NOT READ OR WRITE FILE CONTENT INSIDE A
+  MACHINE'S DRIVES, AND THE DRIVE-LETTER MAPPING IS REMOVED ALONG
+  WITH THAT — DECIDED (owner, 2026-08-16). Supports U14, U20; P16,
+  P18. Changes **U14** and **P16**, removes **P17** and **P27**,
+  and withdraws feature **F41**.
+
+  Reliquary declares a machine's drives, creates them, and can swap
+  their media — but it does not read or write what's actually
+  inside a drive, and it does not map any volume to a specific
+  guest drive letter. If something outside Reliquary needs to get a
+  file across the guest/host boundary, it has to supply the drive
+  and move the file itself: by using a directory-source drive that
+  attaches a host directory, by swapping a disk image live with
+  `insert-media --file`, or by using the machine's own directory,
+  which D5 already exposes as a way to reach the files directly with
+  outside tools. **The recommended tool for this is named
+  explicitly: the third-party `remanence` library**, which opens raw
+  and qcow2 disk images directly and reads and writes the FAT
+  volumes inside them. This work happens entirely outside
+  Reliquary's own runtime — a consumer uses `remanence` (or another
+  tool) directly, not through Reliquary.
+
+  CONSIDERED AND REJECTED: **keeping just the directory-source half
+  of the removed file-access feature**, since that half needs no
+  access to a stopped machine's disk at all. This was rejected
+  because it would still require keeping the drive-letter mapping
+  alive to address a drive by letter — the very thing this decision
+  removes — so keeping half the feature would cost nearly the whole
+  mechanism anyway, and the surviving half would only work on QEMU.
+  Also rejected: **a narrowed `describe-drives` command** that
+  reports only the declared and chosen drive facts. `list-machines
+  --json` already reports those facts, and a command shaped only by
+  what was just deleted isn't a real, separately justified feature;
+  a genuine per-machine inspection command would need to be argued
+  for on its own merits, not as a leftover.
+
+  WHAT WOULD REOPEN THIS: a real use case that can't be completed
+  using property values, declared drives, and live media swapping.
+  **Feature F15 is the place to watch** — it now reports drives by
+  their key name rather than by guest drive letter, so any future
+  demand to bring back drive letters is really a demand to bring
+  back the whole mapping this decision removes.
+
+
+- D106 — THE TEST SUITE NOW REQUIRES PYTEST, NOT JUST PYTHON'S
+  BUILT-IN `unittest` — DECIDED (owner, 2026-08-13). Supports how
+  P11 was already read by D95: a check that silently fails to run
+  is a capability gap that fails silently, which P11 forbids.
+  Changes AGENTS.md's stated preference for the standard library's
+  `unittest`; the rule's actual wording is updated as part of this
+  migration.
+
+  **The real argument was never about adding a dependency, even
+  though that's the argument that kept getting made against it.**
+  AGENTS.md already treats a test-only dependency as acceptable when
+  the suite genuinely needs it — `jsonschema` is one such dependency
+  — so simply counting dependencies doesn't settle anything. What
+  settles it is the exact kind of failure the "no check silently
+  skips" rule exists to catch: the conformance-corpus tests were
+  running against the parser and never against the schema, while
+  claiming the two could never drift apart, and 135 test fixtures
+  split across two checks, run inside `unittest`'s `subTest`,
+  produced a test run that looked identical whether it ran the full
+  set or only half of it. With pytest parametrizing each fixture as
+  its own separately collected test, the number of tests collected
+  becomes part of what's actually being checked. The same problem
+  showed up in the opt-in integration test tier: a pytest marker
+  states "this tier is being deliberately skipped," where
+  `unittest`'s `skipUnless` looks identical whether the skip is
+  deliberate or accidental — which is why, under the old setup, that
+  tier needed its own separately asserted, exact skip count just to
+  catch an accidental skip.
+
+  CONSIDERED AND REJECTED: **using pytest only as the test runner,
+  while keeping the existing `TestCase`-based test classes.** This
+  costs almost nothing and keeps `python -m unittest tests` working
+  for someone who just unpacks the source distribution — but it
+  buys none of the benefits above, since the fixtures would stay
+  wrapped in `subTest` and the integration tier would stay a plain
+  skip, which are exactly the two problems this migration exists to
+  fix. CONSIDERED AND REJECTED: **staying entirely on `unittest`** —
+  the same downsides, with the dependency avoided.
+
+  Two costs are accepted here, deliberately. First, `python -m
+  unittest tests` no longer works, so checking an unpacked source
+  distribution now needs the project's development dependency group
+  installed — decided in the same round as **D105**, which is what
+  put the test suite itself into the source distribution. This cost
+  was accepted because pytest is already packaged everywhere a
+  package maintainer would be working. Second, **plugin autoloading
+  is explicitly turned off in the project's own pytest
+  configuration**, rather than left to whatever plugins happen to be
+  installed for whoever runs the tests — a test suite shipped to
+  other people must not collect a different set of tests in their
+  environment than it does in this one.
+
+  Nothing else is reopened by this. The general preference for the
+  standard library's `unittest` still stands everywhere else — this
+  is one dependency judged worth it for this specific reason, not a
+  general lowering of the bar.
+
+- D105 — THE SOURCE DISTRIBUTION (SDIST) NOW SHIPS THE TEST SUITE,
+  BUT NOT THE `planning/` GOVERNANCE FILES — DECIDED (owner,
+  2026-08-13). Supports how P11 is read: a claim nobody can actually
+  check isn't really a claim. Changes **D96** — its ruling about
+  `planning/` stands, and its ruling about the wheel package is
+  untouched.
+
+  **D96 treated the packaging ecosystem as neutral on whether the
+  sdist should include the test suite, but it isn't neutral.** By
+  convention, an sdist is the artifact a stranger can both build
+  *and verify* from, and downstream packagers routinely run a
+  project's own test suite as part of building their package — that
+  convention points the opposite way from what D96 decided, and D96
+  only weighed the wheel package's already-settled rule and a raw
+  file count, without weighing this packaging convention. That file
+  count argument was really about `planning/`, not about the test
+  suite: 187 of 280 files were governance documents and test
+  fixtures counted together as a single number, when it's really
+  only the governance documents that have no business in a
+  stranger's hands.
+
+  CONSIDERED AND REJECTED: leaving the test suite out and relying on
+  `uv build`'s completeness check instead, which is what D96
+  originally offered as the benefit of leaving the suite out. That
+  completeness check is kept, and it's still how we prove a source
+  archive is complete — but it was never actually an argument for
+  *withholding* the test suite, only that nothing was technically
+  lost from the archive by leaving it out. What actually was lost is
+  a downstream packager's ability to run the test suite, on a
+  platform this project itself never tests on.
+
+  CONSIDERED AND REJECTED: **moving the catalogue of example scripts
+  into `docs/`**, so the tests that check documented examples could
+  still read it. This was the initial plan, on the idea that a body
+  of examples the code is checked against counts as documentation
+  rather than governance — but it was abandoned once we looked at
+  what the catalogue actually holds: *unresolved* design problems,
+  which get deleted once they're resolved. That's governance, and
+  shipping governance to strangers is exactly what the other half of
+  this decision refuses. **Instead, the test itself moved**, into
+  `tests/source_tree/`, which is never shipped anywhere: a test that
+  reads something no shipped artifact carries should simply be
+  unable to run outside this repository, rather than wrapped in a
+  guard that quietly makes it pass elsewhere. The general rule for
+  this kind of test now lives in AGENTS.md, governing every test
+  like this, not just this one catalogue.
+
+  REOPENS IF the test suite ever needs something a downstream
+  packager can't reasonably provide. **D106**'s requirement of
+  pytest does not count as one of those.
+
+- D104 — A TEMPORARY MACHINE-STATE CHANGE IS WRITTEN AS A `with`
+  BLOCK, AND UNDOING A BOOT-ORDER CHANGE REQUIRES A STOPPED MACHINE
+  — DECIDED (owner, 2026-08-13, during the U24 pledge round).
+  Supports **U24** and **U26**; P14, S3. Builds on **D15**'s first
+  open question (Q1), without reopening it.
+
+  **This serves two separate use cases, not one use case with a
+  failure-handling clause attached.** U24, as originally drafted,
+  included the guarantee that a run leaves the machine's state
+  exactly as it began, as part of its own path — but the "one use
+  case is one simple path" rule doesn't allow a deviation like that
+  to live as a clause inside the happy path. This guarantee became a
+  **use case in its own right** (U26), rather than a principle,
+  which was the other place such a rule could have lived.
+  CONSIDERED AND REJECTED: writing it as a principle instead (it
+  would have been P28). The rule genuinely does apply to every
+  outcome and every surface — reverting state after a run that
+  *succeeded* is the same rule quietly doing its job where nobody's
+  watching — but the half of it a user actually experiences is a
+  goal they pursue, and turning it into a principle would have
+  described the mechanism when what was actually missing was
+  recognizing the demand for it. Neither half's substance changed,
+  and feature F54 delivers both.
+
+  Two close calls were made here, against what was initially
+  recommended, and the arguments against them are recorded because
+  each one is strong enough that someone might raise it again.
+
+  **The syntax is a `with` block** — wrapping either the phases of a
+  phased script or the statements of a linear one — headed by one of
+  `insert`, `eject`, or `set-boot`, written exactly as those verbs
+  are written today. CONSIDERED AND REJECTED: **a `scope=run`
+  modifier** added to those three verbs instead, which would cost
+  nothing in new syntax — a `key=value` modifier is already the same
+  shape as the existing `exclude=` and `stability=` modifiers, so no
+  new language construct is needed, and validation rules V2/V14
+  could cover it without a new rule id. This was rejected because a
+  modifier like that can only ever scope its effect to the whole
+  *run*, while what U24 actually needs is to scope to one *stage*
+  within a run — a mechanism that can't express the actual unit the
+  need is written in isn't cheap, no matter how little syntax it
+  adds. Also rejected: a **header declaration** at the top of the
+  script (like `boot cdrom0 hdd0`) — this covers boot order alone,
+  leaving media changes — half of what U24 needs — requiring a
+  second mechanism, and it would put persistent-state policy in
+  exactly the place script-spec.md deliberately keeps that kind of
+  policy out of.
+
+  **The boot-order form of the block is headed by `boot`, and it
+  states only a prefix** — not `set-boot`, and not a full boot
+  order. What a stage of a script actually needs to say is "boot
+  from the CD-ROM first," and an author shouldn't have to restate
+  the rest of an order they aren't changing (owner, same day). The
+  drives named come first, in the order given, and the machine's
+  already-configured order follows after them. CONSIDERED AND
+  REJECTED: reusing `set-boot` as this block's header too. That verb
+  *replaces* the whole boot order, so using the same word for a
+  scoped, prefix-only version would give one spelling two different
+  meanings — which a closed grammar like this one can't tolerate,
+  since a reader would have no way to tell which meaning applies. A
+  separate word costs one more entry in a vocabulary that has room
+  for it, and leaves `set-boot`'s existing meaning untouched.
+
+  CONSIDERED AND REJECTED — raised and then withdrawn within the
+  same decision round: **promoting an entire class of drive at
+  once**, so one word could move every CD-ROM drive together.
+  Instead, the block's header takes specific drive slot keys, so a
+  machine with two optical drives has to name both explicitly. This
+  was withdrawn as more capability than the actual need calls for —
+  but the naming collision it would have run into is worth
+  recording: a bare `cdrom` is already the blueprint's shorthand for
+  the drive named `cdrom0`, so a drive-kind keyword couldn't have
+  used that obvious spelling, and every other candidate spelling
+  would just have been a third way of naming a drive.
+
+  **The block's scope is dynamic, not based on where the text sits.**
+  It stays active as long as control is actually inside the block,
+  regardless of how control got there. A text-based (lexical) scope
+  was rejected for a mechanical reason, not a stylistic one: every
+  phase body in this language ends with a jump to another phase, so
+  a scope that ended wherever its own text ended would revert its
+  changes the instant the first `goto` fired, making it useless for
+  anything an installer script actually needs.
+
+  **Undoing a boot-order change requires the machine to be
+  stopped.** If control exits the block while the machine is still
+  running, the run fails, and the error names exactly what couldn't
+  be undone. CONSIDERED AND REJECTED: letting the runtime's own
+  restore mechanism write the saved state document even while the
+  machine keeps running, on the reasoning that a restore has no live
+  effect and only changes what the next boot will read. This was
+  rejected because D15's first open question already established
+  that changing the boot order requires a stopped machine, as a
+  property of the machine itself — not merely as a courtesy to
+  whoever's writing the script — and letting a second code path
+  write that state under a different rule is exactly the kind of
+  exception that erodes a guarantee over time, since the next
+  exception would cite this one as precedent. The cost accepted here
+  is real, and stated plainly: a run that otherwise succeeded
+  completely can still fail at its very last step, and the fix, if
+  an author needs to hand back a still-running machine, is for the
+  script itself to say so explicitly. **Task T27 removes most of the
+  sting** by moving this same check to parse time instead of run
+  time, which is why feature F54 depends on that earlier analysis.
+
+  **What would reopen the stopped-only restore rule** is the same
+  thing that would reopen D15's first open question: if the boot
+  order is ever given a live effect on a running machine, or if the
+  stopped-only requirement is revisited for its own separate
+  reasons, this rule gets reconsidered together with that change,
+  and not before.
+
+- D103 — THE VOCABULARY CROSSING THE ADAPTER BOUNDARY FOR KEY NAMES
+  IS QEMU'S OWN QCODE SET, DOCUMENTED AS SUCH — DECIDED (owner,
+  2026-08-13). Supports P11. Leaves P25 untouched: that principle
+  governs the blueprint's portable vocabulary, and the script
+  language's `press` key names stay portable.
+
+  **The internal boundary between the control plane and the
+  backends was already using QEMU's own key names, while claiming
+  to be backend-neutral.** Three docstrings, plus the boundary's own
+  design note, claimed the key names crossing it were a portable set
+  that QEMU simply happened to match. That wasn't true:
+  `control_display._PLAIN` emits QEMU-specific names like `spc` and
+  `ret`, `script_runner.resolve_key` translates the script
+  language's own key names into QEMU's names before crossing the
+  boundary, and the VirtualBox adapter's own scancode table is keyed
+  by `ret`, `spc`, `pgup`, and `pgdn` — not `enter` or `space`.
+  **That table is the proof**: the one adapter this supposedly
+  neutral contract was written for was actually built to match
+  whatever names arrived, rather than to match what was declared, so
+  the "portable" claim had already failed the one real test it had.
+
+  CONSIDERED AND REJECTED: making the boundary genuinely
+  backend-neutral — renaming the control plane's internal tables,
+  moving the QEMU-specific name mapping into the QEMU adapter, and
+  rekeying VirtualBox's table to match. This would need a naming
+  vocabulary that doesn't exist yet: `PORTABLE_KEY_NAMES` only
+  covers 31 named keys, while this boundary also has to carry
+  punctuation, letters, and digits — so doing this honestly would
+  mean inventing a third naming scheme that neither backend actually
+  speaks natively, for no real behavioral benefit on either one. The
+  cost accepted instead is just naming the boundary after the
+  reference backend (QEMU) it was already built around — a one-time
+  cost.
+
+  REOPENS IF a backend shows up whose own input API can't express a
+  qcode name, or a second adapter author needs key spellings this set
+  doesn't cover — at that point, a real third naming scheme would
+  earn its keep, and this decision is the one to overrule.
+
+- D102 — BLUEPRINT FILES ARE WRITTEN IN JSON5, NOT JSONC — DECIDED
+  (owner, 2026-08-05). Supports U4, U5; G2. Changes D18's earlier
+  choice of input format; D18's rule that a blueprint construct may
+  only expand into plain data, never carry general computation,
+  still applies unchanged.
+
+  **JSON5 is now the grammar blueprint files are written in.** JSONC
+  turned out not to be one settled grammar, but more of a loose
+  label used across the ecosystem: even its own draft specification
+  makes support for trailing commas optional, which forced
+  Reliquary's earlier wording to define its own project-specific
+  variant of it. JSON5, by contrast, has one published grammar, so
+  authors and any independent tooling they use have one external
+  spec to implement against. The parser still rejects `NaN` and both
+  positive and negative infinity, so a parsed blueprint's values
+  remain ordinary JSON data once loaded.
+
+  CONSIDERED AND REJECTED: keeping the narrower JSONC dialect because
+  it's more familiar to editors. That's still a reasonable choice for
+  a generic configuration file, but it doesn't outweigh having a
+  fully specified grammar for Reliquary's own authored file format.
+  REOPENS only if there's evidence that the editor and schema tooling
+  this format depends on can't actually support JSON5 without a real
+  loss to the authoring experience.
+
+- D101 — THE MAP OF SCRIPT LABELS COMES FROM THE BLUEPRINT, READ
+  FRESH EACH TIME A SCRIPT RUNS — DECIDED (owner, 2026-08-02).
+  Supports U1, U14; P6, P11.
+
+  A map of labels to scripts describes which instructions to run,
+  not what the machine itself is — so it belongs alongside
+  `parameters`, outside the set of fields that get frozen into a
+  machine's saved state, rather than inside it. It's read straight
+  from the blueprint every time a script runs, and it's never stored
+  in machine state or included in the state digest. The
+  authoritative description of this lives in
+  [instance-model.md](../docs/spec/instance-model.md); what's
+  recorded here is the actual contested question, because the code
+  had drifted toward the opposite behavior, and a reader could
+  reasonably have assumed that drift was intentional — cli.md had
+  already defined a label as coming from "the blueprint's `scripts`
+  map," and the design for U5's parameters was written assuming the
+  scripts map was read fresh at each run.
+
+  CONSIDERED AND REJECTED: making `parameters` also read from saved
+  machine state instead, to make the two symmetrical. This was
+  rejected because it would break the half of the existing behavior
+  that was actually correct — editing a parameter would then require
+  running `apply` before the next run could see the change. REOPENS
+  only if a real case shows a machine needs its script-label map
+  locked in place against later blueprint edits — which is exactly
+  the kind of argument this decision says doesn't apply to it.
+
+- D100 — FEATURES F12 AND F44 ARE REJECTED OUTRIGHT — DECIDED
+  (owner, 2026-08-02). Supports P8. Retires both feature numbers
+  (see D23 — no placeholder stub kept for either).
+
+  Neither feature is worth what it would cost to build. **F44**
+  (`replay`) would have offered cheap reruns without needing a real
+  hypervisor — but that only holds as long as neither the script nor
+  the guest's behavior changes. What's left once you account for
+  that is catching regressions in Reliquary's own
+  screen-interpretation logic against a frozen recording — and F43
+  already does that job. **F12** (`simulator`) names one real pain
+  point — people writing tests end up monkeypatching
+  `start_machine`, `stop_machine`, and `exec` directly — but its own
+  "decide first" section left the actual feature undesigned (what
+  shape should a fake guest-output responder take, under principles
+  P6 and P7?), which is a disproportionate design cost just to make
+  life more convenient for people writing tests.
+
+  CONSIDERED AND REJECTED: leaving both parked in `proposed/`
+  instead of rejecting them outright. That shelf is for live
+  arguments still waiting on real demand, not for settled maybes.
+  Either capability can come back, but only by winning its own
+  argument again from scratch — not by reviving these entries.
+
+- D99 — A USE CASE INVENTED JUST TO SATISFY THE CITATION REQUIREMENT
+  DOES NOT COUNT AS REAL DEMAND — DECIDED (owner, 2026-08-02).
+  Supports P8.
+
+  P8 requires that a real need be shown before a feature is built,
+  so that features answer actual needs, instead of needs getting
+  invented backward to justify a feature someone already wanted to
+  build. Writing a use case *specifically in order to* satisfy that
+  citation requirement inverts the rule while appearing to follow
+  it — the check looks satisfied on paper, while the exact problem
+  it exists to prevent still happens, just one step removed. A use
+  case only earns its number by describing a need that would exist
+  on its own, independent of whatever feature is citing it. This was
+  caught when F44's pledge round drafted use case U23 for exactly
+  this reason — F44 was withdrawn, U23 was struck, and its number is
+  not reused (see D23 — no placeholder kept).
+
+  CONSIDERED AND REJECTED: narrowing U23 down to just the part about
+  F12's monkeypatching problem, instead of striking it entirely.
+  That specific problem is real, but it belongs to F12 alone, and
+  keeping a use case alive just to justify a feature nobody has
+  actually argued for repeats the same mistake in smaller print.
+
+- D98 — A DIAGNOSTIC CAPTURE FILE IS NOT THE SAME THING AS A RUN
+  RECORD, AND ITS FILE FORMAT IS NOT A DOCUMENTED APPLICATION
+  SURFACE — DECIDED (owner, 2026-08-01, during the F13 pledge
+  round). Supports P22; **narrows how far D36 reaches**.
+
+  **The real question here is whether D36 already rules this out.**
+  D36 deleted persisted run output entirely — the `run-events.jsonl`
+  file, the `transcript.txt` file, and the whole `runs/` archive —
+  and surface S7 now states the rule as "a run drives the machine
+  and returns its output to whoever started it, and stores nothing."
+  Feature F42's new `--record <path>` option writes screen captures
+  to disk, which looks at first glance like exactly what D36 already
+  refused. It isn't: what D36 actually refused was **using
+  persistence as the mechanism for asynchronous runs** — a record
+  written so a separate process could follow along with a run in
+  progress — and it refused that because nobody had shown a need for
+  it. A capture file, by contrast, is only ever written when a
+  maintainer explicitly names a path for it, nothing reads it at
+  runtime, and it answers a real need D36 never actually considered:
+  P22 requires a way to test the screen-interpretation logic against
+  more than fabricated input, and a capture file is how that testing
+  happens. D36 still fully applies to every run that doesn't ask for
+  a capture.
+
+  **The capture file's format is deliberately not treated as a
+  documented application surface**, and this decision records that
+  choice explicitly so it isn't lost: someone who finds `.rlqt`
+  files and goes looking for its entry in `docs/spec/` should learn,
+  from this entry, that no such spec was ever written on purpose. It
+  has no compatibility guarantee and no stability promise — changing
+  its format is routine maintenance, not an application-surface
+  change requiring the surface-change process. What *is* a
+  documented surface is only the `--record` option's existence and
+  behavior (surfaces S1 and S2, which are governed together under
+  P6). The alternative considered and rejected was a maintainer-only
+  `RELIQUARY_RECORD` environment variable instead of the `--record`
+  flag — this would have left D36 and S7 technically untouched, but
+  only by leaving the whole capability undocumented: an unspecified
+  environment variable quietly behaving like a real surface without
+  ever being reviewed as one, in a project where every other
+  `RELIQUARY_*` environment variable is fully specified.
+
+  **What would reopen this is feature F44 (a hypothetical "replay"
+  feature)**: the moment some caller's workflow starts depending on
+  a transcript file for something other than diagnostics, the format
+  becomes something the outside world relies on, which brings back
+  both the surface-change vetting process and the need for a real
+  `docs/spec/` entry. That dependency is exactly what F44 would
+  introduce, which is why this entry states the format's current,
+  undocumented standing now, rather than leaving it to be discovered
+  the hard way later.
+
+- D97 — EVERY `list-*` COMMAND SHOWS ITS DESCRIPTIONS; DROPPING THE
+  FIELD ENTIRELY WAS REJECTED — DECIDED (owner, 2026-08-01).
+  Supports U11; P6, P11. Resolves the open question D88 left as
+  task T8.
+
+  T8 offered two ways to resolve this open question: decide how
+  descriptions should display to a human reader, or drop the
+  `description` field entirely from every listing surface, including
+  `--json` output. **Dropping it is rejected, because use case U11
+  still stands** — "read a description" is an active requirement of
+  that use case, so dropping the field would really be changing the
+  list of use cases while disguised as a display cleanup; reopening
+  this would first require winning that separate argument. The
+  display question is now settled: **an indented, wrapped line of
+  description text under each entry, never a fixed-width column** —
+  a fixed-width column holding unbounded free text is exactly what
+  D88 already rejected, since truncating it would cut off the very
+  words someone is trying to read. This applies uniformly everywhere
+  a listing shows something with a description: `list-codex`, both
+  forms of `list-scripts`, and `list-blueprints`. `list-blueprints`'s
+  JSON record also gains `description` and `platform` fields, so
+  `--json` output carries the same information the human-readable
+  view shows (P6). CONSIDERED AND REJECTED: a separate `describe-*`
+  detail command. Reading full text one command per entry is the
+  wrong interaction for scanning an entire library at once, and a
+  whole new family of commands needs real justification that a
+  simple wrapped line of text already satisfies. The authoritative
+  wording for this lands in docs/spec/cli.md, delivered together
+  with the implementation that resolves T8.
+
+- D96 — RELEASED PACKAGE ARTIFACTS CARRY NO TESTS — DECIDED (owner,
+  2026-07-30). [Its ruling about the sdist is later overruled by
+  **D105**: the test suite ships in the sdist again — only the
+  ruling about the wheel package, and the clauses below about
+  `planning/`, still apply.] Supports P21's general instinct,
+  applied here to what actually gets shipped rather than what the
+  project depends on. The wheel package already excluded the test
+  suite; the sdist had the suite deliberately added to it, and
+  **that choice was never actually decided by anyone** — it built up
+  gradually through `MANIFEST.in`, and AGENTS.md and `check_dist.py`
+  then started describing it as settled policy, with `check_dist`
+  going as far as to *require* the suite's presence. Two-thirds of
+  the source distribution's files were test files: 187 of 280.
+
+  [This paragraph is overruled by D105.] **The real question is what
+  replaces the check the sdist's test suite provided.** Shipping the
+  suite bought one genuinely useful thing: the ability to unpack the
+  sdist outside the repository and run the suite there, as a check
+  that the source package was complete. Dropping the suite has to
+  account for losing that. The answer is structural rather than a
+  direct replacement: `uv build` builds the wheel package *from* the
+  sdist, so an archive that's missing anything the build needs will
+  simply fail to build. The actual check was never "do the tests
+  pass" — it was "is the archive complete" — and the build process
+  proves that on its own, without needing to ship 187 test files to
+  do it.
+
+  **THE `planning/`/`design/` DIRECTORIES WERE THE GIVEAWAY** (in the
+  owner's words: "'planning' docs in published test package is a
+  solution to a problem, it's part of a problem"). These were added
+  to the sdist so the test suite could read the catalogue of example
+  scripts out of an unpacked sdist — meaning internal, maintainer-only
+  governance documents were being shipped to a stranger, just to
+  support a test run essentially nobody ever actually performs. This
+  goes away along with the test suite, and `check_dist` now
+  **forbids** both the `planning/` and `design/` trees from appearing
+  in either shipped artifact, rather than requiring them in one.
+  [D105 later keeps the `planning/` half of this rule and drops the
+  other half: the test suite is required in the sdist again, and
+  still forbidden in the wheel.] `docs/` still ships: documentation
+  inside a source package is a normal convention, and it isn't a
+  test.
+
+  This takes effect starting with the next release. **The
+  already-published 0.1.0.dev6 sdist on PyPI still carries the
+  tests** and can't be changed — once a version is published, it's
+  immutable — so this record shouldn't be read as if it applied
+  retroactively to that release.
+
+- D95 — THE MINIMUM SUPPORTED PYTHON VERSION IS RAISED TO 3.12, BY
+  DROPPING SUPPORT FOR OLDER VERSIONS RATHER THAN FIXING THEM —
+  DECIDED (owner, 2026-07-30). Supports how P11 is already read
+  elsewhere — AGENTS.md already applies this to host platforms — an
+  untested version is a capability nobody has actually verified, not
+  a quiet promise that it works. The package had published `>=3.9`
+  as its requirement, but that had never actually been tested. The
+  first real test run failed on **Python 3.9 and 3.10** (the
+  `keyring` dependency reaches `platform.win32_ver()`, which shells
+  out to another process on those versions, tripping the test
+  suite's own rule against spawning subprocesses) and on **Python
+  3.11** (39 errors, caused by a dataclass default value using
+  `MappingProxyType`, which 3.11 rejects as unhashable). Python
+  3.12, 3.13, and 3.14 all pass. **Fixing these instead of dropping
+  support for the older versions was considered and rejected** (in
+  the owner's words: "if there is *any* doubt, just drop"): the 3.11
+  issue needs a `default_factory`, and the 3.9/3.10 issue needs the
+  no-subprocess guard taught about `platform`'s internal behavior —
+  both are cheap fixes, but neither is worth making a support claim
+  that nobody had actually asked for. This can be reopened by
+  actually fixing those two issues and lowering the floor again —
+  the test run against the floor version, described in AGENTS.md's
+  "Required checks" section, is what would keep that claim honest
+  going forward.
+
+- D94 — DROPPING TWINE IS PART OF ADOPTING UV — DECIDED (owner,
+  2026-07-30). Supports P21, which applies to development tooling
+  just as much as to shipped packages. Adopting uv itself doesn't
+  need its own entry: uv owning the Python environment and the
+  release process is already stated in AGENTS.md's "Development
+  environment" and "Required checks" sections, and the commit that
+  made the change is the record of it. **What earns this entry is
+  one specific contested call.** Keeping the `twine` tool around just
+  for its `twine check` step was considered and rejected: that
+  check's job is really about validating RST-formatted long
+  descriptions, but this project's `readme` field points at
+  `README.md`, and CommonMark markdown essentially has no input that
+  fails that kind of validation; also, PyPI's own upload endpoint
+  already validates and **rejects** bad package metadata on its own;
+  a rejected upload doesn't consume the version number, so the cost
+  of only finding out at upload time is just a retry; and
+  `tools/check_dist.py` already is the project's real check on
+  built artifacts. Running a pre-flight duplicate of a check the
+  server already performs, against a file format that essentially
+  never fails that check, is exactly the kind of redundant tooling
+  P21 rules out. **This can be reopened if the readme ever stops
+  being markdown** — switching to an RST-formatted description would
+  bring back the original reason for `twine check`. The Poetry, PDM,
+  and Hatch tools were also briefly considered and rejected: each of
+  them manages a lock file, but none of them provisions the Python
+  interpreter itself the way uv does, and Poetry specifically wants
+  its own dialect of `pyproject.toml`, where this project already
+  writes standard PEP 621 and PEP 735 configuration.
+
+- D93 — A DEVICE OR ADAPTER NAME ONLY BECOMES PART OF THE
+  FIRST-CLASS BLUEPRINT VOCABULARY IF IT APPLIES ACROSS MULTIPLE
+  BACKENDS — DECIDED (owner, 2026-07-30), overruling **D91** the
+  same day it was delivered, and removing D91's device-list field.
+  Supports P8; adds a new principle, **P25**.
+
+  THE RULE: a device or adapter name only becomes a proper,
+  first-class blueprint field if it applies to more than one
+  backend. Anything only one backend provides has to stay behind
+  that backend's own settings section, `backend-settings` — still
+  reachable, but at the cost of not being portable across backends,
+  and that cost is exactly the pressure that should grow the shared
+  vocabulary one name at a time, as real cross-backend need appears.
+  Adding `virtio-console` and `virtio-net` as seed entries in that
+  shared vocabulary was rejected under this same rule: including a
+  name in the shared vocabulary just because one backend happens to
+  expose it would record something that isn't actually true.
+
+- D92 — THE `backend-settings` ESCAPE HATCH IS SUPPORTED; THE SAME
+  CODE THAT RENDERS SETTINGS ALSO VALIDATES THEM; AND DECLARING
+  SETTINGS FOR ONE BACKEND NARROWS BACKEND SELECTION TO THAT
+  BACKEND — DECIDED (owner, 2026-07-30) and delivered the same day,
+  retiring feature F28. Supports U22; P10, P11. `backend-settings`
+  is now normative, documented in the blueprint field reference and
+  in AGENTS.md.
+
+  Three rulings made here, recorded because they don't fit anywhere
+  else:
+
+  - **The code that renders backend settings is also the code that
+    validates them.** The `settings_args` function does both jobs —
+    that's what guarantees a settings section a `create` command
+    accepted is exactly the section a `start` command later applies.
+    Two separate code paths for validating and rendering could drift
+    apart from each other.
+  - **Declaring a settings section for just one backend narrows
+    backend selection to that backend, but only because the section
+    exists — never because of what's inside it.** Declaring any
+    settings at all for one backend pins the machine to that
+    backend, without the actual setting values themselves being
+    treated as requirements a backend must satisfy.
+  - **Only the settings section belonging to whichever backend was
+    actually assigned gets checked.** No adapter is allowed to judge
+    another backend's settings vocabulary, so an unknown setting key
+    is only rejected where an adapter actually owns that settings
+    section.
+
+- D90 — A RUN'S "OUTCOME" DESCRIBES ITS END STATE, A "WAIT" IS A
+  POLL RATHER THAN A SUBSCRIPTION, AND A TIMED-OUT WAIT IS REPORTED
+  AS BOTH A FAILURE AND A TIMEOUT AT ONCE — DECIDED (owner,
+  2026-07-30) and delivered the same day, retiring feature F30.
   Supports U14; P11.
 
-  The three are one ruling about **what a word promises**. An
-  outcome describes the state the run left behind, not the path it
-  took; a wait is a poll and never a subscription, so it reports
-  what it saw when it looked; and an expired wait is *both*
-  classifications at once rather than being forced into one — a
-  taxonomy that made a caller choose would lose the half it did not
-  pick, which is the reporting failure P11 refuses.
+  These three rulings are really one decision about **what each of
+  these words is allowed to promise**. A run's "outcome" describes
+  the state the run ended in, not the path it took to get there. A
+  "wait" works by repeatedly checking (polling), never by
+  subscribing to be notified — so it can only ever report what it
+  actually observed the last time it checked. And when a wait times
+  out, it is reported as *both* a failure and a timeout at the same
+  time, rather than being forced into one category or the other — a
+  system that made a caller pick one classification would lose
+  whichever half it didn't pick, which is exactly the kind of silent
+  loss of information P11 forbids.
 
-- D89 — THE OUTCOME PROBE IS RELIQUARY'S OWN TEXT, AND ITS SCOPE
-  IS STATED — DECIDED (owner, 2026-07-30) and delivered the same
-  day, retiring F26. Supports U14, U22; P6, P10, P11, G2.
+- D89 — THE SUCCESS/FAILURE CHECK USES TEXT RELIQUARY ITSELF WROTE
+  AND READS BACK, AND ITS LIMITATION IS DOCUMENTED RATHER THAN
+  HIDDEN — DECIDED (owner, 2026-07-30) and delivered the same day,
+  retiring feature F26. Supports U14, U22; P6, P10, P11, G2.
 
-  `--check` asks the guest whether a command signalled failure, and
-  both halves of the answer are **text reliquary composed and read
-  back** — the sentinel is a word reliquary said, not one the
-  command did. That is what keeps the feature inside G2 and P18: no
-  meaning is read into guest output.
+  The `--check` flag asks the guest whether the last command
+  signaled failure. Both sides of that check use **text Reliquary
+  itself wrote into the guest and then reads back** — the marker
+  text it looks for is a word Reliquary said, not something the
+  command itself printed. That is what keeps this feature within
+  the bounds of G2 and P18: Reliquary never tries to interpret
+  meaning out of arbitrary guest output.
 
-  **Its limit is stated rather than papered over** (P11): a
-  mistyped command leaves ERRORLEVEL untouched and so reads as
-  success. Recognizing the shell's own "Bad command or file name"
-  would mean curating guest output spellings, which a localized DOS
-  makes unbounded — the guessing P10 refuses.
+  **Its limitation is stated explicitly, rather than hidden** (P11):
+  if a command is mistyped, DOS leaves the `ERRORLEVEL` variable
+  unchanged, so `--check` reads that as success even though nothing
+  actually ran. Recognizing DOS's own "Bad command or file name"
+  message would mean maintaining a list of every possible spelling
+  of that message across every guest — unbounded once localized
+  copies of DOS are considered — exactly the kind of guessing P10
+  rules out.
 
-- D88 — AUTOSEED IS DELETED; U1 IS TWO COMMANDS AND P4 IS
-  ABSOLUTE AGAIN — DECIDED (owner, 2026-07-30). Supports P4, P18,
-  U11. **Supersedes U1's text** (reshaped in place under its own
-  number, as D61 did), **clarifies U11**, and **amends D59** by
-  retiring its seeding axis.
+- D88 — THE AUTOMATIC-SEEDING FEATURE IS DELETED; U1 BECOMES TWO
+  SEPARATE COMMANDS, AND P4 IS ABSOLUTE AGAIN — DECIDED (owner,
+  2026-07-30). Supports P4, P18, U11. **Replaces the wording of
+  U1** (rewritten in place under the same number, the same way D61
+  handled a similar case), **clarifies U11**, and **changes D59** by
+  removing its automatic-seeding option.
 
-  Nothing resolves out of the codex, on either surface and under no
-  flag: the directories are the sole sources, a miss fails closed,
-  and the refusal names `rlq seed-blueprint <name>` where the
-  library holds it. The rule's home is **P4** and AGENTS.md.
+  Nothing resolves automatically out of the codex library anymore,
+  on either the CLI or the API, and no flag brings the old behavior
+  back — the blueprint and script directories a user manages are the
+  only sources Reliquary looks in, a missing blueprint or script now
+  fails outright rather than silently falling back, and the
+  resulting error names the exact command to run —
+  `rlq seed-blueprint <name>` — when the codex library actually holds
+  that name. This rule now lives in **P4** and in AGENTS.md.
 
-  - **A no-new-knob alternative** that reproduced both former modes
-    and kept P4 absolute — declined for making seeding a silent
-    consequence of resolution. A knob that can be turned on is one
-    CI turns on, and a silently supplied blueprint is a bug that
-    surfaces on someone else's machine.
-  - **"A codex blueprint is read where it lies rather than copied
-    out"** goes with it: with no fallback there is nothing to read,
-    and an unseeded name is refused rather than resolved.
+  - CONSIDERED AND REJECTED: **an alternative that added no new
+    command-line flag**, reproducing both of the old modes of
+    behavior while still keeping P4 absolute. Rejected because it
+    would make automatic seeding a silent side effect of just
+    resolving a name — a setting that can be turned on is a setting
+    some CI pipeline eventually turns on, and a blueprint quietly
+    supplied from the codex is a bug that only shows up later, on
+    somebody else's machine.
+  - The related rule, **"a codex blueprint is read directly from
+    where it lives, rather than copied out first,"** is retired
+    along with this: once there's no automatic fallback to the
+    codex, there's nothing left to read that way, and an unseeded
+    name is simply refused, not silently resolved through the codex.
 
-- D87 — THE CODEX IS NOT AN API BINDING; P6 GAINS ITS FIRST NAMED
-  EXCEPTION — DECIDED (owner, 2026-07-30). Supports P4, P18, U11;
-  **amends P6**.
+- D87 — THE CODEX LIBRARY'S COMMANDS ARE NOT EXPOSED THROUGH THE
+  PYTHON API; THIS IS PRINCIPLE P6'S FIRST NAMED EXCEPTION —
+  DECIDED (owner, 2026-07-30). Supports P4, P18, U11; **changes
+  P6**.
 
-  The codex verbs — `seed-blueprint`, `seed-script`, `list-codex` —
-  are **CLI-only**, and the exception is named in
-  [api.md](../docs/spec/api.md) rather than left as an omission a
-  reader might take for an oversight. WHY: a library that changes
-  in a point release is not something a program may bind against,
-  so exporting the verbs would invite exactly the programmatic
-  dependence the codex refuses to promise. Naming the exception is
-  what keeps P6 a rule with one hole rather than a rule with
-  unrecorded slack.
+  The codex-related CLI commands — `seed-blueprint`, `seed-script`,
+  `list-codex` — are **CLI-only**, and this exception is written
+  down explicitly in [api.md](../docs/spec/api.md), rather than left
+  as a silent gap a reader might mistake for an oversight. WHY: the
+  codex library's contents can change between minor point releases,
+  so it isn't something a program should be able to depend on
+  programmatically — exposing these commands through the API would
+  invite exactly the kind of fragile programmatic dependency the
+  codex is designed never to promise. Writing the exception down
+  explicitly is what keeps P6 a rule with exactly one documented
+  exception, instead of a rule with an undocumented gap.
 
-- D86 — TASKS ARE ITEMIZED; A T-NUMBER EVAPORATES, AND THE
-  SEQUENCE STATES ITS OWN HIGH-WATER MARK — DECIDED (owner,
-  2026-07-29). Supports P23. Applies D42's handle rule to tasks.
+- D86 — TASKS GET THEIR OWN NUMBERED LIST; A RETIRED T-NUMBER IS
+  NEVER REUSED, AND THE SEQUENCE'S STARTING POINT RECORDS ITS OWN
+  HISTORY — DECIDED (owner, 2026-07-29). Supports P23. Applies
+  D42's general numbering rule to tasks specifically.
 
-  - **Reuse** (lowest-free, the way machine ids are allocated) —
-    declined: an id that names one thing at a time is fine for a
-    machine and useless for a citation, where a struck task's
-    number appearing again makes the record ambiguous.
-  - The sequence **starts at T8** because T0–T7 were spent by an
-    earlier per-list numbering that ran three times; beginning
-    above them is what keeps every T-number in the record resolving
-    to exactly one thing.
+  - CONSIDERED AND REJECTED: **reusing the lowest free number**, the
+    same way machine ids are allocated. Rejected because an id that
+    only ever refers to one thing at a time works fine for a
+    machine, but is useless for a citation — if a struck task's
+    number gets assigned to a new task later, any past reference to
+    that number in this record becomes ambiguous.
+  - The task-numbering sequence **starts at T8** because T0 through
+    T7 were already used up by an earlier, per-list numbering scheme
+    that had been restarted three separate times; starting the new
+    sequence above those old numbers guarantees every T-number in
+    this record always resolves to exactly one task.
 
-- D85 — THE WORLD-FACING BOUNDARIES ARE THE **APPLICATION
-  SURFACES**, ITEMIZED S1–S8 — DECIDED (owner, 2026-07-29).
-  Supports P8, P23, P24. Normative in root
-  [ARCHITECTURE.md](../ARCHITECTURE.md).
+- D85 — THE PROJECT'S USER-FACING BOUNDARIES ARE NOW CALLED
+  "APPLICATION SURFACES," NUMBERED S1 THROUGH S8 — DECIDED (owner,
+  2026-07-29). Supports P8, P23, P24. Normative wording lives in
+  root [ARCHITECTURE.md](../ARCHITECTURE.md).
 
-  Renaming "interfaces" to **application surfaces** and itemizing
-  them S1–S8 turns the housekeeping surface test from a *judgement*
-  into a **lookup**: a contributor asks whether the change touches
-  a numbered item, not whether it feels world-facing. A test that
-  needs judgement is a test that gets skipped by whoever is in a
-  hurry, which is precisely the population housekeeping serves.
+  Renaming what used to be called "interfaces" to **application
+  surfaces**, and giving each one a number from S1 to S8, turns the
+  check for "does this change need the surface-change process" from
+  a *judgment call* into a **lookup**: a contributor now just checks
+  whether their change touches one of the numbered items, instead of
+  having to judge whether it "feels" user-facing. A check that
+  requires judgment is a check that gets skipped by whoever's in a
+  hurry — exactly the group this rule most needs to reach.
 
-- D84 — THE SCRIPT-VALIDATION RULES MOVE OFF S: S1–S14 BECOME
-  V1–V14 — DECIDED (owner, 2026-07-29). Supports (none): a rule
-  id's letter is a vocabulary choice that no use case or principle
-  demands. Recorded because **D85 needed the letter** and because
-  the ids are world-facing, so the change is a break rather than a
-  tidy-up.
+- D84 — SCRIPT-VALIDATION RULES ARE RENUMBERED FROM S1–S14 TO
+  V1–V14, FREEING UP THE LETTER "S" — DECIDED (owner, 2026-07-29).
+  Supports (none) — this is a pure renaming with no use case or
+  principle requiring it. Recorded because **D85 needed the letter
+  S**, and because these rule ids are visible to users, so this
+  change is a breaking change, not just a cleanup.
 
-  WHY THE RULES MOVED RATHER THAN THE SURFACES. D85 gives the
-  application surfaces the letter **S**, and S was taken: the
-  `.rlqs` static rules had held it since the dotted ids landed
-  (D55). Two live S-sequences was the one option refused outright —
-  `S6` would have named both the reference-check rule and the run's
-  returned output, with *this file* citing both — because that is
-  exactly the ambiguity the never-reuse discipline exists to
-  prevent. Of the two, the rules moved: the surfaces are the outer
-  boundary a governance lookup resolves against, while a validation
-  rule is language-internal.
+  WHY THE VALIDATION RULES MOVED, RATHER THAN THE APPLICATION
+  SURFACES. D85 assigns the letter **S** to the application
+  surfaces, but S was already taken: the script language's static
+  validation rules (in `.rlqs` files) had used that letter ever
+  since dotted rule ids were introduced (D55). Having two separate,
+  live "S-something" numbering systems at once was the one option
+  ruled out immediately — `S6` would have simultaneously meant both
+  a specific reference-checking validation rule and the application
+  surface covering a run's returned output, and this very file cites
+  both — exactly the kind of ambiguity the "never reuse a number"
+  discipline exists to prevent. Between the two, the validation
+  rules were the ones renumbered: application surfaces are the outer
+  boundary the whole governance process checks changes against,
+  while a validation rule is purely internal to the script language.
 
-  V FOR VALIDATION, AND THE NUMBERS DO NOT MOVE. V1–V14 map one for
-  one onto S1–S14 — the letter changes, the number never does — so
-  every historical citation decodes mechanically (S6 is V6) and no
-  renumbering has to be looked up. The **S15 retired by D5** (the
-  `results` header, dropped with `stage`/`collect`) stays retired
-  and no V15 is ever issued, so a search for either still resolves
-  to one thing.
+  "V" FOR VALIDATION, AND THE ACTUAL NUMBERS STAY THE SAME. V1
+  through V14 map one-to-one onto the old S1 through S14 — only the
+  letter changes, never the number — so any historical citation can
+  be decoded just by substituting the letter (old S6 is now V6),
+  with no lookup table needed. The old **S15, which D5 already
+  retired** (it was the `results` header, removed along with the
+  `stage`/`collect` commands), stays retired, and no V15 is ever
+  issued — so a search for either S15 or V15 still points to
+  exactly one thing (nothing currently in force).
 
-  WHAT IT COST, ITEMIZED. Around 230 live references: the
-  diagnostic-id map in `script_nodes.py`, the rule citations in
-  `script_validation.py`, `script_parser.py`, `binding.py`,
-  `facts.py` and the grammar's comments, the normative rule list in
-  script-spec.md, 41 conformance fixtures (the `# rule:` header
-  *and* the filename prefix), four harness regexes, and the two
-  corpus READMEs. **The ids are world-facing** — a diagnostic cites
-  its rule and the corpus asserts on the id — so this is a clean
-  pre-1.0 break under P9: no alias, no dual spelling, every
-  reference moved in the one change and the suite green (1110
-  tests, the one sanctioned skip).
+  WHAT THIS COST TO CHANGE, ITEMIZED. Around 230 live references
+  needed updating: the diagnostic-id lookup table in
+  `script_nodes.py`; rule citations in `script_validation.py`,
+  `script_parser.py`, `binding.py`, and `facts.py`, plus comments in
+  the grammar file; the normative rule list in script-spec.md; 41
+  conformance test fixtures (both the `# rule:` header inside each
+  file and the filename prefix); four regular expressions used by
+  the test harness; and both corpus README files. **Because these
+  ids are visible outside the codebase** — a diagnostic message
+  cites its rule id, and the conformance corpus's own tests assert
+  on that id — this was done as a clean, one-time breaking change
+  under P9, since the project is still pre-1.0: no alias for the old
+  spelling, no period of supporting both spellings — every reference
+  was updated in one single change, with the full test suite passing
+  afterward (1110 tests, with the one already-accepted skip).
 
-  A THIRD MEANING FOUND IN PASSING, AND SPELLED OUT INSTEAD. The
-  blueprint corpus README's `S2`/`S3` are **milestone stages** —
-  vocabulary dead since D33 — not rule ids, and they were rewritten
-  in words ("the second stage") rather than renumbered: left alone
-  they would have read as application surfaces the moment D85
-  landed. Caught by auditing the pattern's matches before running
-  it, which is the reason to audit.
+  A THIRD MEANING, FOUND ALONG THE WAY AND HANDLED SEPARATELY. The
+  blueprint corpus README used `S2` and `S3` to mean **milestone
+  stages** — vocabulary that's been unused since D33 — not rule ids
+  at all. These were rewritten as plain words ("the second stage")
+  instead of being renumbered, because left as-is, they would have
+  looked like references to application surfaces the moment D85 took
+  effect. This was caught by reviewing every match of the search
+  pattern before actually running the rename — exactly why that kind
+  of review is worth doing.
 
-  FOLDED: this entry and the preamble's decoder;
-  normative [script-spec.md](../docs/spec/script-spec.md) (the rule
-  list and the ids-are-finer section); `script_nodes.py`,
+  FILES TOUCHED BY THIS CHANGE: this entry and the glossary at the
+  top of this document; the normative
+  [script-spec.md](../docs/spec/script-spec.md) (its rule list and
+  the section on how rule ids work); `script_nodes.py`,
   `script_validation.py`, `script_parser.py`, `script_grammar.lark`,
   `binding.py`, `facts.py`; the script conformance corpus (41
-  fixtures renamed and rewritten, its README) and the blueprint
-  corpus README; `test_script_corpus.py`,
+  fixtures renamed and rewritten, plus its README) and the blueprint
+  corpus README; the test files `test_script_corpus.py`,
   `test_script_spec_conformance.py`, `test_script_validation.py`,
   `test_script_timing.py`, `test_script_nodes.py`,
   `test_script_parser.py`, `test_binding.py`, `test_facts.py`,
   `test_dry_run.py`; [AGENTS.md](../AGENTS.md); and the CHANGELOG's
   unreleased section.
 
-- D82 — THE PROJECT IS GPL-3.0-ONLY, RELICENSING IS RESERVED, AND
-  CONTRIBUTIONS ARE ASSIGNED — DECIDED (owner, 2026-07-29).
-  Supports none: no use case or principle demands a licence, and
-  the reasoning is the owner's alone. The policy is normative in
-  AGENTS.md, `CONTRIBUTING.md` and `CLA.md`.
+- D82 — THE PROJECT IS LICENSED GPL-3.0-ONLY, THE OPTION TO
+  RELICENSE COMMERCIALLY LATER IS RESERVED, AND CONTRIBUTORS ASSIGN
+  THEIR COPYRIGHT — DECIDED (owner, 2026-07-29). Supports nothing —
+  no use case or principle required a specific license; this was the
+  owner's own call. The policy is written normatively in AGENTS.md,
+  `CONTRIBUTING.md`, and `CLA.md`.
 
-  The rule that governs everything downstream: **vet against a
-  commercial dual licence, and say only "relicensing" out loud.**
-  The question to ask of any external source is *could this ship
-  inside a proprietary product?* — never *is this GPL-compatible?*,
-  which has a comfortable answer far more often and is therefore
-  the wrong question. Judging correctly costs nothing when a
-  dependency is first considered and cannot be revisited at any
-  price afterwards.
+  The rule that governs everything downstream from this: **when
+  vetting any external code or dependency, check it against the
+  standard of a commercial dual license — but don't publicly say
+  more than the word "relicensing."** The question to ask about any
+  external source is *could this ever ship inside a proprietary
+  product?* — never *is this merely GPL-compatible?*, which has a
+  comfortable "yes" far more often, and is therefore the wrong
+  question to be asking. Judging this correctly costs nothing at the
+  moment a dependency is first considered, and cannot be fixed later
+  at any cost once it's already in use.
 
-  - **AGPL-3.0-only** — declined: it closes a narrow hole at the
-    cost of adoption the project needs more.
-  - **Assignment with no fallback** — declined: some jurisdictions
-    bar assignment, so an exclusive sublicensable licence is the
-    automatic fallback.
+  - CONSIDERED AND REJECTED: **using AGPL-3.0-only instead of
+    GPL-3.0-only.** This would close one narrow loophole (the
+    network-use case), but at the cost of discouraging the adoption
+    the project needs more.
+  - CONSIDERED AND REJECTED: **requiring contributors to assign
+    copyright with no fallback option.** Some legal jurisdictions
+    don't allow copyright assignment, so the actual rule falls back
+    automatically to an exclusive, sublicensable license grant in
+    those cases.
 
-- D81 — STATICALLY REACHABLE MEANS THE GUEST DECIDED NOTHING; THE
-  CHECK FAMILY IS GUARDED, NOT MERELY GONE — DECIDED (owner,
+- D81 — "STATICALLY REACHABLE" ONLY MEANS THE GUEST HASN'T MADE A
+  CHOICE YET; AND REMOVED COMMANDS FROM THE CHECK FAMILY ARE
+  ACTIVELY GUARDED AGAINST, NOT JUST DELETED — DECIDED (owner,
   2026-07-29) and delivered the same day. Supports P6, P9, P11.
 
-  A handler body is the **guest's** decision, not the plan's, so no
-  static pass can promise it runs; the report counts what it could
-  not reach rather than implying a completeness it cannot have.
+  Whether a menu handler's body actually runs is a decision the
+  **guest** makes at runtime, not something the script's static
+  structure decides — so no static analysis pass can ever promise a
+  given handler body will run. The dry-run report instead counts
+  what it *couldn't* statically reach, rather than implying a
+  completeness the analysis can't actually have.
 
-  **Deleted spellings are guarded, not merely removed** — a purge
-  test holds them retired. A name deleted without a guard comes
-  back by autocomplete and by memory, and the second arrival looks
-  like a feature rather than a regression.
+  **Deleted command spellings are actively guarded against, not just
+  deleted from the code** — a dedicated test enforces that they stay
+  gone. A name that's deleted without a test guarding against its
+  return tends to come back anyway, through autocomplete or through
+  someone half-remembering the old name — and when it comes back
+  that way, it looks like a new feature request instead of a
+  regression.
 
-- D80 — A DRY RUN REFUSES WHAT A CREATE REFUSES, AND HASHES
-  NOTHING — DECIDED (owner, 2026-07-29) and delivered the same day.
-  Supports U7; P7, P10, P11. Normative in
+- D80 — A DRY RUN REJECTS EXACTLY WHAT A REAL `create` WOULD
+  REJECT, AND IT NEVER COMPUTES A HASH — DECIDED (owner, 2026-07-29)
+  and delivered the same day. Supports U7; P7, P10, P11. Normative
+  in [cli.md](../docs/spec/cli.md).
+
+  A dry run performs the same evaluation as a real run, just without
+  committing anything: it rejects whatever a real `create` would
+  reject, at the exact same point a real `create` would reject it —
+  with two deliberate exceptions, and each exception exists because
+  the dry run genuinely **cannot** do that check, not because of a
+  judgment call about how serious the issue is. First, an unbound
+  location value is reported as "not evaluated" rather than checked,
+  because a dry run must never prompt the user for input. Second,
+  when a `backend=` value is given, a backend that isn't installed is
+  reported rather than raised as an error, because that flag's whole
+  purpose is asking whether the blueprint *would* work on that
+  backend, if it were available.
+
+  **A dry run never computes a file hash.** The `cached` field in
+  its output only reports whether a file is present, not whether its
+  contents have been verified. Actually verifying the hash would
+  make what's supposed to be a cheap, read-only check pay a real
+  computational cost, and it would report a stronger guarantee than
+  what the flag is actually being asked to answer.
+
+- D79 — FEATURE F11 IS SPLIT IN TWO; THE `--dry-run` FLAG PRODUCES A
+  DOCUMENT, NOT A LIVE STREAM — DECIDED (owner, 2026-07-29).
+  Supports U7; P6, P9, P10, P11. Normative in
   [cli.md](../docs/spec/cli.md).
 
-  A dry run is the same evaluation with nothing committed: it
-  refuses what a create would refuse *where* a create would refuse
-  it, with two deliberate exceptions, each a thing it **cannot do**
-  rather than a severity judgement — an unbound location is
-  reported unevaluated because it must never prompt, and under
-  `backend=` an absent backend is reported rather than raised
-  because that flag asks whether the blueprint would work *there*.
+  Adding `--dry-run` turns a command's output from a live stream
+  into a **document**: `--json` output becomes valid for the first
+  time, because it now prints exactly what the underlying function
+  call returns, while `--progress` and `--display` are refused,
+  because a plan being evaluated has no live stream to render and no
+  window to show it in.
 
-  **It hashes nothing**: `cached` is presence, not verification.
-  Verifying would make a read-only check pay a real cost and would
-  report a stronger fact than the flag's own question asks for.
+  - CONSIDERED AND REJECTED: **adding `--dry-run` to just one
+    command instead of the whole family.** Rejected because being
+    pledged doesn't mean being scheduled for a specific release — the
+    flag has to mean the same thing everywhere it appears, or it
+    doesn't mean anything reliable at all.
+  - CONSIDERED AND REJECTED: **reporting only the part of the script
+    that could be statically determined, and silently leaving out
+    the rest.** Rejected because a reader would have no way to tell
+    what had been left out, and the counts in the report would stop
+    actually describing the script the caller wrote. Instead, the
+    report states its own limitation explicitly (for example, `3
+    statements not statically reachable`) — applying P11's "state the
+    limit, don't hide it" rule to the dry-run report itself.
 
-- D79 — F11 IS CUT IN TWO; A DRY RUN IS A DOCUMENT, NOT A STREAM —
-  DECIDED (owner, 2026-07-29). Supports U7; P6, P9, P10, P11.
-  Normative in [cli.md](../docs/spec/cli.md).
-
-  `--dry-run` flips a command from a stream to a **document**:
-  `--json` becomes legal because it prints exactly what the twin
-  returns, while `--progress` and `--display` are refused — a plan
-  has no stream to render and no window to show.
-
-  - **`--dry-run` on one command only** — declined because pledged
-    is not scheduled: the flag means the same thing everywhere it
-    appears or it means nothing.
-  - **Reporting only the statically decidable part** — declined: a
-    reader cannot tell what was omitted, and the counts stop
-    describing the script the caller wrote. The report states its
-    own limit instead (`3 statements not statically reachable`),
-    which is P11 at the report level.
-
-- D75 — A PROMPT IS NOT COMPLETION, AND UNATTRIBUTABLE OUTPUT IS A
+- D75 — A PROMPT BEING ON SCREEN DOES NOT MEAN A COMMAND FINISHED;
+  OUTPUT THAT CAN'T BE ATTRIBUTED TO THE COMMAND IS TREATED AS A
   FAILURE — DECIDED (owner, 2026-07-28) and delivered the same day.
   Supports U12, U14, U9; P11.
 
-  `wait_ready` returns *because* a prompt is on screen, so a
-  completion test that asks only for a prompt is satisfied by the
-  one already there and hands back the boot's output as though it
-  were the command's. Completion therefore needs evidence **this**
-  command landed: its echo, or a screen that changed since it was
+  `wait_ready` returns as soon as a prompt appears on screen — so if
+  `exec`'s completion check only looked for a prompt, it would be
+  satisfied by the prompt that was already there from booting, and
+  would hand back the boot's own leftover output as if it were the
+  command's output. So completion now requires actual evidence that
+  **this specific** command finished: either its own echoed text on
+  screen, or a screen that has visibly changed since the command was
   sent.
 
-  And where the echo was never seen at all, the rows above the
-  prompt are **refused rather than returned**: a plausible tuple of
-  somebody else's text is worse than an error, because nothing
-  downstream can tell it is wrong.
+  And in the case where the command's echo was never actually seen
+  at all, the rows above the prompt are **refused outright, rather
+  than returned as a guess**: returning a plausible-looking but
+  wrong batch of somebody else's text is worse than returning an
+  error, because nothing further down the line has any way to tell
+  that it's wrong.
 
-- D72 — P10 SHARPENS: GUESSING IS THE VIOLATION, AND A GUEST'S
-  ANSWER ABOUT ITSELF IS AN OBSERVATION — DECIDED (owner,
-  2026-07-28) and armed the same day. Supports U14, U20; P11, P16.
+- D72 — PRINCIPLE P10 IS SHARPENED: WHAT IT FORBIDS IS GUESSING, NOT
+  READING; A GUEST TELLING US SOMETHING ABOUT ITSELF COUNTS AS AN
+  OBSERVATION — DECIDED (owner, 2026-07-28) and took effect the same
+  day. Supports U14, U20; P11, P16.
 
-  P10 forbids **guessing**, not reading. A value the guest states
-  about itself is an observation and may be used; what is refused
-  is inference from appearance — deducing a filesystem from a
-  screen, a platform from a banner. The distinction matters because
-  the naive reading ("never ask the guest") would bar reading
-  anything on the host at all — an image's format, a file's size —
-  which involves no guest and is the most reliable fact available.
+  P10 forbids **guessing**, not reading. A value the guest itself
+  states about itself is an observation, and it is fine to use it;
+  what is actually forbidden is inferring something from how it
+  looks — for example, guessing a filesystem type from a screen's
+  appearance, or guessing a platform from a banner's text. This
+  distinction matters because a naive reading of the rule ("never
+  ask the guest anything") would also forbid reading things that
+  don't involve the guest at all, like a disk image's file format or
+  a file's size on the host — which are actually the most reliable
+  facts available, since they involve no guessing whatsoever.
 
-- D70 — THE BLUEPRINT SURFACE IS LOCATED; POSITIONS RIDE ON THE
-  PARSED CONTAINERS — DECIDED (owner, 2026-07-28) and delivered the
-  same day. Supports U4, U11; G6; P6, P8.
+- D70 — BLUEPRINT VALIDATION ERRORS NOW REPORT A FILE LOCATION,
+  TAKEN DIRECTLY FROM THE PARSED DATA — DECIDED (owner, 2026-07-28)
+  and delivered the same day. Supports U4, U11; G6; P6, P8.
 
-  A diagnostic names where in the file the fault is, and the
-  position rides on the **parsed container** rather than on a
-  re-scan of the text: a second pass over the source to find a line
-  number can disagree with the parse that produced the error, and a
-  diagnostic pointing at the wrong line is worse than one pointing
-  nowhere.
+  A validation error now names where in the blueprint file the
+  problem actually is, and that location comes directly from the
+  **already-parsed data structure**, not from a second, separate
+  scan of the raw text looking for a matching line number. A second
+  scan over the source text to locate a line number could disagree
+  with what the parser that actually produced the error saw — and a
+  diagnostic that points at the wrong line is worse than one that
+  points nowhere at all.
 
-- D69 — THE PACING BISECTION IS REFUSED; THE 0.1s DEFAULT IS
-  DELIBERATE, NOT PROVISIONAL — DECIDED (owner, 2026-07-28).
-  Supports U14, U20, U12; G1. **Amends D60's** stated reason.
+- D69 — RUNNING A BINARY-SEARCH EXPERIMENT TO TUNE THE
+  INPUT-PACING DEFAULT IS REJECTED; THE 0.1-SECOND DEFAULT IS A
+  DELIBERATE CHOICE, NOT A PLACEHOLDER — DECIDED (owner,
+  2026-07-28). Supports U14, U20, U12; G1. **Changes the stated
+  reasoning behind D60**.
 
-  **What is refused is the *method***: standing up a bisection to
-  tune a default treats a number as an empirical fact about
-  hardware when it is a floor chosen for a reason. The variance
-  lives in the *readiness mechanism* — an installer arming its
-  keyboard handler, a shell entering its read loop — not in paint
-  speed, so a measured number would be measuring the wrong thing
-  and would look authoritative while doing it.
+  **What is rejected here is the *method* of tuning this number, not
+  the number itself.** Setting up an experiment that narrows down an
+  "ideal" default value through repeated measurement treats the
+  pacing delay as if it were an empirical fact about hardware
+  timing — when it is actually a floor value chosen for a specific
+  reason. The real variability comes from the *readiness mechanism*
+  — whether an installer has finished arming its keyboard handler,
+  whether a shell has actually entered its input loop — not from how
+  fast the screen draws, so measuring paint speed would be measuring
+  the wrong thing entirely, while looking scientifically
+  authoritative doing it.
 
-  [Amended: this left nothing covering paint speed, which is what
-  **F48**'s `stability=` gate now guards — pacing is left with
-  readiness alone, which is what makes 0.1s an honest floor.]
+  [This entry's reasoning was later amended: it originally left
+  nothing responsible for covering variance in paint speed. That is
+  now covered by feature **F48**'s `stability=` gate instead —
+  leaving this pacing default responsible only for readiness timing,
+  which is what makes 0.1 seconds an honest, deliberately chosen
+  floor value rather than one pretending to cover more than it
+  does.]
 
-- D68 — P3 SHARPENS TO BOTH SIDES; THE LINE IS THE AGENT, NOT THE
-  SIDE — DECIDED (owner, 2026-07-28) and armed the same day.
-  Supports P3.
+- D68 — PRINCIPLE P3 IS SHARPENED TO APPLY ON BOTH SIDES OF THE
+  HOST/GUEST BOUNDARY; THE ACTUAL LINE IS "IS IT AN AGENT," NOT
+  "WHICH MACHINE IS IT ON" — DECIDED (owner, 2026-07-28) and took
+  effect the same day. Supports P3.
 
-  Reliquary consumes the agents guests already have and **builds
-  none**, on either side of the seam: the refusal is about
-  *authoring an agent*, not about which machine the code runs on.
-  Stated as a side, the principle would have refused host-side
-  helpers that are not agents at all while permitting a guest-side
-  one that plainly is.
+  Reliquary only makes use of agents that guests already have
+  installed, and **builds none of its own**, on either side of the
+  host/guest boundary — what is actually refused is *writing new
+  agent software*, not a rule about which machine the code happens
+  to run on. Written as a rule about which side of the boundary code
+  runs on, the principle would have wrongly forbidden ordinary
+  host-side helper code that isn't an agent at all, while wrongly
+  allowing a guest-side helper that clearly is one.
 
-  What was refused with it: churning P3 for a hypothetical. The
-  sharpening landed only because a real case tested the wording.
+  Also rejected here: rewriting P3 speculatively, just to cover a
+  hypothetical case with no real example behind it. This sharpening
+  was only made because an actual, real case tested the existing
+  wording and found it wanting.
 
-- D67 — THE SEAM EXTRACTION'S RULINGS: A GENERIC VM IDENTITY, NO
-  PORT ABOVE THE SEAM, AND STUBS THAT CLAIM NOTHING — DECIDED
-  (owner, 2026-07-28). Supports U7, U1; P7, P11, P12. Normative in
-  AGENTS.md, "VM ownership".
+- D67 — RULINGS MADE WHILE EXTRACTING THE BACKEND-ADAPTER BOUNDARY:
+  A GENERIC WAY TO IDENTIFY A VM, NO NETWORK PORT VISIBLE ABOVE THE
+  BOUNDARY, AND A STUB ADAPTER THAT CLAIMS NO CAPABILITIES —
+  DECIDED (owner, 2026-07-28). Supports U7, U1; P7, P11, P12.
+  Normative in AGENTS.md, under "VM ownership."
 
-  - **Nothing above the seam reads a port.** Keeping `port=` as an
-    ordinary parameter was declined: a port is one adapter's shape
-    of an endpoint, and a caller that can name it is a caller
-    written against QEMU.
-  - **A stub adapter claims no capability**, so assignment passes
-    over it even where the backend is installed. A stub that
-    claimed capability would be discovered as a failure at
-    materialization, which is the honesty P11 exists to force.
+  - **Nothing above the adapter boundary is allowed to read a
+    network port directly.** Keeping `port=` available as an
+    ordinary parameter was rejected: a port number is specific to
+    how one particular adapter (QEMU) exposes a connection endpoint,
+    and any calling code that can name a port directly is code
+    that's really been written against QEMU specifically, not
+    against the general adapter interface.
+  - **A stub adapter (one not yet fully implemented) claims none of
+    the capabilities a real adapter would.** This means backend
+    assignment skips over it even when that backend happens to be
+    installed on the host. If a stub claimed capabilities it doesn't
+    actually have, the failure would only be discovered later, when
+    actually trying to create a machine — exactly the kind of
+    upfront honesty P11 requires.
 
-- D66 — THE BACKEND PRIORITY ORDER RANKS AGENTLESS SCRIPTABILITY
-  — DECIDED (owner, 2026-07-28). Supports U7, U12, U1; P3, P11.
-  F2's decide-first, settled in the act that pledged it, so the
-  feature reached the shelf carrying none.
+- D66 — THE DEFAULT BACKEND PRIORITY ORDER RANKS BACKENDS BY HOW
+  SCRIPTABLE THEY ARE WITHOUT A GUEST AGENT — DECIDED (owner,
+  2026-07-28). Supports U7, U12, U1; P3, P11. This settles F2's
+  "decide first" question, resolved as part of the same act that
+  pledged the feature, so the feature reached the pledged shelf with
+  no open question left attached.
 
-  THE ORDER: **QEMU, VirtualBox, VMware Workstation, Hyper-V**,
-  for default assignment when a blueprint names no `backend`. It
-  breaks ties among candidates already available *and* capable —
-  assignment walks the list and takes the first that is both — so
-  it never stands in for a capability check (P11), and an explicit
-  `backend` skips the walk entirely.
+  THE ORDER: **QEMU, then VirtualBox, then VMware Workstation, then
+  Hyper-V**, used for default backend assignment whenever a
+  blueprint doesn't specify a `backend` explicitly. This order only
+  breaks ties among backends that are already both installed *and*
+  capable of running the requested machine — assignment walks down
+  the list and picks the first backend that's both — so this
+  ordering never substitutes for an actual capability check (P11),
+  and specifying `backend` explicitly skips this list entirely.
 
-  WHY AGENTLESS SCRIPTABILITY IS THE RANK. The proposal said "best
-  scriptability"; sharpened, the criterion is the *agentless*
-  plane, and the reason is when the choice is made. Assignment
-  happens at materialization, before any guest exists, and the
-  install that follows is agentless by definition — P3's arc has
-  agentless operation preparing a guest and a native agent taking
-  over only once one is inside it. A backend's agent story is
-  therefore worth nothing at the moment of assignment, and for the
-  guests U12 and U1 actually drive it is worth nothing ever: DOS-era
-  systems stay agentless permanently.
+  WHY THIS RANKS BACKENDS BY AGENTLESS SCRIPTABILITY. The original
+  proposal said "best scriptability"; refined, the actual criterion
+  is scriptability *without a guest agent installed*, and the reason
+  is about *when* the backend choice actually gets made. Backend
+  assignment happens at machine creation time, before any guest
+  operating system even exists yet, and the installation process
+  that follows is necessarily agentless — P3's overall design has
+  agentless operation doing the work of preparing a guest, with a
+  native agent only taking over once one has actually been installed
+  inside it. So a backend's story around agent support is worth
+  nothing at the moment assignment happens, and for the guests that
+  U12 and U1 actually drive — DOS-era systems — it's worth nothing
+  ever, since those systems stay permanently agentless.
 
-  THE RANKING, BACKEND BY BACKEND. QEMU is first on evidence
-  rather than preference — it is the only adapter with a full
-  control plane set, and F2 exists because the seam is read off
-  it. VirtualBox second: `VBoxManage` covers lifecycle, scancode
-  input, screenshots and serial redirection, the closest match to
-  the set scripts already rely on, with VNC behind the extension
-  pack. VMware Workstation third: it exposes VNC but no comparable
-  scancode surface. Hyper-V last, and not by prejudice — it has no
-  VNC at all (a capability failure, never an emulation), which
-  leaves it with no agentless display plane, and F5 keeps it
-  deliberately last for the same reason.
+  THE RANKING, BACKEND BY BACKEND. QEMU ranks first based on
+  evidence, not preference — it's the only adapter with a complete
+  control-plane implementation, and feature F2 exists specifically
+  because the adapter boundary was designed by reading off QEMU's
+  implementation. VirtualBox ranks second: its `VBoxManage`
+  command-line tool covers machine lifecycle, keyboard input by
+  scancode, screenshots, and serial-port redirection — the closest
+  match to the toolset scripts already depend on, with VNC access
+  available behind VirtualBox's separate extension pack. VMware
+  Workstation ranks third: it exposes VNC, but has no comparably
+  rich scancode-based input surface. Hyper-V ranks last, and not out
+  of bias — it has no VNC support at all, which is a genuine missing
+  capability, not just a different implementation choice — leaving
+  it with no agentless way to view or control the display at all,
+  which is also why F5 deliberately keeps it last for the same
+  reason.
 
-  WEIGHED AND DECLINED: ordering by host ubiquity. U7's own text
-  invites it — "a Windows laptop with Hyper-V already enabled" —
-  and on the most common host it would default to the least
-  scriptable backend, which is the wrong outcome for the one thing
-  a default has to serve: U1's single command reaching a usable
-  machine through U12's unattended install. Ubiquity is already
-  honored where it belongs, in availability probing; it is not a
-  tie-break among the available.
+  CONSIDERED AND REJECTED: ranking backends by how commonly they're
+  already installed on a typical host. U7's own wording practically
+  invites this — it mentions "a Windows laptop with Hyper-V already
+  enabled" — but on the single most common host setup, that would
+  default to the *least* scriptable backend, which is the wrong
+  outcome for the one thing this default has to serve: U1's promise
+  of reaching a usable machine with a single command, via U12's
+  unattended install process. Host ubiquity is already accounted for
+  in the right place — when checking which backends are actually
+  available — it just isn't used to break ties among the ones that
+  are.
 
-  ALSO DECLINED: no default at all, requiring an explicit
-  `backend`. U7 says the machine materializes on whatever capable
-  backend the host offers, and U1 claims the journey is one short
-  command; a required field costs both.
+  ALSO REJECTED: having no default at all, and requiring `backend`
+  to always be specified explicitly. U7 promises that a machine
+  materializes on whatever capable backend the host happens to
+  offer, and U1 promises the whole journey is a single short
+  command; requiring an explicit backend choice would break both
+  promises.
 
-  TWO OF THE FOUR ARE STUBS at F2 (work item 4, raising
-  `NotImplementedError`), so the order's tail is **intent recorded
-  now**, not shipped behavior — the same pattern as F3's VDI
-  format table, and honest for the same reason: the record says
-  what the project means before the code can prove it.
+  TWO OF THE FOUR BACKENDS ARE STILL STUBS as of feature F2 (its
+  fourth work item raises `NotImplementedError` for them), so the
+  tail end of this ordering **records intent now**, ahead of
+  actually being working, shipped behavior — the same pattern
+  already used for F3's VDI format table, and honest for the same
+  reason: the record states what the project intends before the code
+  can actually back it up.
 
-  FOLDED: pledged/FEATURES.md (F2's decide-first becomes settled
-  text) and pledged/design/backend-adapter.md (the assignment
-  section's open question becomes the order, with its per-backend
-  ground).
+  FILES UPDATED: pledged/FEATURES.md (F2's "decide first" question
+  becomes settled, final text) and pledged/design/backend-adapter.md
+  (the assignment section's open question becomes this ordering,
+  along with the reasoning behind each backend's position).
 
-- D65 — A PLEDGED DEMAND IS NECESSARY AND NOT SUFFICIENT; F2
-  PLEDGES WHOLE — DECIDED (owner, 2026-07-28). Supports U7
-  (pledged in this round), P11. The pledges of U7 and F2 are
-  lifecycle acts and are not recorded here (D63); U7's argument
-  was written in its 2026-07-23 draft and needed no re-making.
-  What follows is what was adjudicated in their course.
+- D65 — A PLEDGED USE CASE MAKES A FEATURE ELIGIBLE TO BE PLEDGED,
+  BUT DOESN'T PLEDGE IT AUTOMATICALLY; FEATURE F2 IS PLEDGED AS ONE
+  WHOLE PIECE — DECIDED (owner, 2026-07-28). Supports U7 (pledged in
+  this same round), P11. Pledging U7 and F2 are themselves routine
+  lifecycle steps and don't get their own entries (D63) — U7's
+  justification was already written out in its 2026-07-23 draft and
+  didn't need to be remade. What follows is the actual rulings made
+  while doing this.
 
-  THE SIZE CALL. F2 was tested against D42's one-sprint bound and
-  pledged **whole**, keeping its number rather than retiring it
-  for a piece each. The extraction is bounded twice over: by
-  working code — QEMU is the only adapter with a full control
-  plane set, so the seam is read off an implementation rather than
-  designed — and by a regression oracle that says when it is done,
-  all QEMU interaction through the adapter API with the FreeDOS
-  install script passing unchanged. Four of the five work items
-  are small (autodiscovery, default assignment, stubs, ownership
-  verification); the adapter API is the bulk. WEIGHED AND
-  DECLINED: cutting the seam from discovery-and-assignment. It
-  buys a smaller first commitment at the price of F2's number,
-  which backend-adapter.md and several entries cite, and the
-  pieces are not independently useful — discovery with no seam to
-  assign into delivers nothing.
+  THE SIZE DECISION. F2 was checked against D42's rule that a
+  feature must fit in one sprint, and was pledged **as a single
+  whole feature**, keeping its original number rather than being
+  split up and retired piece by piece. Its scope is bounded in two
+  separate ways: by the working code that already exists — QEMU is
+  the only backend with a fully implemented control plane, so the
+  adapter boundary is being extracted from an existing
+  implementation, rather than designed from scratch — and by a clear
+  test for when it's done: all QEMU interaction routed through the
+  new adapter API, with the FreeDOS install script still passing
+  unchanged. Four of its five work items are small (auto-discovering
+  backends, default backend assignment, stub adapters for the rest,
+  and verifying VM ownership); the adapter API itself is the bulk of
+  the work. CONSIDERED AND REJECTED: splitting out just the
+  discovery-and-assignment part as a smaller feature on its own.
+  This would make the first commitment smaller, but at the cost of
+  F2's own number, which backend-adapter.md and several other
+  entries already cite — and the pieces aren't independently useful
+  anyway: discovering backends with no adapter boundary to assign
+  machines into doesn't actually deliver anything on its own.
 
-  NECESSARY, NOT SUFFICIENT. `proposed/FEATURES.md` said pledging
-  a feature's use case "is what returns the feature to a numbered
-  arc", which reads as sufficiency; that reading is declined. A
-  pledged use case makes a feature **pledgeable** and pledges
-  nothing itself — each feature still moves by its own decision.
-  F3 and F5 both cite U7 and both stay in `proposed/` under a
-  pledged U7, which is the test of the rule and not an oversight.
-  The converse half is unchanged and is why this round has two
-  moves in it: a feature may not be pledged ahead of its demand,
-  which is the error D61 undid and the reason F2 waited five days.
+  NECESSARY, BUT NOT SUFFICIENT. `proposed/FEATURES.md` had said
+  that pledging a feature's underlying use case "is what returns the
+  feature to a numbered arc" — which reads as though pledging the
+  use case is enough on its own. That reading is rejected. Pledging
+  a use case only makes a feature **eligible** to be pledged — it
+  doesn't pledge the feature itself; each feature still needs its
+  own separate decision to move. F3 and F5 both cite use case U7,
+  and both stay in `proposed/` even after U7 is pledged — this is
+  the rule actually being tested, not an oversight. The reverse rule
+  is unchanged, and is why this decision round makes two separate
+  moves: a feature still can't be pledged ahead of the use case that
+  justifies it — that was the exact mistake D61 corrected, and it's
+  why F2 waited five days before being pledged.
 
-  F5's DEMAND GAP NARROWED AND DID NOT CLOSE. [It closed
-  2026-08-21: D110 adjudicates U5 as the GUI half's demand.] The
-  2026-07-27 sweep
-  found F5 the one live traceability violation. U7 reaches part of
-  it — U7 names Hyper-V outright, so the last two adapters now
-  stand on pledged demand — and reaches none of the rest: the VNC
-  plane, the landmark asset spec and pointer input answer to
-  nothing in force or pledged, and materializing on the host's
-  hypervisor says nothing about driving a graphical installer.
-  Recorded as a finding, not an adjudication: the demand divides
-  exactly where D42's split would fall, which is for whoever
-  adjudicates F5 to use.
+  F5's MISSING JUSTIFICATION SHRANK, BUT DIDN'T FULLY CLOSE HERE.
+  [It did fully close later, on 2026-08-21: D110 settles U5 as the
+  justification for F5's GUI-automation half.] The 2026-07-27 review
+  found F5 to be the one feature still lacking full traceability
+  back to a use case. Pledging U7 covers part of that gap — U7
+  explicitly names Hyper-V, so the last two backend adapters now
+  rest on a pledged use case — but it doesn't cover the rest: the
+  VNC control plane, the landmark-asset spec, and pointer input all
+  still answer to no use case that's either in force or pledged, and
+  simply being able to create a machine on the host's hypervisor
+  says nothing about being able to drive a graphical installer
+  through it. This is recorded here as a finding, not as a full
+  ruling: the remaining gap splits exactly where D42's size rule
+  would naturally split it, which is left for whoever formally rules
+  on F5 to use.
 
-  FOLDED: pledged/USE-CASES.md and pledged/FEATURES.md (U7 and F2
-  arrive; both shelves stop being empty); proposed/USE-CASES.md
-  and proposed/FEATURES.md (both leave; the F2–F6 preamble, F3's
-  and F5's banners, F7's two findings, one of which this round
-  closes); planning/README.md (the map's design rows);
-  `planning/pledged/design/backend-adapter.md` — moved from
-  `proposed/design/`, since design travels with what it serves
-  (D61), which returns a directory empty since that decision — and
-  the backend-adapter links in root ARCHITECTURE.md and
+  FILES UPDATED: pledged/USE-CASES.md and pledged/FEATURES.md (U7
+  and F2 are added; neither shelf is empty anymore);
+  proposed/USE-CASES.md and proposed/FEATURES.md (both entries
+  removed; also updated: the shared preamble for F2 through F6, F3's
+  and F5's status notes, and F7's two open findings, one of which
+  this decision closes); planning/README.md (the directory map's
+  design-document rows); `planning/pledged/design/backend-adapter.md`
+  (moved from `proposed/design/`, since a design document moves
+  along with whatever it documents — D61 — which leaves that
+  directory empty as of this decision); and the links to
+  backend-adapter.md in root ARCHITECTURE.md and
   planning/design/guest-communication.md.
 
-- D64 — U4 DOES NOT CARRY U5's MECHANISM; U5 SPLITS AT THE
-  DELIVERY LINE — DECIDED (owner, 2026-07-28). Supports none: a
-  use-case adjudication is itself demand.
+- D64 — USE CASE U4 DOES NOT COVER U5's PARAMETERIZATION MECHANISM;
+  U5 IS SPLIT AT THE POINT WHERE DELIVERY ACTUALLY REACHED —
+  DECIDED (owner, 2026-07-28). Supports nothing — ruling on a use
+  case is itself what creates demand for other things, not something
+  that needs its own supporting citation.
 
-  A use case states **what the user needs**, never the mechanism
-  that serves it, so U4 cannot be read as carrying U5's
-  parameterization just because parameterization would serve it.
-  U5 split at the line delivery actually reached: the delivered
-  half became U21 and the half still waiting on the GUI era stayed
-  proposed. Splitting at the delivery line is what keeps the
-  standing list true — a half-met use case in force would make the
-  root list a claim the code does not support.
+  A use case states **what the user actually needs**, never the
+  specific mechanism used to deliver it — so U4 can't be read as
+  already covering U5's parameterization feature just because
+  parameterization happens to be a good way to serve U4. Instead, U5
+  is split at the exact point delivery actually reached: the part
+  that was actually delivered becomes its own use case, **U21**,
+  while the part still waiting on GUI automation to exist stays in
+  `proposed/`. Splitting exactly at the delivery line is what keeps
+  the list of active use cases accurate — a use case marked "in
+  force" that's only half actually delivered would make the root
+  use-case list assert something the code doesn't actually support.
 
-- D63 — A LIFECYCLE ACT ALONE EARNS NO ENTRY; THE PROMOTION
-  GENRE CLOSES — DECIDED (owner, 2026-07-28). Supports (none) —
-  record discipline, demanded by no numbered entry; what it
-  aligns with is the cross-project governance standard, which
-  carries no local number to cite.
+- D63 — A ROUTINE LIFECYCLE STEP DOES NOT GET ITS OWN ENTRY; THE
+  PRACTICE OF WRITING "PROMOTION" ENTRIES ENDS — DECIDED (owner,
+  2026-07-28). Supports nothing directly — this is a rule about how
+  this record itself is kept, not required by any numbered entry;
+  it brings this file in line with the project's general
+  cross-project governance standard for decision records, which has
+  no local number of its own to cite.
 
-  WHAT STARTED IT (owner): the record is getting large, and *"we
-  need a record of any architecture decisions in what they
-  promoted, but I don't think we need a decision record of the
-  promotion itself. That status is self evident."* The standard
-  already says as much — the move is the act, the commit that
-  does it is the record, and there is no separate register to
-  keep in step — and this record kept one anyway: the promotion
-  genre (D37, D46, D47, D49, D51, D57, and the pledging and
-  arming clauses of D61 and D62) runs roughly 650 lines, about
-  a ninth of the file, written while the machinery was still
-  being invented, restating what location and git history
-  already say.
+  WHAT STARTED THIS (in the owner's words): this record was getting
+  large, and *"we need a record of any architecture decisions in
+  what they promoted, but I don't think we need a decision record of
+  the promotion itself. That status is self evident."* The general
+  governance standard already says exactly this — the move itself is
+  the act, the commit that makes it is the record, and there's no
+  separate log that needs to be kept in sync with it — but this file
+  had been keeping one anyway: the group of "promotion" entries
+  (D37, D46, D47, D49, D51, D57, plus the pledging- and
+  arming-related sections of D61 and D62) runs to roughly 650 lines,
+  about a ninth of the whole file, written while this governance
+  process was still being figured out, and mostly just restating
+  what an item's location and its git history already show.
 
-  THE RULE. Proposing, pledging, promoting, delivering: no
-  entry. Delivery evidence — the clause-by-clause case that a
-  use case is actually met, D46's genre — goes in the moving
-  commit's message, where the act it evidences lives. What
-  still earns an entry is a RULING made in the act's course: a
-  clause read one way with the other reading declined (D46's
-  media-swap clause), a scope widened (D46's two-to-four), a
-  pledge found accidental and withdrawn (D61's whole subject).
-  Record the ruling, slim — the entry says what was adjudicated
-  and never narrates the promotion around it; D61 under this
-  rule is twenty lines, not 150. A decision whose conclusion
-  pledges something is untouched: that entry records an
-  argument, and the pledge is its consequence.
+  THE RULE, GOING FORWARD. Proposing, pledging, promoting, or
+  delivering something: none of these get their own entry. Evidence
+  that delivery actually happened — the clause-by-clause case that a
+  use case is genuinely met, the kind of thing D46 used to do —
+  belongs in the commit message of the commit that makes the move,
+  right alongside the act it's evidence for. What still earns an
+  entry is an actual RULING made along the way: a disputed clause
+  read one specific way, with the other reading rejected (like
+  D46's ruling on its media-swap clause), a scope deliberately
+  widened (like D46 widening from two cases to four), or a pledge
+  found to have been made by accident and then withdrawn (the entire
+  subject of D61). Record just the ruling, kept short — the entry
+  states what was actually decided and never narrates the promotion
+  process around it; under this rule, D61 would be twenty lines, not
+  150. A decision whose entire conclusion is simply "pledge this" is
+  untouched by this rule: that kind of entry is recording an
+  argument, and the pledge is just its natural consequence.
 
-  WHAT THIS DOES NOT DO. Nothing below moves, retires, or is
-  rewritten. The genre's entries stand as written under the
-  spellings rule, and their numbers stay citable (D62 cites
-  D57; D46 applies D34). D34's promotion-on-delivery rule is
-  also untouched: promotion stays automatic, and simply stops
-  being narrated here.
+  WHAT THIS RULE DOES NOT DO. Nothing written under the old practice
+  is moved, retired, or rewritten because of this decision. Those
+  existing entries stand exactly as written, under the usual rule
+  about preserving spellings, and their numbers stay fully citable
+  (D62 still cites D57; D46 still applies D34). D34's rule that
+  promotion happens automatically on delivery is also untouched —
+  promotion still happens automatically, it just stops being
+  separately written up here.
 
-  WEIGHED AND DECLINED: retroactively compressing or archiving
-  the genre. Retirement moves an entry intact and saves
-  nothing, rewriting is forbidden by the record's own
-  discipline, and deletion breaks the permanent-handle
-  guarantee. An archival split — old entries moved whole,
-  numbers intact, to a companion file — is the one compliant
-  shrink, and remains available as its own decision, not taken
-  here.
+  CONSIDERED AND REJECTED: retroactively shrinking or archiving the
+  existing group of promotion entries. Moving an entry to the
+  "retired" section keeps it intact and saves no space; rewriting it
+  is forbidden by this file's own rule against altering the
+  substance of past entries; and deleting it outright would break
+  the guarantee that a D-number is a permanent handle. Splitting old
+  entries out, whole and with their numbers intact, into a separate
+  companion file is the one way this could be shrunk without
+  breaking those rules — but that's left as its own, separate
+  decision, not made here.
 
-  FOLDED: the governance standard (the record's discipline and
-  its move-is-the-act clause) and its DECISIONS.md template;
-  this file's preamble. Nothing else in the tree changes: the
-  rule governs entries not yet written.
+  FILES UPDATED: the cross-project governance standard document (its
+  rule about records and its "the move is the act" clause) and its
+  DECISIONS.md template; this file's own preamble at the top.
+  Nothing else in the repository changes — this rule only governs
+  entries written from now on.
 
-- D60 — INPUT PACING IS CONTROL-PLANE PACING, NOT A `delay` VERB —
-  DECIDED (owner, 2026-07-24) and delivered 2026-07-27. Supports
-  U14, U20, U12. Normative in
+- D60 — INPUT PACING IS A CONTROL-PLANE SETTING, NOT A SEPARATE
+  `delay` VERB IN THE SCRIPT LANGUAGE — DECIDED (owner, 2026-07-24)
+  and delivered 2026-07-27. Supports U14, U20, U12. Normative in
   [script-spec.md](../docs/spec/script-spec.md).
 
-  THE DISTINCTION, which is what keeps `delay` refused: a `delay`
-  verb is a pause an author *sequences* — a step standing between
-  two others, encoding a guess about how long something takes.
-  `pacing` is a property of *delivering input*, the gap the control
-  plane takes before its first key event whether or not anyone
-  writes the word. The language adds the ability to tune that gap,
-  not to insert one.
+  THE DISTINCTION THAT KEEPS A `delay` VERB OUT OF THE LANGUAGE: a
+  `delay` verb would be a pause an author deliberately *inserts as a
+  step*, sitting between two other steps, encoding a guess about how
+  long something should take. "Pacing," by contrast, is a property
+  of *how input gets delivered* — the gap the control plane already
+  takes before sending its very first key event, whether or not any
+  script ever mentions it. The language adds the ability to tune
+  that existing gap, not the ability to insert a new one.
 
-  **The 0.1s built-in is a floor, not an estimate.** The variance
-  it was once justified by — paint speed — is not what it covers;
-  what makes a guest ready to *read* is the readiness mechanism,
-  and no single number serves every screen, which is why the
-  per-phase and per-statement overrides carry the weight.
+  **The built-in 0.1-second pacing value is a floor, not an estimate
+  of typical timing.** The variance it was originally justified by —
+  how fast the screen redraws — is not actually what it's meant to
+  cover. What actually determines when a guest is ready to *receive*
+  input is the readiness mechanism, and no single fixed number can
+  serve every possible screen — exactly why the per-phase and
+  per-statement override settings carry most of the real weight
+  here.
 
-- D61 — THE PLEDGED SHELF IS RE-TESTED ENTRY BY ENTRY — DECIDED
-  (owner, 2026-07-27). Supports U8, U11, U12, U13; P8. **Amends
-  D44** (its clearing sentence only) and **retires D42's F1
-  tolerance**. F1, U2 and U6 withdrew; U1 condensed and promoted.
+- D61 — EVERYTHING ON THE PLEDGED SHELF IS RE-CHECKED, ONE ENTRY AT
+  A TIME, RATHER THAN CARRIED OVER AUTOMATICALLY — DECIDED (owner,
+  2026-07-27). Supports U8, U11, U12, U13; P8. **Changes D44** (only
+  its sentence about clearing the shelf) and **retires the exception
+  D42 made for F1**. As a result of the recheck: F1, U2, and U6 are
+  withdrawn; U1 is condensed and promoted.
 
-  THE FINDING, which is why this is an entry rather than four
-  lifecycle moves: **the pledges arrived without anyone making
-  them.** Before the shelf existed, entries carried their state as
-  a word, where *accepted* meant only that the argument had won.
-  The restructure filed each by its word — correctly — but F1 had
-  no word to be filed by, so it was created on the shelf because
-  its work items had nowhere else to go. D44 then changed what the
-  shelf *claims*, from agreement to a commitment to deliver, and
-  cleared its occupants in one sentence. Nobody ever decided to
-  build the recorder. **A shelf whose meaning changes under its
-  occupants re-tests them one by one; it does not inherit them.**
+  THE FINDING THAT MADE THIS AN ENTRY RATHER THAN FOUR ORDINARY
+  LIFECYCLE MOVES: **the items on the pledged shelf ended up there
+  without anyone actually deciding to pledge them.** Before the
+  pledged shelf existed as a concept, each entry recorded its own
+  status as a single word, where *accepted* only ever meant "the
+  argument for this has been won." When the project restructured
+  around a pledged shelf, each old entry was correctly filed
+  according to its own word — but feature F1 had no such word to be
+  filed under, so it ended up created directly on the pledged shelf
+  simply because its work items had nowhere else to go. Then D44
+  changed what being on the pledged shelf actually *means* — from
+  "there's agreement on this" to "there's a commitment to actually
+  deliver this" — and cleared out everyone currently on the shelf in
+  a single sentence when it did. Nobody had ever actually decided to
+  build the screen recorder that F1 describes. **Whenever what a
+  shelf claims about its contents changes, everything already on it
+  needs to be individually re-checked against the new meaning — it
+  doesn't just carry over automatically.**
 
-  - **Retiring U1 as superseded by U11–U13** — weighed and
-    declined: U1 names a command nothing else in force does.
-  - **Pledging U8 first**, as the parked plan assumed — declined:
-    it commits the project to building export.
+  - CONSIDERED AND REJECTED: **retiring U1 as superseded by the
+    newer U11 through U13.** Rejected because U1 names a command
+    that nothing else currently in force actually names.
+  - CONSIDERED AND REJECTED: **pledging U8 first**, as an earlier,
+    now-abandoned plan had assumed. Rejected because doing so would
+    commit the project to actually building an export feature, which
+    nothing currently justifies.
 
-- D59 — EVERY WORKING DIRECTORY IS PLACEABLE; P12 AND P4 AMENDED —
-  DECIDED (owner, 2026-07-27) and delivered the same day. Supports
-  U17, U14, U4; P4, P6. The six placeable directories and the
-  derivation cascade are normative in
+- D59 — EVERY WORKING DIRECTORY REBUILDS CAN LIVE IN ITS OWN
+  CONFIGURABLE LOCATION; PRINCIPLES P12 AND P4 ARE UPDATED TO MATCH
+  — DECIDED (owner, 2026-07-27) and delivered the same day. Supports
+  U17, U14, U4; P4, P6. The six placeable directories and the rules
+  for how their locations are derived are normative in
   [asset-resolution.md](../docs/spec/asset-resolution.md) and
   AGENTS.md.
 
-  **Containment stopped being topology**, which is the durable
-  half: with six independent roots, "under the home" is not a claim
-  reliquary can make, so P12 was amended to what it can still
-  guarantee — reliquary writes only where it was told to, never
-  beside the module and never into a source repository.
+  **The lasting part of this decision is that "containment" stopped
+  being about directory structure.** With six independently
+  configurable root directories, Reliquary can no longer honestly
+  claim that everything it writes lives "under one home directory,"
+  so P12 was updated to state only what it can actually still
+  guarantee: Reliquary only ever writes to locations it was
+  explicitly told to use, never next to its own installed module
+  code, and never into a source code repository.
 
-  Its seeding axis was **retired by D88**, which restored P4 to an
-  absolute; the alternative preserved here was rejected for making
-  seeding a silent consequence of resolution.
+  The part of this decision about automatically seeding files was
+  **later retired by D88**, which restored P4 to being an absolute
+  rule again; the automatic-seeding alternative that had been kept
+  here was itself rejected because it made seeding files a silent
+  side effect of simply resolving a name, rather than something
+  explicitly requested.
 
-- D58 — THE FOUR ERROR CLASSES DESCRIBE EVERY SURFACE, NOT A
-  SCRIPT RUN — DECIDED (owner, 2026-07-27). Supports U9, U14; P6,
-  P7, P11. Normative in AGENTS.md.
+- D58 — THE FOUR ERROR CLASSES APPLY TO EVERY COMMAND, NOT JUST TO
+  RUNNING A SCRIPT — DECIDED (owner, 2026-07-27). Supports U9, U14;
+  P6, P7, P11. Normative in AGENTS.md.
 
-  What decides a class **never mentions a script**: the authored
-  input alone (`StaticError`), the world not satisfying it
-  (`PreflightError`), or the work itself failing (`RunFailure`). So
-  a malformed blueprint is static and a machine that does not exist
-  is preflight, whatever command was run. A taxonomy read as
-  script-run phases would have left every non-script surface
-  choosing a class by analogy.
+  What determines which error class applies **never depends on
+  whether a script is even involved**: it depends only on whether
+  the problem is in the authored input itself (`StaticError`), on
+  the surrounding environment not meeting a requirement
+  (`PreflightError`), or on the actual work failing while it ran
+  (`RunFailure`). So a malformed blueprint file is always a
+  `StaticError`, and trying to act on a machine that doesn't exist
+  is always a `PreflightError`, no matter which command triggered
+  it. If this taxonomy had instead been defined around the phases of
+  running a script specifically, every command that isn't about
+  running a script would have been left guessing which class applies
+  to it by loose analogy.
 
-  A fifth class for cancellation was refused as one whose whole
-  population is a single event; `RunCancelled` is a sibling of
-  `RunFailure`, never a subclass.
+  A proposed fifth error class, just for cancellation, was rejected,
+  because its entire population would be a single kind of event;
+  `RunCancelled` is instead a sibling class alongside `RunFailure`,
+  never a subclass of it.
 
-- D57 — P16 IS PLEDGED; THE TEST IS WHAT A CONSUMER MUST DO —
-  DECIDED (owner, 2026-07-27). Supports U14, U20; P11.
+- D57 — PRINCIPLE P16 IS PLEDGED; THE TEST FOR IT IS WHETHER A
+  CALLER WOULD OTHERWISE HAVE TO REBUILD RELIQUARY'S OWN LOGIC
+  THEMSELVES — DECIDED (owner, 2026-07-27). Supports U14, U20; P11.
 
-  THE TEST, which is the entry's reusable part: a capability earns
-  a principle when its absence forces **a consumer to reproduce
-  reliquary's own model outside it**. Not when it would be
-  convenient, and not when reliquary could plausibly own it — the
-  bar is that the caller is currently obliged to re-implement
-  something reliquary already knows, and will get it wrong in ways
-  reliquary cannot see.
+  THE TEST, which is the reusable part of this decision: a
+  capability deserves to become a principle when not having it
+  forces **a caller to reproduce Reliquary's own internal model of
+  something outside of Reliquary itself.** Not just when it would be
+  merely convenient, and not just when Reliquary could plausibly be
+  the one to own that logic — the actual bar is that a caller is
+  currently forced to re-implement something Reliquary already
+  understands internally, and will inevitably get it wrong in ways
+  Reliquary itself has no way to see or catch.
 
-  [P16 gained a carve-out in **D108**: a machine's file
-  content is out of purview by design, so the test above is
-  asked only of what a machine *is* — its lifecycle, drives,
-  media, screen, input and returned values.]
+  [P16 later gained an explicit exception in **D108**: a machine's
+  file content is deliberately out of scope for Reliquary by design,
+  so the test above only applies to what a machine actually *is* —
+  its lifecycle, its drives, its media, its screen, its input, and
+  its returned values.]
 
-- D55 — THE REASON-BLOCKQUOTE SWEEP IS DROPPED — DECIDED (owner,
-  2026-07-27, closing out the Language queue). Supports P8, P23.
-  The 2026-07-21 spec-craft round left one editorial proposal
-  deliberately open — a sweep giving script-spec.md's rules
-  per-rule rationale blockquotes — and it is refused rather than
-  finished. Recorded here so it is not re-raised as an oversight;
-  it was considered and declined.
-  **ITS DEFINITION WAS ALREADY LOST**, which is half the argument.
-  The entry naming it points at *"the review output — workflow
-  `wf_ac5f89b4-402` journal"*, and a run id resolves only inside
-  its own session; no copy exists in the repo. Three entries lean
-  on those journals and none is readable. So finishing the sweep
-  would have meant inventing what it was, not completing it —
-  there is not one `Reason` blockquote in the file to infer the
-  shape from.
-  THE SUBSTANTIVE GROUND, which stands even if the journal turned
-  up tomorrow. **The spec already points at its reasoning**: it
-  carries eleven D-number citations at load-bearing spots, and a
-  D-number is this project's citation currency by design. A
-  per-rule blockquote replaces that pointer with a *copy*, and
-  D52 deleted an entire section of TASKS.md on what copies do —
-  a summary kept beside what it summarizes drifts, and a reader
-  has no way to tell. The cost scales: 51 sections, no test, and a
-  normative document is the worst place for prose that can quietly
-  stop being true.
-  THE NEED IT SERVED IS REAL AND ALREADY MET. A reader weighing a
-  proposed change needs to know why a rule exists — which is
-  precisely what the interface-change rule sends them to
-  DECISIONS.md for, and what the D-citations in the spec make
-  reachable in one hop. Where a rule's reason is *not* reachable,
-  the fix is a citation, not a paragraph.
-  EVIDENCE FROM THE INTERVENING SIX DAYS: script-spec.md went
-  through a full realignment, three delivered milestones and this
-  week's audits without anyone missing the blockquotes.
-  FOLDED: this entry; TASKS.md (the Language bullet dropped, and
-  with it the error-id clause it carried — that half is a defect,
-  entered under Defects, the *index* staying deferred to beta in
-  the spec sentence that already says so). script-spec.md is
-  unchanged.
+- D55 — THE PLAN TO ADD A "REASON" EXPLANATION TO EACH VALIDATION
+  RULE IN script-spec.md IS DROPPED — DECIDED (owner, 2026-07-27,
+  closing out the Language backlog). Supports P8, P23. An earlier
+  spec-writing round on 2026-07-21 had deliberately left one
+  editorial idea open: adding a rationale blockquote explaining the
+  "why" behind each rule in script-spec.md. That idea is now
+  rejected outright rather than finished. This is recorded here so
+  it doesn't get raised again as though it had simply been
+  forgotten — it was considered and turned down.
 
-- D54 — `@` VERSUS `$` IS INHERENT AND OBSERVABLE; EXAMPLE 06
-  CLOSES — DECIDED (owner, 2026-07-27). Supports P5, P8, G6.
-  The last open question in
-  [06-media-label-vs-item](design/script-examples/) is settled and
-  the example is deleted, the catalogue holding open problems
-  only.
-  THE QUESTION. `insert` takes its media through either sigil —
-  `insert cdrom0 @freedos-livecd` or `insert floppy1
-  $supplemental-disk` — and the two look equally definite on the
-  page while meaning different things: `@` names a specific item,
-  `$` defers the choice to the run. A reader must recall the
-  property declaration to know which insert is fixed.
-  SETTLED AS THE EXAMPLE ITSELF GUESSED: **inherent, and already
-  observable.** Deferral is what a property is *for*, so the page
-  cannot say which media a `$` insert will mount without deleting
-  the feature. What the example asked for instead — something
-  naming the resolved item at insert time — turned out to exist:
-  the runtime resolves the binding before building the action's
-  detail, so `insert floppy1 $supplemental` emits
-  `insert floppy1 @win98-cd`, the resolved name spelled with the
-  definite sigil. The observability half was closed by milestone
-  9's event stream without anyone noticing it answered this.
-  PROMOTED TO NORMATIVE BEFORE DELETING, which is why this carries
-  a number rather than being housekeeping. The behaviour shipped
-  but **no norm required it**, so it was free to change and the
-  example could not be closed against it. script-spec.md's run
-  event stream now states it: an `insert` names the media it
-  actually mounted, a `$` argument reporting the resolved name and
-  not the property's. Same shape as D50's format-stability
-  promotion — existing behaviour becoming a rule the
-  implementation answers to (P5: the stream is where a run's
-  difference becomes visible, and no surface reports what it does
-  not carry).
-  A COVERAGE GAP CLOSED WITH IT. Nothing tested this. The suite
-  had a test for an *unbound* `$` insert failing, and none for a
-  bound one reporting its resolved name — so the behaviour the
-  spec now requires was resting on one unexamined line. It has a
-  test.
-  THE EXAMPLE'S OTHER TWO QUESTIONS were closed earlier: the
-  label/item split died with embedded media blocks (2026-07-22),
-  and rejecting an `@`-reference the namespace does not define
-  landed 2026-07-27 as the preflight defect it had always been
-  rather than the language task it was filed as.
-  FOLDED: this entry; script-spec.md ("The run event stream", the
-  action bullet); design/script-examples/ (06 deleted, README's
-  table and its resolved-examples note); test_script_runner.py
-  (the resolved-name test). CHANGELOG: none — the behaviour is
-  unchanged, only its standing.
+  **PART OF THE ARGUMENT IS THAT ITS ORIGINAL DEFINITION IS ALREADY
+  LOST.** The entry that first proposed this idea points to *"the
+  review output — workflow `wf_ac5f89b4-402` journal"* as its
+  source, but a workflow run id like that only resolves within its
+  own session — no copy of that journal exists anywhere in this
+  repository. Three other entries also depend on those same
+  journals, and none of them are readable anymore. So actually
+  finishing this sweep would mean inventing what it was supposed to
+  look like from scratch, not completing existing work — there
+  isn't even a single example `Reason` blockquote anywhere in the
+  file to infer the intended format from.
 
-- D53 — BARE WORDS STAY POSITION-TYPED; TASK [08] IS REFUSED —
-  DECIDED (owner, 2026-07-27). Supports P8, P23, G6.
+  THE SUBSTANTIVE REASON, which holds up even if that journal turned
+  up again tomorrow: **the spec already points to its own
+  reasoning.** It already carries eleven D-number citations at the
+  places that matter, and a D-number is this project's whole
+  citation system, by design. Adding a rationale blockquote to every
+  rule would replace that pointer with a *copy* of the reasoning
+  instead — and D52 already deleted an entire section of TASKS.md
+  over exactly this problem with copies: a summary kept next to the
+  thing it summarizes drifts out of sync over time, and a reader has
+  no way to tell when that's happened. The cost of doing this scales
+  badly too: 51 separate rule sections, no automated test to catch
+  drift, and a normative specification document is the worst
+  possible place to put prose that can quietly stop being true.
 
-  The proposal was to reserve a keyword list so a bare word could
-  be typed without its position. Refused: position already types
-  every bare word unambiguously, and a reserved list is a surface
-  that grows forever and breaks scripts that used a word before it
-  was reserved.
+  THE ACTUAL NEED THIS WOULD HAVE SERVED IS REAL, AND IT'S ALREADY
+  MET. A reader evaluating a proposed change does need to know why a
+  rule exists in the first place — and that's exactly what the
+  interface-change process already sends them to this DECISIONS.md
+  file to find, which the D-number citations already in the spec
+  make reachable in a single click. Wherever a rule's reasoning
+  currently *isn't* reachable that way, the right fix is to add a
+  citation, not to write a paragraph of prose.
 
-  THE PROCEDURAL HALF, cited since: **a refusal never becomes a
-  task**, and the refusal is the *first* option a queued item may
-  meet — a queue entry is pre-approved work, not a commitment that
-  the work is right.
+  EVIDENCE FROM THE SIX DAYS SINCE: script-spec.md has since gone
+  through a full realignment, three delivered milestones, and this
+  week's audits, and nobody has missed having these blockquotes.
 
-- D52 — EVERYTHING IS STRUCK WHEN IT IS DONE — DECIDED (owner,
-  2026-07-27). Supports P8, P23; **amends D45**.
+  FILES UPDATED: this entry; TASKS.md (the "Language" backlog item
+  is dropped, along with the related error-id task it carried — that
+  part is a genuine defect and has been re-entered under the
+  Defects section, with the actual index still deferred to the 1.0
+  release, as the spec's existing wording already states).
+  script-spec.md itself is unchanged.
 
-  `TASKS.md` keeps no Completed section and no Rejected section: a
-  queue holds what waits, and the commit that strikes an item is
-  its record. **A refusal never becomes a task entry** — it belongs
-  here, in the decision record, which is the whole record of a
-  refusal. Keeping done work in the queue makes the queue's length
-  meaningless as a measure of what is outstanding, and keeping
-  refusals there splits the guard against re-litigating across two
-  files.
+- D54 — WHETHER `@` OR `$` IS USED IS ALREADY OBSERVABLE FROM THE
+  RUN'S OWN OUTPUT; DESIGN EXAMPLE 06 IS CLOSED — DECIDED (owner,
+  2026-07-27). Supports P5, P8, G6. The last open question in
+  [06-media-label-vs-item](design/script-examples/) is now settled,
+  and the example file itself is deleted — the design-examples
+  catalogue only holds problems that are still genuinely open.
 
-- D51 — U3 RETIRES, SUPERSEDED BY U14 — DECIDED (owner,
+  THE QUESTION. The `insert` script statement takes its media
+  reference through either of two sigils — `insert cdrom0
+  @freedos-livecd` or `insert floppy1 $supplemental-disk` — and on
+  the page, both forms look equally concrete, even though they mean
+  different things: `@` names one specific item directly, while `$`
+  defers the actual choice to whatever happens at run time. A reader
+  has to go find the property's own declaration elsewhere just to
+  know which kind of `insert` they're looking at.
+
+  SETTLED EXACTLY AS THE EXAMPLE ITSELF HAD GUESSED IT MIGHT BE:
+  **this is inherent to the design, and it's already observable.**
+  Deferring the choice is the entire *point* of using a property, so
+  the documentation page can never state in advance which media a
+  `$`-prefixed insert will actually mount, without eliminating the
+  feature that makes properties useful. What the example asked for
+  instead — some way to see the actually-resolved item at the moment
+  the insert happens — turned out to already exist: the runtime
+  resolves the property's binding before it builds the record of
+  what the statement did, so `insert floppy1 $supplemental` produces
+  an event recorded as `insert floppy1 @win98-cd` — the resolved
+  item name, written with the definite `@` sigil. The observability
+  half of this question was actually already answered by milestone
+  9's run-event stream, without anyone at the time noticing that it
+  answered this specific open question.
+
+  THIS WAS MADE OFFICIAL BEFORE THE EXAMPLE WAS DELETED, which is
+  why this gets a decision number instead of being a routine
+  cleanup. This behavior already shipped, but **nothing had ever
+  made it an official, guaranteed rule**, so it remained free to
+  change later, and the example couldn't be closed out while
+  depending on behavior that wasn't guaranteed. script-spec.md's
+  description of the run event stream now states this explicitly as
+  a rule: an `insert` statement's recorded event names the media it
+  actually mounted, and a `$`-prefixed argument reports the resolved
+  item's name, not the property's own name. This is the same
+  pattern as D50's promotion of format stability to a rule —
+  existing behavior becoming something the implementation is now
+  held to (supporting P5: the event stream is where any run-to-run
+  difference becomes visible, and no part of the system is allowed
+  to report something it doesn't actually carry).
+
+  A GAP IN TEST COVERAGE WAS CLOSED ALONG WITH THIS. Nothing had
+  actually tested this behavior before. The test suite had a test
+  for an *unbound* `$` insert correctly failing, but no test at all
+  for a *bound* one correctly reporting its resolved name — so the
+  very behavior the spec now requires had been resting on a single,
+  never-examined line of code. It now has a real test.
+
+  THE EXAMPLE'S OTHER TWO OPEN QUESTIONS were already closed
+  earlier: the question of splitting "label" from "item" died along
+  with embedded media blocks (2026-07-22), and rejecting an
+  `@`-reference to a name the media namespace doesn't define was
+  resolved on 2026-07-27 as the ordinary preflight-check defect it
+  had always really been, rather than as the language-design task it
+  had originally been filed under.
+
+  FILES UPDATED: this entry; script-spec.md (the "run event stream"
+  section and its bullet about the `insert` action);
+  design/script-examples/ (example 06 deleted; the README's table
+  and its note about resolved examples updated);
+  test_script_runner.py (a new test for reporting the resolved
+  name). No CHANGELOG entry: the actual behavior is unchanged, only
+  its official status.
+
+- D53 — BARE WORDS IN A SCRIPT STAY TYPED BY THEIR POSITION IN THE
+  STATEMENT; TASK [08]'S PROPOSAL IS REJECTED — DECIDED (owner,
+  2026-07-27). Supports P8, P23, G6.
+
+  The proposal was to reserve a fixed list of keywords, so that a
+  bare word in a script could be understood on its own, without
+  needing to know its position in the statement. This is rejected: a
+  bare word's position in the statement already, unambiguously,
+  tells you what kind of thing it is, and a reserved-keyword list
+  would be a piece of language surface that only ever grows over
+  time, and would break any existing script that happened to use one
+  of those words before it became reserved.
+
+  THE PROCEDURAL POINT THIS ESTABLISHES, since cited elsewhere: **a
+  rejected proposal never gets turned into a task.** A rejection is
+  one of the possible outcomes a queued item can reach — being in
+  the task queue only means the work is pre-approved to be looked
+  at, never a guarantee that doing the work is actually the right
+  call.
+
+- D52 — EVERY TASK IS REMOVED FROM THE QUEUE ONCE IT'S DONE, WITH NO
+  "COMPLETED" OR "REJECTED" SECTION KEPT — DECIDED (owner,
+  2026-07-27). Supports P8, P23; **changes D45**.
+
+  `TASKS.md` keeps no "Completed" section and no "Rejected" section:
+  this queue only ever holds work that's still waiting to be done,
+  and the commit that finishes (or "strikes") an item is that item's
+  permanent record. **A rejected proposal never becomes an entry in
+  the task queue at all** — it belongs here instead, in this
+  decision record, which is the complete record of why it was
+  rejected. Leaving finished work sitting in the queue would make
+  the queue's length meaningless as a measure of what's actually
+  still outstanding, and leaving rejections there too would split
+  the safeguard against re-arguing settled questions across two
+  separate files.
+
+- D51 — USE CASE U3 IS RETIRED, SUPERSEDED BY U14 — DECIDED (owner,
   2026-07-27). Supports P8; **completes D36**.
 
-  U3 stated a *preference* for a guest-agent transport. U14 carries
-  the same demand — a program driving a machine and reading
-  results — with **no transport preference at all**, which is the
-  point of the supersession: a use case names what the user needs,
-  never the mechanism, and a preference embedded in one is a design
-  decision wearing a demand's clothes. What carries the preference
-  now is **P3**, a principle, which governs how a native agent is
-  consumed if one ever lands without demanding that it land.
+  U3 had stated a *preference* for a specific transport mechanism (a
+  guest agent). U14 covers the same underlying need — a program
+  driving a machine and reading back results — but with **no
+  preference at all about the transport mechanism used**, which is
+  the entire point of replacing U3 with it: a use case is supposed
+  to state what the user actually needs, never the specific
+  mechanism used to deliver it, and a mechanism preference baked
+  into a use case is really a design decision wearing a use case's
+  clothing. The actual preference for a guest-agent transport now
+  lives in **P3** instead, a principle, which governs how a native
+  agent gets used if one is ever built — without requiring that one
+  ever be built.
 
-- D50 — THE 2026-07-26 RESTRUCTURE'S UNNUMBERED ACTS, ISSUED —
-  DECIDED (owner, 2026-07-27). Supports P8, P23; **amends D23**
-  (pledge is the move). The restructure dissolved the roadmap into
-  these directories, renamed PRINCIPLES.md to root ARCHITECTURE.md,
-  and made location the statement of status — all of it normative
+- D50 — THE UNNUMBERED CHANGES MADE IN THE 2026-07-26 RESTRUCTURE
+  ARE FORMALLY RECORDED — DECIDED (owner, 2026-07-27). Supports P8,
+  P23; **changes D23** (establishing that pledging is what actually
+  moves an item). The restructure dissolved the project roadmap
+  into these planning directories, renamed PRINCIPLES.md to root
+  ARCHITECTURE.md, and made an item's directory location the
+  statement of its status — all of this is now normative, written
   in [README.md](README.md).
 
-  THE RULING, which is why it needed a number at all: **acts that
-  change the governance machinery cannot be unnumbered.** The
-  restructure had been performed as housekeeping, and housekeeping
-  is approved as a class precisely because it touches nothing
-  arguable; a change to how the project decides things is the
-  opposite of that. Issuing the number retroactively is what makes
-  the rebuild citable.
+  THE ACTUAL RULING HERE, which is why this needed a decision number
+  at all: **a change to how the project's own governance machinery
+  works can't go unnumbered.** The restructure had originally been
+  carried out and treated as routine housekeeping, but housekeeping
+  is approved as its own category specifically because it never
+  touches anything genuinely arguable — and a change to how the
+  project makes decisions is exactly the opposite of that. Assigning
+  this decision a number retroactively is what makes the restructure
+  itself something later work can properly cite.
 
-- D49 — P24 RESTATED AND ARMED, AFTER LANDING NOWHERE — DECIDED
-  (owner, 2026-07-27). Supports P8, P22, P23; **restores a
-  decision made 2026-07-27 in commit `42c8c75` that reached no
-  document**, and is the first promotion made under D48's second
-  bar.
-  WHAT WAS LOST, AND HOW. That commit's message says *"state P24
-  in D44 — every enumerated interface carries automated tests
-  checking it against its specification, and the suite passes on
-  every commit to main — dropping 'to whatever extent possible'
-  so the principle can actually be violated, and requiring an
-  untestable surface to name its gap."* None of it landed: P24
-  never entered ARCHITECTURE.md, the D-number was **reused the
-  same day** by D44 (the `accepted/` → `pledged/` rename), and
-  the companion edit that bullet describes — adding P24's
-  every-commit gate to P22's list of expected knocks — is absent
-  from P22 too. The decision existed only in a commit message.
-  WHY NOBODY NOTICED, which is the interesting part. The single
-  surviving trace is [design/audits.md](design/audits.md), which
-  refers to P24 as an accomplished fact — *"armed 2026-07-26 …
-  the strongest claim in the list with the thinnest verification
-  behind it"* — so the one document that talks about P24 asserts
-  it exists. A dangling reference is only findable against
-  something; this one pointed at a number that had been silently
-  spent, which reads as a valid citation to every check that
-  matters. Found while tracing where principles get recorded for
-  D48, not by looking for it.
-  VERIFIED BEFORE ARMING, by D23's standard — against the code,
-  not the docs. Every interface enumerated in "The interfaces"
-  carries test modules: CLI (`test_cli`), embedding API
+- D49 — PRINCIPLE P24 IS RESTATED AND FORMALLY ARMED, AFTER ITS
+  ORIGINAL VERSION NEVER ACTUALLY LANDED ANYWHERE — DECIDED (owner,
+  2026-07-27). Supports P8, P22, P23; **restores a decision that was
+  actually made on 2026-07-27, in commit `42c8c75`, but never
+  reached any actual document**, and is the first promotion carried
+  out under D48's second bar.
+
+  WHAT WAS LOST, AND HOW IT HAPPENED. That earlier commit's message
+  says: *"state P24 in D44 — every enumerated interface carries
+  automated tests checking it against its specification, and the
+  suite passes on every commit to main — dropping 'to whatever
+  extent possible' so the principle can actually be violated, and
+  requiring an untestable surface to name its gap."* None of that
+  actually landed anywhere: P24 never actually entered
+  ARCHITECTURE.md, its D-number was **reused that same day** for
+  D44 (the rename of `accepted/` to `pledged/`), and the companion
+  edit that commit message describes — adding P24's every-commit
+  testing requirement to P22's list of expected exceptions — is also
+  missing from P22. The decision existed only inside a commit
+  message, nowhere else.
+
+  WHY NOBODY NOTICED — this is the interesting part. The one
+  surviving trace of this is [design/audits.md](design/audits.md),
+  which refers to P24 as if it were already an established fact —
+  *"armed 2026-07-26 … the strongest claim in the list with the
+  thinnest verification behind it"* — so the one document that
+  actually discusses P24 asserts that it already exists. A dangling
+  reference like that is only findable by checking it against
+  something real — and this one happened to point at a number that
+  had already been silently spent elsewhere, which makes it look
+  like a perfectly valid citation to any reader not checking
+  closely. This was found while tracing how principles get recorded,
+  for D48's purposes — not by deliberately searching for this
+  specific problem.
+
+  VERIFIED BEFORE BEING FORMALLY ARMED, using D23's standard:
+  checked against the actual code, not against documentation claims.
+  Every interface listed in "The interfaces" section does carry real
+  test modules: the CLI (`test_cli`), the embedding API
   (`test_machines`, `test_media`, `test_run_script`, `test_core`,
-  with `test_old_surface_purge` guarding the deleted one),
-  scripting language (the five `test_script_*` modules and
-  `test_check_script`), machine blueprint (`test_document` plus
-  `test_conformance_corpus`, which runs one corpus against both
-  parser and schema so the two cannot drift), script properties
+  with `test_old_surface_purge` guarding against deleted surfaces
+  coming back), the scripting language (the five `test_script_*`
+  modules plus `test_check_script`), the machine blueprint format
+  (`test_document` plus `test_conformance_corpus`, which runs one
+  shared corpus against both the parser and the schema so the two
+  can never silently drift apart), script properties
   (`test_properties`, `test_binding`, `test_credentials`,
   `test_facts`), recorded outputs (`test_events`, `test_errors`),
-  home layout (`test_home`, `test_assets`). Suite run at
-  adjudication: **768 passing, 1 skipped** — the opt-in FreeDOS
-  integration test.
-  ARMED, NOT PLEDGED — and the residue filed, which is D48's
-  second bar doing its first work on the day it was written.
-  Pledged would be the false state: the tests exist and the suite
-  is green, so the project does honor this as a rule. What it does
-  not yet honor evenly is the phrase *"against its
-  specification"* — most modules test behavior rather than
-  deriving cases from the norm, and only the blueprint has a true
-  conformance corpus. audits.md had already named exactly this
-  gap; under D48 a named gap against an armed principle is not an
-  audit idea, it is a **defect**, and it is entered in TASKS.md
-  as one.
-  THE SECOND CLAUSE IS HONORED BY DISCIPLINE, said plainly. *"The
-  suite passes on every commit to main"* has no machinery behind
-  it, because P22 says there is no CI — and P22 now names
-  automating this gate as one of the cases expected to knock.
-  That is not a weakness in P24; it is the same posture written
-  from the other side.
-  FOLDED: this entry; ARCHITECTURE.md (P24 stated after P23; P22's
-  expected-knocks list gains it, the companion edit `42c8c75`
-  intended); design/audits.md (its P24 question corrected — the
-  principle was armed today, not on the 26th, and the audit it
-  proposes is now the filed defect); TASKS.md (the conformance-
-  depth defect entered). No CHANGELOG line: nothing
-  release-facing moved.
+  and the home directory layout (`test_home`, `test_assets`). The
+  full test suite was run at the time of this decision: **768 tests
+  passing, 1 skipped** — the opt-in FreeDOS integration test.
 
-- D48 — A GAP AGAINST A STANDING ENTRY IS A BUG; THE PROMOTION BAR
-  IS TWO BARS — DECIDED (owner, 2026-07-27). Supports P8, P23;
-  **sharpens D34**. Normative in [README.md](README.md).
+  ARMED, BUT NOT FULLY PLEDGED — with the remaining gap filed as its
+  own task, which is D48's second bar doing its very first real job
+  on the same day it was written. Calling this "pledged" would have
+  been a false statement: the tests do exist and the suite is
+  passing, so the project genuinely does honor this as a working
+  rule today. What it does *not* yet honor evenly is the specific
+  phrase *"against its specification"* — most test modules test
+  behavior directly, rather than deriving their test cases
+  systematically from a written specification, and only the
+  blueprint format actually has a true conformance corpus doing
+  that. design/audits.md had already identified exactly this gap;
+  under D48's rule, a known gap against an already-armed principle
+  isn't just an idea for a future audit anymore — it's a **defect**,
+  and it's now entered into TASKS.md as one.
 
-  Promotion runs on **two bars, not one**: a use case moves on
-  *full delivery*, a principle on being *honored as a rule* with
-  every known residue filed as a defect in the same change. Below
-  the root list a shortfall is unbuilt work; at the root list it is
-  a bug. Conflating them would let a principle be promoted while
-  someone "means to" fix an exception — which makes the standing
-  list a statement of intent, and the standing list is the one
-  document that has to be a statement of fact.
+  THE SECOND PART OF THIS PRINCIPLE IS HONORED THROUGH DISCIPLINE
+  ALONE, STATED PLAINLY. The clause *"the suite passes on every
+  commit to main"* has no automated tooling actually enforcing it,
+  because P22 already states that this project runs no continuous
+  integration — and P22 now separately lists automating this
+  specific check as one of the situations expected to eventually
+  require attention. That isn't a weakness specific to P24; it's the
+  exact same overall posture, just described from the other side.
 
-- D47 — P5, P14, P17 AND P18 ENTER FORCE — DECIDED (owner,
-  2026-07-27, the second TASKS.md adjudication). Supports P8, P10,
-  P11; applies D34's promotion rule to principles.
+  FILES UPDATED: this entry; ARCHITECTURE.md (P24 is now stated,
+  placed after P23; P22's list of expected future exceptions gains
+  this item, the companion edit commit `42c8c75` had originally
+  intended to make); design/audits.md (its question about P24 is
+  corrected — the principle was actually armed today, not on the
+  26th, and the audit it had proposed is now the filed defect
+  described above); TASKS.md (the conformance-depth defect is
+  entered). No CHANGELOG entry: nothing user-facing actually changed
+  as a result of this.
 
-  THE BAR, which is what the entry is for: a principle is armed by
-  being *honored as a rule*, with every known residue filed as a
-  defect in the same change — not by being agreed with. Below the
-  root list a shortfall is unbuilt work; at the root list the
-  project asserts the code honors it, and a divergence becomes a
-  bug. Promoting a principle while knowing of an exception would
-  make the root list a wish rather than a claim.
-
-- D46 — U9 AND THE U11–U13 CHUNK TRIO ARE PLEDGED AND IN FORCE —
-  DECIDED (owner, 2026-07-27). Supports P6, P7, P8.
-
-  A use case may be **pledged and delivered in one act** where the
-  code already meets it: the two moves are separate events, not a
-  mandatory interval, and forcing a wait would make the standing
-  list lie about what the code does.
-
-  THE RULING WITH TEETH: **a use case is rejected by naming it.**
-  An unwritten case cannot be refused, so the sweep that found U9
-  and U12 delivered-but-unpledged had to pledge them rather than
-  quietly treat delivery as sufficient — which is the defect a
-  traceability check would have caught the day milestone 9 landed.
-
-- D45 — THE HOUSEKEEPING BOUNDARY IS HOUSEKEEPING'S ALONE; A SMALL
-  SURFACE CHANGE MAY BE A TASK — DECIDED (owner, 2026-07-27).
-  Supports P8, P23; **completes D43**. Normative in
+- D48 — A GAP AGAINST AN ALREADY-STANDING PRINCIPLE OR USE CASE IS A
+  BUG, NOT JUST UNFINISHED WORK; PROMOTING SOMETHING TO THE ROOT
+  LIST NOW REQUIRES CLEARING TWO SEPARATE BARS — DECIDED (owner,
+  2026-07-27). Supports P8, P23; **sharpens D34**. Normative in
   [README.md](README.md).
 
-  Housekeeping's surface test exists to compensate for a class
-  **nobody with authority ever reviews** — work approved on sight
-  and landed without an entry. The task queue needs no such
-  compensation, because only authority may write to it and entering
-  an item *is* approving it. So the two gates are not the same gate
-  at different sizes: a small surface change may be a task, refused
-  from housekeeping for *who reviews it* rather than for what it
-  touches.
+  Promoting something to the root, standing list of principles or
+  use cases now requires clearing **two separate bars, not one**: a
+  use case is promoted once it is *fully delivered*, and a principle
+  is promoted once it is actually *honored as a working rule*, with
+  every currently-known exception filed as a defect in that very
+  same change. Below the root list, a shortfall just means there's
+  unbuilt work remaining; once something is actually on the root
+  list, a shortfall is a bug. Treating these the same would let a
+  principle get promoted to the root list while someone still merely
+  "intends to" fix a known exception later — which would turn the
+  standing list into a statement of intent, when the standing list
+  is supposed to be the one document in this whole project that has
+  to be a plain statement of fact.
 
-- D44 — THE SECOND SHELF IS `pledged/`, NOT `accepted/` — DECIDED
-  (owner, 2026-07-27). Supports P8, P23. Normative in
-  [README.md](README.md).
+- D47 — PRINCIPLES P5, P14, P17, AND P18 ARE PROMOTED TO THE ROOT
+  LIST AND TAKE EFFECT — DECIDED (owner, 2026-07-27, the second
+  TASKS.md ruling of the day). Supports P8, P10, P11; applies D34's
+  promotion rule to principles.
 
-  **Neither shelf is named after an act.** Both gates need one —
-  admitting a document to `proposed/` is an approval too — so a
-  shelf named for an act claims words the other gate still has to
-  borrow. Both names state what the item *is*: proposed, argued and
-  binding nothing; pledged, owed with no date attached.
+  THE BAR THIS ENTRY EXISTS TO ENFORCE: a principle is armed not by
+  everyone simply agreeing with it, but by the code actually
+  *honoring it as a working rule*, with every currently-known
+  exception filed as a defect in that same change. Below the root
+  list, a shortfall just means unfinished work; once something is on
+  the root list, the project is asserting the code already honors
+  it, so any gap becomes a bug. Promoting a principle while already
+  knowing about an unaddressed exception would turn the root list
+  into a wish list instead of a factual claim.
 
-  The structural reason that settled it: `accepted/` had meant only
-  that the argument had won, and renaming it to a commitment to
-  deliver changed what the shelf *claimed* about its existing
-  occupants — which is what forced the entry-by-entry re-test in
-  **D61**. A shelf does not inherit occupants across a change in
-  its meaning.
+- D46 — USE CASE U9 AND THE U11–U13 GROUP OF USE CASES ARE PLEDGED
+  AND TAKE EFFECT IMMEDIATELY — DECIDED (owner, 2026-07-27).
+  Supports P6, P7, P8.
 
-- D43 — WRITING UNDER planning/ IS A GOVERNED ACT; AUTHORITY
-  COMPRESSES THE STEPS — DECIDED (owner, 2026-07-26). Supports P8,
-  P23; **amends D39** (widening its two queues to three). The three
-  queues and the gate are normative in [README.md](README.md).
+  A use case can be **pledged and delivered in the same single
+  act**, when the code already satisfies it — pledging and
+  delivering are two separate events, not something that has to
+  happen with a mandatory gap in between, and forcing a wait between
+  them would make the root use-case list lie about what the code can
+  actually already do.
 
-  THE RULING: the gate weighs most on the **task queue**, because a
-  `proposed/` entry admits an argument and commits nothing, and a
-  promotion is that argument's conclusion with its reasoning
-  recorded — but a task entry *is* the whole vetting with nothing
-  behind it. There, authority is all that stands between
-  pre-approval and self-approval. So the third queue is refused for
-  **who may write to it**, never for what it may contain: a small
-  surface change may be a task, and the housekeeping surface test
-  is housekeeping's alone.
+  THE RULING WITH REAL CONSEQUENCE: **a use case only gets rejected
+  by being written down and formally named first.** An unwritten use
+  case can never be formally refused, so when a review found that U9
+  and U12 had actually already been delivered without ever being
+  formally pledged, the right fix was to pledge them properly,
+  rather than quietly treating "it's already delivered" as good
+  enough on its own — this exact gap is what a proper traceability
+  check would have caught the very day milestone 9 shipped.
 
-- D42 — NO ROADMAP; FEATURES CARRY RETIRING F-NUMBERS AND A
-  SPRINT-SIZED BOUND — DECIDED (owner, 2026-07-26), completing the
-  governance rebuild of that day. Supports P9. The machinery is
+- D45 — THE HOUSEKEEPING SURFACE TEST APPLIES ONLY TO HOUSEKEEPING;
+  A SMALL SURFACE CHANGE CAN STILL BE HANDLED AS A REGULAR TASK —
+  DECIDED (owner, 2026-07-27). Supports P8, P23; **completes D43**.
+  Normative in [README.md](README.md).
+
+  Housekeeping's surface test exists specifically to make up for one
+  particular risk: work that gets approved on sight, by whoever
+  happens to be doing it, and lands without any separate written
+  entry, with **nobody in a position of authority ever actually
+  reviewing it**. The task queue doesn't need that same safeguard,
+  because only someone with authority is allowed to write to it in
+  the first place, and adding an item to the task queue already *is*
+  an act of approval. So these two approval gates aren't the same
+  gate applied at different sizes — a small surface change is
+  allowed to go through as a regular task; it's only refused from
+  going through housekeeping specifically, based on *who reviews
+  it*, not based on what it actually touches.
+
+- D44 — THE SECOND SHELF FOR SETTLED WORK IS CALLED `pledged/`, NOT
+  `accepted/` — DECIDED (owner, 2026-07-27). Supports P8, P23.
+  Normative in [README.md](README.md).
+
+  **Neither shelf's name is based on the act that put something
+  there.** Both approval steps need a name for what happens —
+  admitting a document into `proposed/` is itself a form of approval
+  too — so naming a shelf after the act of approving it would claim
+  wording the other shelf's own approval step would then have to
+  borrow instead. Both actual names instead describe what the item
+  currently *is*: "proposed" means argued for, but not binding
+  anything yet; "pledged" means genuinely owed, just with no
+  delivery date attached.
+
+  The structural reason that actually settled this: `accepted/` used
+  to mean only that an argument had been won. Renaming it to reflect
+  an actual commitment to deliver changed what the shelf *claims*
+  about everything already sitting on it — which is exactly what
+  forced the entry-by-entry recheck carried out later in **D61**. A
+  shelf doesn't automatically inherit its existing occupants across
+  a change in what it means to be on that shelf.
+
+- D43 — WRITING ANYTHING UNDER `planning/` IS A GOVERNED ACT; HAVING
+  AUTHORITY SHORTENS THE STEPS NEEDED, BUT DOESN'T SKIP THEM —
+  DECIDED (owner, 2026-07-26). Supports P8, P23; **changes D39**
+  (widening it from two queues to three). The three queues and the
+  approval gate are normative in [README.md](README.md).
+
+  THE RULING: this approval gate matters most for the **task
+  queue**, because an entry in `proposed/` merely admits that an
+  argument exists and commits to nothing, and a later promotion is
+  just that argument's conclusion, with its reasoning already on
+  record — but a task-queue entry *is* the entire review, with
+  nothing else behind it. There, having actual authority is the only
+  thing standing between legitimate pre-approval and someone simply
+  approving their own work. So the third queue (tasks) is restricted
+  based on **who is allowed to write to it**, never based on what
+  kind of thing it's allowed to contain: a small surface change is
+  allowed to go through as a task, and the housekeeping surface test
+  only applies within housekeeping itself.
+
+- D42 — THE PROJECT KEEPS NO ROADMAP; FEATURES ARE GIVEN F-NUMBERS
+  THAT RETIRE ON DELIVERY, AND EACH MUST FIT WITHIN ONE SPRINT —
+  DECIDED (owner, 2026-07-26), completing that day's rebuild of the
+  governance process. Supports P9. The resulting process is
   normative in [README.md](README.md).
 
-  WHY NO ROADMAP, which is the part with no other home: a roadmap
-  classifies by *when*, where everything in this directory
-  classifies by *state*, and it promises an order nothing commits
-  to. `pledged/` says the project will do it and says nothing
-  whatever about when — a commitment without a date, which is what
-  lets the shelf be **wrong**: an item nobody intends to deliver is
-  withdrawn or rejected, never left sitting as a pledge nobody
-  means.
+  WHY THERE'S NO ROADMAP — the part of this that has no other
+  natural home to live in: a roadmap organizes things by *when*
+  they'll happen, while everything else in this directory is
+  organized by *what state it's in* — and a roadmap makes a promise
+  about ordering that nothing here actually commits to. Being on the
+  `pledged/` shelf means the project genuinely will do the work, and
+  says nothing at all about when — a commitment with no date
+  attached, which is exactly what lets the shelf stay **honest**: if
+  an item turns out to be something nobody actually intends to
+  deliver, it gets withdrawn or rejected outright, rather than left
+  sitting there as a pledge nobody actually means to keep.
 
-  The sprint bound bites **at the pledge**, not in `proposed/`, so
-  a proposal may be many sprints and cutting it up is part of
-  pledging it. An F-number evaporates on delivery and is never
-  reused: gaps are history rather than a promise.
+  The one-sprint size limit only applies **at the moment something
+  is pledged**, not while it's still in `proposed/` — so a proposal
+  is allowed to describe something that would take many sprints, and
+  cutting it down to size is part of what happens when it's actually
+  pledged. A feature's F-number disappears once it's delivered, and
+  is never reused afterward: gaps in the numbering are just history,
+  not a promise of something still to come.
 
-- D41 — THE IDENTITY LEDGER IS DELETED; `add-media` AUTHORS A
-  DECLARATION — DECIDED (owner, 2026-07-26). Supports P4, P8;
-  **amends D22**'s cache clauses.
+- D41 — THE MEDIA-IDENTITY LEDGER IS DELETED; `add-media` NOW
+  AUTHORS A DECLARATION INSTEAD OF IMPORTING A FILE — DECIDED
+  (owner, 2026-07-26). Supports P4, P8; **changes D22**'s clauses
+  about the media cache.
 
-  **The cache is wholly regenerable, so nothing records where a
-  file came from.** Every payload arrived by download or
-  extraction, so no verb asks a file's provenance before
-  reclaiming it — a ledger would be a second source of truth about
-  a directory that can always be rebuilt, and one that goes stale
-  silently.
+  **The media cache can always be fully regenerated, so nothing
+  needs to record where any of its files originally came from.**
+  Every file in it arrived there either by downloading it or by
+  extracting it from something else, so no command ever needs to ask
+  about a file's origin before reusing or reclaiming it — keeping a
+  separate ledger of that would just be a second, independent source
+  of truth about a directory that can always be rebuilt from scratch
+  anyway, and one that would silently go stale over time.
 
-  `add-media` therefore *authors a declaration* rather than
-  importing a file: it computes the sha256 and writes the `.rlqb`
-  locating the media where it already lies, copying nothing.
-  Supplying a file is an authoring act, which is why it belongs to
-  blueprint authoring and not to the media cache.
+  So `add-media` now *authors a declaration* pointing at a file,
+  rather than importing or copying that file: it computes the file's
+  sha256 hash and writes an `.rlqb` file that locates the media
+  exactly where it already sits on disk, without copying anything.
+  Supplying a file this way is an act of authoring, which is why
+  this command belongs with blueprint authoring, not with the media
+  cache.
 
-- D40 — CANCELLATION REACHES A HOST TRANSFER BY ITS OWN
-  PARAMETER — DECIDED (owner, 2026-07-26). Supports the
-  execution model's severability; fixes a gap against a standing
-  promise rather than making a new one, so it is a
-  gap-is-a-bug fix (D38's exclusion) whose *seam* is the decided
-  part. [Retrofitted 2026-07-28 — Supports U12, U13; P5. The
-  clause above cites no numbered vision, and the severability it
-  names is a *spec* promise rather than a principle
-  (docs/spec/script-spec.md — Ctrl-C "leaves the machine
-  as-is"), so it gave the entry nothing citable. What the fix
-  serves is numbered: U12's long run showing where it is and
-  what it waits on while it goes, U13's media fetching and
-  verifying itself, and P5's rendering being *timely* — a 294 MB
-  download that reports nothing for minutes and swallows Ctrl-C
-  fails all three at once.]
-  THE DEFECT. planning/ROADMAP.md ("Cancel ends the run, not the
-  machine") already promised that on Ctrl-C "input deliveries are
-  atomic, **host transfers abort**". They did not. Cancellation
-  was a `threading.Event` read only by `_check_clocks` at
-  statement boundaries, and `acquire.py`'s transfer loops knew
-  nothing of it — so a Ctrl-C during `insert cdrom0 @…` was not
-  observed until the download, its SHA-256, the extraction, and
-  *its* SHA-256 had all finished. Reported from the field as
-  minutes of an unresponsive Ctrl-C on a 294 MB LiveCD fetch.
-  Aggravating it, the same statement passed no `events`, so the
-  transfer reported no progress at all: silence for minutes reads
-  as a hang, which is how it was found.
-  THE SEAM, WHICH IS THE DECISION. Cancellation travels as its own
-  `cancelled=` keyword — the run engine's `threading.Event`,
-  threaded through `insert_media` / `start_machine` / `fetch_media`
-  to the chunk loops, checked at every chunk. `None` (a fetch
-  outside a run) is uninterruptible exactly as before, so the
-  addition is inert wherever it is not passed.
-  WEIGHED AND DECLINED: carrying the token on the `EventStream`,
-  which is already threaded end-to-end and would have cost ~4
-  lines against ~10 signatures. Declined because it couples two
-  unrelated properties to one keyword — and that coupling is
-  precisely the failure that produced this bug. One call site
-  (`_machine_change`) dropped `events` and silently lost progress
-  reporting; under the coupled design the same omission would also
-  have made a multi-minute transfer uninterruptible, with nothing
-  to fail closed on since `events=None` is a supported state. Two
-  orthogonal keywords keep the two failure modes independently
-  diagnosable, and keep `acquire.py` free of any dependency on run
-  control flow.
-  CTRL-C ESCALATES. A second interrupt restores the default
-  handler and raises at once. The graceful stop is a promise, not
-  a trap: the previous handler swallowed every repeat into the
-  same flag, so a stop that would not land left killing the
-  terminal as the only way out.
-  ALSO: `urlopen` gained a 30s timeout. A mirror that accepts a
-  connection and then stalls is a failed location, not a reason to
-  hang forever — it surfaces as `OSError`, which the alternatives
-  loop already treats as one location failing, so the next mirror
-  is tried.
-  AND THE SCRATCH FILE GOES WITH THE TRANSFER. A transfer writes
-  `<destination>.part` and renames it only once whole, so an
-  interrupted one stranded that file — previously rare, since
-  mid-transfer interruption was barely reachable; now the ordinary
-  case. Cleanup was put on *every* incomplete path rather than on
-  cancellation alone: there is no resume (the next attempt opens
-  the file `"wb"` and starts over), so an abandoned partial is
-  never anything but garbage, and a rule that holds only for one
-  way of ending would have been the arbitrary one.
+- D40 — CANCELLING A RUN NOW ALSO REACHES DOWNLOADS AND EXTRACTIONS
+  IN PROGRESS, THROUGH THEIR OWN DEDICATED PARAMETER — DECIDED
+  (owner, 2026-07-26). Supports the execution model's ability to be
+  safely interrupted at any point; this fixes a gap against a
+  promise the project had already made, rather than making a new
+  promise, so it's a "a gap against a standing rule is a bug" fix
+  (the kind D38 excludes from needing its own justification) — the
+  part actually being decided here is the mechanism used to fix it.
+  [Retrofitted on 2026-07-28 — Supports U12, U13; P5. The paragraph
+  above didn't cite any numbered vision document, and the guarantee
+  it's fixing is a promise made in the *spec*
+  (docs/spec/script-spec.md — Ctrl-C "leaves the machine as-is"),
+  not a principle, so it originally gave this entry nothing citable.
+  What this fix actually serves does have numbers: U12's
+  long-running operation showing where it is and what it's currently
+  waiting on while it runs, U13's downloading and verifying of
+  media, and P5's requirement that output be rendered *promptly* — a
+  294 MB download that reports nothing for minutes and swallows a
+  Ctrl-C fails all three of these at once.]
 
-- D39 — THE TWO RAW INPUT QUEUES; NOTHING ENTERS ELSEWHERE —
-  DECIDED (owner, 2026-07-24). Supports P8; completes D38.
-  **Widened to three queues by D43.**
+  THE BUG. `planning/ROADMAP.md` (in its "Cancel ends the run, not
+  the machine" section) had already promised that pressing Ctrl-C
+  would make "input deliveries atomic, **host transfers abort**."
+  They didn't. Cancellation was implemented purely as a
+  `threading.Event` flag that only `_check_clocks` ever checked, and
+  only at the boundaries between statements — `acquire.py`'s
+  file-transfer loops knew nothing about it at all. So a Ctrl-C sent
+  during a statement like `insert cdrom0 @…` wasn't actually noticed
+  until the download, its SHA-256 check, the extraction, and *its*
+  SHA-256 check had all already fully finished. This was reported
+  from real-world use as several minutes of an unresponsive Ctrl-C
+  while fetching a 294 MB LiveCD image. Making it worse, that same
+  statement also wasn't passed an `events` object, so the transfer
+  reported no progress at all — several minutes of total silence
+  looks exactly like a hang, which is how this bug was actually
+  found.
 
-  Nothing flows into the project without starting in a queue, the
-  single exception being a small raw commit approved under
-  housekeeping. The point is not the count of queues but the
-  closure: an idea with no door is an idea that enters by whoever
-  happens to be writing, and a rejection then has nowhere to be
-  recorded — which is why a refused item's reason is recorded here
-  rather than in the queue it left.
+  THE FIX, WHICH IS THE ACTUAL DECISION HERE. Cancellation now
+  travels through its own dedicated `cancelled=` keyword argument —
+  the run engine's existing `threading.Event` object, threaded
+  through `insert_media`, `start_machine`, and `fetch_media`, all
+  the way down to the chunk-by-chunk transfer loops, which now check
+  it on every single chunk. Passing `None` (which happens for a
+  fetch triggered outside of a run) leaves that transfer just as
+  uninterruptible as it always was — so this addition has no effect
+  anywhere it isn't explicitly passed.
 
-- D38 — HOUSEKEEPING IS A STANDING APPROVAL BUCKET — DECIDED
-  (owner, 2026-07-24). Supports P8; sharpens TASKS.md's passive
-  "small ones may simply be deemed obvious", which named no test,
-  no deemer, and no act.
-  THE BUCKET. Small code cleanups and small reported defects —
-  tiny in scope **and** crystal clear that they are a problem
-  needing addressing — are approved as a class, in advance. They
-  need no use case, no principle, no issue, and no D-number of
-  their own. Whoever lands the work invokes the bucket by naming
-  it in the commit; the commit is the record (the CHANGELOG
-  follows its own existing rule — a user-visible change earns an
-  entry, invisible tidying does not).
-  WHAT IT IS FOR: work that has *no citation available*. Tidiness
-  with no defect behind it — dead code, a stale path, a clunky
-  help string — and defects too small to be worth an issue. A
-  defect against a *standing* principle is deliberately **not** in
-  this bucket: the principle is already its demand (the
-  gap-is-a-bug rule), so it needs no approval, only fixing.
-  REJECTION IS A DUTY, NOT AN OMISSION (owner). Anything that
-  fails the test is **refused** under housekeeping and routed to
-  the governance mechanism — an issue, a use-case or principle
-  proposal, the interface-change rule, a roadmap item. This is
-  what makes the bucket a gate rather than a shortcut: the
-  question is asked on every candidate, and "no" has somewhere to
-  go. Also never admissible: a use-case or principle amendment,
-  or a design decision.
-  THE FIRST TEST IS MECHANICAL, AND IT IS ABSOLUTE (owner,
-  2026-07-24): **anything that changes an interface is
-  automatically not housekeeping.** It is asked first and answered
-  by lookup, not judgement — INTERFACES.md *enumerates* the
-  surfaces, so this is a checklist rather than an opinion: the
-  four primary interfaces (CLI, embedding API, scripting language,
-  machine blueprint) and the supporting world-facing contracts
-  (script properties, the codex, the run's returned output, the
-  home layout). Touch one and the answer is no, whatever the diff
-  looks like. That property is what makes the exclusion hold up
-  against the bucket's real failure mode, which is self-assessment
-  — "tiny" and "clearly a problem" are judged by whoever wants to
-  do the work, and everyone's own change feels like both.
-  THE TIE-BREAK, for what survives that test: **doubt escalates.
-  If it has to be argued into the bucket, it does not belong in
-  it.** Both remaining halves must hold — tiny alone is not
-  enough, and obvious alone is not enough.
-  THE TRAP, from milestone 9's own landing. Three changes that
-  day were all small: the codex install script's `press enter` →
-  `select "Yes"` (a defect, no interface touched — housekeeping);
-  the guest-console family passing the machine's directory so its
-  identity check could pass (restores behavior that never worked
-  — housekeeping); and the output-discipline sweep that made
-  `create-machine` print `plain-0` rather than "created machine
-  plain-0". The third felt smallest and was the only one that
-  changed a world-facing contract on every command — it needed
-  milestone 9's deliverable behind it, and under this rule would
-  be refused. Size is not the test on its own.
-  FOLDED: this entry; TASKS.md's preamble (the operative rule
-  replacing the passive sentence); INTERFACES.md (the exclusion
-  stated where the interface-change rule lives, so the bypass is
-  closed at the door it would be walked through).
+  CONSIDERED AND REJECTED: piggybacking the cancellation signal on
+  the existing `EventStream` object, which is already threaded all
+  the way through end-to-end, and would have cost roughly 4 lines of
+  code instead of touching about 10 function signatures. This was
+  rejected because it would tie two completely unrelated concerns to
+  a single keyword argument — and that exact kind of unwanted
+  coupling is what produced this bug in the first place. One call
+  site (`_machine_change`) had already been found to drop the
+  `events` argument and silently lose progress reporting as a
+  result; under the coupled design, that same omission would have
+  also made a multi-minute transfer completely uninterruptible, with
+  nothing to safely fail back to, since `events=None` is otherwise a
+  perfectly normal, supported state. Keeping these as two separate,
+  independent keyword arguments keeps these two different failure
+  modes independently diagnosable, and keeps `acquire.py` free of
+  any dependency on the run engine's own control flow.
 
-- D37 — MILESTONE 9 DELIVERS U14 AND U20; BOTH PROMOTE —
-  DECIDED (2026-07-24, landing milestone 9). Supports P8, P11,
-  P18; applies D34's promotion-on-delivery rule and D36's
-  reframing. The milestone landed in full — the return-not-store
-  run model, the error taxonomy, live `--progress` feedback, and
-  the exec-run mechanics — so by D34 the two use cases it accepted
-  move to their standing list as a step of that delivery.
-  U14 PROMOTED. The loop it describes runs end to end against a
-  live FreeDOS machine: work put in, run from a consumer-authored
-  script, and the result read back through a machine variable
-  (`get-machine-var`). The `exec` twin landed with it,
-  returning the text its command produced, which is the run
-  family's parity D36 named. [The in-band file verbs this entry
-  also cited as evidence are gone (**D108**), and U14 no longer
-  claims a file as the product; the promotion stands on what
-  survives.]
-  U20 PROMOTED, ITS TRANSPORT PROVEN. The T1 spike ran the swap
-  cycle on QEMU/DOS: a live `insert-media --file` swap is *seen*
-  by DOS (the directory listing after a swap is the new image's,
-  never the previous disk's), and a guest write reaches the host
-  image — verified byte-wise after `eject-media`, and again after
-  swapping back, each image carrying only its own rounds. No
-  reshaping was needed.
-  THE ONE CONDITION THE SPIKE FOUND, NOW A GUARD. A floppy drive's
-  geometry is fixed when the backend attaches it at launch, and a
-  live change does not revise it: a slot launched empty takes
-  QEMU's own 2.88M default, so inserting a 1.44M image into it
-  live reaches the guest as "general failure" on every read and
-  write. Reliquary did not choose that geometry and will not ship
-  a silently broken drive (P11), so `start` records the launched
-  medium's size and a mismatched live insert fails closed naming
-  both sizes and the fix. This is what the spike was *for* — the
-  finding became a guard rather than a footnote.
-  P16/P17/P18 NOT PROMOTED. The code honors P18 (no shipped
-  readiness script, no result vocabulary), but the principles are
-  **drafted, adjudication pending**. Promotion presupposes
-  acceptance, which is the owner's, so they stay in
-  PRINCIPLE-PROPOSALS.md; the implementation is evidence for that
-  adjudication, not a substitute for it. [P17 was later armed and
-  is now struck outright — **D108**.]
-  U3's SUPERSESSION IS DUE, NOT TAKEN. D36 settled that U14
-  supersedes U3 alone, and U14 is now delivered — but retiring a
-  use case is the lifecycle's Retire clause, an owner
-  adjudication, not a step of this delivery. U3 waits in the
-  proposals doc with that noted.
-  FOLDED: this entry; USE-CASES.md (U14 and U20 added);
-  USE-CASE-PROPOSALS.md (both removed, no stub — D23; U3's note);
-  ROADMAP (milestone 9 marked complete, the arc with it, the
-  spike condition recorded); TASKS.md (T1–T7 marked landed, the
-  spike result, the two fixes found in passing); script-spec.md
-  (the `set` verb, and the half of the file-exchange omission
-  in-band put/get closes — as a CLI/API capability, never a
-  language one); AGENTS.md; the machine-state schema
-  (`variables`, the anonymous medium); README, CHANGELOG, and
-  both references.
+  PRESSING CTRL-C TWICE ESCALATES. A second interrupt restores
+  Python's default signal handler and raises immediately. The
+  graceful stop is meant as a promise, not a guarantee that traps
+  every signal — the previous handler had been swallowing every
+  repeated Ctrl-C into the same single flag, so a stop that failed
+  to land in time left killing the whole terminal as the only
+  remaining way out.
 
-- D36 — THE RUN RETURNS ITS OUTPUT — DECIDED (owner, 2026-07-24).
-  Supports P4, P6, P8, P18; **amends D35**. Normative in S7 and
-  AGENTS.md.
+  ALSO FIXED: `urlopen` calls now have a 30-second timeout. A mirror
+  server that accepts a connection and then just stalls indefinitely
+  is effectively a failed download location, not a good reason to
+  hang forever — it now surfaces as an `OSError`, which the existing
+  mirror-fallback loop already treats the same as any other location
+  failing, so the next mirror in the list gets tried instead.
 
-  A run drives the machine and **returns its output to whoever
-  started it, storing nothing**. What was deleted with the
-  persistence — `run-events.jsonl`, `transcript.txt`, the `runs/`
-  archive, retention and the run verbs — was refused for want of
-  demand, not disliked: it is async's substrate, and async itself
-  had none. It returns with **F6** if U19 is ever pledged.
+  AND CLEANUP NOW COVERS THE LEFTOVER SCRATCH FILE TOO. A transfer
+  writes to a `<destination>.part` file and only renames it to its
+  final name once it's fully complete — so an interrupted transfer
+  used to strand that partial file on disk. This used to be rare,
+  since interrupting a transfer mid-flight was barely reachable
+  before this fix; now that Ctrl-C actually reaches transfers, it's
+  the ordinary case. Cleanup logic was applied to *every*
+  incomplete-transfer code path, not just to cancellation
+  specifically: since there's no resume support at all (the next
+  attempt just reopens the file in `"wb"` mode and starts completely
+  over), an abandoned partial file is never useful for anything but
+  taking up disk space — and a cleanup rule that only applied to one
+  specific way a transfer could end would have been the genuinely
+  arbitrary choice.
 
-  [Bounded by **D98**: a `--record` capture is written only where a
-  maintainer names a path and is read by nothing at runtime, which
-  is a different thing from persistence as async's substrate.]
+- D39 — TWO QUEUES HANDLE ALL RAW, UNAPPROVED WORK; NOTHING ENTERS
+  THE PROJECT ANY OTHER WAY — DECIDED (owner, 2026-07-24). Supports
+  P8; completes D38. **Later widened from two queues to three by
+  D43.**
 
-- D35 — ASYNCHRONOUS RUNS LEAVE THE ARC — DECIDED (owner,
-  2026-07-24). Supports P8; follows D33's ground.
+  Nothing gets added to this project without first passing through
+  one of these queues, with the single exception of a small raw
+  change approved directly under the housekeeping bucket. The point
+  here isn't really how many queues there are — it's that the set of
+  entry points is closed: an idea with no defined door to go through
+  is an idea that just gets added by whoever happens to be writing
+  the code at the time, and a rejection then has nowhere to actually
+  be recorded. That's exactly why a rejected item's reasoning is
+  recorded here, in this decision file, rather than in whichever
+  queue it was rejected from.
 
-  The feedback split (**P5**) is satisfied by the run's own driver
-  watching it live, so detaching a run — or following one from a
-  process that did not start it — is a **separable** capability no
-  use case wrote down. Its demand is the U19 draft; pledging U19
-  is what schedules the work back on. [**D36** extended this: the
-  persistence such a run needs went with it.]
+- D38 — HOUSEKEEPING IS A STANDING, PRE-APPROVED BUCKET FOR SMALL
+  WORK — DECIDED (owner, 2026-07-24). Supports P8; sharpens the
+  vague language TASKS.md previously used — "small ones may simply
+  be deemed obvious" — which hadn't actually named any test, any
+  specific person doing the "deeming," or any concrete action.
 
-- D34 — PROMOTION ON DELIVERY IS AUTOMATIC — DECIDED (owner,
-  2026-07-24). Supports P8; sharpens D23. THE RULE: when a
-  milestone or a task FULLY delivers a use case or a principle,
-  moving it from its proposals doc to its standing list is a step
-  OF THAT DELIVERY, not a later owner adjudication. D23 already
-  said "DELIVERY makes it current and moves it over"; what was
-  unstated is that the mover is whoever lands the work, in the
-  same change, the moment the code honors the entry. No holding
-  it for a separate sign-off.
-  THE TRIGGER IS FULL DELIVERY, NOT ACCEPTANCE. A milestone that
-  cites a proposal accepts it (D23, acceptance-is-scheduling); a
-  milestone whose landed code honors it in full delivers it. The
-  two can diverge: milestone 8 accepted both U5 and P13, but only
-  P13 is fully delivered — U5's canonical customized-Windows
-  scenario waits on the GUI era, so U5 stays
-  accepted-awaiting-delivery while P13 promotes. The one who
-  lands the work makes that call by the same test the P1–P12
-  delivery pass used: does the project honor the entry as the
-  code stands today?
-  THE MECHANICS (the same for a U and a P): add the entry to its
-  standing list at its normative home (root PRINCIPLES.md /
-  USE-CASES.md), in number order; DELETE it from the proposals
-  doc, no placeholder left behind (D23's no-stub rule); and
-  record the move here, the entry's number the search key for the
-  planning-doc sweep. A partly-delivered entry does not move —
-  the standing lists are an implementation claim (D23,
-  implemented-only), so a half-honored entry would be a false one.
-  [D48 splits this into two bars: it holds for a use case, while
-  a principle promotes at *honored as a rule* with every known
-  residue filed in the same change. The tension is inside this
-  entry — the test two sentences above, inherited from the P1–P12
-  pass, is already the rule-shaped one.]
-  FIRST APPLICATION: P13 (property sources) promotes to
-  PRINCIPLES.md with milestone 8 — the binding pipeline, the
-  layered sources, custody and per-resolution provenance are all
-  landed (T1–T5, verified against the code). FOLDED: this entry;
-  PRINCIPLES.md (P13 added between P12 and P15);
-  PRINCIPLE-PROPOSALS.md (P13 removed from Drafted) and its
-  lifecycle preamble; USE-CASE-PROPOSALS.md's parallel preamble;
-  ROADMAP milestone 8's note (P13 promoted, U5 still awaiting the
-  GUI era). U5's own move waits on its delivery, by this same rule.
+  THE BUCKET, DEFINED. Small code cleanups and small reported
+  defects — genuinely tiny in scope **and** unambiguously clear that
+  they're a real problem needing a fix — are approved as an entire
+  category, in advance. They don't need a use case, a principle, a
+  filed issue, or a D-number of their own. Whoever actually does the
+  work invokes this pre-approval simply by naming "housekeeping" in
+  the commit message; that commit is the whole record (the CHANGELOG
+  still follows its own separate, existing rule — a user-visible
+  change gets a CHANGELOG entry, invisible internal tidying does
+  not).
 
-- D33 — THE NUMBERED ARC ENDS AT MILESTONE 9 — DECIDED (owner,
-  2026-07-23). Supports P8.
+  WHAT THIS BUCKET IS ACTUALLY FOR: work that has *no other citation
+  available to justify it*. Tidying up code with no specific defect
+  behind it — dead code, an outdated file path, an awkward help
+  string — and defects too minor to be worth filing as a full issue.
+  A defect against an **already-standing** principle is deliberately
+  **excluded** from this bucket: the principle itself is already the
+  justification (under the "a gap against a standing rule is a bug"
+  rule), so fixing it needs no separate approval at all — it just
+  needs fixing.
 
-  The pillars beyond it — further backends, guest agents, the GUI
-  era — were **demoted for lack of use-case backing**, not for
-  lack of design: their designs stay settled and stand as written.
-  A milestone number is a schedule, and scheduling work no demand
-  asks for is how a roadmap acquires items nobody intends to build.
-  Scheduling any of them again is the pledge of the use case that
-  wants it.
+  REJECTING SOMETHING FROM THIS BUCKET IS A REQUIRED STEP, NOT
+  SOMETHING THAT CAN JUST BE SKIPPED (in the owner's words). Anything
+  that fails the test below is **refused** housekeeping status and
+  instead routed to the proper governance process — filing an issue,
+  proposing a use case or principle, going through the
+  interface-change rule, or adding a roadmap item. This is what
+  makes the bucket a genuine gate rather than just a shortcut: the
+  qualifying question gets asked of every single candidate, and a
+  "no" answer always has somewhere else to go. Also never eligible
+  for this bucket under any circumstances: amending a use case or a
+  principle, or making any kind of design decision.
 
-- D32 — THE CONTAINMENT PATH LIVES INSIDE THE BRACES — DECIDED
-  (owner, 2026-07-23, milestone 7's S3). Supports P14; RESOLVES a
-  contradiction between D22/D24 and D26/D27. Found by running the
-  S2 corpus against the first parser written to the spec — which
-  is what writing the corpus first was for.
-  THE CONTRADICTION: D22 settled the spelling as
-  `${media:<name>}/<path>`, path OUTSIDE the closing brace, and
-  D24 built on it — "a backslash after `}` is an error naming the
-  `/` rule" presupposes the path follows the brace. But D26's
-  character class justifies `/` as "separates the containment
-  path (exactly one)", which it need not do if the path is
-  outside the body at all, and D27's corrected production spells
-  the body `qualifier:media-name[/path]`, path INSIDE. Both
-  readings were live, and blueprint-model.md inherited both in
-  one document — its location table said outside, its closure
-  section said inside — WITHOUT THE REWRITE NOTICING. A spec
-  contradicting itself about a character position is one an
-  implementer resolves by guessing.
-  DECIDED: INSIDE. `${media:outer/cd.iso}`. THE GOVERNING
-  ARGUMENT IS THE CLOSURE: a qualified reference is whole-value
-  only, and with the path inside, whole-value means the string is
-  EXACTLY ONE REFERENCE — the closure test sees the entire
-  location and nothing trails it. With the path outside, the
-  parser must special-case trailing text after a qualified
-  reference, distinguishing a path suffix from interpolation the
-  reach rules forbid there; that is a second rule, and it lives
-  exactly where P14 says a second rule must not accrete. It also
-  gives D26's `/` its stated job back.
-  WHAT THE OUTSIDE FORM HAD: D22's priority, and familiarity —
-  it reads like a path join. Both real, neither structural.
-  THE BACKSLASH DIAGNOSTIC SURVIVES, which was the strongest
-  objection: `${media:outer\cd.iso}` is the same Windows author
-  making the same guess, and the parser names the same `/` rule —
-  it is now caught inside the body rather than after it, and the
-  message is unchanged in substance.
-  RECORDED AS METHOD: the S2-before-S3 ordering (the milestone
-  reassessment) is what surfaced this. A corpus written from the
-  spec, run against a parser written from the same spec, is a
-  differential test of the SPEC — and it failed on the one
-  sentence where the spec disagreed with itself.
-  FOLDED: this entry; blueprint-model.md (the location table, the
-  path-suffix section, the containment example, the resolution
-  order example); the S2 corpus fixtures; reliquary/document.py.
-  D22, D24, D26 and D27 keep their text; this entry is the
-  amendment of record.
+  THE FIRST TEST IS PURELY MECHANICAL, AND IT IS ABSOLUTE (owner,
+  2026-07-24): **anything that changes a documented interface is
+  automatically disqualified from being housekeeping.** This
+  question is asked first, and it's answered by simple lookup, not
+  by judgment — INTERFACES.md literally *lists* every application
+  surface, so this is a checklist, not a matter of opinion: the four
+  primary interfaces (the CLI, the embedding API, the scripting
+  language, and the machine blueprint format) plus the supporting
+  user-facing contracts (script properties, the codex library, the
+  run's returned output, and the home directory layout). Touch any
+  one of these, and the answer is automatically no, no matter how
+  small the actual diff looks. This mechanical property is exactly
+  what protects this exclusion from the bucket's real failure mode,
+  which is self-assessment — "tiny" and "clearly a problem" tend to
+  get judged by whoever wants to do the work in the first place, and
+  everyone's own proposed change tends to feel like both.
 
-- D31 — USE-CASES.md MOVES TO THE ROOT — DECIDED (owner,
-  2026-07-23). Supports P8. The use-case list joins PRINCIPLES.md
-  at the repository root. THE ARGUMENT IS THE PARALLEL, already
-  written into both files: PRINCIPLES.md lives at the root
-  BECAUSE IT DESCRIBES CURRENT REALITY — "every principle here is
-  real — the project honors it as the code stands today (it lives
-  at the root for that reason)" — and USE-CASES.md makes the
-  identical claim in the identical shape, implemented-only, with
-  everything undelivered in its proposals doc. The two lists have
-  one lifecycle, one relationship to the code, and one job as the
-  surface every interface change triages against (P8, which D28
-  had just made symmetric across them). Leaving one under
-  `planning/` said the opposite of what both files say about
-  themselves: `planning/` is maintainer-facing plans, and a list
-  of what is TRUE TODAY is not a plan. The proposals docs stay in
-  `planning/` on the same reasoning — being exactly the plans.
-  FOLDED: the move; USE-CASES.md's own links and its
-  root-placement note; PRINCIPLES.md, AGENTS.md,
-  planning/INTERFACES.md, planning/ROADMAP.md,
-  planning/USE-CASE-PROPOSALS.md, planning/proposed/design/recorder.md,
-  this file's preamble, and the documentation-rules skill's
-  placement list. Historical DECISIONS entries keep their
-  `planning/USE-CASES.md` spellings under the spellings rule.
+  THE TIE-BREAK, for whatever survives that first mechanical test:
+  **any doubt means it escalates out of the bucket. If you have to
+  argue your way into calling something housekeeping, it doesn't
+  belong in housekeeping.** Both remaining conditions must hold at
+  once — being tiny alone isn't enough, and being an obvious problem
+  alone isn't enough either.
 
-- D30 — THE MEDIA LIFECYCLE COMMANDS: THE NOUN IS THE MEDIA, AND
-  TWO DEAD VERBS GO — DECIDED (owner, 2026-07-23). Supports U13,
-  P6, P9.
+  THE TRAP THIS RULE IS DESIGNED TO CATCH, illustrated by milestone
+  9's own landing. Three changes made that same day were all
+  individually small: the codex install script's `press enter` being
+  replaced with `select "Yes"` (a genuine small defect fix, touching
+  no documented interface — correctly housekeeping); the
+  guest-console command family being passed the machine's own
+  directory so its identity check could actually pass (restoring
+  behavior that had never actually worked — also correctly
+  housekeeping); and an output-discipline cleanup that made
+  `create-machine` print just `plain-0` instead of the sentence
+  "created machine plain-0". This third change felt like the
+  smallest of the three, and it was actually the only one of the
+  three that changed a genuinely user-facing contract, on every
+  single command — it actually needed milestone 9's larger
+  deliverable behind it to be justified, and under this rule it
+  would correctly be refused housekeeping status. Being small is
+  never the test on its own.
 
-  **There is no `delete-media`**: removing a media is editing the
-  `.rlqb` that declares it. A command that deleted a declaration
-  would make the blueprint file no longer the statement of what
-  exists — the cache is regenerable and the declaration is the
-  authored artifact, so the verb would be editing the wrong one of
-  the two. `add-media` went the same way later (**D41**): supplying
-  a file is authoring a declaration.
+  FILES UPDATED: this entry; TASKS.md's introductory section (the
+  vague passive sentence is replaced with this actual operative
+  rule); INTERFACES.md (the housekeeping exclusion is stated right
+  where the interface-change rule itself lives, so this potential
+  loophole is closed at the exact door someone would otherwise try
+  to walk through).
 
-- D29 — PARTLY-OVERRULED ENTRIES ARE ANNOTATED, NEVER REWRITTEN
-  — DECIDED (owner, 2026-07-23). Supports P23 — retrofitted
-  2026-07-27. A convention for this record
-  itself, settled on its first instance rather than after the
-  second. D27 corrected one clause of D26 — the claim that the
-  character class was "the whole closure, and the only test
-  needed" — leaving parts A, B, C and E standing. The
-  spellings rule offered no guidance for that shape: it governs
-  ENTRY-level retirement and word-level drift, not a single
-  wrong clause inside a live entry.
-  THE RULE: an entry only partly overruled STAYS WHERE IT IS and
-  is ANNOTATED — a bracketed one-line pointer at the affected
-  clause naming the amending entry, every other clause
-  untouched. It is the retirement note's instinct at clause
-  granularity. Correcting the prose in place is NEVER the
-  answer: an error and its discovery are part of the record, and
-  here the most useful part of it — D26's part D listed
-  `${key:-x}` as an excluded operator in the same paragraph that
-  claimed the class excluded it, which is the whole argument for
-  why a stated test must be testable.
-  WHY THE SPELLINGS RULE DOES NOT COVER IT: that rule protects
-  the record's fidelity to its own moment, and it is not licence
-  to leave a WRONG INSTRUCTION standing where a reader arriving
-  by search will act on it. A DATED WORD CANNOT CAUSE A BUG; A
-  WRONG TEST CAN — and this one was aimed squarely at milestone
-  7's next deliverable, where someone greps for the closure,
-  finds "the only test needed", and ships a parser accepting
-  `${mem:-512M}`. The mirror of this round's own find: a
-  boundary nobody stated cannot be checked against, and a stated
-  boundary that is wrong is worse than none, because it gets
-  checked against and passes the wrong things.
-  FOLDED: this entry; the DECISIONS preamble (the convention
-  beside the retirement and spellings rules); D26 part D (the
-  pointer, its first application).
+- D37 — MILESTONE 9 FULLY DELIVERS USE CASES U14 AND U20; BOTH ARE
+  PROMOTED TO THE ROOT LIST — DECIDED (2026-07-24, on landing
+  milestone 9). Supports P8, P11, P18; applies D34's automatic
+  promote-on-delivery rule and D36's reframing of how runs work. The
+  milestone landed in full — the "return output rather than store
+  it" run model, the error-class taxonomy, live `--progress`
+  feedback, and the exec-run mechanics — so under D34, the two use
+  cases this milestone had accepted move to their standing lists as
+  part of delivering it.
 
-- D28 — THE INTERFACE-CHANGE RULE COVERS PRINCIPLES — DECIDED
-  (owner, 2026-07-23). Supports P8 (which it clarifies). The
-  owner: "requests must align to principles or use cases, and a
-  change in principles requires vigorous argument, just like the
-  use case." HALF OF THAT WAS RECORDED AND HALF WAS NOT.
-  RECORDED: demand. The ROADMAP preamble already has every item
-  citing a use case (U) or a governing principle (P), "which
-  drives work just as well". NOT RECORDED: the vetting side. The
-  interface-change rule (INTERFACES.md) was written entirely
-  use-case-shaped — "the use-case list is where interface
-  changes are argued", triage "by their use-case impact", all
-  three tiers use-case framed, and the hard case demanding that
-  "Reliquary's use cases change". P8 mirrored it: "triages by
-  its impact on the use cases". SO A CHANGE MISALIGNED WITH A
-  PRINCIPLE RATHER THAN A USE CASE HAD NO PATH THROUGH THE RULE
-  — while PRINCIPLES.md asserted amendments "are argued like
-  interface changes", PRINCIPLE-PROPOSALS.md said its lifecycle
-  "mirrors the use-case one", and D25 amended P9 explicitly
-  under the rule. The practice existed; the rule never
-  authorized it. The gap was live through this whole round: D25,
-  D27's P15, and P14's reshaping are all principle-level changes
-  made under a rule that did not mention principles.
-  THE FIX: P8 is retitled "Interface and principle changes are
-  vetted" and triages by impact on the use cases AND the
-  governing principles; a change misaligned with either is
-  argued as the amendment it requires, A PRINCIPLE AMENDMENT AS
-  VIGOROUSLY AS A USE-CASE ONE, never as a feature on its own
-  merits. INTERFACES.md's rule gains the principle branch
-  throughout: the frame ("cannot be phrased as 'the use cases
-  should say …' or 'the principles should say …'"), all three
-  triage tiers, and the workflow naming PRINCIPLE-PROPOSALS.md
-  beside USE-CASE-PROPOSALS.md. One line is added that neither
-  document carried: THE TWO CARRY EQUAL WEIGHT, AND NEITHER IS
-  EDITED TO FIT A FEATURE SOMEONE HAS ALREADY DECIDED TO BUILD.
-  CLARIFICATION, NOT SUPERSESSION — and decided on evidence
-  rather than taste, under the lifecycle's own test (a
-  clarification is a wording edit no past citation would read
-  differently under). P8 has three citations; none reads
-  differently, and one reads BETTER: D27 cites "Supports P8" for
-  a decision that ADDS A PRINCIPLE, precisely the case the old
-  wording did not cover. So no number is retired and none is
-  spent. WEIGHED AND DECLINED: superseding P8 with a new
-  P-number (the lifecycle's route for a change in nature — the
-  retitle and the widened subject argued for it, but the
-  citation test governs, and churning a number that nothing
-  reads differently is cost without benefit).
-  RECORDED AS METHOD: this entry's own change was argued and
-  approved before being made, which is the discipline it adds.
-  FOLDED: this entry; PRINCIPLES.md (P8); INTERFACES.md (the
-  rule's frame, its three triage tiers, and its workflow).
+  U14 IS PROMOTED. The workflow it describes runs completely end to
+  end against a live FreeDOS machine: work is submitted, run from a
+  script the consumer wrote themselves, and the result is read back
+  through a machine variable (`get-machine-var`). The matching
+  `exec` capability landed alongside it, returning the actual text
+  its command produced — the parity between these two that D36 had
+  already established as required. [The in-band file-transfer
+  commands this entry originally cited as supporting evidence have
+  since been removed (**D108**), and U14 no longer claims that a
+  file is something it produces — this promotion stands on whatever
+  still survives that later change.]
 
-- D27 — THE INPUT MODEL, AND D26'S CLOSURE TEST CORRECTED —
-  DECIDED (owner, 2026-07-23). Supports P8; **amends D26** (part D)
-  and **adds P15**.
+  U20 IS PROMOTED, ITS TRANSPORT MECHANISM PROVEN WORKING. The T1
+  exploratory spike ran the full media-swap cycle on QEMU running
+  DOS: a live `insert-media --file` swap is genuinely *seen* by DOS
+  (the directory listing right after a swap correctly shows the new
+  image's contents, never the previous disk's), and a write made by
+  the guest actually reaches the host's image file — this was
+  verified byte-for-byte after `eject-media`, and again after
+  swapping back, with each image correctly containing only the
+  writes made during its own time attached. No redesign was needed.
 
-  THE CORRECTION IS THE POINT: D26 closed the string grammar by a
-  test that did not hold. A closure argued from "no author would
-  write that" is not closure — it is a prediction about authors —
-  and the grammar has to refuse the shapes its own character class
-  admits, whether or not anyone would write them. P15 was added on
-  the same instinct: a rule that leans on taste is a rule that
-  cannot be checked.
+  THE ONE CONDITION THE SPIKE FOUND IS NOW A REAL SAFETY GUARD. A
+  floppy drive's storage geometry gets fixed the moment the backend
+  attaches it at machine launch, and a live media swap doesn't
+  revise that geometry: a drive slot that launched empty defaults to
+  QEMU's own 2.88 MB geometry, so live-inserting a 1.44 MB image
+  into that slot reaches the guest as "general failure" on every
+  single read and write. Reliquary didn't choose that mismatched
+  geometry, and it will not silently ship a broken drive to a user
+  (P11), so `start` now records the size of whatever medium it
+  launched with, and a live insert whose size doesn't match now
+  fails outright, naming both sizes involved and how to fix it. This
+  safety guard is the entire reason the spike was run in the first
+  place — the finding became a permanent guard, not just a footnote
+  in a report.
 
-- D26 — THE REACH TRIM AND THE STRING-GRAMMAR CLOSURE — DECIDED
-  (owner, 2026-07-23, the format re-examination round). Supports
-  U4, U5; P7, P10. **Amends D18** (its HCL2 decline and its growth
-  rule) and **D24** (its reach rule).
+  PRINCIPLES P16, P17, AND P18 ARE NOT PROMOTED HERE. The code does
+  actually honor P18 (no readiness script ships built-in, no fixed
+  vocabulary for results), but these principles are still only
+  **drafted, and awaiting a formal decision**. Promotion presupposes
+  that a principle has been formally accepted, which is a decision
+  that belongs to the owner, so these stay in
+  PRINCIPLE-PROPOSALS.md for now; the implementation landing is
+  evidence supporting that eventual decision, not a substitute for
+  actually making it. [P17 was later formally armed, and has since
+  been struck outright — see **D108**.]
 
-  - **HCL2 is declined structurally, not "not yet"** — it moves
-    from D18's deferred column to the closed one. YAML, TOML and
-    KDL stay declined on their own earlier grounds.
-  - **`sha256` stays interpolable** — refusing it was weighed and
-    declined; a pinned digest supplied by property is a real
-    authoring shape.
-  - **`${key:-x}` and its family are closed out**: the character
-    class admits them, so the grammar refuses them explicitly
-    rather than letting a defaulting operator arrive by accident.
+  U3's RETIREMENT IS OVERDUE, BUT NOT ACTUALLY DONE HERE. D36
+  already established that U14 supersedes U3 specifically, and U14
+  is now fully delivered — but formally retiring a use case is its
+  own separate step in the use-case lifecycle, requiring its own
+  owner decision, not something that happens automatically as part
+  of this delivery. U3 remains waiting in the proposals document,
+  with a note about this.
 
-- D25 — THE COMPATIBILITY HORIZON MOVES TO 1.0 — DECIDED (owner,
-  2026-07-23). Supports P9 (which it amends). A principle
-  amendment, argued and approved as one under the
-  interface-change rule — the owner noting the irony of amending
-  the standing list he had just ruled is never changed in nature
-  (D23), and approving it: a clarification this is not.
-  THE RULE: no backward compatibility is provided until a GA 1.0
-  RELEASE (was: "at least a beta-quality release"). Through beta
-  and the rest of pre-1.0, SOME effort not to break users MAY be
-  granted WHEN WARRANTED — but NO PROMISES. Read into the
-  operating rule, and vetoable: an effort granted once creates no
-  expectation of the next, a clean break stays the default, and
-  any cushion is a deliberate exception — the owner's call,
-  recorded in the CHANGELOG — never a shim left to accumulate,
-  because a shim nobody decided to keep is exactly what the rule
-  exists to prevent.
-  WHAT MOVED WITH IT: every horizon keyed to beta because it was
-  keyed to compatibility — format versioning and the `$schema`
-  spelling (ROADMAP "Deferred to 1.0", machine-blueprint.md,
-  blueprint-model.md, instance-model.md, script-spec.md's
-  format-version paragraph), and the CLI's additive-growth
-  contract for machine-readable surfaces (cli.md), which promised
-  at beta what the rule now starts at 1.0. The arguments were
-  unchanged by the move — a pre-1.0 document has no format
-  vintage exactly as a pre-beta one had none. UNMOVED: horizons
-  keyed to beta for reasons of their own, not compatibility — the
-  error-id INDEX (TASKS.md) is documentation polish and stays
-  where it is.
-  FOLDED: this entry; AGENTS.md (the normative home, its heading
-  renamed); PRINCIPLES.md P9; INTERFACES.md's landing rule;
-  ROADMAP roadmap-constraints and the deferral list; api.md,
-  cli.md, machine-blueprint.md, media-spec.md, script-spec.md,
-  blueprint-model.md, instance-model.md. CHANGELOG entries and
-  earlier DECISIONS entries keep the spellings of their time.
+  FILES UPDATED: this entry; USE-CASES.md (U14 and U20 added);
+  USE-CASE-PROPOSALS.md (both removed, with no placeholder left
+  behind, per D23's rule; U3's note added); the ROADMAP (milestone 9
+  marked complete, and with it the whole numbered arc; the spike's
+  finding recorded); TASKS.md (tasks T1 through T7 marked landed,
+  the spike's result, and two smaller fixes found along the way);
+  script-spec.md (the `set` verb, and half of the previously-noted
+  file-exchange gap now closed by in-band put/get — but only as a
+  CLI/API capability, never as part of the script language itself);
+  AGENTS.md; the machine-state schema (`variables`, the anonymous
+  medium concept); the README, the CHANGELOG, and both reference
+  documents.
 
-- D24 — THE REFERENCE GRAMMAR BATTERY — DECIDED (owner,
-  2026-07-23, the milestone-7 decide-first item). Supports U1, U4,
-  U5; P11; G3, G6, G7. The grammar is normative in
-  [blueprint-model.md](../docs/spec/blueprint-model.md): the
-  reference grammar is **closed at two productions**, the character
-  class screens and the productions decide, and references are
-  refused outright in identity and graph positions and in the
-  closed vocabularies.
+- D36 — A RUN RETURNS ITS OUTPUT DIRECTLY TO WHOEVER STARTED IT,
+  RATHER THAN WRITING IT SOMEWHERE PERSISTENT — DECIDED (owner,
+  2026-07-24). Supports P4, P6, P8, P18; **changes D35**. Normative
+  in surface S7 and AGENTS.md.
 
-  The durable part is *why closed*: an open grammar cannot say what
-  it refuses, so every extension would arrive as a silent
-  reinterpretation of text that already parsed. A media name may
-  lead with a digit where a property key may not — the `@` sigil
-  classifies the token, while a property key also appears bare at
-  its declaration, where a leading digit would lex as a duration.
+  A run drives the machine and **returns its output directly to
+  whoever started it, storing nothing on disk**. What got deleted as
+  part of this — the `run-events.jsonl` file, the `transcript.txt`
+  file, the entire `runs/` archive, any retention policy, and the
+  run-inspection commands that went with them — was removed because
+  nobody had actually demonstrated a need for it, not because it was
+  disliked as a design: it existed purely as the underlying
+  mechanism for asynchronous runs, and asynchronous runs themselves
+  had no demonstrated need either. This capability can come back
+  later, through **feature F6**, if use case U19 is ever formally
+  pledged.
 
-- D23 — THE USE-CASE LIFECYCLE, AND NO STUB — DECIDED (owner,
-  2026-07-23). Supports P8, P23. The machinery it settled is
-  normative in [README.md](README.md) — the three locations, the
-  clarify/retire/supersede moves, the one global U-sequence — and
-  is not restated here. Two rulings have no other home, and both
-  are cited downstream:
+  [Later narrowed by **D98**: a `--record` capture file is written
+  only when a maintainer explicitly names a path for it, and nothing
+  at runtime ever reads it back — which is a genuinely different
+  thing from using persistence as the underlying mechanism for
+  asynchronous runs.]
 
-  - **NO STUB.** A retired or superseded number leaves nothing
-    behind: the gap in the sequence *is* the history, and a
-    successor names what it carries forward so citations still
-    resolve. This is what "no stub, D23" cites, and it is why a
-    dead proposal's number is spent rather than reused.
-  - **"Deprecated" is rejected** as the vocabulary. A use case is
-    *retired* (dropped) or *superseded* (replaced, successors
-    named); deprecation implies a grace period this lifecycle does
-    not offer.
+- D35 — ASYNCHRONOUS (DETACHED) RUNS ARE REMOVED FROM THE PROJECT'S
+  PLANNED ARC — DECIDED (owner, 2026-07-24). Supports P8; follows
+  the same reasoning D33 already established.
 
-  WEIGHED AND REVERTED: a separate `planning/ISSUES.md`. The issue
-  tracker is the open door and this directory is the project's own
-  voice; a third intake here would have split triage across two
-  registers.
+  The requirement to split live feedback from stored results (**P5**)
+  is already fully satisfied by having the process that started a
+  run watch it live as it happens — so detaching a run to keep
+  running in the background, or following a run's progress from a
+  different process than the one that started it, is a genuinely
+  **separable** capability that no actual use case currently
+  describes needing. The actual demand for it exists only as the
+  draft of use case U19; formally pledging U19 is what would put
+  this work back on the schedule. [**D36** later extended this
+  reasoning: the persistent storage a detached run would need to
+  work at all was removed along with it.]
+
+- D34 — DELIVERING SOMETHING FULLY AUTOMATICALLY PROMOTES IT —
+  DECIDED (owner, 2026-07-24). Supports P8; sharpens D23. THE RULE:
+  when a milestone or a task FULLY delivers a use case or a
+  principle, moving it from its proposals document to its standing
+  (root) list happens automatically, AS PART OF that same delivery —
+  it is not a separate decision the owner makes later. D23 had
+  already said that "DELIVERY makes it current and moves it over";
+  what hadn't been made explicit is that whoever actually lands the
+  work is the one who moves it, in that very same change, the moment
+  the code actually honors what the entry describes. There's no
+  waiting around for a separate, later sign-off.
+
+  WHAT ACTUALLY TRIGGERS THIS IS FULL DELIVERY, NOT MERE ACCEPTANCE.
+  A milestone that simply cites a proposal formally accepts it (this
+  is D23's "acceptance is scheduling" rule); a milestone whose
+  landed code actually honors that proposal in full is what delivers
+  it. These two things can diverge from each other: milestone 8
+  accepted both use case U5 and principle P13, but only P13 was
+  actually fully delivered — U5's core customized-Windows-installation
+  scenario still depends on GUI automation that doesn't exist yet, so
+  U5 stays in the "accepted, awaiting delivery" state while P13 gets
+  promoted. Whoever lands the work makes this call themselves, using
+  the exact same test the earlier P1 through P12 promotion pass
+  used: does the project, as the code stands today, actually honor
+  what this entry describes?
+
+  THE MECHANICS OF A PROMOTION (identical whether it's a use case or
+  a principle): add the entry to its standing list, at its normative
+  home document (root PRINCIPLES.md or USE-CASES.md), in numerical
+  order; DELETE it from the proposals document entirely, leaving no
+  placeholder behind (per D23's no-stub rule); and record the move
+  here, in this decision file, with the entry's own number serving
+  as the search key for anyone auditing the planning documents. An
+  entry that's only partly delivered does not get promoted — the
+  standing lists are meant to be a factual claim about what's
+  actually implemented (D23's "implemented means only what's
+  actually implemented" rule), so promoting a half-honored entry
+  would make that claim false.
+
+  [D48 later split this single rule into two separate bars: this
+  rule, as written, still holds exactly as-is for a use case, while
+  a principle instead promotes once it's *honored as a working
+  rule*, with every currently-known exception filed as a defect in
+  that same change. The tension between these two readings already
+  exists inside this very entry — the test described two paragraphs
+  above, inherited from the original P1 through P12 promotion pass,
+  is already effectively the rule-as-a-working-standard version.]
+
+  THE FIRST TIME THIS RULE WAS ACTUALLY APPLIED: principle P13
+  (about property sources) was promoted into PRINCIPLES.md together
+  with milestone 8 — the property-binding pipeline, the layered
+  source model, custody tracking, and per-resolution provenance
+  tracking had all landed (tasks T1 through T5, verified directly
+  against the code). FILES UPDATED: this entry; PRINCIPLES.md (P13
+  added, placed between P12 and P15); PRINCIPLE-PROPOSALS.md (P13
+  removed from the "Drafted" section) and its lifecycle introduction
+  section; USE-CASE-PROPOSALS.md's equivalent introduction section;
+  the ROADMAP's note on milestone 8 (recording that P13 was
+  promoted, while U5 is still waiting on GUI automation to exist).
+  U5's own eventual promotion will wait on its own actual delivery,
+  under this exact same rule.
+
+- D33 — THE PROJECT'S NUMBERED MILESTONE PLAN ENDS AT MILESTONE 9 —
+  DECIDED (owner, 2026-07-23). Supports P8.
+
+  The items planned beyond milestone 9 — additional backend support,
+  guest agents, and GUI automation — were **removed from the
+  schedule for lack of any use case actually demanding them**, not
+  because their designs were bad: their existing designs remain
+  settled and stand exactly as written. A milestone number is a
+  scheduling commitment, and scheduling work that no actual use case
+  is asking for is exactly how a roadmap ends up carrying items
+  nobody actually intends to build. Putting any of these back on the
+  schedule requires pledging the use case that actually wants it.
+
+- D32 — A MEDIA PATH REFERENCE'S SUB-PATH GOES INSIDE THE `${...}`
+  BRACES, NOT AFTER THEM — DECIDED (owner, 2026-07-23, during
+  milestone 7's S3 stage). Supports P14; RESOLVES a contradiction
+  between D22/D24 and D26/D27. This was found by running the S2 test
+  corpus against the first parser actually written to match the
+  spec — which is exactly what writing the corpus first was for.
+
+  THE CONTRADICTION. D22 had settled the syntax as
+  `${media:<name>}/<path>`, with the path OUTSIDE the closing brace,
+  and D24 built directly on that — its rule that "a backslash right
+  after `}` is an error, citing the `/` rule" only makes sense if the
+  path comes after the brace. But D26's definition of the allowed
+  character class justified `/` by saying it "separates the
+  containment path (there's exactly one)" — which wouldn't need to
+  be true if the path were entirely outside the reference's body —
+  and D27's corrected grammar rule spells the reference body as
+  `qualifier:media-name[/path]`, with the path INSIDE. Both
+  interpretations were actively supported by different entries, and
+  the spec document, blueprint-model.md, ended up inheriting both at
+  once, in the same document — its location table said "outside,"
+  while its closure section said "inside" — WITHOUT THE REWRITE EVER
+  NOTICING THE CONFLICT. A spec that contradicts itself about where
+  a single character goes is a spec whoever implements it has to
+  resolve by guessing.
+
+  DECIDED: THE PATH GOES INSIDE THE BRACES. `${media:outer/cd.iso}`.
+  THE DECIDING ARGUMENT IS ABOUT CLOSURE: a qualified reference is
+  only ever valid as the entire value of a field, and with the path
+  placed inside the braces, "the entire value" simply means the
+  string is EXACTLY ONE REFERENCE — the closure check can see the
+  whole location in one piece, with nothing trailing after it. With
+  the path placed outside the braces instead, the parser would have
+  to specially handle trailing text that follows a qualified
+  reference, telling apart a path suffix from the kind of
+  interpolation the reach rules already forbid in that position —
+  that's a second special-case rule, and it would live in exactly
+  the place P14 says a second rule must never be allowed to
+  accumulate. Keeping the path inside also gives D26's `/` character
+  the actual job D26 said it had.
+
+  WHAT THE "PATH OUTSIDE" FORM HAD GOING FOR IT: it was D22's
+  original choice, and it's more familiar-looking, since it reads
+  like joining a file path onto something. Both of those are real
+  advantages, but neither is a structural argument.
+
+  THE BACKSLASH-DETECTION DIAGNOSTIC SURVIVES, which was the
+  strongest objection raised against this: `${media:outer\cd.iso}`
+  is still the exact same mistake a Windows-habituated author would
+  make, and the parser still names the same `/` rule in its error
+  message — the only difference is that this mistake is now caught
+  while still inside the reference body, rather than just after it,
+  and the actual error message is unchanged in substance.
+
+  RECORDED HERE AS A NOTE ON METHOD: running the S2 corpus before S3
+  (during that milestone's reassessment) is exactly what surfaced
+  this contradiction. A test corpus written directly from the spec,
+  run against a parser also written directly from the same spec, is
+  really a differential test of the SPEC ITSELF — and it failed on
+  exactly the one sentence where the spec disagreed with itself.
+
+  FILES UPDATED: this entry; blueprint-model.md (the location table,
+  the path-suffix section, the containment example, and the
+  resolution-order example); the S2 test corpus fixtures;
+  reliquary/document.py. D22, D24, D26, and D27 all keep their
+  original wording unchanged; this entry is the official amendment
+  on record.
+
+- D31 — USE-CASES.md MOVES FROM `planning/` TO THE REPOSITORY ROOT —
+  DECIDED (owner, 2026-07-23). Supports P8. The use-case list now
+  sits alongside PRINCIPLES.md at the repository root.
+
+  THE ARGUMENT IS A DIRECT PARALLEL, already written into both files
+  themselves: PRINCIPLES.md lives at the root BECAUSE IT DESCRIBES
+  CURRENT REALITY — its own text says "every principle here is real
+  — the project honors it as the code stands today (it lives at the
+  root for that reason)" — and USE-CASES.md makes the exact same
+  claim, in the exact same way: it lists only what's actually
+  implemented, with everything not yet delivered kept separately in
+  its own proposals document. These two lists share one lifecycle,
+  one relationship to the actual code, and one role as the reference
+  point every interface change gets checked against (P8, which D28
+  had just made apply symmetrically to both). Leaving one of the two
+  lists under `planning/` said the opposite of what both files claim
+  about themselves: `planning/` holds maintainer-facing plans, and a
+  list of what is TRUE TODAY is not a plan. The proposals documents
+  themselves stay in `planning/`, for the identical reason — they
+  genuinely are plans.
+
+  FILES UPDATED: the actual file move; USE-CASES.md's own internal
+  links and its note explaining why it lives at the root;
+  PRINCIPLES.md, AGENTS.md, planning/INTERFACES.md,
+  planning/ROADMAP.md, planning/USE-CASE-PROPOSALS.md,
+  planning/proposed/design/recorder.md, this file's own preamble,
+  and the documentation-rules skill's list of file locations. Older
+  DECISIONS entries keep their original `planning/USE-CASES.md` path
+  references, per the rule that preserves an entry's original
+  wording.
+
+- D30 — THE MEDIA LIFECYCLE COMMANDS TREAT THE `.rlqb` DECLARATION
+  AS THE REAL OBJECT; TWO UNUSED VERBS ARE REMOVED — DECIDED (owner,
+  2026-07-23). Supports U13, P6, P9.
+
+  **There is no `delete-media` command**: removing a media entry
+  means editing the `.rlqb` file that declares it. A dedicated
+  command that deleted a declaration for you would suggest that the
+  blueprint file is no longer the authoritative statement of what
+  exists — the media cache itself can always be regenerated, and
+  it's the declaration that's the actually-authored artifact, so a
+  `delete-media` command would end up editing the wrong one of the
+  two things. `add-media` was later handled the same way (**D41**):
+  supplying a file is itself an act of authoring a declaration, not
+  a separate import step.
+
+- D29 — AN ENTRY ONLY PARTLY OVERRULED STAYS IN PLACE AND GETS A
+  NOTE, RATHER THAN BEING REWRITTEN — DECIDED (owner, 2026-07-23).
+  Supports P23 — retrofitted into that principle on 2026-07-27.
+  This is a convention for how this record itself works, settled
+  the very first time this situation came up, rather than waiting
+  until it happened a second time.
+
+  D27 corrected one specific clause of D26 — the claim that a
+  certain character class was "the whole closure test, and the only
+  one needed" — while leaving D26's other parts (A, B, C, and E)
+  standing unchanged. The existing rule about preserving an entry's
+  original wording didn't actually cover this situation: that rule
+  governs retiring an entire entry, or vocabulary drifting out of
+  date over time — not a single incorrect clause sitting inside an
+  otherwise-still-valid entry.
+
+  THE RULE THIS ESTABLISHES: an entry that's only partly overruled
+  STAYS EXACTLY WHERE IT IS, and gets ANNOTATED instead — a short,
+  bracketed note right at the affected clause, naming the entry that
+  amends it, with every other clause left completely untouched. This
+  is really the same instinct behind the "retired entries" section,
+  just applied at the level of a single clause instead of a whole
+  entry. Actually rewriting the prose in place is NEVER the right
+  answer: a mistake and how it was discovered are themselves part of
+  the historical record, and in this specific case, that discovery
+  is actually the most useful part of the whole entry — D26's part D
+  had listed `${key:-x}` as an excluded pattern in the very same
+  paragraph that claimed the character class already excluded it,
+  which is exactly the argument for why a stated test has to
+  actually be testable.
+
+  WHY THE EXISTING "PRESERVE ORIGINAL WORDING" RULE DOESN'T COVER
+  THIS: that rule exists to protect the record's faithfulness to the
+  moment it was written, and it was never meant as permission to
+  leave a genuinely WRONG INSTRUCTION standing where a reader who
+  finds it through search would act on it. AN OUTDATED WORD CANNOT
+  CAUSE A BUG; A WRONG TEST CAN — and this particular wrong test was
+  aimed squarely at what milestone 7 was about to deliver next:
+  someone searches for how the closure test works, finds the phrase
+  "the only test needed," and ships a parser that incorrectly
+  accepts `${mem:-512M}`. This is the mirror image of what this very
+  decision round found elsewhere: a boundary that was never stated
+  at all can't be checked against, but a boundary that's stated
+  incorrectly is actually worse than no boundary at all, because it
+  does get checked against, and it wrongly lets the wrong things
+  pass.
+
+  FILES UPDATED: this entry; the DECISIONS preamble (this convention
+  added alongside the existing rules about retired entries and
+  preserved wording); D26's part D (the bracketed note, as the very
+  first real use of this rule).
+
+- D28 — THE INTERFACE-CHANGE PROCESS ALSO GOVERNS CHANGES TO
+  PRINCIPLES, NOT ONLY TO USE CASES — DECIDED (owner, 2026-07-23).
+  Supports P8 (which this decision clarifies). The owner's own
+  words: "requests must align to principles or use cases, and a
+  change in principles requires vigorous argument, just like the use
+  case." HALF OF THIS HAD ACTUALLY BEEN WRITTEN DOWN, AND HALF HAD
+  NOT.
+
+  WHAT HAD BEEN WRITTEN DOWN: the demand side. The ROADMAP's
+  introduction already required every item to cite either a use case
+  (U) or a governing principle (P), noting that a principle "drives
+  work just as well" as a use case does. WHAT HAD NOT BEEN WRITTEN
+  DOWN: the review/vetting side. The interface-change process itself
+  (documented in INTERFACES.md) had been written entirely in
+  use-case-shaped language — "the use-case list is where interface
+  changes are argued," changes get triaged "by their use-case
+  impact," all three review tiers were framed around use cases, and
+  even the hardest case described required that "Reliquary's use
+  cases change." P8 mirrored this same gap, describing changes as
+  "triages by its impact on the use cases." SO A CHANGE THAT
+  CONFLICTED WITH A PRINCIPLE, RATHER THAN A USE CASE, HAD NO
+  DEFINED PATH THROUGH THIS PROCESS AT ALL — even though
+  PRINCIPLES.md itself asserted that amendments to principles "are
+  argued like interface changes," PRINCIPLE-PROPOSALS.md said its
+  own lifecycle process "mirrors the use-case one," and D25 had
+  already amended principle P9 explicitly under this very process.
+  The actual practice already existed; the written rule had simply
+  never actually authorized it. This gap was live throughout this
+  whole decision round: D25, D27's addition of P15, and P14's
+  reshaping were all changes at the principle level, made under a
+  process that, as written, never even mentioned principles.
+
+  THE FIX: P8 is retitled to "Interface and principle changes are
+  vetted," and now triages changes by their impact on both the use
+  cases AND the governing principles; a change that conflicts with
+  either one must be argued as the amendment it actually requires —
+  A PRINCIPLE AMENDMENT ARGUED JUST AS VIGOROUSLY AS A USE-CASE
+  AMENDMENT — and never simply justified as a feature on its own
+  separate merits. INTERFACES.md's process document gains the
+  equivalent "principle" branch throughout: in its framing ("cannot
+  be phrased as 'the use cases should say …' or 'the principles
+  should say …'"), across all three of its review tiers, and in its
+  workflow description, which now names PRINCIPLE-PROPOSALS.md right
+  alongside USE-CASE-PROPOSALS.md. One new sentence is added that
+  neither document had actually stated before: THE TWO LISTS CARRY
+  EQUAL WEIGHT, AND NEITHER ONE IS EVER EDITED JUST TO FIT A FEATURE
+  SOMEONE HAS ALREADY DECIDED TO BUILD.
+
+  THIS IS A CLARIFICATION, NOT A REPLACEMENT — and this was decided
+  based on actual evidence, not just a preference, using the
+  lifecycle process's own test for the difference (a clarification
+  is a wording change that no past citation of it would read any
+  differently under). P8 has three existing citations; none of them
+  reads any differently under the new wording, and one actually
+  reads BETTER: D27 cites "Supports P8" for a decision that ADDS AN
+  ENTIRELY NEW PRINCIPLE — exactly the kind of case the old wording
+  never actually covered. So no principle number is retired, and no
+  new number gets spent on this. CONSIDERED AND REJECTED: replacing
+  P8 with an entirely new principle number instead (which is the
+  lifecycle process's normal path for a change in what something
+  fundamentally means) — the retitling and the broadened scope both
+  made a case for doing that, but the citation test governs here,
+  and spending a new number on a change that nothing actually reads
+  differently under would be cost with no real benefit.
+
+  RECORDED HERE AS A NOTE ON METHOD: this entry's own change was
+  itself argued for and approved before being made — which is
+  exactly the discipline this decision adds to the process.
+
+  FILES UPDATED: this entry; PRINCIPLES.md (P8's text); INTERFACES.md
+  (the process's framing, its three review tiers, and its workflow
+  description).
+
+- D27 — THE INPUT MODEL, AND CORRECTING D26'S CLOSURE TEST —
+  DECIDED (owner, 2026-07-23). Supports P8; **amends D26** (its part
+  D) and **adds a new principle, P15**.
+
+  THE CORRECTION IS THE ENTIRE POINT OF THIS ENTRY: D26 had claimed
+  the string grammar was fully closed, based on a test that didn't
+  actually hold up. A closure argument based on "no author would
+  ever write that" isn't really a closure at all — it's just a
+  prediction about author behavior — and the grammar has to actually
+  refuse every shape its own character class technically allows,
+  whether or not anyone would realistically write it. P15 was added
+  out of this same realization: a rule that depends on taste or
+  prediction is a rule that can't actually be mechanically checked.
+
+- D26 — NARROWING WHAT PROPERTIES CAN REACH, AND CLOSING THE STRING
+  GRAMMAR — DECIDED (owner, 2026-07-23, during the format
+  re-examination round). Supports U4, U5; P7, P10. **Changes D18**
+  (its rejection of HCL2 and its computational-growth rule) and
+  **D24** (its reach rule).
+
+  - **HCL2 is rejected on structural grounds, not just "not yet."**
+    It moves from D18's "deferred" list to the permanently "closed"
+    list. YAML, TOML, and KDL remain rejected for the reasons
+    already given earlier.
+  - **`sha256` values can still be interpolated.** Refusing to allow
+    that was considered and rejected; a pinned hash value supplied
+    through a property is a genuine, legitimate way to author a
+    blueprint.
+  - **`${key:-x}`-style default-value syntax and similar patterns
+    are explicitly closed off**: the allowed character class
+    technically permits them, so the grammar now explicitly refuses
+    them, rather than letting a default-value operator sneak in by
+    accident.
+
+- D25 — THE COMPATIBILITY-PROMISE DEADLINE MOVES FROM BETA TO A FULL
+  1.0 RELEASE — DECIDED (owner, 2026-07-23). Supports P9 (which this
+  decision amends). This is a change to a principle, argued for and
+  approved as one, through the interface-change process — the owner
+  noted the irony of amending the very root list he'd just ruled was
+  "never changed in nature" (D23), and approved it anyway: this
+  genuinely is not just a clarification.
+
+  THE RULE: no backward compatibility is guaranteed until a full,
+  general-availability 1.0 release (it previously said "at least a
+  beta-quality release"). Throughout beta and the rest of the
+  pre-1.0 period, SOME effort to avoid breaking users MAY be made
+  WHEN IT SEEMS WARRANTED — but this comes with NO PROMISES. This
+  gets folded into the project's actual operating rule, and it's
+  vetoable at any time: making the effort once creates no
+  expectation that it'll happen again next time, a clean break stays
+  the default behavior, and any accommodation made is a deliberate,
+  individual exception — the owner's own call each time, recorded in
+  the CHANGELOG — never something left in the code to just
+  accumulate, because an unmaintained compatibility shim nobody
+  actually decided to keep is exactly the problem this rule exists
+  to prevent.
+
+  WHAT MOVED ALONG WITH THIS: every other deadline that had been
+  tied to "beta" specifically because it was really about
+  compatibility — format versioning and the `$schema` field syntax
+  (the ROADMAP's "Deferred to 1.0" section, machine-blueprint.md,
+  blueprint-model.md, instance-model.md, and script-spec.md's
+  format-version paragraph) — and the CLI's promise that
+  machine-readable output only ever grows additively (cli.md), which
+  had promised this starting at beta and now starts at 1.0 instead.
+  The underlying reasoning didn't actually change with this move — a
+  document written before 1.0 genuinely has no format version to
+  speak of, exactly as one written before beta had none either. WHAT
+  DIDN'T MOVE: deadlines tied to "beta" for their own independent
+  reasons that have nothing to do with compatibility — the error-id
+  index (in TASKS.md) is purely documentation polish, and stays
+  exactly where it was.
+
+  FILES UPDATED: this entry; AGENTS.md (its normative section, with
+  its heading renamed); PRINCIPLES.md's P9; INTERFACES.md's rule
+  about what "lands" as a change; the ROADMAP's constraints section
+  and its deferral list; api.md, cli.md, machine-blueprint.md,
+  media-spec.md, script-spec.md, blueprint-model.md,
+  instance-model.md. CHANGELOG entries and older DECISIONS entries
+  keep the wording that was accurate at the time they were written.
+
+- D24 — THE REFERENCE GRAMMAR IS PINNED DOWN AS A CLOSED SET OF
+  RULES — DECIDED (owner, 2026-07-23, the milestone-7 "decide first"
+  item). Supports U1, U4, U5; P11; G3, G6, G7. This grammar is
+  normative in [blueprint-model.md](../docs/spec/blueprint-model.md):
+  the reference grammar is **closed, made of exactly two grammar
+  rules**, the allowed-character check and the two grammar rules
+  together decide what's valid, and references are refused outright
+  wherever they'd appear in an identity field, a dependency-graph
+  field, or one of the closed vocabulary fields.
+
+  The lasting part of this decision is *why* it needs to be closed:
+  an open-ended grammar can never say what it refuses, so every
+  future extension to it would silently reinterpret text that used
+  to parse successfully under the old rules. As one specific
+  consequence: a media name is allowed to start with a digit, while
+  a property key is not — because the `@` sigil already tells you
+  what kind of token it is, while a property key also appears bare,
+  on its own, at the point where it's declared, and a leading digit
+  there would instead get parsed as a duration value.
+
+- D23 — THE USE-CASE LIFECYCLE IS DEFINED, AND A RETIRED NUMBER
+  LEAVES NO PLACEHOLDER — DECIDED (owner,
+  2026-07-23). Supports P8, P23. The actual process this settles —
+  the three document locations, the clarify/retire/supersede
+  actions, and the single global U-numbering sequence — is
+  normative in [README.md](README.md) and isn't restated here. Two
+  specific rulings from this decision have no other natural home,
+  and both get cited by later entries:
+
+  - **NO PLACEHOLDER STUB.** A retired or superseded use-case number
+    leaves nothing behind in its place: the resulting gap in the
+    numbering sequence *is itself* the history, and whatever
+    replaces it names what it's carrying forward, so old citations
+    still resolve correctly. This is what "no stub, per D23" refers
+    to when cited, and it's why a dead proposal's number is
+    permanently spent rather than ever being reused.
+  - **The word "deprecated" is rejected** as terminology here. A use
+    case is either *retired* (dropped entirely) or *superseded*
+    (replaced, with its successor named explicitly); "deprecated"
+    implies a grace period that this lifecycle process doesn't
+    actually offer.
+
+  CONSIDERED AND REVERSED: creating a separate `planning/ISSUES.md`
+  file. The project's issue tracker is already the open door for
+  reporting things, and this planning directory is meant to be the
+  project's own internal voice — adding a third intake point here
+  would have split the triage process across two separate systems.
 
 - D22 — THE BLUEPRINT REVISION ROUND — DECIDED (owner,
-  2026-07-23, the second same-day round, superseding the
-  four-component shape of the media/composition round before any
-  of it was implemented). Supports U4; P10. The shape is normative
+  2026-07-23, the second decision round held the same day,
+  superseding the earlier four-component design for media and
+  composition before any of it was actually implemented). Supports
+  U4; P10. The resulting shape is normative
   in [blueprint-model.md](../docs/spec/blueprint-model.md).
 
-  Kept: **child-side-only containment** — dropping the batch
-  `children` form — was declined as sugar over the one semantic
-  rather than a second semantic, so `children` desugars to
-  child-declares-parent and both spellings stay.
+  Kept from the earlier design: **containment declared only from
+  the child's side** — dropping the earlier batch-style `children`
+  list form — was considered and rejected as being sugar on top of
+  the one real underlying meaning, rather than a genuinely separate
+  meaning of its own, so the `children` form is kept as sugar that
+  expands into individual child-declares-parent statements, and
+  both spellings remain valid.
 
-- D21 — CODEX NAMING: A LAUNCHING POINT, NEVER A VERSION LIBRARY —
+- D21 — CODEX ENTRIES ARE NAMED AS GENERIC STARTING POINTS, NEVER
+  AS VERSION-SPECIFIC LIBRARY ENTRIES —
   DECIDED (owner, 2026-07-23, closing the open point from the
   generic-blueprint walkthrough). Supports U11; P11 — retrofitted
-  2026-07-27. No versioned items in the
-  codex — generic `openbsd`, generic `freedos`; "the codex is a
-  launching point for real blueprints only" (owner). Entries
-  are named for the system; the version lives inside the file
-  as the source component's URL and hash (the two-field bump),
-  so a codex version bump is a content update under an
-  unchanged name, reaching new seeds only — the never-overwrite
-  rule keeps existing copies the user's. Concurrent versions,
-  pinned vintages, and variants are user/project territory:
-  seed, rename, make it real — which dissolves the coexistence
-  case that motivated version-bound names. Scripts are named
-  for the flow they drive (`freedos-install`), never a release:
-  the branching-wait design spans versions by observation, and
-  a script's supported span is legible in its own handlers. The
-  split rule (generic by default, version-bound on deliberate
-  coexistence) was the recommendation; the owner went stronger —
-  coexistence in the codex is simply out. The `-plain` variant
+  2026-07-27. No codex entry names
+  a specific version — it's generic `openbsd`, generic `freedos`,
+  and so on; "the codex is a launching point for real blueprints
+  only" (in the owner's words). Entries
+  are named after the system they represent; the actual version
+  information lives inside the blueprint file itself, as the source
+  component's URL and hash (the "two-field bump" pattern), so
+  bumping a codex entry's version is really just a content update
+  under an unchanged file name, which only reaches newly seeded
+  copies going forward — the never-overwrite
+  rule means anyone's existing copy stays entirely theirs, unaffected.
+  Running multiple versions side by side, pinning a specific vintage,
+  or maintaining variants are all things that belong to the user or
+  their project, not to the codex itself:
+  seed it, rename it, make it a real project file — this approach
+  eliminates the whole need for the codex to support multiple
+  coexisting versions of the same entry, which is what had
+  originally motivated giving entries version-specific names.
+  Scripts are named after the workflow they drive
+  (`freedos-install`), never after a specific release: the
+  branching-wait design already handles multiple versions through
+  direct observation of the screen, and a script's actual supported
+  version range is visible just by reading its own handlers. The
+  original recommendation had been a split rule (generic by default,
+  version-specific only when versions deliberately need to
+  coexist) — the owner went further than that: coexistence in the
+  codex is simply not supported at all. The `-plain` variant naming
   marker dissolves with it: the launching point IS the plain
-  install, and variants belong to users. SCOPE (owner): entries
+  install, and any variants belong entirely to users to create
+  themselves. SCOPE, as the owner defined it: entries
   keep nominal version control points where easy — the adjacent
   url+sha knobs, seam comments pointing at them — acknowledging
   version churn; but the codex NEVER promises a comprehensive
@@ -2558,564 +3416,819 @@ is waiting on an answer today.
   ("impossible!"): an entry is tested as shipped against the
   one release it tracks; a bumped copy is the user's, aided by
   fail-closed verification and observation-driven scripts,
-  warranted by nothing. REALIGNMENT AHEAD (per
-  the no-BC rule): `freedos-1.4-plain.rlqb` → `freedos.rlqb`,
+  warranted by nothing. REALIGNMENT STILL TO COME (per
+  the no-backward-compatibility rule): `freedos-1.4-plain.rlqb` →
+  `freedos.rlqb`,
   `freedos-1.4-plain-install.rlqs` → `freedos-install.rlqs`,
   and the mentions across script-spec (the reference-script
   pointer), machine-blueprint.md, and cli.md follow at
-  implementation realignment. FOLDED: codex.md (the doctrine
-  under Naming conventions; the table examples; both
+  implementation realignment. FILES UPDATED: codex.md (the naming
+  guidance under Naming conventions; the table examples; both
   `run-script` examples).
 
-- D20 — THE DECLARED DERIVATION RANK — DECIDED (owner,
-  2026-07-23), settling the forks D19 left pending. Supports P7,
-  P13. Normative in
+- D20 — A DECLARED DEFAULT VALUE RANKS BELOW EVERY SUPPLIED SOURCE,
+  BUT ABOVE ASKING THE USER INTERACTIVELY — DECIDED (owner,
+  2026-07-23), settling the open branches D19 left pending. Supports
+  P7, P13. Normative in
   [script-properties.md](../docs/spec/script-properties.md).
 
-  A declared `default=` derivation ranks **below** every supplied
-  source and **above** the interactive ask: it is the script
-  author's fallback, so anything the operator actually supplied
-  beats it, and it exists precisely so the ask is not reached. Host
-  facts (`rlq.*`) are unanswerable-when-empty rather than empty
-  strings — a blank username is not an answer, and silently binding
-  one produces a run that fails somewhere later.
+  A declared `default=` value ranks **below** every source that
+  actually supplies a value, and **above** the fallback of
+  interactively asking the user: it's the script author's own
+  fallback value, so anything the person actually running the
+  machine explicitly supplies beats it, and its whole purpose is to
+  make sure the interactive prompt is never even reached when a good
+  default exists. Host-provided facts (`rlq.*`) are treated as
+  unanswerable when they're empty, rather than as empty strings — a
+  blank username isn't a real answer, and silently binding an empty
+  string as if it were one just produces a run that fails somewhere
+  later on, for a much more confusing reason.
 
-- D19 — PROPERTY SOURCE MODEL: THE ORDER IS CLOSED, THE SEAMS ARE
-  NAMED — DECIDED (owner, 2026-07-23). Supports P7, P13, P21.
+- D19 — HOW A PROPERTY GETS ITS VALUE FOLLOWS A FIXED, CLOSED ORDER,
+  AND EVERY STAGE OF IT IS NAMED — DECIDED (owner, 2026-07-23).
+  Supports P7, P13, P21.
   Normative in
   [script-properties.md](../docs/spec/script-properties.md).
 
-  **The source order is closed**, and that is the ruling: a value's
-  provenance is a fixed, statable sequence rather than a search
-  that stops when something is found. An open order cannot be
-  reported — the dry run's `describe_sources` names each key's
-  source only because there is one answer to name — and a caller
-  debugging a wrong value needs the *rule*, not the outcome.
+  **The order in which property sources are checked is fixed and
+  closed**, and that's the actual ruling here: where a value came
+  from is a fixed sequence that can be stated in full, not an
+  open-ended search that just stops as soon as something is found.
+  An open-ended search couldn't actually be reported back to the
+  user — the dry-run's `describe_sources` output can name exactly
+  where each key's value came from only because there is exactly one
+  correct answer to give; and someone debugging why a value came out
+  wrong needs to know the actual *rule* being followed, not just the
+  specific outcome they got.
 
-  Implementation is **bespoke** rather than a configuration
-  library: the layering is small, the semantics are the project's
-  own, and a dependency would have to be bent to match them (P21).
+  The implementation itself is **custom-built, rather than based on
+  an existing configuration library**: the layering involved is
+  small, its exact behavior is specific to this project, and any
+  existing dependency would have had to be bent out of shape to
+  match it (P21).
 
-- D18 — BLUEPRINT FORMAT: THE COMPUTATIONAL-GROWTH RULE — DECIDED
-  (owner, 2026-07-23). Supports U4, U5; G2. **Its prior JSONC
-  choice is superseded by D102; amended by D26**, which moved HCL2
-  from deferred to closed.
+- D18 — BLUEPRINT FORMAT DESIGN: THE RULE FOR HOW COMPUTATIONAL
+  FEATURES ARE ALLOWED TO GROW — DECIDED
+  (owner, 2026-07-23). Supports U4, U5; G2. **Its original choice of
+  JSONC as the format is later superseded by D102; its HCL2
+  rejection is changed by D26**, which moved HCL2
+  from "deferred" to permanently "closed."
 
-  THE GROWTH RULE, which is the durable half: a construct that
-  *enriches values* may land as plain data expanded by reliquary;
-  **general computation never enters the JSON tree**. It would
-  arrive only as a layer producing plain blueprints — generation
-  above via the embedding API, or a separately specified evaluation
-  layer (Jsonnet the candidate).
-  In-tree function objects and string templating are permanently
-  rejected: a blueprint that computes is a blueprint no tool can
-  read without running it.
+  THE GROWTH RULE, which is the part of this decision that's still
+  in force today: a language construct that only *enriches a
+  value* — meaning it still expands into plain data that Reliquary
+  itself computes — is allowed to be added to the blueprint format;
+  **general-purpose computation is never allowed into the JSON data
+  tree itself.** If general computation is ever needed, it can only
+  arrive as a separate layer that itself produces plain blueprint
+  data as its output — either through generation done above the
+  format via the embedding API, or through a separately specified
+  evaluation layer (Jsonnet being the leading candidate for that, if
+  it's ever built).
+  In-tree function objects and string templating inside the
+  blueprint format itself are permanently rejected: a blueprint
+  file that performs computation is a blueprint file that no tool
+  can safely read without actually running it first.
 
-- D16 — BLUEPRINT `name` FIELD REINSTATED — DECIDED (owner, 2026-07-22),
-  reversing the 2026-07-21 drop. Supports U11 — retrofitted
-  2026-07-27. `name` returns as an optional
-  human-readable display name for the blueprint, distinct from the
-  file-stem identity: the stem stays the one selection key
-  (`--blueprint <stem>`) and a machine's id stays `<stem>-<n>`, so
-  `name` never selects, never renames, and does not affect machine
-  behavior — it feeds `search` alongside `description`, appears in
-  listings where a friendlier label than the stem helps, and is
-  resolved into the state. WHY: owner — "name should be part of the
-  spec, we'll regret not having it at some point"; reserving a
-  display label distinct from the stem is cheap now and a naming
-  freeze is free before v1, never after (the reserve-space
-  principle already recorded here). The original drop's concern (a
-  second name can drift from the stem and duplicate the
-  description) is accepted as a UX caveat, not a reason to omit the
-  field — tools fall back to the stem when `name` is absent. FOLDED:
-  machine-blueprint-reference.md (new `name` section; the
-  `description` section's "there is no display-name field" claim
-  removed and `search` now matches `name` too),
-  machine-blueprint.schema.json (`name` property). The
-  implementation already carried `name` (the drop was never coded),
-  so the milestone-6 field-validation task keeps it and the codex
-  `freedos-1.4-plain.rlqb` `name` stays valid.
+- D16 — THE BLUEPRINT `name` FIELD IS REINSTATED — DECIDED (owner, 2026-07-22),
+  reversing the drop made on 2026-07-21. Supports U11 — retrofitted
+  2026-07-27. `name` comes back as an optional
+  human-readable display name for a blueprint, kept entirely separate
+  from its file-stem-based identity: the file stem remains the one
+  and only key used for selection
+  (`--blueprint <stem>`), and a machine's own id stays `<stem>-<n>`
+  — so
+  `name` never selects anything, never renames anything, and has no
+  effect on machine behavior whatsoever. It's simply searched by
+  `search` alongside `description`, shown in
+  listings wherever a friendlier label than the raw file stem is
+  useful, and gets recorded into machine state. WHY: in the owner's
+  words — "name should be part of the
+  spec, we'll regret not having it at some point" — reserving space
+  for a separate display label, distinct from the file stem, is
+  cheap to do now, and freezing the naming design is free before a
+  1.0 release, but never free after it (this is the same "reserve
+  space early"
+  principle already recorded elsewhere in this file). The original
+  concern that led to dropping the field (a
+  second name could drift out of sync with the stem, and
+  duplicate what `description` already does) is accepted here as a
+  real UX caveat, not as a reason to leave the
+  field out entirely — tools simply fall back to showing the stem
+  whenever `name` isn't set. FILES UPDATED:
+  machine-blueprint-reference.md (a new `name` section added; the
+  `description` section's claim that "there is no display-name
+  field" is removed, and `search` now matches against `name` too),
+  machine-blueprint.schema.json (the `name` property added back).
+  The actual
+  implementation had never removed `name` in the first place (the
+  original drop was only ever a documentation change, never coded),
+  so the milestone-6 field-validation task keeps handling it as-is,
+  and the codex's
+  `freedos-1.4-plain.rlqb` entry's existing `name` field remains
+  valid.
 
-- D15 — MILESTONE 6 DECIDE-FIRST ROUND — DECIDED (owner, 2026-07-22):
-  Supports U1; P8 — retrofitted 2026-07-27.
-  The three "Decide first" questions ROADMAP milestone 6 gated its
-  implementation on. Interface triage (planning/INTERFACES.md): the
-  state ops and the blueprint format are world-facing interfaces;
-  Q1 confirms already-specced, use-case-aligned behavior (U1's
-  install pattern and mid-run media swaps), Q3 tightens validation
-  with no use-case impact (easy approval), Q2 changes no interface
-  (internal policy) — no use-case amendment.
-  - Q1 RUNNING-MACHINE RECONFIGURATION: insert/eject are
-    running-or-stopped, set-boot and apply stopped-only. Hot media
-    changes are ALLOWED — an `insert`/`eject` on a running machine
-    is a live media change the guest observes; on a stopped
-    machine it is a pure state edit reconciled at the next
-    `start`. This CONFIRMS the existing contract
-    (script-spec.md "Insert and eject": "Both verbs work on a
-    running machine ... and on a stopped one"; cli.md / the CLI
-    gap-queue item 3's "running-or-stopped for insert/eject"), not
-    a change to it. `set-boot` stays stopped-only (a launch-time
-    firmware order — no live effect) and `apply` stays stopped-only
-    (memory/cpus/drives are hardware topology). Uniform
-    stopped-only was WEIGHED AND DECLINED (the recommendation): it
-    would have contradicted the already-specced running-or-stopped
-    rule and the script language's own live-dispatch semantics,
-    where a script drives a running guest and swaps media mid-run.
-    CONSEQUENCE — an implementation gap, not a spec change: today's
-    `machines.py` guards insert/eject as stopped-only (the
-    milestone-1 shortcut), so the milestone-6 work must grow a
-    live-QMP change path (identity-verified session) when the
-    machine is running, and AGENTS.md's "all three require a
-    stopped machine" line is that shortcut, corrected when hot
-    insert/eject lands.
-  - Q2 CONCURRENT MACHINES: no home-wide limit on machines running
-    at once. The per-machine lock and per-start identity model make
-    concurrency safe — each machine is its own cache directory,
-    backend process, and auto-allocated port — so the honest
-    ceiling is host resources (memory, free ports), surfaced as an
-    ordinary `start` failure. A configurable cap was WEIGHED AND
-    DECLINED: policy surface with no invariant behind it. Folded:
-    instance-model.md ("The machine state").
-  - Q3 SIZE/BASE ON CDROM: rejected. A `cdrom` drive's only content
-    source is `media` (or the empty `null`) — the read-only optical
-    medium has nothing to size, difference, or synthesize, so
-    `size`, `base`, and `hostdir` all require a writable medium
-    (`hdd`/`floppy`), symmetric with `hostdir`'s pre-existing cdrom
-    prohibition. This closes the JSON-schema round's open find (the
-    schema encoded only the stated rules, and the field reference's
-    "meaningful for hdd and floppy" did not prohibit elsewhere).
-    Leaving it permissive was WEIGHED AND DECLINED (a nonsensical
-    blank/writable-optical shape validating). Folded:
-    machine-blueprint-reference.md (`size`, `base`, and the Values
-    rule), machine-blueprint.schema.json (`cdromDrive` drops
-    `size`/`base`, requires `media`). Enforced in `blueprint.py` at
-    the field-reference-validation task.
-  Folded across: planning/TASKS.md (the milestone-6 task list — T0
-  landed), instance-model.md, machine-blueprint-reference.md,
-  machine-blueprint.schema.json.
+- D15 — THE MILESTONE 6 "DECIDE FIRST" QUESTIONS ARE RESOLVED —
+  DECIDED (owner, 2026-07-22): Supports U1; P8 — retrofitted into
+  that principle on 2026-07-27. These are the three "Decide first"
+  questions the ROADMAP had made milestone 6's implementation
+  conditional on. Interface review (planning/INTERFACES.md): both
+  the machine-state operations and the blueprint format are
+  user-facing interfaces; Q1 confirms behavior that was already
+  specified and already aligned with a use case (U1's install
+  pattern and mid-run media swaps); Q3 tightens validation with no
+  impact on any use case (easily approved); Q2 changes no interface
+  at all — it's purely internal policy — so none of these require
+  amending any use case.
+  - Q1, RECONFIGURING A RUNNING MACHINE: `insert`/`eject` work
+    whether the machine is running or stopped; `set-boot` and
+    `apply` only work on a stopped machine. Making live media
+    changes is ALLOWED — running `insert`/`eject` on a running
+    machine is a live media change the guest can actually see
+    happen; running it on a stopped machine is purely an edit to
+    saved state, reconciled the next time the machine starts. This
+    CONFIRMS the contract that already existed (script-spec.md's
+    "Insert and eject" section already said "Both verbs work on a
+    running machine ... and on a stopped one"; cli.md and the CLI
+    backlog's item 3 already said "running-or-stopped for
+    insert/eject") — it doesn't change that contract. `set-boot`
+    stays stopped-only, because it's a launch-time firmware setting
+    with no live effect; `apply` stays stopped-only too, since
+    memory, CPU count, and drives are all hardware topology
+    decisions. Making everything uniformly stopped-only was
+    CONSIDERED AND REJECTED (even though it had originally been
+    recommended): it would have directly contradicted the
+    already-specified running-or-stopped rule, and the script
+    language's own live-dispatch design, where a script actively
+    drives a running guest and swaps media mid-run. CONSEQUENCE —
+    this reveals an implementation gap, not a change to the spec:
+    today's `machines.py` currently enforces insert/eject as
+    stopped-only (a shortcut taken back in milestone 1), so the
+    milestone 6 work needs to add a live-QMP change path (using an
+    identity-verified session) for when the machine is actually
+    running, and AGENTS.md's current line "all three require a
+    stopped machine" reflects that old shortcut, and will be
+    corrected once hot insert/eject actually lands.
+  - Q2, RUNNING MULTIPLE MACHINES AT ONCE: there's no home-wide
+    limit on how many machines can run simultaneously. The
+    per-machine lock and the per-start identity-verification model
+    already make running things concurrently safe — each machine
+    gets its own cache directory, its own backend process, and its
+    own auto-allocated network port — so the real, honest limit is
+    just whatever host resources are available (memory, free
+    ports), which naturally shows up as an ordinary `start` command
+    failure when exhausted. A configurable cap on concurrent
+    machines was CONSIDERED AND REJECTED: it would just be policy
+    surface area with no actual underlying guarantee behind it.
+    Files updated: instance-model.md (its "The machine state"
+    section).
+  - Q3, `size`/`base` ON A CD-ROM DRIVE: rejected. A `cdrom` drive's
+    only possible content source is `media` (or nothing at all,
+    `null`) — a read-only optical medium has nothing that can be
+    resized, diffed against a base, or synthesized, so `size`,
+    `base`, and `hostdir` all now require a writable medium type
+    (`hdd` or `floppy`) — matching the existing prohibition that
+    already applied to `hostdir` on a cdrom drive. This closes an
+    open finding from the earlier JSON-schema round (the schema had
+    only encoded the explicitly stated rules, and the field
+    reference's note that these fields are "meaningful for hdd and
+    floppy" hadn't actually prohibited them anywhere else). Leaving
+    this permissive was CONSIDERED AND REJECTED (it would have let
+    a nonsensical blank/writable-optical-drive combination validate
+    successfully). Files updated: machine-blueprint-reference.md
+    (the `size` and `base` sections, and the Values rule),
+    machine-blueprint.schema.json (the `cdromDrive` schema no
+    longer allows `size`/`base`, and now requires `media`). This is
+    enforced in `blueprint.py` as part of the
+    field-reference-validation task.
+  Files updated across all three: planning/TASKS.md (the milestone-6
+  task list — task T0 landed), instance-model.md,
+  machine-blueprint-reference.md, machine-blueprint.schema.json.
 
-- D14 — MILESTONE INJECTION: LOCAL HTTP SERVER FOR INSTALLER ANSWER
-  FILES — DECIDED (owner, 2026-07-22). Supports U1, U4, U5; G1 —
-  retrofitted 2026-07-27. A new ROADMAP milestone 5
-  lands Packer's ephemeral local HTTP server for Kickstart /
-  preseed / AutoYaST / `unattend.xml` and kin
-  (docs/spec/http-serve.md). Former milestones 5–12 renumber
-  to 6–13. Interface triage (planning/INTERFACES.md): strong
-  alignment with U1 and with U4/U5 where those answer files are
-  the installer's native path — easy approval; no use-case
-  amendment. Surfaces named: scripting language, CLI/API (run-
-  scoped server lifetime), authored-asset layout. Distinct from
-  the deleted property-binding "response file" concept (same
-  file, THE RESPONSE CONCEPT DELETED). The "Procedural and
-  declarative" ROADMAP prose is amended: where answer files
-  exist they are served Packer-style rather than competed with;
-  G1 remains the agentless control-plane rule, not a ban on the
-  installer's own answer-file path. Historical DECISIONS entries
-  keep the milestone numbers of their time; forward-looking
-  pointers in ROADMAP, TASKS, and design status notes move with
-  the renumber. Folded: ROADMAP (synopsis, procedural/declarative,
-  milestones 5–13, Horizon, guest-communication closing),
-  docs/spec/http-serve.md (new), TASKS forward refs,
-  backend-adapter / guest-communication / landmarks status
-  banners.
+- D14 — A NEW MILESTONE ADDS A LOCAL HTTP SERVER FOR SERVING
+  INSTALLER ANSWER FILES — DECIDED (owner, 2026-07-22). Supports U1,
+  U4, U5; G1 — retrofitted into that goal on 2026-07-27. A new
+  ROADMAP milestone 5 is inserted, adding the same kind of ephemeral
+  local HTTP server Packer uses, for serving Kickstart, preseed,
+  AutoYaST, `unattend.xml`, and similar installer answer files
+  (documented in docs/spec/http-serve.md). The former milestones 5
+  through 12 are renumbered to 6 through 13. Interface review
+  (planning/INTERFACES.md): this aligns strongly with U1, and with
+  U4/U5 wherever these answer files are the installer's own native
+  mechanism — easily approved, with no use-case amendment needed.
+  Interfaces touched: the scripting language, the CLI/API (the
+  server's lifetime is scoped to one run), and the authored-asset
+  directory layout. This is distinct from the now-deleted
+  property-binding "response file" concept (same term, but THE
+  RESPONSE-FILE CONCEPT ITSELF IS DELETED). The ROADMAP's "Procedural
+  and declarative" section is updated to match: wherever an
+  installer's own answer files already exist, they're now served
+  the way Packer serves them, rather than being replaced by
+  something competing with them; goal G1 remains the rule that the
+  control plane stays agentless — it isn't a ban on using an
+  installer's own native answer-file mechanism. Older DECISIONS
+  entries keep whatever milestone numbers were accurate at the time
+  they were written; forward-looking references in the ROADMAP,
+  TASKS, and design status notes are updated to match the
+  renumbering. Files updated: the ROADMAP (its synopsis, the
+  procedural/declarative section, milestones 5 through 13, the
+  Horizon section, and the note closing out guest-communication),
+  docs/spec/http-serve.md (newly created), forward references in
+  TASKS, and the status notes in backend-adapter,
+  guest-communication, and landmarks design documents.
 
-- D13 — PARSER: OWN LEXER + LARK PARSER — DECIDED (owner,
-  2026-07-22), following the no-JSON-in-scripts round that made it
-  possible. Supports P21 — retrofitted 2026-07-27. The grammar lives in Reliquary/script_grammar.lark,
-  mirroring script-spec.md's normative EBNF; Reliquary's own
-  tokenizer feeds it through a custom lark lexer. Evidence from
-  three probes:
-  - a lark grammar carries the whole typed EBNF — headers,
-    property declarations, phases, branching waits, reactive
-    phases, every action — in ~45 lines under LALR(1). Before the
-    island was deleted it could not parse a script at all, which
-    is what changed the answer
-  - lark's OWN lexer was WEIGHED AND DECLINED: its diagnostics are
-    terminal-level ("No terminal matches '4'" where Reliquary's
-    says "invalid duration: '45' (durations carry a unit: ms, s,
-    m, or h)"), and on one case it mislabelled `timeout` as a
-    keypress name. match_examples recovered only 4 of 7 authored
-    messages, failing whenever the same mistake followed a
-    different verb — it matches parser state, so the corpus grows
-    as mistakes × contexts and degrades silently in the gaps
-  - the hybrid keeps both: verified that all lexical diagnostics
-    survive verbatim through the lark layer
-  - `press enter` broke the first attempt — `enter` is both a verb
-    and a key name, and a context-free lexer must type it before
-    the parser knows it is in `press`'s arguments. Keywords are
-    therefore recognized only in node-name position, which is what
-    script-spec.md already prescribes ("slot, key-name, and
+- D13 — THE SCRIPT PARSER USES RELIQUARY'S OWN TOKENIZER FEEDING A
+  LARK-BASED PARSER — DECIDED (owner,
+  2026-07-22), following the "no JSON in scripts" decision that made
+  this possible. Supports P21 — retrofitted into that principle on
+  2026-07-27. The grammar itself lives in Reliquary/script_grammar.lark,
+  mirroring the normative EBNF grammar already in script-spec.md;
+  Reliquary's own tokenizer feeds tokens into it through a custom
+  lark lexer. This was decided based on evidence from three separate
+  experiments:
+  - A lark grammar can express the entire typed EBNF grammar —
+    headers, property declarations, phases, branching waits,
+    reactive phases, every kind of action — in roughly 45 lines,
+    using the LALR(1) parsing algorithm. Before the
+    embedded-JSON exception was removed from the language, this
+    wasn't even possible — the grammar couldn't parse a script at
+    all — which is exactly what changed the answer here.
+  - Using lark's OWN built-in lexer instead of Reliquary's custom
+    one was CONSIDERED AND REJECTED: its error messages only
+    describe things at the raw-token level (like "No terminal
+    matches '4'," compared to Reliquary's own "invalid duration:
+    '45' (durations carry a unit: ms, s,
+    m, or h)"), and in one case it actually mislabeled the word
+    `timeout` as if it were a keypress name. Running the
+    `match_examples` test against it only correctly recovered 4 of 7
+    hand-authored error messages, failing every time the same
+    underlying mistake occurred after a different verb — because its
+    matching depends on parser state, the number of test cases
+    needed grows as mistakes multiplied by contexts, and it silently
+    gets worse in the gaps nobody happens to test.
+  - The hybrid approach (Reliquary's tokenizer, lark's parser) keeps
+    the best of both: it was verified that every one of Reliquary's
+    own lexical-level error messages survives unchanged all the way
+    through the lark parsing layer.
+  - The phrase `press enter` broke the very first implementation
+    attempt — `enter` is both a verb name and the name of a key, and
+    a lexer that doesn't look at surrounding context has to decide
+    which one it is before the parser even knows it's inside
+    `press`'s argument list. So keywords are only recognized when
+    they appear in the "node name" position — which is exactly what
+    script-spec.md already required: "slot, key-name, and
     machine-state values are name tokens whose closed vocabularies
-    are checked by validation, not the grammar")
-  - RULE ADOPTED: the grammar owns node names and positional
-    argument types; modifiers are uniform in the grammar and
-    checked against per-node signatures in the transformer, which
-    can name the node and list what it accepts; the S-numbered
-    rules stay above the grammar. Encoding S8's two-handler
-    minimum in the CFG was tried and reverted — the error became
-    "Unexpected token _BLOCK_CLOSE" at the closing brace instead
-    of naming the wait. script-spec.md's choice to enforce S-rules
-    "over the parse tree rather than encoded in the CFG" is what
-    protects the diagnostics, not an implementation detail
+    are checked by validation, not the grammar."
+  - THE RULE THIS ESTABLISHES: the grammar itself is only responsible
+    for node names and the basic types of positional arguments;
+    modifiers are handled uniformly at the grammar level, then
+    checked against each specific node's own allowed signature inside
+    the transformer code, which can then name the specific node and
+    list exactly what it accepts. The separately numbered validation
+    rules stay layered above the grammar, not inside it. Trying to
+    encode rule S8's "at least two handlers" requirement directly
+    into the context-free grammar was attempted and then reverted —
+    doing so turned the error message into a generic "Unexpected
+    token _BLOCK_CLOSE" pointing at the closing brace, instead of a
+    message that actually names the missing wait condition.
+    script-spec.md's existing choice to enforce these numbered rules
+    "over the parse tree rather than encoded in the grammar" is what
+    actually protects the quality of the error messages — it isn't
+    just an incidental implementation detail.
 
-- D12 — NO JSON IN SCRIPTS — DECIDED (owner, 2026-07-22).
-  Supports U6; G7 — retrofitted 2026-07-27. A script
-  carries no embedded assets. The `media <label> { ... }` block
-  and the `landmark <name> { ... }` block are both deleted;
-  media definitions (`.rlqm`) and landmark declarations (`.rlql`
-  plus `<name>.<n>.png` renderings) are authored files of their
-  own, resolved beside the script under authored-asset
-  resolution and referenced by `@name`. Folded into
-  script-spec.md (the "Embedded media definitions" and
-  "Installation into the media library" sections deleted, the
-  island removed from the core grammar and the normative EBNF),
-  media-spec.md, landmarks.md (the embedded form deleted),
-  ROADMAP, INTERFACES, USE-CASES U6 (amended), and the
-  implementation (the parser's media handling, `EmbeddedMedia`,
-  and the node layer's island machinery deleted). The round
-  records:
-  - the trigger: the install model read as an awkward bolt-on.
-    Three separable costs were named — the JSON island as the
-    sole exception to the lexical model, the install protocol
-    (five-step transactional write, collision and coalescing
-    rules, partial-overlap errors, `fetch-media --script`), and
-    the label/item split (residual problem [06], where the label
-    named an installed file and `@` named an item inside it)
-  - deleting media blocks alone was WEIGHED AND DECLINED: it
-    would not have removed the island, since embedded landmark
-    blocks (landmarks.md, "the same JSON schema as `.rlql` plus
-    inline base64 variant data") reinstate it at milestone 12,
-    and it would have left two analogous authored assets with
-    opposite bundling policies
-  - deleting the install while keeping the blocks was WEIGHED
-    AND DECLINED for the same reason: it removes the protocol
-    but keeps the lexical exception
-  - the decisive arguments for deleting both: the island is the
-    only carve-out in the node grammar and its removal makes the
-    surface uniform and LL(1) end to end; a script is UTF-8
-    text, so an embedded rendering must be base64 — measured at
-    roughly 12:1 to 100:1 payload-to-procedure for a
-    twenty-landmark GUI workflow, and the design had already
-    flinched at this with its open "trailing assets zone"
-    question; and embedding permanently freezes the asset
-    format, since anything carried in a text script can never
-    become non-text (the `.rlql` non-text form stays possible
-    only if declarations live in files)
-  - the "no second schema" justification for embedding was found
-    already broken in the small: `.rlqm` files are JSONC while
-    the embedded island was strict JSON, because brace tracking
-    could not survive a comment — the host format had already
-    forced the embedded form to accept less than the file form
-  - the single-file-workflow property is GIVEN UP knowingly. Its
-    cited support did not hold: U4 describes "the repository
-    carries only blueprints, media definitions, and Reliquary
-    scripts", a side-by-side repository, and U1's one-command
-    path seeds three separate codex artifacts. The real loss is
-    casual sharing (pasting a whole workflow into a gist or an
-    issue), which was already lost for anything with landmarks;
-    a bundle format outside the language stays available as
-    additive growth (G7)
-  - consequences folded: the label loses its only job, closing
-    residual problem [06]; `fetch-media --script` and
-    `fetch_media(script=)` are deleted; check-script's
-    prospective embedded-media validation and its "writing to
-    `media/`" carve-out go; ROADMAP milestone 5 loses
-    embedded-install targeting; the recorder emits its draft as
-    script plus asset files, one mode instead of two
+- D12 — SCRIPTS NO LONGER CARRY EMBEDDED JSON DATA — DECIDED (owner,
+  2026-07-22). Supports U6; G7 — retrofitted into that goal on
+  2026-07-27. A script file no longer carries any embedded assets at
+  all. Both the `media <label> { ... }` block
+  and the `landmark <name> { ... }` block are deleted entirely;
+  media definitions (`.rlqm` files) and landmark declarations
+  (`.rlql` files, plus their `<name>.<n>.png` image renderings) are
+  now their own separate authored files, located next to the script
+  using the normal authored-asset
+  resolution rules, and referenced from the script by name using
+  `@name`. FILES UPDATED:
+  script-spec.md (its "Embedded media definitions" and
+  "Installation into the media library" sections are deleted, and
+  the embedded-data exception is removed from both the core grammar
+  and the normative EBNF),
+  media-spec.md, landmarks.md (its embedded form deleted),
+  the ROADMAP, INTERFACES, use case U6 (amended), and the
+  implementation itself (the parser's media-handling code,
+  the `EmbeddedMedia` class, and the node layer's special-case
+  machinery for embedded data are all deleted). This decision round
+  found and recorded the following:
+  - WHAT TRIGGERED THIS: the embedded-install design read as an
+    awkward add-on. Three separable costs were
+    identified — the embedded-JSON exception was
+    the *only* exception to an otherwise purely text-based language,
+    the actual install protocol involved
+    (a five-step transactional write, rules for handling collisions
+    and coalescing, partial-overlap errors, a `fetch-media --script`
+    command) was itself substantial, and there was an
+    unresolved design problem (numbered [06], where the label
+    named an installed file while `@` named an item inside it) — a
+    confusing split.
+  - CONSIDERED AND REJECTED: deleting only the media blocks, while
+    keeping the embedded-JSON exception itself. This
+    wouldn't have actually removed the underlying exception, since
+    embedded landmark blocks (per landmarks.md, "the same JSON
+    schema as `.rlql` plus
+    inline base64-encoded image data") would have reintroduced it
+    anyway at milestone 12,
+    and it would have left two very similar kinds of authored assets
+    with completely opposite policies on whether they get bundled
+    into the script.
+  - CONSIDERED AND REJECTED, for the same underlying reason: deleting
+    the install protocol while keeping the embedded blocks
+    themselves. This removes the protocol's complexity
+    but keeps the actual lexical exception in the grammar.
+  - THE ARGUMENTS THAT ACTUALLY DECIDED DELETING BOTH: the embedded-data
+    exception was the only special case anywhere in the node
+    grammar, and removing it makes the entire language
+    surface uniform and parseable with a simple LL(1) parser end to
+    end. A script file is plain UTF-8
+    text, so any embedded binary image data would necessarily have
+    to be base64-encoded — measured out, this comes to roughly a
+    12-to-1 up to 100-to-1 ratio of encoded-data size to actual
+    procedure-code size for a
+    twenty-landmark GUI workflow, and the design had already shown
+    hesitation about this very problem, via its still-open "trailing
+    assets zone"
+    question. And embedding data permanently locks in the asset's
+    file format, since anything embedded inside a text script can
+    never later become a non-text format (keeping the
+    `.rlql` landmark format able to become non-text in the future
+    only stays possible if landmark declarations live in their own
+    separate files).
+  - The "avoids needing a second file format" justification
+    originally given for embedding was found to have already broken
+    down in a small but telling way: `.rlqm` media-definition files
+    use the more permissive JSONC format, while the embedded
+    version inside a script had to use strict JSON, because tracking
+    matching braces could not survive a JSON comment being present —
+    meaning the surrounding script format had already
+    forced the embedded form to accept less than the separate file
+    form did.
+  - The property of everything living in a single file was GIVEN UP
+    HERE, KNOWINGLY. The evidence originally
+    cited to support that property didn't actually hold up: U4
+    already describes "the repository carries only blueprints, media
+    definitions, and Reliquary scripts" as living side by side in a
+    repository, not merged into one file, and U1's single-command
+    install path already seeds three entirely separate codex files.
+    The real loss here is casual sharing — being able to
+    paste one whole workflow into a gist or a bug report — but that
+    capability was already lost for anything that used landmarks. A
+    separate bundle file format, layered outside the language
+    itself, remains available later as a purely additive addition
+    (per goal G7).
+  - CONSEQUENCES OF THIS DECISION, folded into other documents: the
+    "label" concept loses its only remaining purpose,
+    which closes out the previously unresolved design problem [06];
+    the `fetch-media --script` CLI command and the
+    `fetch_media(script=)` API parameter are both deleted;
+    check-script's planned validation of embedded media, and its
+    special-case allowance for "writing to
+    `media/`," both go away; ROADMAP milestone 5
+    no longer targets embedded-install as a goal; and the script
+    recorder now always emits its draft as script plus asset files —
+    one single output mode instead of two different ones.
 
 - D11 — THE JULY 2026 SCRIPT-LANGUAGE REDESIGN — DECIDED (owner,
-  2026-07-21). Supports U6; G2, G3, G7. The redesign is normative
+  2026-07-21). Supports U6; G2, G3, G7. The redesign itself is
+  normative
   in [script-spec.md](../docs/spec/script-spec.md), which carries
-  the typed EBNF and every rule this round settled — so the design
-  itself is not restated here. What the entry is for is the shape
-  of the change: the old grammar could not parse the reference
-  script, and the answer was a statement model replacing the
-  terminal production rather than a patch to the productions that
-  failed. Later rounds amended much of the detail (D24 the
-  reference grammar, D26 the reach and string rules, D60 pacing);
-  read the spec, never this entry, for what the language is.
+  the full typed EBNF grammar and every rule this decision round
+  actually settled — so the design itself isn't restated here. What
+  this entry exists to record is the *shape*
+  of the change: the old grammar couldn't even parse the reference
+  script, and the fix was replacing the terminal production with an
+  entirely new statement model, rather than patching the individual
+  grammar rules that were
+  failing. Later decisions amended much of the detail (D24 redid the
+  reference grammar, D26 redid the reach and string rules, D60 redid
+  pacing) — read the spec itself, never this entry, to understand
+  what the language actually is today.
 
-- D10 — GUIDING-PRINCIPLES GAP QUEUE — DECIDED (owner,
-  2026-07-21, the necessity/sufficiency panel walked adversarially
-  per use case). Supports U1, U2, U4, U5, U6, U14; G2, G3.
-  VERDICT, which is the durable part: **the primary application
-  surfaces are necessary and minimal** — every gap the panel found
-  was a spec lagging the principles rather than a missing surface,
-  and each was closed into its spec by the realignment pass. The
-  work list itself is spent; the finding is why no surface was
-  added to close a gap.
+- D10 — WORKING THROUGH THE GUIDING-PRINCIPLES BACKLOG — DECIDED
+  (owner,
+  2026-07-21, a panel checking necessity and sufficiency, worked
+  through adversarially, use case by use case). Supports U1, U2, U4,
+  U5, U6, U14; G2, G3.
+  THE VERDICT, which is the lasting part of this: **the primary
+  application surfaces are both necessary and already minimal** —
+  every gap this panel actually found
+  turned out to be the specification lagging behind the principles,
+  never an actually missing surface,
+  and each one was closed by updating its own spec during the
+  realignment pass. The
+  original work list itself is now fully spent; what remains useful
+  is the finding itself — explaining why no new surface was ever
+  added to close any of these gaps.
 
-- D9 — BLUEPRINT-SPEC GAP QUEUE — DECIDED (owner, 2026-07-21).
-  Supports U2, U4. A work list against the media and blueprint
-  specs: the media spec tracked the principles closely and the gaps
-  clustered in the blueprint spec. Every item closed into
+- D9 — WORKING THROUGH THE BLUEPRINT-SPEC BACKLOG — DECIDED (owner,
+  2026-07-21).
+  Supports U2, U4. A work list checked against the media and
+  blueprint
+  specs: the media spec already tracked the guiding principles
+  closely, and the actual gaps
+  clustered in the blueprint spec instead. Every item on the list
+  was closed by updating
   [blueprint-model.md](../docs/spec/blueprint-model.md) and the
-  blueprint guide/reference, which are normative; nothing was
-  refused, so nothing else survives the landing.
+  blueprint guide/reference documents, which are now normative;
+  nothing on the list was
+  rejected, so nothing else survives beyond what already landed.
 
-- D8 — CLI DESIGN GAP QUEUE — DECIDED (owner, 2026-07-21).
-  Supports U1, U3, U4, U14; P6. VERDICT: the two-layer lifecycle
-  vocabulary, the parity doctrine, the selection failure modes and
-  the no-prompt discipline are sound; the gaps were unnamed
-  conventions, and every one has since landed in
-  [cli.md](../docs/spec/cli.md). Kept here: the spellings weighed
-  and refused, because each is a plausible re-raise.
+- D8 — WORKING THROUGH THE CLI DESIGN BACKLOG — DECIDED (owner,
+  2026-07-21).
+  Supports U1, U3, U4, U14; P6. THE VERDICT: the two-layer lifecycle
+  vocabulary, the parity requirement between CLI and API, the
+  failure modes for selecting a machine, and the rule against
+  interactive prompts are all sound as designed; the actual gaps
+  were just conventions that had never been written down, and every
+  one of them has since landed in
+  [cli.md](../docs/spec/cli.md). Kept here: the specific alternative
+  spellings that were considered and rejected, since each one is a
+  plausible thing to get proposed again later.
 
-  - **`run` → `runs`** — declined: no meaning is gained, and `run`
-    names run records exclusively.
-  - **`--format`** — declined as YAGNI; a pre-beta conversion stays
-    free if one is ever wanted.
-  - **`--as`** for the new blueprint's name — declined because
-    `as=` is a Python keyword; `--name` mirrors as `name=` in every
-    binding language.
-  - **An explicit `--stdin` flag, and a hybrid** — declined: one
-    spelling and zero new surface beat two, and a secret never
-    travels as an argv value (process listings, shell history).
-  - **The suffix trio** `--blueprint-name` / `--machine-number` /
-    `--machine-id` — declined: deletion beat addition.
+  - **Renaming `run` to `runs`** — rejected: nothing is gained in
+    meaning, and `run`
+    already exclusively refers to run records.
+  - **Adding a `--format` flag** — rejected as speculative, since
+    nobody's asked for it yet ("YAGNI"); converting to this before a
+    beta release
+    stays free to do later if it's ever actually wanted.
+  - **Using `--as` for a new blueprint's name** — rejected because
+    `as` is a reserved Python keyword; `--name` was chosen instead,
+    which maps cleanly onto a `name=` parameter in every language
+    binding.
+  - **Both an explicit `--stdin` flag and a hybrid auto-detection
+    approach** — rejected: having exactly one spelling and adding
+    zero new surface area
+    beats supporting two different ways to do the same thing, and a
+    secret value should never be passed as a plain command-line
+    argument anyway, since it would then be visible in process
+    listings and shell history.
+  - **The three-flag family** `--blueprint-name` / `--machine-number`
+    / `--machine-id` — rejected: removing flags was the better fix
+    here than adding more of them.
 
-- D7 — API DESIGN GAP QUEUE — DECIDED (owner, 2026-07-21).
-  Supports U14; P6, P7. VERDICT: the twin-name identity rule, the
-  `--json` twin's-return rule, pull-only handles and the
-  named-omission discipline are sound; the gaps were unnamed
-  conventions and unnamed twins, all since homed in
-  [api.md](../docs/spec/api.md). The refusals, which are what a
-  later round would otherwise re-raise:
+- D7 — WORKING THROUGH THE API DESIGN BACKLOG — DECIDED (owner,
+  2026-07-21).
+  Supports U14; P6, P7. THE VERDICT: the rule that a function and
+  its CLI command share the same name, the rule that a `--json`
+  flag's twin returns the exact same structure, handles that can
+  only be read from (never written to) directly, and the rule that
+  any deliberate omission must be explicitly named, are all sound as
+  designed; the actual
+  gaps were unnamed conventions and functions missing their
+  CLI-equivalent "twin," all of which have since been documented in
+  [api.md](../docs/spec/api.md). Rejected alternatives, kept here
+  specifically because a
+  later round would otherwise likely propose them again:
 
-  - **A mechanical CLI↔API mirror** — declined: parity binds the
-    pair, not each function alone, so a flag need not become a
-    parameter of the same name.
-  - **`open_run` / `get_run`** — declined for `attach_run`, the
-    doctrine's own verb: sync is async plus attach.
-  - **A full error-domain tree** — declined as speculation ahead of
-    demand; classes grow additively and never as a break. Strict
-    `Error`-suffixing declined with it.
-  - **A CLI-owned mismatch checkpoint** — declined: the error names
-    one file while a refetch is the caller's call.
-  - **`cancel()` on drop, and Python `with`-sugar cancel** — both
-    declined: GC timing carries no semantics in any binding, and
-    the sugar is the same trap opted into. A handle is a follower,
-    never an owner.
+  - **A fully mechanical, one-to-one mirror between every CLI flag
+    and every API parameter** — rejected: parity binds
+    the pair as a whole, not each function alone, so a flag doesn't
+    necessarily need to become a parameter of the same name.
+  - **Separate `open_run()` / `get_run()` functions** — rejected in
+    favor of a single `attach_run()`, which is the verb this
+    design's own
+    doctrine already uses: a synchronous run is really just an
+    asynchronous one plus immediately attaching to it.
+  - **A full, deeply nested tree of error classes covering every
+    possible domain** — rejected as premature speculation ahead of
+    demand; error
+    classes are meant to grow additively over time, never as a
+    breaking redesign. Strictly requiring every error class name to
+    end in
+    "Error" was rejected along with this.
+  - **Having the CLI itself own a checkpoint that detects a
+    mismatch** — rejected: the resulting error only names
+    one specific file, while deciding whether to refetch is really
+    the calling code's own decision to make.
+  - **Automatically calling `cancel()` when a handle object is
+    garbage-collected, and Python `with`-block sugar that cancels
+    automatically on exit** — both
+    rejected: exactly when garbage collection happens carries no
+    defined meaning in any language binding, and the `with`-block
+    sugar is really the same trap opted into on purpose. A handle
+    is meant to only ever follow along with something, never to own
+    or control it.
 
-  The async surface these shape is **F6**, deferred to the backlog
-  and unbuilt; the refusals stand with its design.
+  The asynchronous-run surface these design decisions actually shape
+  is **feature F6**, which remains deferred to the backlog and
+  unbuilt; these rejections stand ready, waiting for that design.
 
-- D6 — GAP-CLOSURE DESIGN QUEUE — DECIDED (owner, 2026-07-21).
-  Supports U1, U5, U6, U14; P6, P7; G2. The five gaps the
-  principles queue left standing, worked in leverage order. **Most
-  of what it settled has since been deleted rather than shipped**:
-  the run-record half — `transcript.txt`, the records archive,
-  `--detach` — went with **D36**, and the export half sits unbuilt
-  on the Horizon, so those rulings and their refusals guard nothing
-  that exists. What survives is what still has a subject:
+- D6 — WORKING THROUGH THE GAP-CLOSURE DESIGN BACKLOG — DECIDED
+  (owner, 2026-07-21).
+  Supports U1, U5, U6, U14; P6, P7; G2. This covers the five
+  remaining gaps left open by the earlier guiding-principles
+  backlog, worked through in order of highest leverage first. **Most
+  of what this decision actually settled has since been deleted
+  rather than ever shipped**:
+  the run-record half of it — the `transcript.txt` file, the
+  run-records archive,
+  the `--detach` flag — was removed along with **D36**, and the
+  export half of it still sits unbuilt
+  on the Horizon — so those specific rulings and their rejected
+  alternatives no longer guard anything
+  that currently exists. What's still relevant is whatever still has
+  a live subject to apply to:
 
-  - **An outcome line on stdout** — declined as scraper bait. The
-    stdout discipline it protects is now S7's.
-  - **Direct console-device access for prompting** — declined as a
-    platform seam; prompt text goes to stderr and the answer comes
+  - **Printing a one-line outcome summary to stdout** — rejected as
+    an invitation for scripts to scrape it. The
+    discipline this rejection protects now belongs to surface S7
+    instead.
+  - **Direct access to the console device for prompting the user** —
+    rejected as being too
+    platform-specific; prompt text is written to stderr instead, and
+    the answer is read
     from stdin.
-  - **A writable/read-only flag on a host directory** — declined
-    explicitly as *an agent invention the owner never asked for*.
-    Recorded because the refusal is about provenance rather than
-    design: an unrequested capability does not enter by being
-    plausible.
+  - **A writable/read-only flag on a host directory drive** —
+    rejected, and explicitly recorded as *a capability an AI agent
+    invented on its own, that the owner never actually asked for*.
+    This is recorded here specifically because the rejection is
+    about where the idea came from, rather than about its design: an
+    unrequested capability does
+    not get added just because it happens to sound plausible.
 
-- D5 — THE RUN-COLLECTION DROP — DECIDED (owner, 2026-07-22, the
-  out-of-band round; an owner revisit of gap-closure items 2 and 3
-  settled through "what use case cannot be met without it?" —
-  answer: none; the mechanism was custody and ergonomics, never
-  capability; U6 verified untouched — console capture in, authored
-  files out). Supports U14 — retrofitted 2026-07-27; the entry
-  argues from U3, which D51 retired into U14, and the "U6
-  verified untouched" note is a check that nothing broke, not a
-  demand. DROPPED wholesale: the `results` header,
-  `stage`/`collect` (S15 and the language's only host paths die
-  with them — example 05's two-worlds question dissolves: strings
-  are guest text only), the CLI pair stage-files/collect-files,
-  and record custody — runs/<n>/output/ leaves the record; a
-  record is the event stream + transcript + screenshots
-  (INTERFACES "Recorded outputs" updated). FILE EXCHANGE IS
-  OUT-OF-BAND: while a machine is stopped on every control plane
-  its drives are plain host state (a hostdir drive is its
-  directory; images are the user's own tools' business);
-  Reliquary neither mediates nor records it; the contract with
-  its edges (running drives untouchable, media cache read-only
-  by doctrine, runs/ append-only, machine state files
-  Reliquary's own) is in instance-model.md "The machine
-  directory and out-of-band access". NEW QUERY:
-  get-machine-dir / get_machine_dir(machine=|blueprint=) — the
-  machine's cache directory as an absolute path; any phase,
-  standard selectors, --json serializes the string. DEFERRED
-  with a roughed shape (ROADMAP "Horizon"): in-band
-  list-files/get-files/put-files (twins list_files / get_files /
-  put_files), <drive-key>:<path> addressing, at-rest
-  capability-honest per call, media excluded, recursive, no
-  custody; details (e.g. get-files' destination default) belong
-  to that milestone's own round; value concentrates where
-  out-of-band thins (non-QEMU backends — no hostdir — and
-  non-FAT filesystems), so sequence at or soon after the second
-  backend. [**That deferral is closed refused, not pending**: the
-  in-band family was built (D62) and then deleted by **D108**,
-  which put a machine's file content outside Reliquary's purview.
-  The out-of-band door this entry created is now the route rather
-  than the fallback.] Named cost accepted: per-iteration artifact history
-  is the caller's to keep (U3 already makes the caller the
-  interpreter). Use-case triage: no amendment — strong U3
-  alignment (interpretation on the agent's side; the record is
-  evidence, not a warehouse). Folded: script-spec (action list,
-  strings table, header table + prose, grammar, S15 removed —
-  S1–S14, severability, event-stream transfer bullet, preflight
-  list, "File exchange — a named omission" replacing the
-  stage-and-collect section, run-directory tree, per-test
-  paragraph, bundle note), cli.md ("The machine directory"
-  replacing "File exchange", machine-scoped command list,
-  media-naming prose), api.md (surface table row, realignment
-  note), ROADMAP ("The CLI" state-ops paragraph + synopsis,
-  script-section offline paragraph, primitive-vocabulary list,
-  interaction-runs custody phrase, spike-8 out-list, realignment
-  deliverable 3, control-plane vvfat note, the Horizon bullet),
-  INTERFACES.md (recorded outputs), instance-model.md (new
-  section), machine-blueprint.md (runs/ contents twice),
-  machine-blueprint-reference.md (hostdir prose + division of
-  labor), codex.md (naming prose), planning/design/script-examples/05 rewritten
-  as a regression note + README row. Gap-closure items 2 and 3
-  annotated SUPERSEDED IN PART above
+- D5 — THE RUN-COLLECTION FEATURE IS DROPPED ENTIRELY — DECIDED
+  (owner, 2026-07-22, the "out-of-band" decision round; the owner
+  revisited gap-closure items 2 and 3, settling the question with
+  "what use case cannot be met without it?" — the answer was none;
+  this mechanism had only ever been about custody and ergonomics,
+  never about capability; use case U6 was double-checked and found
+  unaffected — screen-capture recording stays in, transferring
+  authored files back out does not). Supports U14 — retrofitted
+  into that use case on 2026-07-27; the original entry argued from
+  U3, which D51 later retired into U14, and the note "U6 verified
+  untouched" is just a sanity check that nothing broke, not a real
+  requirement being satisfied.
+
+  DROPPED ENTIRELY: the `results` header, the `stage`/`collect`
+  verbs (validation rule S15 goes with them, and they were the
+  language's only way of touching the host filesystem at all — this
+  also dissolves design example 05's "two worlds" open question,
+  since a script's strings are now guest text only), the CLI command
+  pair `stage-files`/`collect-files`, and the whole concept of
+  Reliquary owning custody of run output — the `runs/<n>/output/`
+  directory is no longer part of the record; a "record" is now just
+  the event stream, the transcript, and screenshots (INTERFACES.md's
+  "Recorded outputs" section is updated to match). FILE EXCHANGE NOW
+  HAPPENS OUT-OF-BAND: while a machine is stopped, on every control
+  plane, its drives are just plain files/directories on the host (a
+  `hostdir`-type drive literally *is* its host directory; a disk
+  image file is entirely the user's own business, using their own
+  tools). Reliquary neither mediates nor records any of this. The
+  rules at the edges of this (a running machine's drives can't be
+  touched this way, the media cache is read-only by convention,
+  `runs/` is append-only, and machine-state files belong to
+  Reliquary alone) are documented in instance-model.md's "The
+  machine directory and out-of-band access" section. A NEW QUERY WAS
+  ADDED: `get-machine-dir` / `get_machine_dir(machine=|blueprint=)`
+  — returns the machine's cache directory as an absolute path; works
+  at any phase, using the standard selectors, and `--json` output
+  serializes it as a plain string. DEFERRED, WITH A ROUGH SHAPE
+  ALREADY SKETCHED (in the ROADMAP's "Horizon" section): in-language
+  `list-files`/`get-files`/`put-files` commands (with matching
+  `list_files`/`get_files`/`put_files` API functions), addressed as
+  `<drive-key>:<path>`, honest about capability at rest on a
+  per-call basis, excluding media drives, working recursively, with
+  no custody retained; details like `get-files`' default destination
+  belong to whatever future milestone actually builds this — the
+  value of building it concentrates exactly where the out-of-band
+  approach gets thin (non-QEMU backends, which have no `hostdir`
+  support, and non-FAT filesystems), so it should be sequenced at or
+  soon after the second backend adapter lands. [**That deferred
+  feature is now closed and rejected, not merely still pending**:
+  the in-band file family actually was built later (D62) and then
+  deleted again by **D108**, which placed a machine's file content
+  permanently outside Reliquary's scope. The out-of-band door this
+  entry created is now the permanent route, not just a temporary
+  fallback.] One cost is knowingly accepted and named here: keeping
+  a history of artifacts across multiple iterations is now entirely
+  the caller's own responsibility to manage (U3 already made the
+  calling agent responsible for interpreting results, so this is
+  consistent). Use-case review: no amendment needed — this aligns
+  strongly with U3 (interpretation happens on the agent's side; the
+  record exists as evidence, not as a permanent warehouse). FILES
+  UPDATED: script-spec.md (its action list, strings table, header
+  table and surrounding prose, its grammar, with S15 removed — S1
+  through S14 remain, its severability section, the event-stream
+  transfer bullet, the preflight list, a new "File exchange — a
+  named omission" section replacing the old stage-and-collect
+  section, the run-directory tree diagram, a per-test paragraph, and
+  a bundle note), cli.md (a new "The machine directory" section
+  replacing "File exchange," the machine-scoped command list, and
+  media-naming prose), api.md (the surface table row, and a
+  realignment note), the ROADMAP (its "The CLI" state-operations
+  paragraph and synopsis, the script-section's offline paragraph,
+  the primitive-vocabulary list, a phrase about interaction-run
+  custody, spike-8's exclusion list, realignment deliverable 3, a
+  control-plane vvfat note, and the Horizon bullet), INTERFACES.md
+  (the recorded-outputs section), instance-model.md (a whole new
+  section), machine-blueprint.md (the `runs/` directory contents,
+  mentioned in two places), machine-blueprint-reference.md (the
+  `hostdir` prose and a note on division of labor), codex.md
+  (naming-related prose), and planning/design/script-examples/05,
+  which is rewritten as a regression note plus a README table row.
+  Gap-closure items 2 and 3 (from D6) are annotated above as
+  SUPERSEDED IN PART.
+
 - D4 — THE USER-PROPERTIES DESIGN ROUND — DECIDED (owner,
-  2026-07-21, the docker-comparison round). Supports U1, U4, U5,
-  U14; P13. The shape it settled is normative in
+  2026-07-21, a round that compared this design against how Docker
+  handles a similar problem). Supports U1, U4, U5,
+  U14; P13. The resulting design is normative in
   [script-properties.md](../docs/spec/script-properties.md) and
-  cli.md;
-  what is kept here is the refusals, each a guard against a
-  re-raise, restated in today's spellings.
+  cli.md; what's kept here is the list of rejected alternatives,
+  each one a guard against it being proposed again, restated in
+  today's terminology.
 
-  - **"Registry" is reserved, not rejected.** The concept is *user
-    properties*; "registry" reads as a remote artifact-distribution
-    service (docker/npm/OCI) and stays free for a future sharing
-    service.
-  - **Blueprint-only wiring** (compose-style, the script naming no
-    key) — declined: every blueprint would re-wire universal keys.
-    A script may suggest a key and a blueprint parameter replaces
-    it.
-  - **`RELIQUARY_<KEY>_PROPERTY`** (suffix form) — declined for the
-    prefix `RELIQUARY_PROPERTY_<KEY>`: a grep-able common prefix
-    and a self-evident reserved namespace.
-  - **One packed environment variable** — declined: it needs a
-    quoting grammar, collides with `RELIQUARY_PROPERTIES`, loses
-    one-secret-one-variable CI injection, and sits inside platform
-    environment-block size limits.
-  - **A layer above the home's file** — declined: project defaults
-    are blueprint parameters' job, and `--properties` *replacing*
-    the home's file is the hermeticity tool, so nothing personal
-    reaches a project-controlled run.
-  - **Ordinary-only environment** (env barred from secret-bound
-    keys) — declined as a refusal that gets worked around; env may
-    carry one, in the named warned-plaintext class. Argv never
-    does.
-  - **JSON and TOML for the file** — declined: every other property
-    layer speaks `key=value`, and TOML's dotted keys nest while
-    rewrite fidelity would need a dependency. `user.properties` is
-    the filename for editor recognition, against the round's own
-    recommendation of `properties.rlqp`; the spec names the caveat
-    that this is *not* Java properties — no unicode escapes, no
-    continuations.
-  - **A bulk values file** — declined: repeatable flags and the
-    API mapping cover it, and growth stays additive.
+  - **The word "registry" is reserved for future use, not rejected
+    outright.** The actual concept being designed here is *user
+    properties*; "registry" reads much more like a remote
+    artifact-distribution service (the way Docker, npm, or an OCI
+    registry work), so that word is kept free for a possible future
+    asset-sharing service.
+  - **Wiring values only through the blueprint itself** (compose-file
+    style, with the script never naming a key) — rejected: every
+    single blueprint would then have to re-wire the same universal
+    keys over and over. Instead, a script may suggest a key name, and
+    a blueprint parameter can override it.
+  - **`RELIQUARY_<KEY>_PROPERTY`** (putting the fixed part as a
+    suffix) — rejected in favor of the prefix form,
+    `RELIQUARY_PROPERTY_<KEY>`: this gives a common prefix that's
+    easy to search for, and makes the reserved namespace immediately
+    obvious.
+  - **One single, packed environment variable holding everything** —
+    rejected: it would need its own quoting syntax, it would collide
+    with an existing `RELIQUARY_PROPERTIES` variable, it would break
+    the "one secret, one environment variable" pattern CI systems
+    rely on for injecting secrets, and it risks running into
+    platform-specific limits on total environment size.
+  - **A configuration layer that sits above the user's home-directory
+    file** — rejected: project-level defaults are already the job of
+    blueprint parameters, and having `--properties` *entirely
+    replace* the home-directory file is exactly the tool needed to
+    guarantee a fully isolated ("hermetic") run — so nothing from a
+    user's personal environment leaks into a project-controlled run.
+  - **Only allowing ordinary (non-secret) values through environment
+    variables**, barring secret-bound keys from using them —
+    rejected as a restriction people would just find a workaround
+    for; an environment variable may carry a secret, but only inside
+    a clearly named, explicitly-warned "plaintext" category. A
+    command-line argument is never allowed to carry one, under any
+    circumstances.
+  - **Using JSON or TOML for the properties file format** — rejected:
+    every other layer of the property system already speaks plain
+    `key=value` syntax, and TOML's dotted-key nesting, plus the need
+    to preserve exact formatting when rewriting the file, would
+    require pulling in an external dependency. The actual filename
+    chosen, `user.properties`, was picked specifically so editors
+    would recognize the format automatically — going against this
+    same design round's own original recommendation of
+    `properties.rlqp`; the spec explicitly notes the caveat that
+    this is *not* actually Java's `.properties` format — no Unicode
+    escape sequences, no line continuations.
+  - **A single file for bulk-loading many values at once** —
+    rejected: repeatable command-line flags plus the API's own
+    mapping type already cover this need, and the design can still
+    grow additively later if that's ever not enough.
 
-- D3 — JSON SCHEMAS FOR THE AUTHORED FORMATS — DECIDED (owner, 2026-07-21,
-  design round; all three forks settled on the recommendations).
-  Supports U4; P9 — retrofitted 2026-07-27:
-  - planning/design/machine-blueprint.schema.json +
-    media-definition.schema.json AUTHORED (draft 2020-12,
-    self-contained, strict JSON, REUSE.toml-covered; spec examples
-    verified against both — 32/32): synchronized companions — the
-    prose specs stay normative, schema-valid never implies valid
-    (per-document structural subset only; cross-document rules and
-    the capability tier stay prose); one media schema covers both
-    homes (library file + embedded block, the same forms)
-  - $schema field: the formats stay CLOSED pre-beta — a pinned
-    schema reference is a version field in disguise; editors bind
-    by file association, which tracks the installed Reliquary;
-    $schema-as-versioned-URL recorded as the leading candidate
-    spelling of the version field at beta (ROADMAP "Decisions
-    still needed")
-  - validator: the parser stays Reliquary's validator (fail-closed
-    diagnostics); a shared valid/invalid fixture corpus runs
-    against both parser and schema — at realignment, with the
-    static-conformance corpus already queued there
-  - spec pins landed with the fold: boot entries unique by slot;
-    control-planes entries unique; sha256 hex accepted in either
-    case, canonical writes lowercase
-  - deferred: machine-state schema + publication mechanics
-    (milestone 3 item 6); media/item name, script-label, and
-    input-name grammars stay open with the asset-spec work (the
-    schemas say non-empty string)
-- D1 — RESOLVED (owner, 2026-07-21). Supports (none) — a
-  vocabulary decision; no use case or principle demands what a
-  thing is called, and the naming class is outside the
-  traceability rule's reach (retrofitted 2026-07-27).
-  [Amended 2026-07-28 — Supports P18. The naming half of that
-  clause stands — no principle demands what a thing is
-  called — but this entry settled more than a name. "Canon" was
-  rejected for naming an abstract authority where "codex" names
-  a bound volume copied from, and that distinction is what P18
-  states in its own words: a library of examples, read and copied
-  from, never one to build on. P18 was clarified the same day to
-  say so about the codex outright — meant to work, never stable,
-  names and content alike free to change in a point release, and
-  there to start a consuming project's own assets rather than to
-  be depended on — which is the principle this entry had none
-  of. A
-  clarification rather than an amendment (P23's first
-  exception): P18 never claimed the codex was stable, so stating
-  that it is not changes the reading of no earlier decision.] The
-  built-in library is named THE
-  CODEX (was "change 'builtin library' concept to 'template
-  library' ??"; "canon" was weighed and rejected — codex is the
-  artifact, a bound volume copied from, where canon is the
-  abstract authority/list) — folded across INTERFACES, USE-CASES, ROADMAP,
-  AGENTS, CONTRIBUTING, cli.md, README, and docs
-  (builtin-library.md renamed codex.md); Reliquary/builtins/
-  package dir renames to codex/ at implementation realignment
+- D3 — JSON SCHEMAS FOR THE AUTHORED FILE FORMATS — DECIDED (owner,
+  2026-07-21, a design round where all three open questions were
+  settled by adopting the original recommendations).
+  Supports U4; P9 — retrofitted into that principle on 2026-07-27:
+  - planning/design/machine-blueprint.schema.json and
+    media-definition.schema.json are AUTHORED (using JSON Schema
+    draft 2020-12, fully self-contained, in strict JSON, covered by
+    REUSE.toml licensing metadata; every spec example was checked
+    against both, 32 out of 32 passing): the two are meant to stay in
+    sync with each other — the prose specs remain the actual
+    authority, and being schema-valid never by itself means
+    something is actually valid (the schema only covers the
+    structural subset that applies within one single document; rules
+    that span multiple documents, and the capability-tier rules,
+    stay defined only in prose). One single media schema covers both
+    places media definitions can appear (a standalone library file,
+    or an embedded block) — since both use the identical structure.
+  - The `$schema` field: authored file formats stay entirely CLOSED
+    before the beta release — a pinned schema reference would really
+    just be a version field wearing a disguise; editors already bind
+    to the correct schema through file-type association, which
+    tracks whatever copy of Reliquary is installed. Using `$schema`
+    as a versioned URL is recorded as the leading candidate spelling
+    for an eventual version field, to be revisited at beta (see the
+    ROADMAP's "Decisions still needed" section).
+  - The validator: Reliquary's own parser remains the actual source
+    of truth for validation (producing fail-closed diagnostics); a
+    shared corpus of valid and invalid test fixtures is run against
+    both the parser and the schema together — this will happen
+    during the realignment pass, alongside the static-conformance
+    corpus that's already queued for that same pass.
+  - Spec rules that landed as part of this: boot entries must be
+    unique by slot; `control-planes` entries must be unique; sha256
+    hashes are accepted in either uppercase or lowercase, but written
+    out in lowercase as the canonical form.
+  - Deferred: the machine-state schema, and the mechanics of actually
+    publishing these schemas (tracked as milestone 3, item 6); the
+    exact grammar for media/item names, script labels, and input
+    names stays an open question, to be settled alongside the
+    asset-spec work — for now, the schemas just require a non-empty
+    string.
+- D1 — RESOLVED (owner, 2026-07-21). Supports (none) — this is
+  purely a naming decision; no use case or principle dictates what
+  something is called, and naming choices fall outside what the
+  traceability rule covers (retrofitted into that understanding on
+  2026-07-27).
+  [Amended on 2026-07-28 — Supports P18. The naming half of the note
+  above still stands — no principle dictates what a thing is
+  called — but this entry actually settled more than just a name.
+  The word "canon" was rejected because it names an abstract
+  authority, whereas "codex" names an actual bound volume that
+  things get copied out of — and that distinction is exactly what
+  principle P18 states in its own words: a library of examples,
+  meant to be read and copied from, never meant to be built on top
+  of directly. P18 was clarified the same day to say this explicitly
+  about the codex: it's meant to actually work, but it's never
+  guaranteed stable, and both its names and its contents are free to
+  change in any minor point release — it exists to help a consuming
+  project start its own set of assets, not to be depended on
+  directly — which is exactly the guarantee this original entry
+  never actually made. This later note counts as a
+  clarification rather than an amendment (the first exception under
+  P23's rule): P18 never claimed the codex was stable in the first
+  place, so stating plainly that it isn't doesn't change how any
+  earlier decision should be read.] The project's built-in library
+  of examples is named THE
+  CODEX (it had originally been recorded as "change 'builtin library'
+  concept to 'template
+  library' ??"; the word "canon" was considered and rejected — a
+  codex is the physical artifact, a bound volume that gets copied
+  from, where a canon is the
+  abstract idea of an authoritative list). FILES UPDATED: INTERFACES,
+  USE-CASES, ROADMAP,
+  AGENTS, CONTRIBUTING, cli.md, README, and the docs
+  (builtin-library.md renamed to codex.md); the `Reliquary/builtins/`
+  package directory is renamed to `codex/` at the point of
+  implementation realignment.
 
 ## Retired decisions
 
-Overruled or no-longer-relevant decisions. A retired decision binds
-nothing, and it is kept only where it still has **teeth** — where
-the position it took is one someone could plausibly re-raise, so
-the record of its refusal is doing work. One whose subject no
-longer exists, or whose surviving insight the overruling entry
-already carries, is struck outright rather than kept as furniture;
-a gap in the sequence is the history, and git holds the text.
-Reopening a retired decision is argued through the surface-change
-rule.
+Decisions that have since been fully overruled, or that no longer
+apply. A retired decision no longer binds anything — it's kept here
+only where it still has **real teeth** — meaning the position it
+originally took is something someone could plausibly try to argue
+for again, so keeping the record of why it was refused is still
+doing useful work. A retired decision whose entire subject no longer
+exists at all, or whose one useful insight is already fully captured
+by whatever entry overruled it, is deleted outright rather than kept
+around as clutter; the resulting gap in the numbering sequence is
+itself the history, and the original text is still available in git
+history. Reopening a retired decision requires going through the
+same surface-change process as anything else.
 
-- D62 — RETIRED (overruled by D108) — THE IN-BAND FILE FAMILY IS
-  COMPLETE; P16 IS ARMED. Supports U14, U20; P16.
+- D62 — RETIRED (overruled by D108) — THE SET OF IN-LANGUAGE
+  FILE-TRANSFER COMMANDS WAS COMPLETE, AND PRINCIPLE P16 WAS ARMED.
+  Supports U14, U20; P16.
 
-  **Kept because its position is the re-raisable one**: that P16
-  obliges Reliquary to carry a file across the host/guest boundary,
-  which is what armed the principle here and what D108 declined.
-  Under the carve-out, a machine's file content is out of purview by
-  design, so the five verbs are gone and no use case demands them
-  back. Its address ruling — one form for files and directories
-  alike, the drive root sayable — died with the letter map it was
-  written against, and D5's `<drive-key>:<path>` shape stays dead
-  too: nothing addresses inside a volume at all.
-
+  **Kept because the position it took is exactly the one someone
+  could plausibly argue for again**: that P16 obligates Reliquary to
+  carry a file across the host/guest boundary itself, which is what
+  armed this principle in the first place, and which D108 later
+  specifically rejected. Under D108's exception, a machine's file
+  content is now permanently out of Reliquary's scope by design, so
+  the five commands this decision introduced are gone, and no
+  current use case is asking for them back. This entry's rule about
+  addressing files (one shared syntax for both files and
+  directories, with the drive's root itself also expressible) died
+  along with the drive-letter mapping it was written against, and
+  D5's earlier `<drive-key>:<path>` addressing syntax stays dead
+  too — nothing addresses a location inside a drive's contents at
+  all anymore.
 
 - D91 — RETIRED (overruled by D93 the same day it was decided and
-  delivered) — A DEVICE IS A DECLARED MODEL, JUDGED AT ASSIGNMENT.
-  Supports U22, U4, U14; P8, P10, P11.
+  delivered) — A DEVICE IS A DECLARED MODEL NAME, JUDGED AT THE
+  MOMENT A MACHINE IS ASSIGNED TO A BACKEND. Supports U22, U4, U14;
+  P8, P10, P11.
 
-  **Kept because P25 and D93 both cite it**, and because its
-  refusal is the re-raisable one: a device vocabulary admitted on
-  *one* backend's say-so. D91 built exactly that axis and D93
-  removed it, replacing the bar with general applicability across
-  backends — what one backend alone provides stays behind that
-  backend's pin in `backend-settings`. The growth rule D91 got
-  right survives in P25: the vocabulary is what demand has asked
-  for, never what a backend happens to expose.
+  **Kept because both P25 and D93 cite it directly**, and because
+  the position it rejected is exactly the one someone could
+  plausibly argue for again: a shared device vocabulary being
+  accepted into the project just because *one* backend happens to
+  support it. D91 had built exactly that mechanism, and D93 removed
+  it, replacing that bar with a requirement of general applicability
+  across multiple backends — anything only one backend actually
+  provides now has to stay behind that backend's own settings
+  section, `backend-settings`. The one thing D91 got right about how
+  this vocabulary should grow still survives, inside P25: the shared
+  vocabulary should only ever contain what real demand has actually
+  asked for, never simply whatever one particular backend happens to
+  expose.
 
-  Its own naming refusal stands: **`virtio-rng-pci`** is QEMU's bus
-  spelling, not a portable device name, and a vocabulary that
-  admits one backend's spellings is the axis D93 closed.
+  D91's own rejection of a specific name still stands, though:
+  **`virtio-rng-pci`** is QEMU's own internal bus-addressing
+  spelling, not a name that's portable across backends, and
+  admitting a device vocabulary built out of one backend's internal
+  spellings is exactly the mechanism D93 shut down.

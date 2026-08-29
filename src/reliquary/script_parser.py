@@ -3,13 +3,13 @@
 """The typed layer of the reliquary script language.
 
 reliquary's own lexer (:mod:`reliquary.script_nodes`) feeds lark's
-LALR(1) parser over ``script_grammar.lark``, which mirrors the
-normative EBNF in docs/spec/script-spec.md. The lexer keeps
-the lexical diagnostics; the grammar fixes node names and
-positional argument types; this module's transformer checks each
+LALR(1) parser, which runs over ``script_grammar.lark`` -- a grammar
+that mirrors the normative EBNF in docs/spec/script-spec.md. The
+lexer produces the lexical diagnostics; the grammar fixes node names
+and positional argument types; this module's transformer checks each
 node's modifiers against its signature and builds the typed tree.
 
-The V-numbered static rules live above this layer.
+The V-numbered static rules are checked by the layer above this one.
 """
 
 import os
@@ -27,17 +27,20 @@ from .script_nodes import (
     KEYWORDS, Interpolation, ScriptParseError, StringLiteral, tokenize)
 from .script_validation import validate
 
-# Each node's allowed modifiers. The transformer reports anything
-# else naming the node and what it accepts. Observation nodes list
-# their timing modifiers only: every other modifier on an
-# observation names a channel (script-spec.md, "Channels"), which
-# V7 checks in the validation layer.
+# Each node's allowed modifiers. If a script uses any other
+# modifier, the transformer reports an error naming the node and
+# what it does accept. Observation nodes list only their timing
+# modifiers here: any other modifier on an observation names a
+# channel instead (script-spec.md, "Channels"), and V7 checks those
+# in the validation layer.
 _SIGNATURES = {
-    # `stability` sits where `stable` cannot, and the divergence is
-    # principled: `stable` qualifies a match, so one must exist, while
-    # `stability` qualifies the frame a compare runs on and a frame
-    # exists at every sample. That is what makes the container rungs
-    # meaningful — and a default possible at all.
+    # `stability` is allowed on nodes where `stable` isn't, and
+    # there's a real reason for that: `stable` describes a match, so
+    # a match has to exist first, while `stability` describes the
+    # frame a comparison runs on, and a frame exists at every sample
+    # regardless of whether anything matched. That's what makes it
+    # meaningful for `stability` to have container-level defaults
+    # (phase, header) at all.
     "wait_one": ("timeout", "stable", "stability"),
     "wait_branching": ("timeout", "stability"),
     "on_handler": ("stable", "stability"),
@@ -47,9 +50,9 @@ _SIGNATURES = {
     "http_def": ("port-min", "port-max"),
     "content_def": ("indent", "from"),
     "http_control": (),
-    # The guest-input verbs, and only they, accept `pacing`: it is
-    # the gap before the first key event, so a verb that delivers no
-    # keys has nothing to pace.
+    # Only the guest-input verbs accept `pacing`: it's the gap
+    # before the first key event, so a verb that sends no keys has
+    # nothing to pace.
     "select": ("exclude", "pacing"),
     "click": ("spot", "pacing"),
     "enter": ("pacing",), "type_text": ("pacing",),
@@ -60,8 +63,9 @@ _SIGNATURES = {
     "font_stmt": (),
 }
 
-# Grammar rule names back to the spelling an author wrote, so a
-# signature diagnostic names the node as it appears in the script.
+# Maps each grammar rule name back to the spelling the script
+# author actually wrote, so a signature error can name the node the
+# way it appears in the script.
 _DISPLAY = {
     "wait_one": "wait", "wait_branching": "wait", "on_handler": "on",
     "always_handler": "always", "type_text": "type",
@@ -70,22 +74,26 @@ _DISPLAY = {
     "http_control": "http", "font_stmt": "font",
 }
 
-# Modifiers whose value must be a duration. They are also the
-# closed timing set that separates an observation's own modifiers
+# Modifiers whose value must be a duration. Together with
+# _FRACTION_MODIFIERS below, these form the complete set of timing
+# modifiers, which is what separates an observation's own modifiers
 # from the channels it observes.
 _DURATION_MODIFIERS = frozenset({"timeout", "deadline", "stable",
                                  "pacing"})
 
-# And the one whose value is a proportion. It joins the set above in
-# separating an observation's own modifiers from its channels, but
-# not in taking a unit: `stable=2s` is how long a *match* must hold,
-# `stability=0.99` how still the *screen* must be. Two axes, and G6
-# refuses one word for both.
+# The one timing modifier whose value is a proportion, not a
+# duration. It joins the set above in separating an observation's
+# own modifiers from its channels, but it doesn't take a unit like
+# the others do: `stable=2s` says how long a *match* must hold,
+# while `stability=0.99` says how still the *screen* must be. These
+# are two different things to measure, and G6 rejects using one word
+# for both.
 _FRACTION_MODIFIERS = frozenset({"stability"})
 
 # The placement matrix (script-spec.md, "Timing"): every timing
-# word the signatures above reject is rejected for a reason, and
-# V2 diagnostics give it rather than listing what fits instead.
+# word the signatures above reject is rejected for a specific
+# reason, and the V2 diagnostic states that reason instead of just
+# listing which modifiers would have been accepted.
 _PLACEMENT = {
     ("wait_one", "deadline"):
         "a budget bounds the wall clock of the construct it annotates, "
@@ -148,12 +156,13 @@ _PLACEMENT = {
         "verb delivers none",
 }
 
-# `stability` is `pacing`'s opposite number and takes the opposite
-# home: pacing sits on the four verbs that deliver input, stability on
-# the observations that compare. Every verb that compares nothing
-# refuses it for the one reason, so these are generated rather than
-# written out — a screenshot and a set-boot are refused identically
-# and for identically little interest.
+# `stability` is `pacing`'s counterpart, and lives on the opposite
+# set of nodes: pacing belongs on the verbs that send input,
+# stability on the observations that compare something. Every verb
+# that compares nothing rejects `stability` for the same reason, so
+# these entries are generated here instead of written out by hand --
+# a `screenshot` and a `set-boot` are both refused for the same
+# uninteresting reason.
 _PLACEMENT.update({
     (node, "stability"):
         "stability guards the frame a compare runs on, and this verb "
@@ -163,7 +172,8 @@ _PLACEMENT.update({
                  "screenshot", "insert", "eject", "set_boot", "set_var",
                  "start", "stop", "http_control")
 })
-# A modifier value's terminal, as the condition kind it spells.
+# Maps a modifier value's lark terminal type to the condition kind
+# it represents.
 _CONDITION_KINDS = {
     "STRING": "text", "REGEX": "regex", "NAME": "state",
     "DURATION": "duration", "MEDIA_REF": "media", "PROP_REF": "property",
@@ -178,11 +188,11 @@ _PROPERTY_REF = re.compile(r"[A-Za-z][A-Za-z0-9._-]*$")
 class Condition:
     """One observation condition on one channel.
 
-    ``channel`` is ``None`` for a bare word, which spells no
-    condition at all; the parser types it anyway so V7 can name
-    what the author wrote. ``named`` distinguishes a channel the
-    author named with a modifier from the unprefixed screen
-    default, which V7 also checks.
+    ``channel`` is ``None`` for a bare word, which is not actually a
+    condition at all -- the parser still types it as one so V7 can
+    name what the author wrote when it rejects it. ``named``
+    distinguishes a channel the author named explicitly with a
+    modifier from the unprefixed screen default; V7 checks that too.
     """
 
     channel: Optional[str]        # "screen", "machine", or None
@@ -194,7 +204,7 @@ class Condition:
 
 
 class _Observed:
-    """The one-condition view V7 guarantees over the authored ones."""
+    """Provides `.condition`: the one condition V7 guarantees exists, out of however many were written."""
 
     @property
     def condition(self):
@@ -217,7 +227,7 @@ class Handler(_Observed):
 
 @dataclass(frozen=True)
 class Statement(_Observed):
-    """One executable node of the authored surface."""
+    """One executable statement, as written in the script."""
 
     verb: str
     arguments: Tuple[object, ...] = ()
@@ -263,18 +273,20 @@ class Phase:
 
 @dataclass(frozen=True)
 class Scope:
-    """A ``with`` block: one machine-state change and what it holds.
+    """A ``with`` block: one machine-state change, and everything it wraps.
 
-    ``action`` is the head, typed as the statement it is written as —
-    an ``insert`` or ``eject`` node with those verbs' own arguments, or
-    a ``boot`` node whose arguments are the slot keys it puts first.
-    Reusing the statement type is what keeps preflight's slot rules one
-    piece of code rather than two.
+    ``action`` is the head, typed as whichever statement it is
+    written as -- an ``insert`` or ``eject`` node with that verb's
+    own arguments, or a ``boot`` node whose arguments are the slot
+    keys it puts first. Reusing the Statement type here is what lets
+    preflight's slot-checking rules stay one piece of code instead
+    of two separate ones.
 
-    ``units`` are the wrapped units in source order: phases in a
+    ``units`` are the wrapped units, in source order: phases in a
     phased script, statements in a linear one, and nested scopes in
-    either. Which of those a block may legally hold is V2's, decided
-    once the script's shape is known.
+    either kind of script. Which of those a block is legally allowed
+    to hold is decided by V2, once the script's overall shape is
+    known.
     """
 
     head: str                     # "boot", "insert", or "eject"
@@ -285,11 +297,12 @@ class Scope:
 
     @property
     def target(self):
-        """What this scope owns, for the one-scope-per-target rule.
+        """What this scope owns, used to enforce the one-scope-per-target rule.
 
-        The boot order is one target however many drives a head names;
-        a medium's target is its slot, so an ``insert`` and an
-        ``eject`` on one slot collide as they should.
+        The boot order counts as a single target no matter how many
+        drives a `with boot` head names. A medium's target is its
+        slot, so an ``insert`` and an ``eject`` on the same slot
+        correctly collide with each other.
         """
         if self.head == "boot":
             return "the boot order"
@@ -335,31 +348,33 @@ class Script:
     properties: Tuple[Property, ...] = ()
     http: Optional[Http] = None
     #: The linear body: every top-level unit that is not a phase,
-    #: nesting preserved, so a ``Scope`` still holds what it wraps. In
-    #: a *phased* script this is the top-level scopes and nothing
-    #: else — a statement landing here is a script mixing the two
-    #: shapes, which V10 rejects.
+    #: with nesting preserved, so a ``Scope`` here still holds
+    #: whatever it wraps. In a *phased* script, this holds only
+    #: top-level scopes -- a bare statement landing here means the
+    #: script mixed the two shapes, which V10 rejects.
     statements: Tuple[object, ...] = ()
     #: Every phase, **flattened** out of whatever scopes wrap it, in
-    #: source order. The phase graph is the flat namespace `goto` and
-    #: `entry` address, and a scope changes where control *is*, never
-    #: which phases exist.
+    #: source order. `goto` and `entry` address phases through one
+    #: flat namespace, and a scope only changes where control *is*
+    #: -- it never changes which phases exist.
     phases: Tuple[Phase, ...] = ()
     headers: Mapping[str, int] = field(default_factory=dict)
     #: Every scope, flattened, in source order.
     scopes: Tuple[Scope, ...] = ()
-    #: Per phase name, the scopes enclosing it, outermost first. The
-    #: runner reads this to know what a transition enters and leaves.
+    #: For each phase name, the scopes that enclose it, outermost
+    #: first. The runner reads this to know which scopes a
+    #: transition enters and leaves.
     phase_scopes: Mapping[str, Tuple[Scope, ...]] = field(
         default_factory=dict)
 
 
 class _Token(LarkToken):
-    """A lark token carrying its reliquary token's decoded value.
+    """A lark token that also carries the decoded value of its reliquary token.
 
-    lark's own ``Token`` is slotted, so the decoded payload — a
-    :class:`StringLiteral` with its interpolation parts, a regex
-    pattern — rides in a slot of its own rather than an attribute.
+    lark's own ``Token`` class uses ``__slots__``, so the decoded
+    payload -- a :class:`StringLiteral` with its interpolation
+    parts, a regex pattern, and so on -- has to ride in its own
+    declared slot rather than a plain attribute.
     """
 
     __slots__ = ("reliquary",)
@@ -462,12 +477,13 @@ def _modifiers(node, items):
 
 
 def _fraction(name, value, line, column):
-    """Check a proportion modifier's value, and return it.
+    """Check a proportion modifier's value is between 0 and 1, and return it as a float.
 
-    The range is closed at both ends and each end means something a
-    script may legitimately say: ``1`` demands a frame with no change
-    at all, and ``0`` turns the guard off for one observation, which
-    is the escape hatch for a screen the default would refuse.
+    The valid range includes both 0 and 1, and each end has a real
+    meaning a script can use: ``1`` requires a frame with no change
+    at all, and ``0`` turns the stability check off for that one
+    observation -- the escape hatch for a screen the default
+    threshold would otherwise reject.
     """
     try:
         number = float(str(value))
@@ -482,12 +498,13 @@ def _fraction(name, value, line, column):
 
 
 def _observation(node, items):
-    """Split an observation's modifiers from the channels it names.
+    """Split an observation's timing modifiers from the channels it names.
 
-    The timing set is closed, so every other modifier on an
-    observation names a channel. Whether that channel exists and
-    carries a value of the right kind is V7's, in the validation
-    layer, where the diagnostic can say so.
+    The set of timing modifiers is fixed, so any other modifier on
+    an observation must be naming a channel. Whether that channel
+    actually exists, and whether its value is the right kind, is
+    checked by V7 in the validation layer, where the error message
+    can say so.
     """
     own = _DURATION_MODIFIERS | _FRACTION_MODIFIERS
     timing = [item for item in items if item[0] in own]
@@ -506,11 +523,12 @@ def _channel(item):
                      line, column, named=True)
 
 
-#: The heads a ``with`` block may carry, each with the argument
-#: shape it is written in. ``insert`` and ``eject`` are the verbs
-#: exactly as they appear as statements; ``boot`` is the head-only
-#: one, and states a prefix of the order rather than replacing it —
-#: which is why it is not spelled ``set-boot`` (D104).
+#: The heads a ``with`` block can carry, each with the argument
+#: shape it is written in. ``insert`` and ``eject`` are exactly the
+#: same verbs as when used as statements; ``boot`` only exists as a
+#: head, and it states a *prefix* of the boot order rather than
+#: replacing it entirely -- which is why it is spelled ``boot``, not
+#: ``set-boot`` (D104).
 _SCOPE_HEADS = ("boot", "insert", "eject")
 
 
@@ -655,9 +673,10 @@ class _Builder(Transformer):
         words = [child for child in children
                  if isinstance(child, LarkToken) and child.type == "NAME"]
         items = [c for c in children if isinstance(c, tuple)]
-        # `default=` is the one repeatable modifier -- an ordered list of
-        # derivation candidates -- so it is split out before the generic
-        # single-value modifier check.
+        # `default=` is the one modifier that can appear more than
+        # once -- it builds an ordered list of derivation candidates
+        # -- so it's pulled out here before the generic check that
+        # every other modifier appears at most once.
         defaults = []
         for name, value, line, column in items:
             if name != "default":
@@ -802,12 +821,13 @@ class _Builder(Transformer):
         return self._screen("regex", children[0])
 
     def screen_landmark(self, children):
-        # A landmark reference is a screen condition in a new *value
-        # spelling*, which is exactly how the growth rule says a new
-        # matcher over an existing channel arrives (F65). The value is
-        # the referenced name; whether it names a landmark rather than
-        # a media or a font is checked at binding, where the one `@`
-        # pool is actually read.
+        # A landmark reference is a screen condition written with a
+        # new *value spelling* -- exactly how the growth rule says a
+        # new matcher on an existing channel should be added (F65).
+        # The condition's value is just the referenced name; whether
+        # that name actually refers to a landmark, rather than a
+        # media file or a font, gets checked later at binding, when
+        # the single `@` reference pool is actually read.
         token = children[0]
         return Condition("screen", "landmark", str(token), _line(token),
                          _column(token))
@@ -817,9 +837,10 @@ class _Builder(Transformer):
                          _line(token), _column(token))
 
     def bare_condition(self, children):
-        # No channel: a bare word spells no condition at all. V7
-        # names it, so the grammar admits it rather than failing
-        # here with an unexpected-token diagnostic.
+        # No channel here: a bare word isn't really a condition at
+        # all. The grammar accepts it anyway, so V7 can name the
+        # actual problem, instead of the parser rejecting it here
+        # with a generic unexpected-token error.
         token = children[0]
         return Condition(None, "word", str(token), _line(token),
                          _column(token))
@@ -936,10 +957,12 @@ class _Builder(Transformer):
                                    children[0].column,
                                    rule_id="node.modifier-not-a-string")
         name = str(children[1])
-        # A `conditions` tuple, like `wait`'s, is what lets preflight's
-        # landmark walk (`_observed`/`_preflight_landmarks`) bind and
-        # refuse a `click`'s reference exactly as it already does a
-        # `wait`'s — no second walk for the same three checks.
+        # Giving `click` a `conditions` tuple, just like `wait` has,
+        # lets preflight's landmark walk (`_observed` /
+        # `_preflight_landmarks`) bind and validate a `click`'s
+        # landmark reference the exact same way it already does for
+        # `wait` -- no separate walk needed to repeat the same three
+        # checks.
         condition = Condition("screen", "landmark", name, line,
                               _column(children[0]))
         return Statement(
@@ -968,9 +991,9 @@ class _Builder(Transformer):
         return self._simple("set-boot", "set_boot", children, keys)
 
     def set_var(self, children):
-        # The script -> host scalar channel: `set <key> "<value>"`
-        # records a machine variable any process can read back with
-        # `get-machine-var`.
+        # The script-to-host channel for a single value: `set <key>
+        # "<value>"` records a machine variable that any process can
+        # later read back with `get-machine-var`.
         return self._simple(
             "set", "set_var", children,
             (str(children[1]), children[2].reliquary.value))
@@ -982,10 +1005,11 @@ class _Builder(Transformer):
         return self._simple("stop", "stop", children, ())
 
     def font_stmt(self, children):
-        # A name list, `insert`'s own `("media"|"property", name)`
-        # shape per reference rather than the single-slot pairing
-        # `_insert_arguments` returns: `font` names no slot, only the
-        # fonts a later screen read tries first (D109).
+        # A list of references, each shaped like `insert`'s own
+        # `("media"|"property", name)` pair, rather than the
+        # single-slot pairing `_insert_arguments` returns: `font`
+        # does not name a slot, only which fonts a later screen read
+        # should try first (D109).
         refs = [child for child in children[1:]
                if isinstance(child, LarkToken)
                and child.type in ("MEDIA_REF", "PROP_REF")]
@@ -996,14 +1020,16 @@ class _Builder(Transformer):
 
     # -- scopes --------------------------------------------------
     def scope_block(self, children):
-        """Type one ``with`` head and collect what it wraps.
+        """Type one ``with`` head and collect whatever it wraps.
 
-        The head vocabulary is closed at three names (V14's kind) and
-        each name's arity is its own (V2's kind); both are decided
-        here, where the diagnostic can name the head the author wrote.
-        The two media heads take the `insert`/`eject` signatures
-        rather than restating them, so a scope and a statement can
-        never drift apart.
+        Only three head names are allowed (checked as V14), and each
+        name's expected number of arguments is checked separately
+        (as V2). Both checks happen here, where the error message
+        can name the head the author actually wrote. The two media
+        heads (`insert`, `eject`) reuse the same argument signatures
+        as the `insert`/`eject` statements, instead of restating
+        them, so a `with` scope and a plain statement can never
+        drift out of sync with each other.
         """
         keyword, head = children[0], str(children[1])
         line, column = _line(keyword), _column(keyword)
@@ -1071,14 +1097,14 @@ class _Builder(Transformer):
 
 
 def _flatten(units, chain, phases, scopes, enclosing):
-    """Collect the phases and scopes a unit list holds, at any depth.
+    """Collect the phases and scopes a unit list holds, at any nesting depth.
 
-    A scope wraps where control *is*, never which phases exist, so the
-    phase namespace stays flat and every layer above this one — the
-    graph rules, the timing plan, the runner's phase map — is unchanged
-    by the construct. What a scope adds is ``enclosing``: the chain of
-    scopes around each phase, outermost first, which is the whole of
-    what a transition needs to know.
+    A scope only wraps where control *is*, never which phases exist,
+    so the phase namespace stays flat: every layer above this one --
+    the graph rules, the timing plan, the runner's phase map --
+    doesn't need to know scopes exist at all. What a scope adds is
+    ``enclosing``: the chain of scopes around each phase, outermost
+    first, which is everything a transition needs to know about it.
     """
     for unit in units:
         if isinstance(unit, Phase):
@@ -1105,10 +1131,10 @@ _PARSER = Lark.open(_GRAMMAR, parser="lalr", lexer=ReliquaryLexer,
 def parse_script(source, path="<script>"):
     """Parse and statically validate a ``.rlqs`` document.
 
-    Applies the lexical rules, the node signatures, and header
-    uniqueness here, then the V-numbered rules over the typed tree
-    in :mod:`reliquary.script_validation` — script shape,
-    observation channels, control flow.
+    Applies the lexical rules, node signatures, and header-uniqueness
+    checks here, then hands off to the V-numbered rules over the
+    typed tree in :mod:`reliquary.script_validation` -- script
+    shape, observation channels, control flow.
     """
     if not isinstance(source, str):
         raise StaticError("script source must be text",
@@ -1149,12 +1175,13 @@ def load_script(path):
 def _diagnose(error, source, path):
     """Turn a lark parse error into a reliquary diagnostic.
 
-    These are the grammar's own rejections, so they carry the
-    coarsest ids in the scheme: the grammar knows a token is
-    unexpected, never which rule the author was reaching for. That
-    is the trade script-spec.md makes deliberately by keeping the
-    V-rules above the CFG — a named rule where validation can
-    reach, an unexpected token where only the parser can.
+    These are the grammar's own rejections, so they get the coarsest
+    ids in the scheme: the grammar only knows a token was
+    unexpected, never which specific rule the author was trying to
+    follow. That is a deliberate tradeoff script-spec.md makes by
+    keeping the V-rules above the grammar layer: a named rule where
+    validation can reach the problem, and a generic unexpected-token
+    error where only the parser sees it.
     """
     token = getattr(error, "token", None)
     line = getattr(error, "line", 0) or 0

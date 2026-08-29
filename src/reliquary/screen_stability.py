@@ -2,44 +2,57 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Has the guest stopped drawing?
 
-A condition can hold perfectly on a screen that is still painting,
-and that is exactly the screen a wait must not act on. This module
-answers the other question — whether the frame itself is settled
-enough to compare against — over the seam's text-screen contract:
-character rows plus opaque, equality-comparable per-cell attribute
-tokens. **Identity is the whole pair**, because a cursor menu moves
-its selection by attribute alone, and a text-only comparison would
-score exactly those frames as perfectly stable.
+A script condition can be true on a screen that is still being drawn,
+and that is exactly the screen a `wait` must not act on. This module
+answers a separate, narrower question: has the captured frame itself
+settled enough to be trusted for comparison? It works over the
+standard text-screen format every backend must produce: rows of
+characters, plus one opaque, comparable attribute token per cell.
+Both the character and the attribute matter together, not just the
+character: a cursor menu can move its selection using color alone, so
+comparing only the text would score those frames as perfectly stable
+even while the highlight was still moving.
 
-**The contract generalizes from cells to pixels** (F65). A landmark
-is compared against a captured framebuffer, where there are no cells
-to compare, so `observe` also takes a Pillow image and measures the
-proportion of *pixels* that held still — the same window, the same
-default, the same recurrence mask. A `Reading` says which unit it
-counted, so a diagnostic can too. The default needs no restating at
-the finer grain: a landmark's residual demands every pixel, so a
-half-painted screen fails the match on its own, and what the gate
-buys there is an honest nearest-miss report rather than one measured
-mid-repaint.
+This same check generalizes from character cells to pixels (F65).
+Matching a landmark compares against a captured framebuffer image,
+where there are no character cells to compare — so `observe` also
+accepts a Pillow image directly, and instead measures the fraction of
+*pixels* that stayed unchanged, using the same time window, the same
+default threshold, and the same self-animating-region mask. A
+`Reading` records which unit it measured, so a diagnostic message can
+say which too. The default threshold does not need a separate value
+at the pixel level: a landmark match already requires every pixel in
+its residual area to match exactly, so a screen that is still
+half-painted simply fails the match on its own — what this settling
+check adds there is an honest "nearest miss" report, rather than one
+measured mid-repaint.
 
-Stability is measured over a **window of wall-clock time**, never
-between consecutive samples. Sample adjacency would make the answer a
-property of the poll rate rather than of the guest: the same screen
-reads stable at a dense cadence, where most adjacent pairs agree, and
-unstable at a sparse one, where consecutive samples are far enough
-apart to differ almost always. The consequence is stated rather than
-hidden — a caller sampling sparser than the window cannot observe it,
-and is told so instead of being given a verdict the cadence produced.
+Stability is measured over a fixed window of wall-clock time, never
+just by comparing two consecutive samples. Comparing only consecutive
+samples would make the answer depend on how fast the caller happens
+to poll, not on what the guest is actually doing: the same screen
+would read as stable when polled quickly (most back-to-back reads
+agree) and unstable when polled slowly (consecutive reads are far
+enough apart to differ almost every time). This limitation is stated
+explicitly rather than hidden: a caller polling slower than the
+stability window simply cannot observe stability at all, and is told
+that directly instead of being handed a verdict that's really just an
+artifact of its own poll rate.
 
-**Recurrence carried that dependence longer than the threshold did.**
-Decoration is `animation_repeats` changes inside `animation_window`,
-which is a sample count wearing a clock's clothes: a caller reading
-once per 0.83s fits two samples in a 1s window and can never reach
-three, so the mask stays empty, a blinking cursor scores as content,
-and the screen never reads settled however long anyone waits. That is
-the same artifact the window definition refuses, and it is answered
-the same way — `Reading.blind` says the cadence cannot see decoration,
-rather than handing back the number an empty mask produced.
+The self-animating-cell detection ("recurrence") carried this same
+poll-rate dependency for longer than the plain stability threshold
+did, before it was fixed too. Decoration is defined as
+`animation_repeats` changes within `animation_window` — which is
+really a sample count wearing a time duration's clothes: a caller
+reading once every 0.83 seconds only fits two samples into a
+one-second window and can never reach three changes, so its
+self-animating mask stays permanently empty, a blinking cursor gets
+counted as real content forever, and the screen never reads as
+settled no matter how long anyone waits. That is the exact same
+poll-rate-dependency bug the window-based definition above was meant
+to prevent, and it is fixed the same way: `Reading.blind` reports
+directly that this poll rate is too slow to ever detect decoration,
+instead of returning whatever number a falsely empty mask produced.
 """
 
 import dataclasses
@@ -51,83 +64,99 @@ from PIL import ImageChops
 from .errors import InternalError
 
 
-#: A quarter of an 80-column row. A text screen is 80 x 25 = 2000
-#: cells, so a single row of text is 80 of them — 4% of the screen.
-#: Any threshold looser than 0.96 therefore calls a screen stable
-#: while a line is being drawn into it, which is precisely the event
-#: this measure exists to refuse. Screen furniture costs an order of
-#: magnitude less: a blinking cursor is 1 cell (0.05%), a clock 8
-#: (0.4%), a percentage counter 4 (0.2%). The default's whole job is
-#: to sit in that gap — above furniture, below content.
+#: 0.99 leaves 1% of the screen free to differ and still count as
+#: stable — a quarter of an 80-column row, or 20 cells out of the
+#: 2000 in a full 80x25 text screen. A looser threshold than 0.96 (4%
+#: free, a full row) would call a screen stable while an entire line
+#: is still being drawn into it — exactly the false positive this
+#: measure exists to prevent. Small self-animating screen details
+#: cost far fewer cells than that: a blinking cursor is 1 cell
+#: (0.05%), a clock 8 cells (0.4%), a percentage counter 4 cells
+#: (0.2%). The whole job of this default is to sit in the gap between
+#: those — above what decoration changes, below what real content
+#: changes.
 DEFAULT_THRESHOLD = 0.99
 
-#: How far back a verdict looks. Quiescence cannot be claimed over a
-#: span that was never observed, so a monitor younger than this
-#: reports that it cannot measure rather than guessing.
+#: How far back a stability verdict looks, in seconds. A screen can't
+#: be said to have held still over a span that was never actually
+#: observed, so a monitor younger than this window reports that it
+#: cannot measure yet, rather than guessing.
 DEFAULT_WINDOW = 0.2
 
-#: Decoration is recognized by **recurrence**, and over the clock
-#: rather than over samples: a denser run collects more samples in the
-#: same wall time and would reach any sample count sooner, which is
-#: the cadence dependence the window definition exists to refuse.
-#: A cell changing this often within this span is repainting on its
-#: own — an advancing cursor, a marching border, a spinner — and a
-#: cell that changes once is content, wherever it sits.
+#: Decoration is recognized by how often a cell changes
+#: (`DEFAULT_ANIMATION_REPEATS`), measured over wall-clock time
+#: (`DEFAULT_ANIMATION_WINDOW`) rather than over a fixed number of
+#: samples: a faster poll rate collects more samples in the same real
+#: time and would hit any given sample count sooner, which is exactly
+#: the poll-rate dependency the time-window approach above is meant
+#: to avoid. A cell that changes this many times within this span is
+#: repainting on its own — an advancing cursor, a marching border, a
+#: spinner — while a cell that changes only once counts as real
+#: content, wherever it is on screen.
 DEFAULT_ANIMATION_WINDOW = 1.0
 DEFAULT_ANIMATION_REPEATS = 3
 
-#: How much room over the bare minimum a widened window is given.
-#: `repeats` samples is what *just* fits, and a window sized to just
-#: fit flips its verdict whenever one read runs long — which on a
-#: screenshot backend is every garbage collection. Doubling it costs
-#: only a slower decoration verdict and buys a window that keeps
-#: working when the cadence wobbles, so recurrence is measured over a
-#: span the caller can actually sustain rather than one it can hit on
-#: a good pass.
+#: How much extra room a widened animation window gets, beyond the
+#: bare minimum needed. Exactly `repeats` samples is what *just*
+#: fits, and a window sized to just barely fit flips its verdict
+#: every time a single read happens to run long — which on a
+#: screenshot backend happens on essentially every garbage collection
+#: pause. Doubling the minimum only costs a slower decoration
+#: verdict, and in exchange keeps working even when the poll rate
+#: wobbles, so decoration is measured over a span the caller can
+#: reliably sustain, not just one it can hit on a lucky run.
 DEFAULT_CADENCE_MARGIN = 2.0
 
-#: What the measured cadence is rounded **up** to before it sizes a
-#: window, and it differs by how the screen was read because the two
-#: paths have different noise. A text scrape is a memory read and its
-#: jitter is milliseconds, so a 0.1s grid is finer than the variation
-#: it quantizes. Interpreting a framebuffer costs the better part of a
-#: second and varies by hundreds of milliseconds — image decode, glyph
-#: matching, a host under load — so anything finer than a second would
-#: have the window resize continuously on noise. Rounding up rather
-#: than to nearest keeps every step in the generous direction, which
-#: is the same instinct as the margin.
+#: The step size the measured poll rate is rounded *up* to before it
+#: is used to size a window. It differs by how the screen is read,
+#: because the two reading paths have different amounts of timing
+#: noise. A text scrape is a plain memory read, with jitter of only a
+#: few milliseconds, so a 0.1s step is finer than the noise it's
+#: rounding away. Recognizing a framebuffer, by contrast, costs the
+#: better part of a second and varies by hundreds of milliseconds —
+#: image decoding, glyph matching, a busy host — so anything finer
+#: than a full second would make the window resize constantly just
+#: from that noise. Rounding up rather than to the nearest step keeps
+#: every adjustment generous, the same instinct behind
+#: `DEFAULT_CADENCE_MARGIN`.
 GUI_CADENCE_STEP = 1.0
 TEXT_CADENCE_STEP = 0.1
 
-#: The widest the animation window may grow, however slow the caller.
-#: Past a few seconds "changed three times recently" stops describing
-#: decoration and starts describing a screen painted in stages, so a
-#: cadence that cannot be accommodated inside this is answered as
-#: `Reading.blind` instead of by widening until everything is masked.
+#: The widest the animation window is ever allowed to grow, no matter
+#: how slow the caller's poll rate is. Past a few seconds, "changed
+#: three times recently" stops meaning decoration and starts meaning
+#: a screen that is being painted in stages, so a poll rate too slow
+#: to fit inside this cap gets reported as `Reading.blind` instead of
+#: having the window widened until it masks everything.
 MAX_ANIMATION_WINDOW = 5.0
 
-#: Slack on the window edge, so a change exactly one window old falls
-#: *outside* it deterministically. Without this the boundary is
-#: decided by float noise, and it is not a rare case: polling at 0.1s
-#: against a 0.2s window puts a change exactly two samples back on the
-#: edge every time, so the same settled screen would read stable or
-#: unstable depending on accumulated rounding. Far below any real
-#: sampling interval, so it can never absorb a change that mattered.
+#: A tiny amount of slack at the window's edge, so a change exactly
+#: one window old reliably falls *outside* it. Without this, the
+#: boundary would be decided by floating-point rounding noise, and
+#: that's not a rare edge case: polling every 0.1s against a 0.2s
+#: window puts a change exactly two samples back right on the
+#: boundary every single time, so the same settled screen could read
+#: as stable or unstable depending on accumulated rounding error.
+#: This is far below any real sampling interval, so it can never
+#: absorb a change that actually mattered.
 _EDGE = 1e-9
 
 
 def unsettled_note(reading):
-    """Why a condition that *was* seen never ended a wait.
+    """Explain why a condition that was seen on screen never ended a
+    wait.
 
-    A wait expires two ways that look identical from outside: the
-    thing waited for never came, or it came only on screens still
-    being drawn. The second is baffling without help — a screenshot
-    taken at the time shows it plainly — so a failure says which, and
-    names the region set aside as decoration, that being what makes
-    the message locate the problem rather than restate the expiry.
-    Every gated wait appends this to its expiry (`execute`,
-    `wait_ready`, `wait_text`); ``None`` — nothing was ever seen —
-    adds nothing.
+    A wait can time out for two reasons that look identical from the
+    outside: either the thing being waited for never appeared, or it
+    only ever appeared on screens that were still being drawn. The
+    second case is baffling without an explanation — a screenshot
+    taken at the time would show it plainly — so a timeout message
+    says which case it was, and names the region that was set aside
+    as decoration, which is what lets the message point at the actual
+    problem instead of just repeating that a timeout happened. Every
+    wait that uses this settling check appends this note to its
+    timeout message (`execute`, `wait_ready`, `wait_text`); passing
+    ``None`` (nothing was ever seen) adds nothing.
     """
     if reading is None:
         return ""
@@ -145,27 +174,32 @@ def unsettled_note(reading):
 def viable_cadence(window=DEFAULT_ANIMATION_WINDOW,
                    repeats=DEFAULT_ANIMATION_REPEATS,
                    margin=DEFAULT_CADENCE_MARGIN):
-    """The slowest poll that can still recognize decoration.
+    """Return the slowest poll rate that can still recognize
+    decoration.
 
-    **The minimum viable cadence**: recurrence needs ``repeats``
-    changes inside ``window``, a change is only ever recorded at a
-    sample, so a caller must fit that many samples in that span. With
-    the default 1s window and 3 repeats, a poll slower than one read
-    every ~0.17s cannot see decoration at all — which is most of a
-    second short of what a screenshot backend costs, and is the whole
-    of why this had to be answered rather than assumed.
+    Recognizing decoration needs ``repeats`` changes inside
+    ``window``, and a change is only ever recorded when a sample is
+    taken, so a caller has to fit at least that many samples into
+    that span. With the default 1-second window and 3 repeats, a
+    poll slower than one read every ~0.17 seconds can't see
+    decoration at all — which is most of a second faster than a
+    screenshot backend actually costs per read, and is exactly why
+    this had to be measured rather than assumed to be fine.
     """
     return window / (repeats * margin)
 
 
 def viable_window(interval, repeats=DEFAULT_ANIMATION_REPEATS,
                   margin=DEFAULT_CADENCE_MARGIN):
-    """The animation window a caller reading every ``interval`` needs.
+    """Return the animation window a caller reading every ``interval``
+    seconds needs.
 
-    The inverse of :func:`viable_cadence`, and what lets a slow
-    caller keep the guard rather than lose it: a backend that costs
-    0.83s a read needs a ~5s window to recognize decoration, and
-    inside that window it recognizes exactly what a fast caller does.
+    This is the inverse of :func:`viable_cadence`, and it's what lets
+    a slow caller keep this protection instead of losing it: a
+    backend that costs 0.83 seconds per read needs roughly a
+    5-second window to recognize decoration, and within that wider
+    window it recognizes exactly the same decoration a fast caller
+    would.
     """
     return interval * repeats * margin
 
@@ -187,21 +221,24 @@ def _grid(frame):
 
 
 def _snapshot(frame):
-    """The comparable form of one reading, and what it counts in."""
+    """Return the comparable form of one reading, along with the unit
+    it is measured in ("pixel" for a framebuffer, "cell" for a text
+    screen)."""
     if _is_image(frame):
         return frame.convert("RGB"), "pixel"
     return _grid(frame), "cell"
 
 
 def _extent(snapshot, unit):
-    """How many units this reading holds."""
+    """Return how many units (cells or pixels) this reading holds."""
     if unit == "pixel":
         return snapshot.size[0] * snapshot.size[1]
     return sum(len(row) for row in snapshot)
 
 
 def _changed(before, after, unit):
-    """The units whose identity differs between two readings."""
+    """Return the units (cells or pixels) whose identity differs
+    between two readings."""
     if unit == "pixel":
         return _changed_pixels(before, after)
     return _changed_cells(before, after)
@@ -218,13 +255,15 @@ def _changed_cells(before, after):
 
 
 def _changed_pixels(before, after):
-    """The flat indices of pixels that differ between two captures.
+    """Return the flat indices of pixels that differ between two
+    captures.
 
-    Differenced band by band in Pillow rather than pixel by pixel in
-    Python: a 640x480 screen is 307,200 units where a text screen is
-    2,000, and the mask this feeds is rebuilt at every sample. A
-    difference in *any* channel counts, which is the same
-    identity-is-the-whole-thing rule the cell path applies to the
+    Differenced band by band using Pillow, rather than pixel by pixel
+    in Python: a 640x480 screen has 307,200 pixels versus a text
+    screen's 2,000 cells, and the mask this feeds into is rebuilt on
+    every sample, so the difference has to be fast. A difference in
+    *any* color channel counts as the pixel having changed, which is
+    the same all-parts-matter rule the cell path applies to the
     character and attribute pair.
     """
     if before.size != after.size:
@@ -246,40 +285,46 @@ class Reading:
     """One verdict on the screen, and the evidence behind it.
 
     ``stability`` is the fraction of the screen that held still over
-    the window, or ``None`` where the window could not be observed at
-    all — which is a different answer from "moving", and a caller's
-    diagnostic is expected to say which. ``animated`` is the region
-    excluded as decoration, which is what lets a timeout say "stable
-    outside a 76-cell animated region" rather than restating a ratio.
+    the window, or ``None`` when the window could not be observed at
+    all — which is a different situation from "the screen is moving",
+    and a caller's diagnostic is expected to say which one it got.
+    ``animated`` is the region excluded as decoration, which is what
+    lets a timeout message say "stable outside a 76-cell animated
+    region" instead of just restating a ratio.
 
-    ``blind`` says the poll is **too sparse for this measure to see
-    decoration at all**, and it is the one answer no further sampling
-    will improve: recurrence needs `animation_repeats` changes inside
-    `animation_window`, a change can only be recorded at a sample, so
-    a caller reading more slowly than that can never accumulate them.
-    Distinguishing it from a monitor that is merely young is the
-    whole of its purpose — both hold too little evidence, but one is
-    a wait and the other is a permanent condition of the caller's
-    cadence, and a caller that cannot tell them apart either blocks
-    forever or pays a window it did not owe.
+    ``blind`` means the poll rate is too slow for this measure to
+    ever recognize decoration at all, and it's the one answer that no
+    amount of further sampling can fix: recognizing decoration needs
+    `animation_repeats` changes inside `animation_window`, a change
+    can only be recorded at a sample, so a caller reading slower than
+    that can never accumulate enough of them. Telling this apart from
+    a monitor that is simply still young is the whole point of this
+    flag — both situations have too little evidence yet, but one will
+    resolve itself with more waiting and the other is a permanent
+    limit of the caller's own poll rate. A caller that can't tell the
+    two apart either blocks forever, or pays for a wider window it
+    didn't actually need.
 
     A blind reading carries ``stability=None`` because the number the
-    mask would have produced is exactly the verdict-from-cadence this
-    module exists to refuse: with no decoration recognized, a blinking
-    cursor counts as content and the screen never reads settled.
+    mask would otherwise have produced is exactly the
+    poll-rate-dependent verdict this module exists to avoid: with no
+    decoration recognized, a blinking cursor counts as real content
+    and the screen never reads as settled.
 
-    The repr is written rather than generated because the animated
-    region runs to thousands of cells on a churning screen, and a
-    diagnostic that dumps them all buries the answer it carries.
+    ``__repr__`` is written by hand rather than generated
+    automatically, because the animated region can run to thousands
+    of cells on a constantly-changing screen, and a diagnostic that
+    dumps them all would bury the actual answer in noise.
     """
 
     stable: bool
     stability: float | None
     animated: frozenset = frozenset()
     blind: bool = False
-    #: What the verdict counted — ``"cell"`` on a text screen,
+    #: What this verdict counted in — ``"cell"`` on a text screen,
     #: ``"pixel"`` on a captured framebuffer (F65). A diagnostic that
-    #: names a region says which, rather than calling pixels cells.
+    #: names a region uses this to say which unit it means, rather
+    #: than mislabeling pixels as cells.
     unit: str = "cell"
 
     def __repr__(self):
@@ -292,10 +337,10 @@ class Reading:
 class ScreenStability:
     """Judges whether the guest has stopped drawing.
 
-    Samples are handed in as they are read — the monitor never reads
-    for itself, so it carries no session and no clock of its own
-    beyond a default `now`. Each `observe` returns the verdict as of
-    that sample.
+    Samples are handed to it as they are read — this monitor never
+    reads the screen itself, so it holds no session and keeps no
+    clock of its own beyond a default value for `now`. Each call to
+    `observe` returns the verdict as of that one sample.
     """
 
     def __init__(self, threshold=DEFAULT_THRESHOLD,
@@ -311,10 +356,12 @@ class ScreenStability:
         self._animation_repeats = animation_repeats
         self._cadence_margin = cadence_margin
         self._max_animation_window = max_animation_window
-        #: Public and mutable: the caller learns which reading path it
-        #: is on from the session it opens, which is after the monitor
-        #: is built. Defaults to the finer grid, so a caller that never
-        #: sets it is quantized closest to its measured cadence.
+        #: Public and mutable, because a caller only learns which
+        #: reading path it is on (text or pixel) once it opens its
+        #: session, which happens after this monitor is already
+        #: built. Defaults to the finer step, so a caller that never
+        #: sets this stays quantized as close as possible to its
+        #: actual measured poll rate.
         self.cadence_step = cadence_step
         self._previous = None
         self._first = None
@@ -326,11 +373,13 @@ class ScreenStability:
     def observe(self, frame, now=None):
         """Record one sample and return the `Reading` it produces.
 
-        ``frame`` is the seam's text screen — ``(rows, attributes)``
-        — or a Pillow image where the plane captured pixels (F65). A
-        monitor stays on the kind it was first handed: mixing the two
-        would compare a screen against a different thing entirely and
-        read every sample as a total repaint.
+        ``frame`` is either the standard text screen format every
+        backend must produce — ``(rows, attributes)`` — or a Pillow
+        image, when the plane captures pixels instead (F65). A
+        monitor sticks with whichever kind it was first handed:
+        mixing the two would compare a screen against something of an
+        entirely different kind, and every sample would read as a
+        total repaint.
         """
         if now is None:
             now = time.monotonic()
@@ -352,20 +401,24 @@ class ScreenStability:
         return self._read(now)
 
     def cadence(self):
-        """The fastest gap between samples, or None before two.
+        """Return the fastest gap between samples, or None before at
+        least two samples exist.
 
-        **The floor, not the average**, because what sizes the window
-        is how fast this caller *can* read and not how fast it chose
-        to. A caller that ramps — dense while a screen moves, idle
-        while it rests, which is exactly what the script runtime does
-        between its settle poll and its backoff — would otherwise
-        have its quiet stretches widen the window and mask the very
-        redraw the next dense pass exists to catch.
+        This returns the *floor* (the fastest gap seen), not the
+        average, because what needs to size the window is how fast
+        this caller *can* read, not how fast it happened to read on
+        average. A caller that ramps its poll rate up and down —
+        reading fast while the screen is moving, and backing off
+        while it's idle, which is exactly what the script runtime
+        does between its settle poll and its backoff — would
+        otherwise have its idle stretches widen the window and mask
+        the very redraw its next fast pass exists to catch.
 
-        Erring low is the safe direction: a cadence estimate that is
-        too fast asks for a narrower window, which falls back to the
-        default and judges as it always did. Too slow is what
-        over-masks.
+        Erring toward too fast an estimate is the safe direction: an
+        estimate that's faster than reality asks for a narrower
+        window than needed, which just falls back to the default and
+        judges the way it always did. An estimate that's too slow is
+        what causes decoration to get over-masked.
         """
         if len(self._samples) < 2:
             return None
@@ -377,18 +430,21 @@ class ScreenStability:
         return math.ceil((fastest - _EDGE) / step) * step
 
     def animation_window(self):
-        """The window recurrence is actually measured over.
+        """Return the window decoration is actually measured over.
 
-        **Widened to what this caller can observe**, never narrowed:
-        a poll dense enough for the default keeps the default, and one
-        too sparse gets the span its own cadence needs
-        (:func:`viable_window`), up to `max_animation_window`. Past
-        that the window would mask a screen painted in stages, so the
-        measure stops widening and says it is blind instead.
+        This window is only ever widened to fit what this caller can
+        actually observe, never narrowed: a poll rate fast enough for
+        the default window keeps the default, and a poll rate too
+        slow gets widened to the span its own poll rate needs (see
+        :func:`viable_window`), up to `max_animation_window`. Past
+        that cap, widening the window further would start masking a
+        screen that is genuinely being painted in stages, so this
+        stops widening and reports itself as blind instead.
 
-        This is what makes the guard survive a screenshot backend
-        rather than switch off there: inside the widened window, a
-        slow caller recognizes exactly the decoration a fast one does.
+        This is what lets this protection keep working on a
+        screenshot backend instead of just giving up there: inside
+        the widened window, a slow caller recognizes exactly the same
+        decoration a fast caller would.
         """
         interval = self.cadence()
         if interval is None:
@@ -402,20 +458,26 @@ class ScreenStability:
         horizon = now - max(self._window, self.animation_window())
         self._changes = [(when, cells) for when, cells in self._changes
                          if when > horizon]
-        # Samples outlive changes: the cadence estimate is what sizes
-        # the window, so it must not be pruned by the window it sizes.
+        # Samples are kept longer than changes: the poll-rate estimate
+        # (`cadence`) is what determines the window size, so the
+        # samples feeding that estimate must not themselves be pruned
+        # by the window they help size.
         sample_horizon = now - max(self._window,
                                    self._max_animation_window)
         self._samples = [when for when in self._samples
                          if when > sample_horizon]
 
     def _animated(self, now):
-        """The cells repainting on their own, or none where most are.
+        """Return the cells repainting on their own, or none when most
+        of the screen qualifies.
 
-        When most of the screen qualifies, masking it would leave
-        almost nothing to judge and every frame would read settled —
-        so the mask is dropped and the comparison runs raw, the same
-        bail-out the menu machinery's learned mask already makes.
+        When most of the screen would count as decoration, masking it
+        all out would leave almost nothing left to judge, and every
+        frame would read as settled regardless of what's actually
+        happening — so in that case the mask is dropped entirely and
+        the comparison runs on the raw screen instead. This is the
+        same fallback the menu-tracking code's own learned mask
+        already uses.
         """
         horizon = now - self.animation_window() + _EDGE
         counts = {}
@@ -431,27 +493,33 @@ class ScreenStability:
         return frozenset(animated)
 
     def _blind(self):
-        """Whether this caller *could* recognize decoration at all.
+        """Return whether this caller could recognize decoration at
+        all, at its current poll rate.
 
-        Recurrence is `animation_repeats` changes inside the window,
-        and a change is only ever recorded at a sample — so a caller
-        whose reads cost more than a third of the window can never
-        accumulate them: the mask stays empty, a blinking cursor
-        scores as content, and every frame reads unsettled forever.
+        Recognizing decoration needs `animation_repeats` changes
+        inside the window, and a change is only ever recorded at a
+        sample — so a caller whose reads cost more than about a third
+        of the window can never accumulate enough of them: the mask
+        stays permanently empty, a blinking cursor gets counted as
+        real content, and every frame reads as unsettled forever.
 
-        **A question about capability, not about recent density.**
-        Asking how many samples happen to fall in the last window
-        answers it wrongly for any caller that ramps: the script
-        runtime backs off to a 2s idle poll once a screen settles, and
-        counting samples would call that backoff blindness and stand
-        the guard down exactly when the next redraw arrives. What
-        decides is the fastest cadence this caller has shown it can
-        sustain, against the window that cadence earns.
+        This asks about the caller's *capability*, not about how many
+        samples happened to land in the recent window. Counting
+        recent samples would get the wrong answer for any caller that
+        ramps its poll rate: the script runtime backs off to a
+        2-second idle poll once a screen looks settled, and counting
+        samples would then mistake that backoff for blindness, and
+        stand this protection down at exactly the moment the next
+        redraw arrives. What actually decides is the fastest poll
+        rate this caller has shown it can sustain, checked against
+        the window that poll rate earns.
 
-        Reached only after widening has been tried and capped, so it
-        answers a cadence nothing can accommodate rather than a merely
-        slow one. Never claimed before a cadence is known, since one
-        sample is a young monitor and not a slow caller.
+        This is only checked after the window has already been
+        widened as far as it can go, so it reports a poll rate that
+        genuinely can't be accommodated, not merely a slow one that
+        widening could still fix. It is never reported before a poll
+        rate is even known yet, since one sample alone just means a
+        young monitor, not a slow caller.
         """
         interval = self.cadence()
         if interval is None:
@@ -473,10 +541,11 @@ class ScreenStability:
         if stability >= self._threshold:
             return Reading(True, stability, animated,
                            unit=self._unit)
-        # Only doubt a verdict the missing mask could have changed. A
-        # screen that reads settled without one is settled whatever
-        # the cadence, and saying otherwise would stand the guard down
-        # on the quiet screens it costs nothing to judge.
+        # Only question a verdict that a missing mask could actually
+        # have changed. A screen that already reads as settled without
+        # any masking is settled no matter what the poll rate was, and
+        # saying otherwise would stand this protection down on quiet
+        # screens that cost nothing to judge correctly.
         if self._blind():
             return Reading(False, None, animated, blind=True,
                            unit=self._unit)

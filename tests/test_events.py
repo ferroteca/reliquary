@@ -48,22 +48,24 @@ class _Recorder:
         self.closed += 1
 
 
-# The declared vocabulary is the emitted vocabulary.
+# Every declared event kind is actually emitted somewhere.
 #
-# P24's inventory pass over the recorded outputs. The script spec
-# lists the stream's minimum vocabulary in prose rather than as a
-# table of names, so there is no set to diff the constants against;
-# what *is* checkable is the claim underneath the list — that the
-# stream carries these kinds. A constant nothing emits is vocabulary
-# the surface advertises and never produces, which a consumer written
-# against it would wait for forever.
+# This is P24's inventory check, applied to the event stream. The
+# script spec lists the stream's minimum set of event kinds in
+# prose, not as a table of names, so there is no list of names to
+# directly diff the code's constants against. What can be checked
+# instead is the claim underneath that list — that the stream
+# actually carries each of these kinds. A constant that nothing ever
+# emits is a kind the docs advertise but the code never produces,
+# and a consumer written to expect it would wait for it forever.
 #
-# It found `screen.read` on 2026-07-27: declared, given a rendering
-# arm, emitted by nothing, and specified in present tense as "emitted
-# by the `screen` command" — which has no stream to emit into, only
-# `run-script` and `fetch-media` carrying `--progress` at all. It is
-# now spec-reserved and carries no constant, which is the rule the
-# spec now states and `KINDS` embodies.
+# This check found `screen.read` on 2026-07-27: it was declared, had
+# a renderer for it, but nothing ever emitted it. The spec described
+# it in present tense as "emitted by the `screen` command" — but the
+# `screen` command has no stream to emit into; only `run-script` and
+# `fetch-media` carry `--progress` at all. It is now spec-reserved
+# instead, with no constant, which is the rule the spec states now
+# and that `KINDS` embodies.
 #
 # **How emission is measured, and its limit**: a kind counts as
 # emitted when a module other than `events` or `progress` references
@@ -170,7 +172,7 @@ def test_ticks_render_but_are_never_recorded():
     assert [e["kind"] for e in stream.events] == [events.RUN_END]
 
 
-# Media movement is honest with a stream and without one.
+# Media-transfer notifications work whether a stream exists or not.
 
 def test_a_note_becomes_an_event_when_a_stream_exists():
     stream = events.EventStream()

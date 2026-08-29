@@ -2,45 +2,48 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The static-validation layer of the reliquary script language.
 
-The V-numbered legality rules that the grammar deliberately does
-not carry (docs/spec/script-spec.md, "Syntactic
-restrictions"), checked over the typed tree so each diagnostic can
-name the offending construct and cite its rule:
+This module checks the V-numbered legality rules that the grammar
+deliberately doesn't enforce itself (docs/spec/script-spec.md,
+"Syntactic restrictions"). It checks them over the typed tree, so
+each diagnostic can name the exact construct that violated the rule
+and cite the rule's id:
 
-- **V3** — ``entry`` appears exactly in phased scripts;
-- **V5** — phase names are unique and durations are positive;
-- **V7** — an observation carries exactly one condition, on a
+- **V3** -- ``entry`` appears exactly in phased scripts;
+- **V5** -- phase names are unique and durations are positive;
+- **V7** -- an observation carries exactly one condition, on a
   known channel, of the right kind;
-- **V8** — a branching ``wait`` carries no condition of its own,
+- **V8** -- a branching ``wait`` carries no condition of its own,
   has at least two handlers, and never appears inside a handler
   body;
-- **V9** — ``on`` only inside a branching ``wait``, ``always``
+- **V9** -- ``on`` only inside a branching ``wait``, ``always``
   only directly inside a reactive phase, no hybrid phase, and no
   ``with`` scope inside another on the same target;
-- **V10** — the two script shapes never mix, and every phase name
+- **V10** -- the two script shapes never mix, and every phase name
   a script transfers to is declared;
-- **V11** — nothing follows a terminating statement, and a
+- **V11** -- nothing follows a terminating statement, and a
   sequential phase's statement list terminates;
-- **V12** — a phased script whose transition graph can cycle
+- **V12** -- a phased script whose transition graph can cycle
   declares a header ``deadline``, the backstop that bounds the
   run.
-- **V13** — a watch pattern is non-empty, and a regex compiles;
-- **V14** — every ``press`` key belongs to the language's closed
+- **V13** -- a watch pattern is non-empty, and a regex compiles;
+- **V14** -- every ``press`` key belongs to the language's closed
   portable vocabulary;
-- **V17** — a stopped-only verb is never reached with the machine
+- **V17** -- a stopped-only verb is never reached with the machine
   running, wherever a static pass can promise it runs at all.
 
-The remaining rules belong to the layers around this one: V1, V2,
-and V4 are the lexer's and the parser's — the timing placement
-matrix is a node signature — and the remaining V14 vocabularies
-arrive with their owning features. V6 is split: the ``default=``
-derivation half is checked here, and the ``${key}`` references
-authored inside statement strings are still bound rather than
-validated. The timing *model* itself, which resolves the durations
-this module checks, is :mod:`reliquary.script_timing`.
+The remaining rules are checked by the layers around this one: V1,
+V2, and V4 belong to the lexer and the parser (the timing placement
+matrix is checked as part of a node's signature), and the remaining
+V14 vocabularies arrive along with the features that own them. V6 is
+split between two places: the ``default=`` derivation half is
+checked here, while the ``${key}`` references written inside
+statement strings are checked when they are bound, not here. The
+timing *model* itself -- which resolves the durations this module
+checks -- lives in :mod:`reliquary.script_timing`.
 
-This module works structurally over the tree, so it imports no
-node type; that keeps the parser free to import it.
+This module works structurally over the tree, so it does not import
+any node type; that keeps the parser free to import this module in
+turn.
 """
 
 import collections
@@ -54,13 +57,15 @@ _RESERVED = frozenset(KEYWORDS)
 
 
 def _not_reserved(name, what, line, column):
-    """Refuse a node name used as an author-chosen identifier (V5).
+    """Reject a node name that reuses a reserved keyword as an author-chosen identifier (V5).
 
-    script-spec.md, "Grammar": reserved node names cannot name
-    phases or property keys. The lexer treats these words as
-    keywords only where a node may start, so `phase enter` parses
-    cleanly and would otherwise declare a phase whose name collides
-    with a verb -- readable by neither a person nor `goto`.
+    script-spec.md, "Grammar" says reserved node names cannot be
+    used to name phases or property keys. The lexer only treats
+    these words as keywords where a node name is allowed to start,
+    so `phase enter` parses without error -- and without this check,
+    it would declare a phase whose name collides with the verb
+    `enter`, which neither a person nor `goto` could read
+    unambiguously.
     """
     if name in _RESERVED:
         raise ScriptParseError(
@@ -69,14 +74,16 @@ def _not_reserved(name, what, line, column):
             rule_id="name.reserved-node")
 
 # The observable channels, each with the condition kind it takes
-# and its closed value set. The screen is the default channel and
-# is deliberately absent: it has no named spelling.
+# and its fixed set of allowed values. The screen is the default
+# channel and is deliberately left out of this map: it has no named
+# spelling of its own.
 _CHANNELS = {"machine": ("state", ("stopped",))}
 _TRANSFERS = ("goto", "finish")
-# A drive key as the blueprint field reference spells it: a medium
-# name and an optional slot index, the bare name being slot 0. Only
-# the shape is known here — which slots a machine actually declares is
-# preflight's question, and needs a machine to answer.
+# A drive key, as written in a blueprint field reference: a medium
+# name plus an optional slot index, where a bare name means slot 0.
+# Only the shape of the key is checked here -- whether a machine
+# actually declares that slot is preflight's question, and answering
+# it needs an actual machine to check against.
 _SLOT_KEY = re.compile(r"([A-Za-z]+)([0-9]*)")
 PORTABLE_KEY_NAMES = frozenset({
     "enter", "esc", "tab", "space", "backspace",
@@ -105,8 +112,9 @@ def validate(script):
         _phased(script)
     else:
         _linear(script)
-    # Last: the flow analysis reads the transition graph, so it runs
-    # once V10 has agreed every `goto` names a phase that exists.
+    # This runs last: the flow analysis reads the transition graph,
+    # so it can only run once V10 has confirmed every `goto` names a
+    # phase that actually exists.
     _machine_flow(script)
 
 
@@ -127,11 +135,13 @@ def _properties(script):
 
 
 def _derivations(script):
-    """The `default=` derivation rules (V5, V6).
+    """Check the `default=` derivation rules (V5, V6).
 
-    Static because a derivation is not an expression: its answer is
-    knowable — or knowably unanswerable — before the run, so every
-    error it can carry is caught here rather than at binding time.
+    These are checked statically because a derivation is not a
+    runtime expression: whether it can answer -- or whether it is
+    knowably unanswerable -- can be determined before the run even
+    starts, so every error it could produce is caught here instead
+    of later, at binding time.
     """
     declared = {prop.key: prop for prop in script.properties}
     for prop in script.properties:
@@ -393,21 +403,24 @@ def _statement_literals(statement):
             yield condition.value, condition.line, condition.column
 
 def _durations(script):
-    """Every written duration is positive.
+    """Check that every written duration is positive.
 
-    Where each may be written is the placement matrix, which the
-    node signatures enforce (V2); this is the value rule.
+    Where each timing modifier is allowed to be written is checked
+    by the placement matrix, enforced through the node signatures
+    (V2); this function checks the *value*, not the placement.
 
-    **`pacing` is deliberately absent from it.** A bound of zero
+    **`pacing` is deliberately not checked here.** A bound of zero
     asks for something that can never happen, which is why
-    `timeout`, `deadline` and `stable` are checked here; `pacing` is
-    an interval rather than a bound, and `0s` reads perfectly well —
-    "this guest is ready, do not wait" — an assertion an author is
-    entitled to make about a screen they know. Refusing it would
-    only produce `pacing=1ms`, which says the same thing less
-    honestly. A negative pacing needs no rule either: the duration
-    token carries no sign, so the lexer has already refused it, and
-    a check here could never fire.
+    `timeout`, `deadline`, and `stable` are checked in this
+    function; `pacing` is different -- it is an interval, not a
+    bound, and `0s` is a perfectly meaningful thing to write: "this
+    guest is ready, don't wait." An author is entitled to make that
+    claim about a screen they know. Rejecting `pacing=0s` would only
+    push authors toward writing `pacing=1ms` instead, which claims
+    the same thing less honestly. A negative pacing value needs no
+    check either: a duration token can never carry a minus sign, so
+    the lexer has already rejected it before this code would ever
+    run.
     """
     for name in ("timeout", "deadline"):
         _positive(getattr(script, name), name,
@@ -460,22 +473,24 @@ def _all_statements(script):
 
 
 def reach(script):
-    """``(statically reachable, total)`` statement counts.
+    """Return ``(statically reachable, total)`` statement counts.
 
-    **A statement is statically reachable when getting to it depends
-    on nothing the guest does.** That is the honest bound on what a
-    dry run can report: a plan can only ever be a plan, and saying
-    how much of the script it could not reach is what keeps it from
-    implying a completeness it cannot have (P11 at the report
-    level).
+    **A statement counts as statically reachable when reaching it
+    does not depend on anything the guest does.** That is the honest
+    limit on what a dry run can report: a plan is only ever a plan,
+    and reporting how much of the script it could not account for is
+    what keeps the report from claiming a completeness it does not
+    have (P11, at the report level).
 
-    A linear script is wholly reachable but for its handler bodies.
-    In a phased one the walk starts at ``entry`` and follows only
-    the ``goto``s in a phase's **own** statement list, never one
-    inside a handler: a handler fires on a guest condition, so every
-    statement in its body — and every phase only it can reach — is
-    guest-conditional. A reactive phase is handlers alone, so it
-    contributes nothing reachable and transfers nothing statically.
+    A linear script is entirely reachable except for its handler
+    bodies. In a phased script, the walk starts at ``entry`` and
+    follows only the ``goto``s in a phase's **own** statement list,
+    never one inside a handler: a handler only fires when the guest
+    does something, so every statement in its body -- and every
+    phase only that handler can reach -- depends on the guest. A
+    reactive phase is made up of handlers alone, so it contributes
+    nothing reachable and transfers nothing that can be determined
+    statically.
     """
     total = len(_all_statements(script))
     if not script.phases:
@@ -498,11 +513,11 @@ def reach(script):
 
 
 def _variables(script):
-    """Every ``set`` key is outside reliquary's reserved namespaces.
+    """Check that every ``set`` key is outside reliquary's reserved namespaces.
 
-    A machine variable is the consumer's own name for its own value
-    (P18), so the only rule is that it never collides with a name
-    reliquary may introduce later.
+    A machine variable is a name the script author chose for their
+    own value (P18), so the only rule is that it must never collide
+    with a name reliquary might introduce later.
     """
     for statement in _all_statements(script):
         if statement.verb != "set":
@@ -518,11 +533,12 @@ def _variables(script):
 
 
 def _keys(script):
-    """Every ``press`` argument belongs to the portable key set.
+    """Check that every ``press`` argument belongs to the portable key set.
 
-    A chord may also contain one-character printable members, as
-    in ``ctrl+c``. A bare character remains text and must be sent
-    with ``type`` or ``enter``.
+    A chord can also include one-character printable keys, as in
+    ``ctrl+c``. A bare single character on its own is still just
+    text, and must be sent with ``type`` or ``enter`` instead of
+    ``press``.
     """
     for statement in _all_statements(script):
         if statement.verb != "press":
@@ -544,18 +560,21 @@ def _keys(script):
 # -- scoped machine-state changes (V2, V5, V9, V10) --------------
 
 def _scoping(script):
-    """The rules a ``with`` block answers to.
+    """Check the rules a ``with`` block has to follow.
 
-    Four, and not one of them is new in kind. What a block may hold is
-    a signature rule (V2). That no two scopes own one target is a
-    placement rule (V9): nested scopes on one target would leave the
-    value a restore returns depending on which order they unwound in,
-    which is not a question a reader should have to ask. That `boot`
-    names distinct drives is uniqueness (V5), and it canonicalizes
-    first, an alias and its indexed form being one slot. And that the
-    two script shapes never mix is V10 — a rule the grammar used to
-    decide and no longer can, because a `with` head says nothing about
-    which shape follows it.
+    There are four rules here, and each is really an instance of a
+    rule kind checked elsewhere too. What a block is allowed to hold
+    is a signature rule (V2). That no two scopes can own the same
+    target is a placement rule (V9): nested scopes on the same
+    target would make what a restore puts back depend on which
+    order they unwound in, which a reader should not have to work
+    out. That `boot` names each drive only once is a uniqueness rule
+    (V5), and it canonicalizes each drive key first, since an alias
+    and its indexed form (like `cdrom` and `cdrom0`) are the same
+    slot. And that the two script shapes never mix is V10 -- a rule
+    the grammar used to be able to decide on its own but no longer
+    can, because a `with` head by itself says nothing about which
+    shape follows it.
     """
     phased = bool(script.phases)
     _units(script.statements, phased, top=True)
@@ -604,12 +623,14 @@ def _targets(units, chain):
 
 
 def _boot_keys(scope):
-    """A scoped boot prefix names each drive once (V5).
+    """Check that a scoped boot prefix names each drive only once (V5).
 
-    By slot rather than by spelling: `cdrom` is the blueprint's alias
-    for `cdrom0`, so the two name one drive and a prefix cannot put it
-    in two places. Whether the drive exists at all is preflight's,
-    where `set-boot`'s keys are checked and a machine is in scope.
+    This checks by slot, not by spelling: `cdrom` is the blueprint's
+    alias for `cdrom0`, so the two names refer to the same drive,
+    and a boot prefix cannot put that one drive in two places.
+    Whether the drive actually exists is checked separately, in
+    preflight, where `set-boot`'s keys are checked against an actual
+    machine.
     """
     seen = {}
     for key in scope.action.arguments:
@@ -630,39 +651,45 @@ def _canonical_slot(key):
 
 # -- where the machine is (V17) ----------------------------------
 #
-# `set-boot` and a scoped `boot` head write a launch-time firmware
-# order, which is stopped-only as a property of the machine (D15's
-# Q1). Reached with the machine up they fail closed and by name — at
-# RUN time, and for the shape that provokes them (flip the boot
-# device, start, install, stop, flip back) run time means after five
-# minutes of installing.
+# `set-boot` and a scoped `boot` head both write a launch-time
+# firmware boot order, and that write is only valid while the
+# machine is stopped -- that is a property of the machine itself
+# (D15's Q1). If the script reaches one of these with the machine
+# running, it currently fails closed, by name, but only at RUN
+# time -- and for the shape of script that triggers this (flip the
+# boot device, start, install, stop, flip back), run time can mean
+# after five minutes of installing.
 #
-# **The script text already decides it.** The header declares the
-# starting state, and the language knows exactly which verbs start
-# and stop the machine, so the answer is available before anything
-# reaches a guest.
+# **The script text already contains everything needed to decide
+# this ahead of time.** The header declares the machine's starting
+# state, and the language knows exactly which verbs start and stop
+# the machine, so the answer -- is the machine running or stopped at
+# this point -- is available before anything ever reaches a guest.
 #
-# **What bounds it is the bound the rest of the static pass already
-# accepts.** A handler body is the guest's decision and not the
-# plan's — `reach` is where that line is already drawn — so this rule
-# speaks only about the statements a static pass can *promise* will
-# run, and is silent everywhere else. A handler body is walked for
-# its *effect* on the machine and never judged, because control
-# reaching it is the guest's call. And two paths that disagree answer
-# nothing at all: a false refusal would be far worse than the late
-# failure this replaces.
+# **This rule only checks what the rest of the static pass already
+# commits to checking.** A handler body only runs because of a
+# guest's action, not because of the plan -- `reach` above already
+# draws that same line -- so this rule only speaks about statements
+# a static pass can *promise* will run, and stays silent everywhere
+# else. A handler body is still walked, to track its *effect* on the
+# machine, but it is never judged directly, because whether control
+# reaches it is the guest's call, not the script's. And when two
+# possible paths through the script disagree about where the machine
+# is, the answer becomes "unknown" rather than picking one: a false
+# refusal here would be worse than the late runtime failure this
+# rule is meant to replace.
 
 _STOPPED, _RUNNING, _UNKNOWN = "stopped", "running", "unknown"
 
-#: One program point: where the machine is, and the clause a
-#: diagnostic uses to say how it got that way. Naming the cause is
-#: most of the value — "the machine is running here" is a verdict,
-#: "started at line 7" is a fix.
+#: One program point: where the machine is, and the phrase a
+#: diagnostic uses to explain how it got there. Naming the cause is
+#: most of the value here -- "the machine is running here" is just a
+#: verdict, but "started at line 7" tells the author what to fix.
 _Where = collections.namedtuple("_Where", "state why")
 
 
 def _machine_flow(script):
-    """Refuse a stopped-only verb the plan promises runs running."""
+    """Refuse a stopped-only verb wherever the plan promises it runs with the machine running."""
     if script.machine == "stopped":
         start = _Where(_STOPPED, "the machine header says stopped")
     else:
@@ -677,7 +704,7 @@ def _machine_flow(script):
 
 
 def _join(here, there):
-    """Merge two paths' answers; disagreement is no answer at all."""
+    """Merge two paths' answers about where the machine is; disagreement produces no answer."""
     if here is None:
         return there
     if here.state != there.state:
@@ -696,16 +723,17 @@ def _after(statement, where):
         return where
     if not statement.handlers:
         condition = statement.condition
-        # A `wait machine=stopped` that completed *observed* the
-        # machine down, so this is a reading rather than an
-        # assumption — and it is how every script that powers a guest
-        # off from inside already ends.
+        # A `wait machine=stopped` that completed actually *observed*
+        # the machine stopped, so this reflects something the script
+        # measured, not an assumption -- and it is how every script
+        # that powers a guest off from the inside already ends.
         if condition is not None and condition.channel == "machine" \
                 and condition.value == "stopped":
             return _Where(_STOPPED, f"observed stopped at line {line}")
         return where
-    # A branching wait continues through whichever handlers do not
-    # transfer, so what follows sees the join of their effects.
+    # A branching wait continues into whichever handlers do not
+    # transfer control away, so what follows sees the combined
+    # effect of all of them.
     reached = [_flow(handler.statements, where, judge=False)
                for handler in statement.handlers
                if not _terminates(handler.statements)]
@@ -718,11 +746,11 @@ def _after(statement, where):
 
 
 def _flow(units, where, judge):
-    """Walk a unit list; report where the machine is once it is done.
+    """Walk a unit list, and report where the machine is once the walk is done.
 
-    ``judge`` is off wherever control arriving is the guest's
-    decision: the walk still folds in what the statements *do*, and
-    refuses nothing.
+    ``judge`` is turned off wherever reaching this code depends on a
+    guest decision: the walk still tracks what the statements *do*
+    to the machine, but does not reject anything.
     """
     for unit in units:
         inner = _scoped(unit)
@@ -742,7 +770,7 @@ def _flow(units, where, judge):
 
 
 def _statement_gate(statement, where):
-    """Refuse a stopped-only verb the machine cannot be down for."""
+    """Refuse a stopped-only verb wherever the machine cannot be confirmed stopped."""
     if statement.verb != "set-boot" or where.state != _RUNNING:
         return
     raise ScriptParseError(
@@ -754,12 +782,14 @@ def _statement_gate(statement, where):
 
 
 def _scope_gate(scope, where, entering, leaving_at=None):
-    """Refuse a boot scope whose edge is crossed with the machine up.
+    """Refuse a boot scope whose entry or exit is crossed with the machine running.
 
-    Both edges write the boot order — entry applies the prefix, exit
-    puts the old order back — so both answer to the verb's own rule,
-    and the exit is the half no author can see coming: it is reached
-    by finishing, and by every failure too.
+    Both edges of the scope write the boot order -- entering it
+    applies the boot prefix, leaving it restores the old order -- so
+    both are subject to the same rule that governs `set-boot`
+    itself. The exit edge is the one an author is unlikely to
+    anticipate: it is reached both by the scope finishing normally
+    and by any failure inside it.
     """
     if scope.head != "boot" or where.state != _RUNNING:
         return
@@ -775,13 +805,15 @@ def _scope_gate(scope, where, entering, leaving_at=None):
 
 
 def _phased_flow(script, start):
-    """Resolve where the machine is at every phase the plan reaches.
+    """Work out where the machine is at every phase the plan can reach.
 
-    Two passes over the static transition graph. The first runs the
-    joins to a fixed point, because a phase reached two ways is judged
-    on what *both* of them promise; the second judges each phase
-    against the answer that settled, so nothing is refused on a state
-    a later edge would have widened to `unknown`.
+    This makes two passes over the static transition graph. The
+    first pass runs the joins repeatedly until the answers stop
+    changing, because a phase that can be reached two different
+    ways has to be judged on what *both* paths promise. The second
+    pass judges each phase against the answer that settled, so
+    nothing gets rejected based on a state that a later-discovered
+    edge would have widened to `unknown`.
     """
     by_name = {phase.name: phase for phase in script.phases}
     entries = {script.entry: start}
@@ -799,8 +831,9 @@ def _phased_flow(script, start):
             pending.append(target)
     for scope in script.phase_scopes.get(script.entry, ()):
         _scope_gate(scope, start, entering=True)
-    # Source order, so a script with two of these reports the first
-    # one an author reads rather than the first the walk settled.
+    # Walked in source order, so a script with two violations
+    # reports the first one an author would read, not just the
+    # first one the earlier walk happened to settle.
     for phase in script.phases:
         where = entries.get(phase.name)
         if where is None:
@@ -810,11 +843,12 @@ def _phased_flow(script, start):
 
 
 def _phase_exit(phase, where):
-    """Where a phase leaves the machine, and the phase it transfers to.
+    """Where a phase leaves the machine, and which phase it transfers to next.
 
-    Only the phase's **own** statement list: a `goto` inside a handler
-    is the guest's decision, so the phase it names is not one the plan
-    reaches and neither is anything beyond it.
+    This only looks at the phase's **own** statement list: a `goto`
+    inside a handler happens because of a guest decision, so the
+    phase it names is not one the plan can promise it reaches, and
+    neither is anything beyond it.
     """
     end = _flow(phase.statements, where, judge=False)
     last = phase.statements[-1] if phase.statements else None
@@ -826,10 +860,11 @@ def _phase_exit(phase, where):
 def _crossings(script, phase, where, target):
     """Judge the scope edges a phase's transfer crosses.
 
-    A scope holds while control is inside its group, so leaving one
-    and entering another happen **on the transition** — which is why
-    this is the edge's business rather than either phase's. A `finish`
-    leaves every scope its phase sits in.
+    A scope's effect holds only while control is inside it, so
+    leaving one scope and entering another both happen **during the
+    transition** between phases -- which is why this check belongs
+    to the transition itself, not to either phase alone. A `finish`
+    leaves every scope the phase it is in was nested inside.
     """
     chain = script.phase_scopes.get(phase.name, ())
     last = phase.statements[-1] if phase.statements else None
@@ -906,11 +941,12 @@ def _phased(script):
 
 
 def _cycles(script):
-    """A phase graph that can cycle declares a run deadline (V12).
+    """Check that a phase graph which can cycle also declares a run deadline (V12).
 
     Only phases reachable from ``entry`` are walked: a cycle among
-    phases the run can never enter is unreachable code, which
-    static analysis warns about rather than budgets.
+    phases the run could never actually enter is unreachable code,
+    which is something static analysis should warn about, not
+    something that needs a time budget.
     """
     if script.deadline is not None:
         return
@@ -1043,9 +1079,10 @@ def _condition(node, what):
         raise ScriptParseError(
             node.line, f"{what} requires a condition", node.column,
             rule_id="obs.missing-condition")
-    # Each condition is checked before the count, so a misspelled
-    # channel is named as one rather than reported as a second
-    # condition beside the string it was written next to.
+    # Each condition is checked individually before checking the
+    # count, so a misspelled channel gets named as the actual
+    # problem, instead of being reported as an extra condition
+    # sitting next to the string it was written beside.
     for condition in node.conditions:
         _channel(condition)
         _pattern(condition)
@@ -1096,20 +1133,23 @@ def _channel(condition):
 # -- watch patterns (V13) ----------------------------------------
 
 def _pattern(condition):
-    """A watch pattern is non-empty and a regex compiles (V13).
+    """Check that a watch pattern is non-empty and, for a regex, that it compiles (V13).
 
-    Both halves are the same failure worn differently: a pattern
-    that cannot say what it is waiting for. An empty one matches
-    every screen, so the ``wait`` around it observes nothing and
-    passes on the first sample; a malformed regex cannot be matched
-    at all, and left here it would surface mid-run as an
-    ``re.error`` — a fault outside the taxonomy, from a defect the
-    script text alone shows.
+    Both checks catch the same underlying problem in two different
+    forms: a pattern that cannot say what it is actually waiting
+    for. An empty pattern matches every screen, so the ``wait``
+    around it does not really observe anything and passes on the
+    very first sample. A malformed regex cannot be matched against
+    anything at all, and if this were not caught here, it would show
+    up mid-run as a Python ``re.error`` -- a kind of failure outside
+    reliquary's normal error classes, caused by a defect that the
+    script text alone already reveals.
 
-    The dialect is Python's ``re``, which script-spec.md names as
-    the language's contract rather than an implementation detail
-    ("Regexes"), so compiling it here is the check the spec asks
-    for and not an accident of the host.
+    The regex dialect is Python's ``re``, which script-spec.md
+    commits to as part of the language's contract, not just an
+    implementation detail ("Regexes"). So compiling the pattern here
+    is checking exactly what the spec requires, not something
+    specific to how this implementation happens to work.
     """
     if condition.kind == "text":
         empty = condition.value.spelling == ""
@@ -1139,9 +1179,10 @@ def _pattern(condition):
 def _terminating(statement):
     """Whether a statement ends the flow through its list."""
     if _scoped(statement) is not None:
-        # A scope ends the flow through its list exactly when what it
-        # wraps does: control leaves the block through the same
-        # transfer it would have left the list through.
+        # A scope ends the flow through its list exactly when
+        # whatever it wraps does: control leaves the block through
+        # the same kind of transfer it would have left the
+        # underlying list through.
         return _terminates(_scoped(statement))
     if statement.verb in _TRANSFERS:
         return True
@@ -1157,13 +1198,14 @@ def _terminates(statements):
 
 
 def _walk(statements, handlers=()):
-    """Yield every statement in a body, handler bodies included.
+    """Yield every statement in a body, including statements inside handler bodies.
 
-    A ``with`` scope is transparent here: what it wraps is walked and
-    the scope itself is not a statement. Phases inside one are skipped
-    rather than descended into, because every phase is reached through
-    the flat ``script.phases`` and walking it twice would double every
-    rule that counts.
+    A ``with`` scope is transparent here: whatever it wraps gets
+    walked, but the scope itself is not yielded as a statement.
+    Phases inside a scope are skipped rather than walked into,
+    because every phase is already reached through the flat
+    ``script.phases`` list, and walking it here too would
+    double-count every rule that counts statements.
     """
     for handler in handlers:
         yield from _walk(handler.statements)
@@ -1178,12 +1220,13 @@ def _walk(statements, handlers=()):
 
 
 def _sequence(statements):
-    """Yield a statement list's own statements, scopes flattened.
+    """Yield a statement list's own statements, with scopes flattened out.
 
-    :func:`_walk` without the handler bodies — the statements control
-    reaches by falling through the list rather than by the guest
-    satisfying a condition, which is the distinction :func:`reach`
-    measures.
+    This is :func:`_walk` without the handler bodies -- it only
+    yields statements control reaches by falling straight through
+    the list, not statements reached because the guest satisfied
+    some condition. That is the exact distinction :func:`reach`
+    needs to measure.
     """
     for statement in statements:
         if _scoped(statement) is not None:
@@ -1193,10 +1236,10 @@ def _sequence(statements):
 
 
 def _scoped(node):
-    """The units a ``with`` scope wraps, or ``None`` for anything else.
+    """The units a ``with`` scope wraps, or ``None`` for anything that is not a scope.
 
-    Structural, like the rest of this module: a scope is the node that
-    holds units.
+    This is a structural check, like the rest of this module: a
+    scope is simply whichever node has a ``units`` attribute.
     """
     return getattr(node, "units", None)
 

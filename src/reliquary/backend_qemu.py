@@ -2,23 +2,27 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The QEMU backend adapter: everything that knows QEMU.
 
-The seam was read off this implementation rather than designed ahead
-of one (F2): binary discovery, image creation, configuration
-rendering, owned process launch, monitor sessions, identity
-verification, input injection, screen capture and readback all live
-here, and nothing above the seam names QEMU, qcow2, QMP or a port.
+The backend interface in `backends.py` was designed by writing this
+adapter first and generalizing from it, rather than the other way
+around (F2). Binary discovery, image creation, configuration
+rendering, launching an owned process, monitor sessions, identity
+verification, input injection, and screen capture and readback all
+live here. Nothing outside this file mentions QEMU, qcow2, QMP, or a
+port number.
 
-The management interface is QMP — a private tool of this adapter, and
-never a control plane (planning/design/guest-communication.md). It
-reaches the world only through the named native escape hatch,
-``QemuSession.native()``, which is explicitly backend-scoped.
+QMP (QEMU's management protocol) is a private implementation detail
+of this adapter — it is never exposed as a control plane
+(planning/design/guest-communication.md). The only way to reach it
+from outside is the explicitly backend-specific escape hatch,
+``QemuSession.native()``.
 
-Two display planes are served over one carrier seam: the agentless
-display's carriers scrape VGA text memory over QMP, and the VNC
-plane's read the RFB framebuffer (:mod:`reliquary.rfb`) through the
-shared fixed-font recognizer, with media movement riding QMP either
-way. The machine state's resolved ``control-planes`` policy decides
-which set a session serves — the first declared plane drives.
+QEMU serves two display planes through one shared set of carrier
+methods: the agentless-display plane reads characters by scraping VGA
+text memory over QMP, and the VNC plane reads pixels from the RFB
+framebuffer (:mod:`reliquary.rfb`) through the shared fixed-font
+recognizer. Media changes go over QMP either way. The machine state's
+resolved ``control-planes`` list decides which plane a session serves
+— whichever plane is listed first is the one used.
 """
 
 import asyncio
@@ -50,14 +54,15 @@ def _system_binary(arch):
     return f"qemu-system-{arch}.exe" if os.name == "nt" else f"qemu-system-{arch}"
 
 
-#: The architecture each guest platform's system binary must emulate.
-#: **QEMU's system binaries are not interchangeable**, and getting this
-#: wrong is not a degraded run: a 64-bit kernel triple-faults on the
-#: 32-bit binary and the machine reboot-loops through its firmware
-#: forever, which reads as a guest that never booted rather than as a
-#: configuration error. DOS keeps `i386` — the binary its delivered
-#: workflow is tested against — and nothing here is read off an image
-#: or a screen: the platform is the one the blueprint declared (P10).
+#: Which CPU architecture's QEMU system binary each guest platform
+#: needs. QEMU's system binaries are not interchangeable, and using
+#: the wrong one doesn't just run worse — a 64-bit kernel triple-
+#: faults on the 32-bit binary and the machine loops through its
+#: firmware forever, which looks like a guest that never boots rather
+#: than a configuration mistake. DOS uses `i386`, the binary its
+#: tested workflow runs on. None of this is detected by inspecting an
+#: image or a screen — the platform used here is always the one the
+#: blueprint declared (P10).
 _PLATFORM_ARCH = {
     "dos": "i386",
     "win9x": "i386",
@@ -65,10 +70,10 @@ _PLATFORM_ARCH = {
     "openbsd": "x86_64",
 }
 
-#: What an unstated platform gets. A machine caught mid-create carries
-#: no resolved platform yet, and DOS is the compatibility default
-#: (AGENTS.md, "Platform selection"), so the answer is the binary this
-#: adapter has always launched.
+#: The architecture used when no platform is given yet. A machine
+#: that's mid-create has no resolved platform, and DOS is the
+#: compatibility default (AGENTS.md, "Platform selection"), so this
+#: is the binary this adapter has always launched in that case.
 _DEFAULT_ARCH = "i386"
 
 _QEMU_BIN = _system_binary(_DEFAULT_ARCH)
@@ -78,10 +83,11 @@ _QEMU_IMG_BIN = "qemu-img.exe" if os.name == "nt" else "qemu-img"
 def _platform_binary(platform):
     """The QEMU system binary a guest platform needs.
 
-    A platform the schema admits and this table has not learned is an
-    **internal gap that names itself** rather than a guess: guessing
-    is what produced the reboot loop this table exists to prevent, and
-    a silent wrong binary is exactly the shape P11 forbids.
+    If the schema allows a platform that isn't in ``_PLATFORM_ARCH``
+    yet, this raises an internal error naming the gap instead of
+    guessing. Guessing is exactly what produces the reboot loop this
+    table exists to prevent, and silently picking the wrong binary is
+    exactly what P11 forbids.
     """
     if platform is None:
         return _system_binary(_DEFAULT_ARCH)
@@ -97,24 +103,24 @@ def _platform_binary(platform):
 
 _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 
-#: The keys ``backend-settings.qemu`` may carry. ``machine`` is a QEMU
-#: machine type, ``args`` a list of arguments appended to the launch
-#: verbatim — the documented escape hatch, and deliberately the whole
-#: of it: a second spelling for anything below would be a second
-#: source for one fact.
+#: The keys ``backend-settings.qemu`` may carry. ``machine`` names a
+#: QEMU machine type; ``args`` is a list of arguments appended to the
+#: launch command line as-is. This is the entire escape hatch on
+#: purpose: adding a second way to say the same thing below would
+#: create two sources of truth for one fact.
 SETTINGS_KEYS = ("machine", "args")
 
-#: QEMU arguments the escape hatch may not carry, each naming what
-#: owns it. Two populations, and the second is not a first-class field:
-#: what a blueprint declares through its own vocabulary, and what the
-#: **VM ownership doctrine** owns — the readable name, the per-start
-#: token and the QMP channel are how a session verifies it is talking
-#: to this machine, so a caller-supplied one is refused rather than
-#: silently overridden. Keys are compared **case-sensitively**, since
-#: ``-m`` (memory) and ``-M`` (machine type) are different options.
-#: NOT here, deliberately: ``-device`` — a backend-specific device is
-#: exactly what this hatch exists to carry (D93, P25) — and ``-cpu``,
-#: which selects a CPU *model* where ``cpus`` owns the count alone.
+#: QEMU arguments the ``args`` escape hatch may not carry, each mapped
+#: to what already owns it. These fall into two groups: things a
+#: blueprint already declares through its own fields, and things
+#: reserved by VM identity tracking — the readable name, the
+#: per-start token, and the QMP channel are how a session proves it's
+#: talking to the right machine, so a caller can't override those.
+#: Keys are compared case-sensitively, since ``-m`` (memory) and
+#: ``-M`` (machine type) are different QEMU options. Deliberately
+#: NOT reserved: ``-device`` — passing a backend-specific device is
+#: exactly what this hatch is for (D93, P25) — and ``-cpu``, which
+#: selects a CPU *model*, since ``cpus`` only controls the count.
 RESERVED_ARGUMENTS = {
     "m": "the machine's `memory`",
     "smp": "the machine's `cpus`",
@@ -137,13 +143,14 @@ RESERVED_ARGUMENTS = {
     "nographic": "the display choice a start is given",
 }
 
-#: The `-drive` properties Reliquary renders for every drive, and so
-#: refuses through ``-set drive.<slot>.<property>`` as it refuses
-#: ``-drive`` itself: the same second source for one fact, reached
-#: by QEMU's own per-drive addressing (D118). Every other drive
-#: property — ``cache``, ``aio``, ``discard``, ``serial``, … — is
-#: the caller's, and QEMU judges its value as it judges the rest of
-#: the hatch.
+#: The `-drive` properties Reliquary already renders for every drive.
+#: These are refused through ``-set drive.<slot>.<property>`` for the
+#: same reason ``-drive`` itself is refused: it would be a second way
+#: to set something already set, reached through QEMU's own per-drive
+#: addressing (D118). Any other drive property — ``cache``, ``aio``,
+#: ``discard``, ``serial``, and so on — belongs to the caller, and
+#: QEMU validates its value the same way it validates the rest of the
+#: escape hatch.
 RESERVED_DRIVE_PROPERTIES = frozenset(
     {"file", "if", "index", "media", "id", "format", "bus", "unit"})
 
@@ -199,46 +206,49 @@ def _find_qemu_tool(binary):
 def find_qemu(platform=None):
     """Locate the QEMU system binary from configuration and common paths.
 
-    ``platform`` is the guest platform the machine declared, which is
-    what decides *which* system binary is wanted (:data:`_PLATFORM_ARCH`);
-    omitting it asks for the compatibility default, which is what a
-    bare availability probe wants.
+    ``platform`` is the guest platform the machine declared; it
+    decides which system binary is needed (see
+    :data:`_PLATFORM_ARCH`). Omit it to get the compatibility default,
+    which is what a plain availability check wants.
     """
     return _find_qemu_tool(_platform_binary(platform))
 
 
-#: Where QEMU keeps the VGA BIOS whose font a guest paints with,
-#: relative to the directory holding the binary. Distributions split
-#: `bin/` from `share/qemu/`; the Windows build keeps both together.
+#: Where QEMU keeps the VGA BIOS file that holds the font a guest
+#: paints text with, relative to the directory holding the binary.
+#: Some distributions put it under `share/qemu/` instead of `bin/`;
+#: the Windows build keeps both together.
 _VGABIOS_NAMES = ("vgabios-stdvga.bin", "vgabios.bin")
 
 
 def guest_glyph_banks(cache=None):
-    """Every VGA font this host's QEMU paints DOS text with.
+    """Every VGA font this host's installed QEMU paints DOS text with.
 
-    **Read off the host, never shipped** — the counterpart of
-    `backend_virtualbox.guest_glyph_banks`, and the same reasoning:
-    the glyphs belong to the installed emulator, not to Reliquary
+    Read directly from the host's QEMU install, never shipped with
+    Reliquary — the same reasoning as
+    `backend_virtualbox.guest_glyph_banks`: these glyphs belong to the
+    installed emulator, not to Reliquary
     (:func:`text_recognize.cached_banks`).
 
-    QEMU's own control plane never needs this — it scrapes VGA text
-    memory, where the guest has already resolved its characters — so
-    this exists for a caller recognizing a QEMU *screenshot*, and to
-    keep the font question answered the same way for both backends
-    rather than only where it happened to bite.
+    QEMU's own agentless-display plane never needs this, since it
+    reads characters the guest has already resolved out of VGA text
+    memory. This exists for recognizing text in a QEMU *screenshot*
+    instead, and to answer the font question the same way for both
+    backends rather than only where it actually caused a problem.
 
-    **What this host can offer is the limit.** QEMU ships its bank
-    with the BIOS's overrides already merged in and carries no
-    override table, so a stock install yields exactly one font — the
-    one the BIOS draws with. The font a DOS guest loads afterwards
-    differs in 19 glyphs and is not recoverable from these binaries,
-    so a QEMU screenshot of a guest-drawn screen would misread them.
-    Every font the installation actually holds is returned, which is
-    the best available answer rather than a complete one.
+    What this host's install actually has is the limit on what can be
+    returned. QEMU ships its font bank with the BIOS's overrides
+    already merged in, and carries no separate override table, so a
+    stock install yields exactly one font — the one the BIOS itself
+    draws with. The font a DOS guest loads afterward differs in 19
+    glyphs and can't be recovered from these files, so a QEMU
+    screenshot of guest-drawn text could still misread it. This
+    returns every font the install actually has, which is the best
+    available answer, not a complete one.
     """
     def extract():
-        # Resolved inside the extractor, so a cache hit answers
-        # without going near the installation at all.
+        # Look up the QEMU path inside this function, so a cache hit
+        # can answer without touching the install at all.
         home = os.path.dirname(find_qemu())
         roots = [home,
                  os.path.join(home, "share"),
@@ -336,10 +346,11 @@ def probe_image_format(path):
 def create_difference_image(filename, base):
     """Create a qcow2 differencing image backed by ``base``.
 
-    Writes land in the difference; the base image stays pristine
-    (the drive ``base`` triad's default ``difference`` type). The
-    base's format is probed so the backing reference is explicit.
-    Existing files are not overwritten. Returns the created path.
+    Writes go to the difference image, so the base image stays
+    unchanged — this is what a drive's ``materialize: difference``
+    setting produces. The base's format is probed first so the
+    backing reference is explicit. Existing files are not
+    overwritten. Returns the created path.
     """
     path = os.path.abspath(os.fspath(filename))
     if not path.lower().endswith(".qcow2"):
@@ -364,11 +375,12 @@ def create_difference_image(filename, base):
 
 
 def create_duplicate_image(filename, base):
-    """Materialize a standalone qcow2 copy of ``base``.
+    """Create a standalone qcow2 copy of ``base``.
 
-    The base is converted in full (``duplicate`` base type), leaving
-    the drive independent of any backing file. Existing files are not
-    overwritten. Returns the created path.
+    This is what a drive's ``materialize: copy`` setting produces:
+    the base is converted in full, leaving the new drive independent
+    of any backing file. Existing files are not overwritten. Returns
+    the created path.
     """
     path = os.path.abspath(os.fspath(filename))
     if not path.lower().endswith(".qcow2"):
@@ -426,12 +438,12 @@ class Qmp:
 
 
 def verify_vm(qmp, port, expected_name, expected_token):
-    """Fail closed unless the server is the exact VM instance recorded.
+    """Raise an error unless the server is the exact VM instance recorded.
 
-    The name alone cannot identify a VM: same-numbered machines of
-    two homes share their readable name, so the per-start token (the
-    QEMU ``-uuid``) must match as well before any command may target
-    the server.
+    The name alone can't identify a VM: two homes with the same
+    machine number use the same readable name, so the per-start
+    token (QEMU's ``-uuid``) also has to match before any command is
+    allowed to target the server.
     """
     reply = qmp.cmd("query-name")
     actual_name = reply.get("name") if isinstance(reply, dict) else None
@@ -496,7 +508,7 @@ def _terminate_started_process(proc):
 
 
 def _endpoint_port(vm):
-    """The recorded QMP port of a QEMU VM record, or fail closed."""
+    """The recorded QMP port of a QEMU VM record, or raise an error."""
     endpoint = (vm or {}).get("endpoint")
     port = endpoint.get("port") if isinstance(endpoint, dict) else None
     if (not isinstance(port, int) or isinstance(port, bool)
@@ -508,14 +520,15 @@ def _endpoint_port(vm):
 
 
 def _allocate_vnc_port(host="127.0.0.1"):
-    """A free loopback port for QEMU's VNC server, above the VNC base.
+    """A free loopback port for QEMU's VNC server, above port 5900.
 
-    Allocated the way the QMP port is — an ephemeral port the OS
-    hands out — with one extra demand: QEMU takes a *display number*
-    and serves port ``5900 + display``, so a port at or below 5900
-    would render as a negative display and is re-drawn. Ephemeral
-    ranges start far above 5900 on every supported host, so the
-    retry never triggers in practice.
+    Allocated the same way as the QMP port — an ephemeral port handed
+    out by the OS — with one extra requirement: QEMU takes a *display
+    number* and serves it on port ``5900 + display``, so a port at or
+    below 5900 would produce a negative display number and has to be
+    retried. In practice the OS's ephemeral port range starts well
+    above 5900 on every supported host, so this retry never actually
+    triggers.
     """
     for _ in range(64):
         port = available_port()
@@ -526,11 +539,12 @@ def _allocate_vnc_port(host="127.0.0.1"):
 
 
 def _check_vnc_endpoint(qmp, vnc_port):
-    """Fail closed unless this QEMU serves VNC where it was recorded.
+    """Raise an error unless this QEMU serves VNC on the recorded port.
 
-    Asked over the already identity-verified QMP session: RFB carries
-    no machine identity, so ``query-vnc`` is what ties the recorded
-    VNC endpoint to the VM the QMP identity check just proved.
+    Asked over a QMP session whose identity has already been
+    verified: RFB itself carries no machine identity, so
+    ``query-vnc`` is what ties the recorded VNC port to the VM the
+    QMP identity check just confirmed.
     """
     reply = qmp.cmd("query-vnc")
     enabled = reply.get("enabled") if isinstance(reply, dict) else None
@@ -549,20 +563,21 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                       vnc=False, current_vm=None, log_dir=None):
     """Launch an owned QEMU process and return its verified identity.
 
-    ``args`` is the command line including the QEMU binary and
-    ``-name``, but excluding ``-qmp`` / ``-display`` / ``-uuid`` /
-    ``-vnc`` (added here). ``vnc`` asks for a loopback VNC server on
-    an allocated display: its port lands in the endpoint beside the
-    QMP port, ``query-vnc`` cross-checks it once the identity is
-    verified, and the readiness probe waits it out under the same
-    startup deadline. ``current_vm`` is the machine's previously
-    recorded VM identity (or ``None``): a still-reachable one refuses
-    the launch so a live VM is never orphaned; a stale one is ignored
-    (the caller overwrites the recorded identity). ``log_dir``
-    receives ``qemu-stderr.log`` — the machine's backend
-    subdirectory. Returns the generic identity record
-    (:func:`backends.identity`) whose endpoint is this QEMU's QMP
-    port; the caller persists it, atomically with the machine phase.
+    ``args`` is the command line, including the QEMU binary and
+    ``-name``, but not ``-qmp`` / ``-display`` / ``-uuid`` / ``-vnc``
+    — those are added here. ``vnc`` requests a loopback VNC server on
+    an allocated display: its port is added to the endpoint alongside
+    the QMP port, ``query-vnc`` cross-checks it once identity is
+    verified, and the readiness probe waits for it under the same
+    startup deadline as everything else. ``current_vm`` is the
+    machine's previously recorded VM identity, or ``None``. If it's
+    still reachable, the launch is refused so a live VM is never
+    orphaned; if it's stale, it's ignored and the caller overwrites
+    the recorded identity. ``log_dir`` is where ``qemu-stderr.log``
+    is written — the machine's backend subdirectory. Returns the
+    generic identity record built by :func:`backends.identity`, whose
+    endpoint is this QEMU's QMP port; the caller saves it together
+    with the machine phase in one atomic write.
     """
     automatic_port = port is None
     port = available_port() if automatic_port else port
@@ -582,7 +597,7 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                 verify_vm(old_qmp, current_port,
                           current_vm["backend-id"], current_vm["token"])
         except (OSError, ConnectError):
-            pass  # stale identity; the caller overwrites it
+            pass  # The recorded identity is stale; overwrite it below.
         else:
             raise PreflightError(
                 "a reliquary VM is already active\n"
@@ -590,9 +605,10 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
                 f"  QMP port: 127.0.0.1:{current_port}\n"
                 "stop it before starting another VM for this machine",
                 rule_id="machine.vm-already-active")
-    # The readable -name repeats across homes (same-numbered machines
-    # of one blueprint); the per-start uuid is the token that makes
-    # this exact QEMU instance verifiable.
+    # The readable -name is not unique by itself: two homes can each
+    # have a machine with the same number from the same blueprint. The
+    # per-start uuid is what makes this exact QEMU instance
+    # verifiable.
     token = str(uuid.uuid4())
     command = list(args)
     command += ["-uuid", token]
@@ -641,8 +657,9 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
             _terminate_started_process(proc)
             raise
     while vnc_port is not None:
-        # The readiness probe the VNC endpoint owes before the launch
-        # is called up, bounded by the same startup deadline.
+        # Wait for the VNC endpoint to become reachable before
+        # returning, using the same startup deadline as the rest of
+        # the launch.
         try:
             rfb.probe("127.0.0.1", vnc_port)
             break
@@ -670,17 +687,18 @@ def launch_owned_qemu(args, *, vm_name, display=False, port=None,
 
 
 def stop(vm):
-    """Power off the identified owned VM (no persistence).
+    """Power off the identified owned VM. Does not save any state.
 
-    ``vm`` is the recorded identity record. The QMP session is
-    identity-verified before ``quit``, so an unrelated VM on the same
-    port is never touched. Fails closed on an identity mismatch or an
-    unreachable VM; the caller reconciles the machine ``phase`` and
-    clears the ``vm`` section.
+    ``vm`` is the recorded identity record. The QMP session's
+    identity is verified before sending ``quit``, so an unrelated VM
+    on the same port is never touched. Raises an error on an identity
+    mismatch or an unreachable VM; the caller is responsible for
+    updating the machine's ``phase`` and clearing the ``vm`` section.
     """
     if not vm:
-        # A machine caught with no recorded VM identity — treat as
-        # already gone so the caller reconciles it to a resting phase.
+        # No recorded VM identity: treat this the same as already
+        # stopped, so the caller can move the machine to a resting
+        # phase.
         raise PreflightError("no recorded reliquary VM to stop",
             rule_id="machine.no-active-vm")
     port = _endpoint_port(vm)
@@ -716,11 +734,12 @@ def stop(vm):
 # -- carriers -----------------------------------------------------
 
 def format_options(image):
-    """The QEMU ``format=`` option for an image, by extension.
+    """The QEMU ``format=`` option for an image, chosen by extension.
 
-    ``.img`` / ``.iso`` are pinned to ``format=raw`` (avoiding QEMU's
-    format-probing warning); any other extension is left for QEMU to
-    identify.
+    ``.img`` and ``.iso`` files always get ``format=raw``, which
+    avoids a warning QEMU prints when it has to probe the format
+    itself. Any other extension is left for QEMU to identify on its
+    own.
     """
     extension = os.path.splitext(image)[1].lower()
     return "format=raw," if extension in (".img", ".iso") else ""
@@ -730,10 +749,10 @@ def vga_screen(qmp):
     """Return the 80x25 VGA text screen as (text rows, attribute rows).
 
     Text rows are right-stripped strings; attribute rows keep the raw
-    VGA attribute byte of all 80 cells. Those bytes are the adapter's
-    contribution to the seam's text-screen contract: opaque,
-    equality-comparable per-cell tokens, promising nothing except
-    that equal tokens mean identically rendered cells.
+    VGA attribute byte for all 80 cells in the row. Those attribute
+    bytes are opaque tokens the caller can only compare for equality —
+    the only promise made about them is that two equal tokens mean
+    two identically rendered cells.
     """
     raw = qmp.hmp("xp /4000bx 0xb8000")
     data = []
@@ -755,43 +774,44 @@ def vga_screen(qmp):
 class QemuSession:
     """The carriers a running QEMU offers, over one verified session.
 
-    A control plane composes these; it never opens a connection of its
-    own and never learns the port behind them.
+    A control plane calls these methods; it never opens its own
+    connection and never learns the port they use.
     """
 
     backend = "qemu"
 
-    #: `text_screen` here reads characters the guest already resolved
-    #: out of VGA text memory — no interpretation, and cheap enough
-    #: that a caller may quantize its cadence finely
-    #: (`screen_stability.TEXT_CADENCE_STEP`).
+    #: `text_screen` here reads characters the guest has already
+    #: resolved out of VGA text memory — no image interpretation
+    #: involved — so it's cheap enough that a caller can poll it
+    #: fairly often (`screen_stability.TEXT_CADENCE_STEP`).
     recognizes_text = False
 
     def __init__(self, qmp):
         self._qmp = qmp
 
     def native(self):
-        """The named native escape hatch: this QEMU's QMP session.
+        """The QEMU-specific escape hatch: this QEMU's QMP session.
 
-        Always explicitly backend-scoped, never generalized — a
-        caller reaching for it has left the portable surface
-        deliberately.
+        Always explicitly QEMU-specific, never made generic — a
+        caller reaching for this has deliberately stepped outside the
+        portable, backend-independent methods.
         """
         return self._qmp
 
     def send_keys(self, combos, delay=0.06):
-        """Inject key combinations, each a list of seam key names.
+        """Inject key combinations, each a list of key names.
 
-        **The seam's key vocabulary is QEMU's qcode set** (D103), so
-        the mapping here is the identity — not by coincidence but
-        because this backend's names *are* the set. Naming the seam
-        after the reference backend is the cost of not inventing a
-        third vocabulary that no backend speaks natively.
+        The key names used throughout Reliquary are QEMU's own
+        "qcode" names (D103), so this mapping is the identity function
+        — not a coincidence, but because this backend's names *are*
+        the set everything else is built from. Naming the shared key
+        vocabulary after QEMU, the reference backend, avoids inventing
+        a third vocabulary that no backend actually speaks natively.
 
-        A backend whose input API names keys differently translates in
-        its own adapter, never in the control plane; VirtualBox's
-        `scancodes_for` is that translation, and it is keyed by these
-        names rather than by the language's.
+        A backend whose input API uses different key names does the
+        translation in its own adapter, never in the control plane;
+        VirtualBox's `scancodes_for` is that translation, and it's
+        keyed by these same QEMU names rather than by its own.
         """
         for combo in combos:
             self._qmp.cmd(
@@ -802,29 +822,30 @@ class QemuSession:
     def text_screen(self, font_banks=()):
         """The native text readback: (character rows, attribute rows).
 
-        ``font_banks`` (F61) is accepted and ignored: a native
-        text-memory read recognizes no pixels, so a script's `font`
-        statement has nothing to change here (`recognizes_text` below
-        is what tells a caller so).
+        ``font_banks`` (F61) is accepted but ignored here: reading
+        native text memory involves no pixel recognition, so a
+        script's `font` statement has nothing to change
+        (`recognizes_text` below reports this to the caller).
         """
         return vga_screen(self._qmp)
 
     def framebuffer(self):
-        """Refused: this plane's screen is text memory, not pixels.
+        """Refused: this plane reads text memory, not pixels.
 
-        The landmark matcher compares the pixels a plane's *screen
-        carrier* hands over, and this one hands over characters the
-        guest already resolved — there is no framebuffer in the
-        reading path to compare. `screendump` still captures a
-        diagnostic image (:meth:`screenshot` above, the `screenshot`
-        verb and the automatic failure capture), which is a different
-        carrier on a different clock and is not a sampling path.
+        The landmark matcher compares the pixels a plane's screen
+        carrier hands it, and this plane hands over characters the
+        guest has already resolved — there's no framebuffer here to
+        compare. `screendump` still captures a diagnostic image
+        (see :meth:`screenshot` above, the `screenshot` verb, and the
+        automatic failure capture), but that's a separate carrier on
+        a separate schedule, not part of the sampling path.
 
-        Unreachable in an ordinary run: `capture_format` reports
-        ``None`` for this plane, so preflight refuses a landmark
-        condition before any guest input (F65). It answers here so
-        that a caller reaching past that gate is told what it asked
-        of, rather than meeting an ``AttributeError``.
+        Not reachable in an ordinary run: `capture_format` already
+        reports ``None`` for this plane, so preflight refuses a
+        landmark condition before any guest input runs (F65). This
+        method still raises the same error so a caller that somehow
+        gets past that check sees a clear message instead of an
+        ``AttributeError``.
         """
         raise PreflightError(
             "the agentless-display plane reads QEMU's VGA text memory "
@@ -833,12 +854,13 @@ class QemuSession:
             rule_id="machine.plane-no-framebuffer")
 
     def pointer_event(self, x, y, buttons):
-        """Refused: an absolute event needs a framebuffer to aim at.
+        """Refused: aiming a pointer event needs a framebuffer to aim at.
 
         A `click` locates its target by matching a landmark, which
-        this plane already refuses in :meth:`framebuffer` — so this
-        method answers the same way for the same reason, unreachable
-        in an ordinary run behind that earlier refusal (F66).
+        this plane already refuses in :meth:`framebuffer`, so this
+        method fails for the same reason. It's not reachable in an
+        ordinary run, since the `framebuffer` refusal above already
+        blocks it (F66).
         """
         raise PreflightError(
             "the agentless-display plane reads QEMU's VGA text memory "
@@ -849,9 +871,9 @@ class QemuSession:
     def screenshot(self, path):
         """Capture the framebuffer to ``path`` as a PNG.
 
-        QEMU writes PNG directly where its build supports it, and PPM
-        otherwise — converted here, so the carrier's product is a PNG
-        either way.
+        QEMU writes PNG directly when its build supports it, and PPM
+        otherwise; when it's PPM, this converts it to PNG, so the
+        result is always a PNG either way.
         """
         png = os.fspath(path)
         try:
@@ -876,9 +898,10 @@ class QemuSession:
     def change_medium(self, drive_key, path=None):
         """Swap or eject a removable medium on the running machine.
 
-        The drive is addressed by its launch id, which is the state's
-        drive key, so the change the guest sees and the change
-        persisted to the state stay one operation.
+        The drive is addressed by its launch id, which is the same
+        key used for it in the state, so the change the guest sees
+        and the change saved to the state stay in sync as one
+        operation.
         """
         if path is None:
             self._qmp.hmp(f"eject {drive_key}")
@@ -889,13 +912,14 @@ class QemuSession:
         self._qmp.hmp(f"change {drive_key} {target}{fmt}")
 
 
-#: Seam key names (QEMU qcodes — see ``control_display`` /
-#: ``script_runner``) → X11 keysyms for RFB ``KeyEvent``. The VNC
-#: plane's own third layer of key mapping (D103), exactly as
-#: VirtualBox owns ``scancodes_for``: keyed by `ret`, `spc`, `pgup`
-#: and `pgdn`, with no entry for `enter` or `space`. Letters and
-#: digits are not listed — their keysym is their character code,
-#: which :func:`keysym_for` computes.
+#: Maps Reliquary's shared key names (QEMU qcodes — see
+#: ``control_display`` / ``script_runner``) to X11 keysyms, for RFB's
+#: ``KeyEvent`` (D103). This is the VNC plane's own key-name mapping,
+#: the same role VirtualBox's ``scancodes_for`` plays for that
+#: backend: keyed by `ret`, `spc`, `pgup`, and `pgdn` — there's no
+#: entry for `enter` or `space`. Letters and digits aren't listed
+#: here because their keysym is just their character code, which
+#: :func:`keysym_for` computes directly.
 _KEYSYMS = {
     "esc": 0xff1b, "ret": 0xff0d, "tab": 0xff09, "backspace": 0xff08,
     "ctrl": 0xffe3, "shift": 0xffe1, "alt": 0xffe9,
@@ -915,19 +939,19 @@ _KEYSYMS = {
 
 
 def keysym_for(name):
-    """The X11 keysym for one seam key name, or fail closed naming it."""
+    """The X11 keysym for one key name, or raise an error naming it."""
     keysym = _KEYSYMS.get(name)
     if keysym is not None:
         return keysym
     if len(name) == 1 and (name.islower() or name.isdigit()):
-        # Latin-1 keysyms are the character codes themselves.
+        # For Latin-1 characters, the keysym is just the character code.
         return ord(name)
     raise StaticError(f"no VNC keysym for key {name!r}",
                       rule_id="key.no-mapping")
 
 
 def _endpoint_vnc_port(vm):
-    """The recorded VNC port of a QEMU VM record, or fail closed."""
+    """The recorded VNC port of a QEMU VM record, or raise an error."""
     endpoint = (vm or {}).get("endpoint") or {}
     port = endpoint.get("vnc-port")
     if (not isinstance(port, int) or isinstance(port, bool)
@@ -942,20 +966,21 @@ def _endpoint_vnc_port(vm):
 class QemuVncSession(QemuSession):
     """The VNC plane's carriers: RFB screen and keys, QMP for the rest.
 
-    Behind the same seam :class:`QemuSession` serves, so everything
-    above it is untouched by construction. The screen carriers read
-    the RFB framebuffer — `text_screen` through the shared fixed-font
-    recognizer, the composition the VirtualBox display plane built —
-    and `send_keys` speaks RFB ``KeyEvent``. `change_medium` and the
-    native escape hatch stay inherited: media movement is a machine
-    operation, not a display one, and it rides the management
-    interface whatever plane drives the screen.
+    Implements the same methods :class:`QemuSession` does, so any
+    code written against that interface works unchanged here too. The
+    screen carriers read the RFB framebuffer — `text_screen` runs it
+    through the shared fixed-font recognizer, the same approach the
+    VirtualBox display plane uses — and `send_keys` sends RFB
+    ``KeyEvent`` messages. `change_medium` and the native escape hatch
+    are inherited unchanged: changing media is a machine-level
+    operation, not a display one, and it always goes over QMP no
+    matter which plane is driving the screen.
     """
 
     #: Like the VirtualBox display plane, this `text_screen`
-    #: interprets a framebuffer rather than reading resolved
-    #: characters, which costs the better part of a second and sets
-    #: how coarsely a caller may quantize its cadence
+    #: interprets a captured framebuffer rather than reading resolved
+    #: characters, which takes the better part of a second and limits
+    #: how often a caller should poll it
     #: (`screen_stability.GUI_CADENCE_STEP`).
     recognizes_text = True
 
@@ -967,8 +992,9 @@ class QemuVncSession(QemuSession):
     def send_keys(self, combos, delay=0.06):
         """Inject key combinations as RFB key events.
 
-        A combo's keys go down in order and up in reverse, the same
-        expansion VirtualBox's scancode carrier performs.
+        A combo's keys are pressed down in order and released in
+        reverse order, the same sequence VirtualBox's scancode
+        carrier uses.
         """
         for combo in combos:
             keysyms = [keysym_for(name) for name in combo]
@@ -981,22 +1007,22 @@ class QemuVncSession(QemuSession):
     def pointer_event(self, x, y, buttons):
         """Move/press/release as one RFB ``PointerEvent`` (F66).
 
-        No translation: the wire's own coordinates are framebuffer
-        pixels, which is exactly what a caller composing a click
-        already has in hand from a landmark's spot.
+        No coordinate translation needed: RFB's own coordinates are
+        already framebuffer pixels, which is exactly what a caller
+        composing a click already has from a landmark's position.
         """
         self._rfb.pointer_event(x, y, buttons)
 
     def text_screen(self, font_banks=()):
         """Framebuffer + shared fixed-font recognizer.
 
-        Read through **this host's** QEMU font — the merged bank its
-        BIOS draws with, which is also near enough to the classic
-        design a DOS guest loads to stay inside the recognizer's
-        match threshold. ``font_banks`` are the authored fonts a
-        script's `font` statement named, tried **before** the host's
-        own, labelled ``"host"`` in the failure report's "fonts
-        tried".
+        Recognized using **this host's** QEMU font — the merged bank
+        its BIOS draws with — which is also close enough to the
+        classic font a DOS guest loads that it stays within the
+        recognizer's match threshold. ``font_banks`` are the fonts a
+        script's `font` statement named explicitly; they're tried
+        *before* the host's own font, which is labelled ``"host"`` in
+        the failure report's "fonts tried" list.
         """
         self._rfb.refresh()
         host_banks = tuple(
@@ -1008,15 +1034,16 @@ class QemuVncSession(QemuSession):
     def framebuffer(self):
         """The RFB framebuffer as a Pillow image (F65).
 
-        The landmark matcher's own carrier: the same refresh-and-read
-        :meth:`text_screen` runs, stopping before the recognizer. A
-        landmark-only sample therefore costs one framebuffer read and
-        no glyph matching at all, which is the point on a GUI screen
-        where recognizing anything would be wasted work.
+        This is the carrier the landmark matcher uses, and it's the
+        same refresh-and-read that :meth:`text_screen` does, just
+        without running the recognizer afterward. So a landmark-only
+        sample costs one framebuffer read and no glyph matching at
+        all — which is the point on a GUI screen, where there's no
+        text to recognize anyway.
 
-        The wire forces 32bpp true colour, so what comes back is
-        already this plane's stated ``rgb`` capture format
-        (:meth:`QemuAdapter.capture_format`).
+        RFB is configured to force 32-bit true-colour, so what comes
+        back already matches this plane's stated ``rgb`` capture
+        format (see :meth:`QemuAdapter.capture_format`).
         """
         self._rfb.refresh()
         return self._rfb.image()
@@ -1033,7 +1060,8 @@ class QemuVncSession(QemuSession):
 
 
 class QemuAdapter(BackendAdapter):
-    """QEMU: the delivered backend, and the seam's source."""
+    """QEMU: the fully built backend, and the one the interface was
+    designed around."""
 
     name = "qemu"
     settings_keys = SETTINGS_KEYS
@@ -1043,11 +1071,12 @@ class QemuAdapter(BackendAdapter):
     def discover(self, platform=None):
         """Probe for the system binary this guest's architecture needs.
 
-        Answering for the *machine's* platform rather than for a fixed
-        binary is what keeps the preflight honest: QEMU ships one
-        system binary per architecture, so probing one and launching
-        another would report a host as ready and then fail — or refuse
-        a host that holds exactly the binary the machine wants.
+        This checks for the binary the *machine's* platform actually
+        needs, rather than a fixed one, to keep preflight accurate:
+        QEMU ships a separate system binary per architecture, so
+        checking one binary and launching a different one could
+        report a host as ready and then fail — or refuse a host that
+        actually has the exact binary the machine needs.
         """
         try:
             executable = find_qemu(platform)
@@ -1059,14 +1088,15 @@ class QemuAdapter(BackendAdapter):
                             detail=f"found at {executable}")
 
     def capabilities(self):
-        """What QEMU provides today — built, not merely intended.
+        """What QEMU actually provides today, not what's merely planned.
 
         ``agentless-display`` and ``vnc`` are listed because both are
-        built here; the serial-console and guest-agent planes are
-        named in the blueprint vocabulary and unbuilt, so claiming
-        them would promise what nothing can honor (P11). The same
-        reading governs controllers: the drive renderer wires ``ide``
-        alone.
+        implemented here. The blueprint vocabulary also names
+        serial-console and guest-agent planes, but those aren't built
+        yet, so they're left out — claiming them would promise
+        something nothing can deliver (P11). The same reasoning
+        applies to controllers: only ``ide`` is listed, since that's
+        the only one the drive renderer supports.
         """
         return Capabilities(
             backend="qemu",
@@ -1081,13 +1111,14 @@ class QemuAdapter(BackendAdapter):
     def capture_format(self, plane):
         """Only the VNC plane reads a framebuffer here (F65).
 
-        The two planes differ in what their screen carrier *is*: the
-        agentless-display plane scrapes resolved characters out of
-        VGA text memory over QMP, and the VNC plane interprets the
-        RFB framebuffer. So a landmark condition — which compares
-        pixels — is served by the second and refused by name on the
-        first. The wire forces 32bpp true colour, which is ``rgb``
-        and makes the reference-side normalization the identity.
+        The two planes differ in what their screen carrier actually
+        reads: the agentless-display plane reads resolved characters
+        out of VGA text memory over QMP, while the VNC plane reads
+        the RFB framebuffer. A landmark condition, which compares
+        pixels, works on the VNC plane and is refused by name on the
+        agentless-display plane. RFB is forced to 32-bit true colour,
+        which is ``rgb``, so the reference-image normalization ends
+        up being a no-op.
         """
         return "rgb" if plane == "vnc" else None
 
@@ -1095,30 +1126,33 @@ class QemuAdapter(BackendAdapter):
         """QMP delivers pointer events on either plane (F66).
 
         Unlike the framebuffer, this is a property of the management
-        interface, not of the screen carrier: ``input-send-event``
-        and RFB ``PointerEvent`` both reach the same emulated tablet
-        regardless of which plane is driving the display. Whether a
-        `click` can actually *aim* one is the separate, plane-specific
-        question :meth:`capture_format` already answers — an
-        agentless-display machine still refuses `click` there, just
-        for lack of anywhere to point rather than for lack of a wire.
+        interface, not the screen carrier: ``input-send-event`` and
+        RFB's ``PointerEvent`` both reach the same emulated tablet no
+        matter which plane is driving the display. Whether a `click`
+        can actually *aim* the pointer is a separate, plane-specific
+        question that :meth:`capture_format` already answers — an
+        agentless-display machine still refuses `click`, just because
+        it has no framebuffer to aim at, not because the wire can't
+        carry the event.
         """
         return plane in ("agentless-display", "vnc")
 
     def validate_settings(self, settings):
-        """Judge this machine's ``qemu`` section, rendering nothing.
+        """Check this machine's ``qemu`` section, without rendering anything.
 
-        The renderer *is* the validator (:func:`settings_args`), so
-        what a create accepts is exactly what a start puts on the
-        command line — including the unknown-key rule, which is why
-        this does not defer to the seam's shared one.
+        The function that renders the arguments, :func:`settings_args`,
+        is also the validator — it's called here and the result
+        discarded. So whatever a create accepts is exactly what a
+        start later puts on the command line, unknown-key check
+        included. This is why validation here doesn't call the shared
+        base-class rule instead.
         """
         settings_args(settings)
 
     # -- materialize and dispose ----------------------------------
 
     def image_path(self, root, stem):
-        """QEMU's native per-machine image: qcow2, named for its media."""
+        """QEMU's native per-machine image: a qcow2 file named for its drive."""
         return os.path.join(root, f"{stem}.qcow2")
 
     def create_image(self, path, *, mode, size=None, base=None):
@@ -1138,21 +1172,23 @@ class QemuAdapter(BackendAdapter):
               current=None):
         """Render the machine's state into a QEMU command line and launch.
 
-        Reliquary drive vocabulary in, QEMU configuration out: memory,
-        the drive arguments, and the firmware boot order are all
-        rendered here, so no caller ever composes a backend argument.
+        Turns Reliquary's own drive vocabulary into QEMU configuration:
+        memory, drive arguments, and the firmware boot order are all
+        rendered here, so no caller ever has to build a backend
+        argument by hand.
 
-        **This machine's own ``backend-settings.qemu`` section renders
-        last**, after everything Reliquary owns: the hatch adds to the
-        configuration rather than sitting inside it, and reading the
-        logged command line, a caller's own arguments are the tail.
-        Sections for other backends are inert and never read.
+        This machine's own ``backend-settings.qemu`` section is
+        rendered **last**, after everything Reliquary itself sets: the
+        escape hatch only adds arguments on top of the rest of the
+        configuration, so in the logged command line, the caller's own
+        arguments always appear at the end. Sections for other
+        backends are ignored and never read.
         """
         memory = state.get("memory") or 16
         vm_name = state.get("backend-id") or f"reliquary-{state['id']}"
-        # The binary comes first because it is chosen, not fixed: a
-        # guest's architecture decides which system emulator can run
-        # it at all (_PLATFORM_ARCH).
+        # The binary is chosen based on the guest's architecture,
+        # rather than fixed, since that decides which system emulator
+        # can run it at all (_PLATFORM_ARCH).
         args = [find_qemu(state.get("platform")), "-name", vm_name,
                 "-m", str(memory)]
         args += drive_args(state.get("drives", {}))
@@ -1160,10 +1196,10 @@ class QemuAdapter(BackendAdapter):
         if boot is not None:
             args += ["-boot", f"order={boot}"]
         if state.get("pointing-device") == "tablet":
-            # An absolute pointing device (F66): a PS/2 mouse is
-            # relative and its guest driver applies acceleration the
-            # host cannot observe, so `click` needs this rather than
-            # the stock relative default (P10).
+            # An absolute pointing device (F66): a PS/2 mouse reports
+            # relative motion and its guest driver applies
+            # acceleration the host can't observe, so `click` needs
+            # the tablet rather than the default relative mouse (P10).
             args += ["-usb", "-device", "usb-tablet,id=pointer0"]
         args += settings_args(
             (state.get("backend-settings") or {}).get(self.name))
@@ -1172,10 +1208,10 @@ class QemuAdapter(BackendAdapter):
             args, vm_name=vm_name, display=display, current_vm=current,
             log_dir=backend_dir, vnc="vnc" in planes)
         if planes[0] == "vnc":
-            # The first declared plane drives the session's carriers
-            # (blueprint-model.md); recording it beside the ports is
-            # what lets a session serve it without re-reading the
-            # policy. The default plane needs no record.
+            # The first plane listed in control-planes is the one a
+            # session serves (blueprint-model.md); recording it here
+            # alongside the ports lets the session use it without
+            # re-reading the policy. The default plane needs no record.
             identity["endpoint"]["plane"] = "vnc"
         return identity
 
@@ -1186,18 +1222,19 @@ class QemuAdapter(BackendAdapter):
     def session(self, vm, cache=None):
         """Yield an identity-verified session over the recorded VM.
 
-        The endpoint's recorded ``plane`` picks the carriers: the VNC
-        plane's where the start recorded it as the driving plane, and
-        the agentless display's otherwise. Either way identity is
-        QMP's job and comes first — a VNC connection never authorizes
-        a command, and the RFB socket is opened only after the
-        machine behind it is verified, with ``query-vnc``
-        cross-checking that the recorded endpoint is the one this
-        QEMU serves.
+        The endpoint's recorded ``plane`` decides which carriers are
+        used: the VNC plane's when start recorded VNC as the driving
+        plane, and the agentless-display plane's otherwise. Either
+        way, QMP checks identity first — a VNC connection never
+        authorizes a command on its own, and the RFB socket is only
+        opened after the machine behind it is verified, with
+        ``query-vnc`` cross-checking that the recorded endpoint is
+        the one this QEMU actually serves.
 
         ``cache`` reaches the VNC plane's recognizer as the host-font
-        cache; the agentless plane reads VGA text memory, where the
-        guest has already resolved its characters, and ignores it.
+        cache. The agentless-display plane reads VGA text memory,
+        where the guest has already resolved its characters, so it
+        ignores ``cache``.
         """
         port = _endpoint_port(vm)
         name = vm["backend-id"]
@@ -1230,10 +1267,11 @@ class QemuAdapter(BackendAdapter):
                     finally:
                         client.close()
         except (OSError, ConnectError) as error:
-            # The recorded VM is gone. The adapter owns no state, so
-            # it does not clear it here — the caller (a lifecycle
-            # operation, or ``mark_stopped``) reconciles the phase and
-            # the ``vm`` section on the next operation.
+            # The recorded VM is gone. This adapter doesn't own any
+            # persisted state, so it doesn't clear anything here — the
+            # caller (a lifecycle operation, or ``mark_stopped``)
+            # updates the phase and the ``vm`` section on its next
+            # operation.
             raise PreflightError(
                 "the recorded reliquary VM is no longer reachable\n"
                 f"  expected: {name} on 127.0.0.1:{port}",
@@ -1241,11 +1279,12 @@ class QemuAdapter(BackendAdapter):
 
 
 def _qemu_version(executable):
-    """The version string QEMU reports, or ``None`` if it will not say.
+    """The version string QEMU reports, or ``None`` if it won't say.
 
-    Discovery never fails on this: a binary that cannot be run is a
-    version Reliquary does not know, not an unavailable backend — the
-    launch itself will report what is actually wrong.
+    Discovery never fails because of this: a binary that can't be run
+    just means Reliquary doesn't know its version, not that the
+    backend is unavailable — the launch itself will report what's
+    actually wrong.
     """
     try:
         completed = subprocess.run(
@@ -1272,10 +1311,11 @@ def _boot_order(boot_keys, drives):
 def _option(item):
     """An argv element as ``(name, inline_value)``, or ``(None, None)``.
 
-    Reads the option name the way QEMU would: leading dashes
-    stripped, and anything past a ``=`` or a space the inline value —
-    so ``-m 64`` written as a single element is caught as ``-m``
-    rather than handed to QEMU as an argument it cannot parse.
+    Reads the option name the way QEMU would: strips leading dashes,
+    and treats anything after a ``=`` or a space as the inline value.
+    That means ``-m 64`` written as a single string is recognized as
+    option ``-m``, instead of being handed to QEMU as one malformed
+    argument it can't parse.
     """
     if not item.startswith("-"):
         return None, None
@@ -1286,19 +1326,20 @@ def _option(item):
 
 
 def _reserved_argument(item):
-    """What owns ``item``'s option, or ``None`` if the caller does."""
+    """What owns ``item``'s option, or ``None`` if it's the caller's."""
     name, _inline = _option(item)
     return RESERVED_ARGUMENTS.get(name) if name else None
 
 
 def _reserved_set(value):
-    """What owns a ``-set`` target, or ``None`` if the caller does.
+    """What owns a ``-set`` target, or ``None`` if it's the caller's.
 
-    ``-set group.id.property=value`` is QEMU's own per-item addressing,
-    and for the ``drive`` group it reaches exactly what ``-drive`` would
-    have — so a property Reliquary renders is refused here as ``-drive``
-    is refused, naming ``drives``; the rest is the caller's (D118). A
-    value that is not of that shape is left to QEMU to refuse.
+    ``-set group.id.property=value`` is QEMU's own way to address a
+    specific object's property, and for the ``drive`` group it can
+    reach exactly what ``-drive`` sets — so any property Reliquary
+    already renders is refused here the same way ``-drive`` itself is
+    refused, naming ``drives`` as the owner (D118). Any value that
+    isn't shaped like that is left for QEMU itself to reject.
     """
     if not isinstance(value, str):
         return None
@@ -1315,20 +1356,22 @@ def _reserved_set(value):
 def settings_args(settings):
     """Validate ``backend-settings.qemu`` and render it into arguments.
 
-    **One path, so a section that validates is a section that
-    renders**: :meth:`QemuAdapter.validate_settings` calls this and
-    discards the result, and the launch calls it for the arguments. A
-    separate checker would be free to drift from the renderer, and the
-    drift would surface as configuration accepted at create time and
-    quietly missing at start.
+    This is the only path that does both, so a section that passes
+    validation is a section that renders correctly:
+    :meth:`QemuAdapter.validate_settings` calls this and discards the
+    result, while the launch calls it to get the actual arguments. A
+    separate validator function could drift out of sync with the
+    renderer, which would show up as configuration accepted at create
+    time and then silently missing at start.
 
-    The section is the escape hatch, so its *values* are the caller's
-    own — QEMU refuses a machine type it does not have, and that
-    refusal is the caller's to read. What is judged here is the key
-    set, each key's shape, and **overlap**: an argument Reliquary owns
-    through a first-class field or through VM identity is refused
-    naming the owner, because two sources for one fact is the one
-    thing a hatch must not become.
+    The section is the escape hatch, so its *values* belong to the
+    caller — if QEMU refuses a machine type it doesn't have, that's
+    the caller's error to read. What this function checks is the set
+    of allowed keys, each key's shape, and overlap: an argument that
+    Reliquary already owns through a first-class field or through VM
+    identity is refused, naming the owner, because letting the hatch
+    set the same thing two different ways is exactly what it must not
+    become.
     """
     settings = settings or {}
     unknown = sorted(key for key in settings if key not in SETTINGS_KEYS)
@@ -1362,8 +1405,8 @@ def settings_args(settings):
             if owner is None:
                 name, inline = _option(item)
                 if name == "set":
-                    # The target is inline (`-set drive.x.cache=none` in
-                    # one element) or the next element.
+                    # The target can be inline (`-set drive.x.cache=none`
+                    # as one element) or given as the next element.
                     following = extra[index + 1] if index + 1 < len(
                         extra) else None
                     owner = _reserved_set(inline or following)
@@ -1381,11 +1424,11 @@ def drive_args(drives):
     """Build QEMU ``-drive`` arguments from a machine's resolved drives.
 
     Returns a list of tokens for a QEMU command line (``-drive``
-    alternating with its value), with floppies first, hard disks next,
-    and cdroms placed on the IDE bus after the last hard disk. A drive
-    whose realized path is a host directory renders as vvfat — the
-    one capability only knowable once resolution has run, so it is
-    judged here rather than at assignment.
+    alternating with its value), with floppies first, hard disks
+    next, and cdroms placed on the IDE bus after the last hard disk.
+    A drive whose resolved path is a host directory is rendered as
+    vvfat — this can only be known once resolution has already run,
+    which is why it's checked here rather than at assignment time.
     """
     args = []
 
@@ -1393,8 +1436,8 @@ def drive_args(drives):
                 if v["medium"] == "floppy"]
     for key, drive in sorted(floppies, key=lambda kv: kv[1]["slot"]):
         path = drive["path"]
-        # id=<key> names the drive so a running insert/eject can target
-        # it over QMP (the slot key is the launch id).
+        # id=<key> names the drive so a running insert/eject can
+        # target it over QMP later (the drive's key is its launch id).
         if path is None:
             args += ["-drive",
                      f"if=floppy,index={drive['slot']},id={key}"]
@@ -1413,9 +1456,9 @@ def drive_args(drives):
         source = (f"fat:rw:{path},format=raw,"
                   if is_dir else path + ",")
         inferred = "" if is_dir else format_options(path)
-        # id=<key> as on every other drive: a hard disk is never
-        # swapped live, but the slot key is how the settings hatch
-        # addresses one drive's options — `-set drive.hdd0.cache=…`
+        # id=<key>, same as every other drive: a hard disk is never
+        # swapped live, but its key is still how the settings hatch
+        # addresses that drive's options — `-set drive.hdd0.cache=…`
         # (D118) — so every drive is addressable the same way.
         args += ["-drive",
                  f"file={source}{inferred}if=ide,index={drive['slot']},"

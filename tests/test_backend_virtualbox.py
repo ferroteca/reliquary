@@ -2,14 +2,15 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Installed tests for the VirtualBox adapter: images, lifecycle.
 
-Everything below the adapter seam that **only VirtualBox knows** — VDI
-materialization, `createvm` under the machine directory, the storage
-verbs, scancodes, and the owned start and stop. What every adapter owes
-the seam alike — the name, the capability report, the image extension,
-discovery, the host font, and the refusal to command an unverified VM —
-is `test_backend_contract`, driven against this backend and QEMU from
-one text (F59). ``VBoxManage`` is always mocked; no unit test launches a
-real hypervisor.
+This file covers everything below the adapter seam that only
+VirtualBox knows about: VDI materialization, `createvm` under the
+machine directory, the storage verbs, scancodes, and the owned start
+and stop. What every adapter must provide the same way — the name,
+the capability report, the image extension, discovery, the host font,
+and the refusal to command an unverified VM — is covered once, in
+`test_backend_contract`, and run against this backend and QEMU from
+that one file (F59). ``VBoxManage`` is always mocked; no unit test
+here launches a real hypervisor.
 """
 
 import os
@@ -366,7 +367,8 @@ def test_stop_verifies_identity_before_poweroff():
 
 
 def test_the_identity_refusal_carries_the_virtualbox_rule_id():
-    """The id a consumer switches on, beyond the contract's behaviour."""
+    """The rule_id a caller can branch on, beyond what the shared
+    contract test already checks."""
     def run(args, **kwargs):
         if args[1] == "showvminfo":
             return _completed(stdout=_info().replace(
@@ -434,7 +436,8 @@ def test_change_medium_retargets_the_recorded_attachment(root):
 
 
 def test_stop_is_satisfied_by_an_already_stopped_vm():
-    """A guest that powered itself off leaves stop nothing to do."""
+    """A guest that has already powered itself off leaves stop() with
+    nothing to do."""
     calls = []
 
     def run(args, **kwargs):
@@ -452,7 +455,8 @@ def test_stop_is_satisfied_by_an_already_stopped_vm():
 
 
 def test_a_session_refuses_a_vm_that_is_not_running():
-    """The runner reads this rule id as the stopped observation."""
+    """script_runner.py checks specifically for this rule id to
+    recognize that the VM has stopped."""
     def run(args, **kwargs):
         if args[1] == "showvminfo":
             return _completed(stdout=_info(state="poweroff"))

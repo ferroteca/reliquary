@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The error taxonomy: one root, four classes, one internal fault.
+"""The error classes reliquary raises, and the exit code each maps to.
 
-Every deliberate reliquary error subclasses :class:`ReliquaryError`,
-so ``except ReliquaryError`` is always the catch-all. The four classes
-are the CLI's exit codes and the API's exceptions under one mapping
+Every error reliquary raises on purpose is a subclass of
+:class:`ReliquaryError`, so ``except ReliquaryError`` always catches
+all of them. There are four classes, and they are both the CLI's exit
+codes and the API's exception hierarchy, from one table
 (docs/spec/script-spec.md, "Error classes and exit codes"):
 
 ===================  =====  ==========================================
@@ -17,56 +18,64 @@ class                exit   what it says
 ``RunCancelled``     5      a deliberate stop at an event boundary
 ===================  =====  ==========================================
 
-**The classes describe every surface, not only a script run** (D58).
-They were named for a run's enforcement tiers and generalize
-unchanged: a malformed blueprint is illegal from its text alone
-exactly as a malformed script is, and naming a machine that does not
-exist is a world condition exactly as an unbootable drive is. The
-deciding questions are the same three in the same order — is it
-decidable from the authored input alone, does the world satisfy the
-input, did the work itself fail — and the surface the caller happened
-to use is not among them. A capability reliquary declares but has not
-wired is a ``PreflightError``: the request is legal and the world,
-which includes what this build implements, does not satisfy it.
+**These four classes apply everywhere in reliquary, not only to a
+script run** (D58). They were first defined for what a script run
+checks at each stage, but the same three questions decide any error,
+on any surface: can you tell it's wrong just by reading the input,
+does the world satisfy the input, did the operation itself fail? A
+malformed blueprint is a ``StaticError`` for the same reason a
+malformed script is: you can tell from its text alone. Naming a
+machine that does not exist is a ``PreflightError`` for the same
+reason an unbootable drive is: it's a fact about the world, not about
+the input's text. It does not matter which surface (CLI command, API
+call, etc.) raised the error. A capability reliquary has declared but
+not actually wired up is also a ``PreflightError``: the request is
+legal, but this build does not (yet) satisfy it.
 
-``0`` is success. ``1`` is a **fault** — never a user's mistake. It
-has two populations and both are reliquary's own: an
-:class:`InternalError`, an invariant reliquary detected in its own
-state, and a genuine accident that never was a ``ReliquaryError`` at
-all. A deliberate raise always lands in this hierarchy; a bare
-builtin is reserved for the invariants python itself enforces.
+Exit code ``0`` is success. Exit code ``1`` means reliquary itself is
+at fault — it is never the user's mistake. That happens in two ways:
+either an :class:`InternalError` was raised because reliquary caught
+itself in a broken state, or some other, unplanned-for Python
+exception occurred that was never one of reliquary's own error
+classes. Every error reliquary raises on purpose belongs to this
+hierarchy; a plain built-in exception (like a bare ``ValueError``) is
+reserved for the errors Python itself raises, not for reliquary's.
 """
 
 
 class ReliquaryError(Exception):
-    """Root of every deliberate reliquary error.
+    """Base class every error reliquary raises on purpose inherits from.
 
-    ``rule_id`` is the stable dotted identifier naming the rule this
-    diagnostic enforces — ``obs.two-channels`` and its siblings. It
-    lives here rather than on the classes below because the spec puts
-    every id in **one namespace shared across the classes**
-    (docs/spec/script-spec.md, "Error classes and exit codes"), and
-    the field at the root is the code saying the same thing: a
-    diagnostic's identity is independent of which tier raised it.
+    ``rule_id`` is a stable dotted name identifying which rule the
+    error is enforcing, such as ``obs.two-channels``. It lives on this
+    base class, not on the subclasses below, because the spec keeps
+    every rule id in one shared namespace across all four error
+    classes (docs/spec/script-spec.md, "Error classes and exit
+    codes") — putting the field here says the same thing in code: an
+    error's identity does not depend on which of the four classes
+    raised it.
 
-    An id is a **contract** — it is what a consumer switches on, so
-    it is stable where the message text is not — and a *field* rather
-    than text baked into a message, so switching needs no prose
-    parsing and the beta id index can be generated.
+    ``rule_id`` is a stable field a caller can switch on, unlike the
+    human-readable message text, which can change. Keeping it as a
+    separate field (rather than embedding it in the message) means no
+    one has to parse the message to find it, and it lets the docs
+    generate an index of every rule id automatically.
 
-    Identity is not location. Where a diagnostic can also say *where*
-    it happened, that comes from the class: ``ScriptParseError`` and
-    ``BlueprintError`` carry line and column, and the script runner's
-    ``_Located`` cites the statement. Preflight diagnostics about the
-    media namespace have no script line to cite and carry an id alone.
+    ``rule_id`` says *what* rule fired, not *where*. Where an error
+    happened comes from the specific subclass instead:
+    ``ScriptParseError`` and ``BlueprintError`` carry a line and
+    column, and the script runner's ``_Located`` names the statement.
+    A preflight error about the media catalog has no script line to
+    point to, so it carries only a rule id.
 
-    ``None`` means no id is assigned yet, which is a measured gap
-    rather than an estimate: the script conformance corpus asserts
-    each fixture's id in both directions, so a marker recording a
-    gap cannot outlive it.
+    ``rule_id`` is ``None`` when no id has been assigned to that error
+    yet. That is a known, tracked gap, not a guess: the script
+    conformance test suite checks every fixture's id in both
+    directions, so a ``None`` here cannot silently linger once that
+    gap is filled.
     """
 
-    #: Default for every subclass that does not set one.
+    #: The default when a subclass does not set its own rule_id.
     rule_id = None
 
     def __init__(self, *args, rule_id=None):
@@ -96,69 +105,83 @@ class RunCancelled(ReliquaryError):
 
 
 class WaitExpired(RunFailure, TimeoutError):
-    """A wait for something another actor would do ran out of time.
+    """Raised when a wait for something another actor would do times out.
 
-    **Two base classes, deliberately, because two true things are
-    being said at once** (D90). A wait that expired is the work not
-    happening, so it *is* a :class:`RunFailure` and exits ``4`` — and
-    ``except ReliquaryError`` stays the catch-all it is contracted to
-    be, which a bare builtin would have broken. But nothing about the
-    machine went wrong and the thing waited for may still arrive, so a
-    Python caller holding the loop wants the ordinary
-    ``except TimeoutError`` and gets it.
+    This class inherits from both ``RunFailure`` and ``TimeoutError``
+    on purpose, because both are true at once (D90). The wait expiring
+    means the expected work never happened, so it counts as a
+    :class:`RunFailure` and exits with code ``4`` — and
+    ``except ReliquaryError`` still catches it, the way it's supposed
+    to catch every deliberate error. But nothing about the machine
+    actually broke, and the thing being waited for might still show up
+    later, so Python code that's polling in a loop can catch it with
+    the ordinary ``except TimeoutError`` too.
 
-    That reconciles two positions the record held separately: the
-    async design's "expiry raises outside the taxonomy, the call
-    repeats" (api.md, the run handle) and the standing invariant that
-    no deliberate raise is a bare builtin — `TimeoutError` being named
-    in the forbidden set by name. The first was written when nothing
-    raised it yet; this is what honoring both looks like.
+    Inheriting from both classes reconciles two things that were
+    written separately and would otherwise conflict: the async design
+    said an expired wait should raise a plain ``TimeoutError`` outside
+    reliquary's error hierarchy so the caller can just retry the call
+    (api.md, the run handle), while the project's standing rule is
+    that reliquary never raises a bare built-in exception on purpose —
+    ``TimeoutError`` was even named explicitly as one of the forbidden
+    ones. The async design was written before anything actually raised
+    a wait-expiry error; this class is what satisfying both rules
+    looks like once something does.
     """
 
 
 class UnreadableScreen(RunFailure):
-    """A captured framebuffer is not a text screen this build can read.
+    """Raised when a captured screen isn't text this build can read.
 
-    Raised by the fixed-font recognizer where a backend has no native
-    VGA text scrape and the guest is painting something the 80×25
-    contract cannot describe — a BIOS splash in a graphics mode, a
-    resolution whose cells the glyph bank cannot cover.
+    Raised by the fixed-font recognizer when the backend has no native
+    way to read VGA text and the guest is showing something the
+    80x25 text-mode contract can't describe — for example a BIOS
+    splash screen in a graphics mode, or a resolution whose cells the
+    glyph bank doesn't have matching glyphs for.
 
-    **It is a :class:`RunFailure` because none of the other three fit.**
-    Nothing about the authored blueprint or script is illegal, so exit
-    ``2`` would blame the wrong party; nothing about the host fails to
-    satisfy the input either, so it is not a preflight condition. What
-    happened is that a read was attempted and did not produce a screen,
-    which is the operation failing.
+    It's a :class:`RunFailure`, not one of the other three classes,
+    because none of them fit: nothing about the authored blueprint or
+    script is illegal, so exit code ``2`` would blame the wrong thing;
+    nothing about the host fails to satisfy the input either, so it's
+    not a preflight problem. What actually happened is that reliquary
+    tried to read the screen and failed, which is the operation
+    itself failing.
 
-    A script run does **not** let it escape: `script_runner` catches it
-    and records the sample as unreadable, so a wait keeps polling until
-    the guest reaches a text mode and expires on its own clock if it
-    never does. Escaping uncaught is for the callers that ask for one
-    screen and have no clock of their own — `rlq screen` and the
-    console verbs — where exit ``4`` and the reason are the answer.
+    A script run never lets this exception escape: `script_runner`
+    catches it and records the sample as unreadable, so a wait just
+    keeps polling until the guest reaches a text mode, and only times
+    out on its own clock if it never does. This exception escapes
+    uncaught only for callers that ask for a single screen and have no
+    clock of their own to fall back on — `rlq screen` and the other
+    console commands — where exiting with code ``4`` and this error
+    message is the right answer.
     """
 
 
 class InternalError(ReliquaryError):
-    """An invariant reliquary detected in its own state.
+    """Raised when reliquary catches its own state violating an invariant.
 
-    Exit ``1``: no user input reaches this, so there is nothing for a
-    caller to correct. It subclasses the root directly rather than
-    joining the four, and it is deliberate rather than accidental —
-    which is the whole reason it is a class instead of a bare
-    ``RuntimeError``, since ``except ReliquaryError`` has to catch it.
+    Exits with code ``1``. No user input caused this, so there's
+    nothing for the caller to fix. It inherits directly from
+    ``ReliquaryError`` rather than from any of the four main classes,
+    because it isn't a case of bad input, a preflight problem, or a
+    failed operation — it's reliquary catching a bug in itself. It's
+    raised on purpose, as its own class, rather than as a bare
+    ``RuntimeError``, specifically so that ``except ReliquaryError``
+    still catches it.
     """
 
 
-#: Success, and the code reserved for reliquary's own faults.
+#: Success, and the exit code reserved for reliquary's own faults.
 OK = 0
 UNEXPECTED = 1
 
-# Each of the four with its exit code and the name the terminal event
-# states. Ordered most specific first so a future subclass never
-# resolves to a broader ancestor's code. InternalError is absent on
-# purpose: it falls through to UNEXPECTED, which is its code.
+# Each of the four error classes with its exit code and the name used
+# in the terminal event. Listed most-specific-first, so a future
+# subclass of one of these is never mistakenly matched against a
+# broader ancestor's code first. InternalError isn't listed here on
+# purpose: it isn't matched below, so it falls through to
+# UNEXPECTED (1), which is the exit code it should have anyway.
 _TAXONOMY = (
     (RunCancelled, 5, "cancelled"),
     (StaticError, 2, "static-error"),
@@ -168,7 +191,7 @@ _TAXONOMY = (
 
 
 def exit_code(error):
-    """The exit code for ``error`` — ``1`` outside the four classes."""
+    """Return the exit code for ``error``; 1 if it's none of the four."""
     for class_, code, _name in _TAXONOMY:
         if isinstance(error, class_):
             return code
@@ -176,7 +199,10 @@ def exit_code(error):
 
 
 def outcome(error):
-    """The terminal event's outcome name for ``error`` (``None``: ok)."""
+    """Return the terminal event's outcome name for ``error``.
+
+    Returns ``"ok"`` when ``error`` is ``None``.
+    """
     if error is None:
         return "ok"
     for class_, _code, name in _TAXONOMY:

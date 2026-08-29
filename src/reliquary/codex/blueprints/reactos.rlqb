@@ -1,12 +1,11 @@
-// ReactOS, installed from its own live/install ISO — the GUI-era
-// codex citizen: its second-stage setup wizard is a real Win32 GUI
-// application, which is what makes it a genuine target for
-// pointer-input testing (F66) rather than a text-mode installer like
-// FreeDOS's.
+// ReactOS, installed from its own install ISO. Its second-stage
+// setup is a real graphical (GUI) wizard with Next/Back buttons,
+// unlike FreeDOS's text-only installer — that's what makes it a
+// good test of click/pointer input (F66).
 //
-// The codex is a launching point, not a version library: this entry is
-// named for the system, and the version lives below as the location and
-// its hash — the two knobs a version bump turns.
+// Codex entries are named for the system, not the version. The
+// version lives below in the media's location and hash, so a
+// version bump only touches those two lines.
 [
   {
     "type": "machine",
@@ -17,24 +16,31 @@
     "control-planes": ["vnc"],
     "description": "ReactOS 0.4.15-x86 installed from its own ISO",
     "drives": {
-      // The blank the installer partitions and formats.
+      // Blank disk. The installer partitions and formats it.
       "hdd0": { "type": "media", "size": "2G" },
-      // Declared but empty — the install script inserts the ISO.
+      // Empty for now. The install script inserts the ISO here.
       "cdrom0": null
     },
-    // Hard disk first, permanently. The blank image the machine
-    // starts with has no boot signature, so the first boot falls
-    // through to the install CD on its own — and after text-mode
-    // setup copies the system and reboots, the now-bootable disk
-    // carries the guest straight into its GUI second stage. Cdrom
-    // first breaks that reboot: the CD starts Setup over, which
-    // finds the half-installed disk and stops at its upgrade/repair
-    // screen (measured 2026-08-26; its own "detects the in-progress
-    // install and continues" behavior proved timing-dependent, not
-    // dependable). A `with boot` scope is not an option here even
-    // though freedos.rlqb uses one: this machine's install script
-    // deliberately leaves the machine running, and a boot restore
-    // on a running machine is refused (D104).
+    // Boot from the hard disk first, always — even though it starts
+    // blank. A blank disk has no boot signature, so on the very
+    // first boot the firmware skips it and boots the CD instead.
+    // Later, once setup has copied files and reboots, the disk IS
+    // bootable, and this order sends the guest straight into it —
+    // which is what we want, since that's when the graphical setup
+    // stage runs.
+    //
+    // We tried cdrom-first instead and it broke: on the reboot, the
+    // CD boots again and restarts Setup, which then finds the
+    // half-installed disk and stops at an "upgrade or repair?"
+    // screen instead of continuing (measured 2026-08-26). ReactOS's
+    // installer is supposed to detect an in-progress install and
+    // resume it automatically, but that didn't happen reliably here.
+    //
+    // We also can't use freedos.rlqb's trick of temporarily
+    // rewriting the boot order for one run (`with boot`), because
+    // this install script leaves the machine running when it's
+    // done, and reliquary refuses to change the boot order of a
+    // running machine (D104).
     "boot": ["hdd0", "cdrom0"],
     "scripts": {
       "install": "reactos-install"
@@ -42,13 +48,14 @@
   },
 
   {
-    // The download, and the ISO read out of it. One remote rung, one
-    // hash; the child names its path inside the container. The
-    // SourceForge "download" link resolves through ordinary HTTP
-    // redirects to a direct binary payload (no JavaScript involved
-    // for a non-browser client), so it needs no special handling —
-    // only the `extension` override, since the URL's own path ends
-    // in ".../download" rather than ".zip".
+    // This downloads a .zip from SourceForge, and the ISO we
+    // actually want is a file inside it (named below by its path in
+    // the zip). SourceForge's "download" link redirects to the real
+    // file over plain HTTP with no JavaScript involved, so nothing
+    // special is needed to fetch it. We do need `extension: "zip"`
+    // below, though: the URL's path ends in "/download", not
+    // ".zip", so reliquary can't guess the file type from the URL
+    // alone.
     "type": "media",
     "name": "reactos-iso-zip",
     "location": "https://sourceforge.net/projects/reactos/files/ReactOS/0.4.15/ReactOS-0.4.15-x86-iso.zip/download",

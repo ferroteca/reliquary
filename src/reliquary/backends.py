@@ -1,26 +1,27 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The backend adapter seam: one API, four adapters.
+"""The common interface for all four backend adapters.
 
-The *provider* contract behind Reliquary's semantic surface
-(planning/pledged/design/backend-adapter.md). It is deliberately not
-one of the world-facing interfaces: no adapter operation appears on
-the CLI or in the embedding API, and consumers touch backends only
-through blueprint vocabulary (``backend``, ``backend-settings`` —
-whose keys each adapter defines and validates — ``control-planes``,
-drives and controllers) and through the capability failures preflight
-reports.
+This is the contract every backend (QEMU, VirtualBox, VMware, Hyper-V)
+implements, described in
+planning/pledged/design/backend-adapter.md. Nothing here is exposed
+directly on the CLI or the embedding API. Callers only reach a backend
+through blueprint fields — ``backend``, ``backend-settings`` (each
+adapter defines and validates its own keys there), ``control-planes``,
+drives, and controllers — and through the capability failures
+preflight reports.
 
-The constraint that governs here is honesty: **capabilities are
-reported, never emulated**. A backend that cannot provide a declared
-drive, controller, materialization mode or control plane fails
-capability preflight by name; nothing is silently approximated.
+The rule this module enforces: a backend must report its capabilities
+honestly, never fake one it doesn't have. If a backend can't provide a
+drive, controller, materialization mode, or control plane the
+blueprint asks for, preflight fails and names exactly what's missing,
+rather than approximating it.
 
-Three things live in this module because none of them is any one
-backend's: the adapter contract (:class:`BackendAdapter`), the
-capability vocabulary the report and the requirement share, and
-**assignment** — the priority walk that picks the backend a machine is
-built on.
+This module holds three things that don't belong to any single
+backend: the adapter interface (:class:`BackendAdapter`), the
+capability vocabulary shared between the report and the requirements,
+and **assignment** — the priority walk in :func:`assign` that picks
+which backend builds a given machine.
 """
 
 import dataclasses
@@ -29,16 +30,18 @@ from typing import Optional, Tuple
 from .errors import PreflightError, StaticError
 
 
-#: The default assignment order (D66, owner 2026-07-28), ranking
-#: *agentless* scriptability — the capability every guest gets,
-#: because assignment happens at materialization, before any guest
-#: exists, and the install that follows is agentless by definition
-#: (P3's arc). It breaks ties among candidates already available *and*
-#: capable, so it never stands in for a capability check (P11).
+#: The default order backends are tried in (D66, owner 2026-07-28).
+#: QEMU and VirtualBox come first because they support agentless
+#: display — every guest gets that, since assignment happens at
+#: materialization time, before any guest exists, and the install
+#: that follows is always agentless at that point (P3's arc). This
+#: order only breaks ties among backends that are already available
+#: *and* capable of the blueprint; it never substitutes for the
+#: capability check itself (P11).
 PRIORITY = ("qemu", "virtualbox", "vmware", "hyperv")
 
-#: Where each adapter lives. Imported on demand so that naming a
-#: backend costs nothing until one is actually asked for.
+#: Where each adapter's class lives. Imported lazily, so naming a
+#: backend costs nothing until something actually asks for it.
 _ADAPTERS = {
     "qemu": (".backend_qemu", "QemuAdapter"),
     "virtualbox": (".backend_virtualbox", "VirtualBoxAdapter"),
@@ -51,13 +54,13 @@ _INSTANCES = {}
 
 @dataclasses.dataclass(frozen=True)
 class Availability:
-    """What a host probe found: availability only, never a choice.
+    """What probing the host found for one backend.
 
-    Discovery establishes that a backend *could* be used; it never
-    selects one and never changes a machine's recorded backend.
+    This only reports whether a backend could be used; it never
+    picks one and never changes a machine's recorded backend.
     ``executable`` is what the probe found (a binary path, a service
-    name); ``home`` is its installation directory when one is known;
-    ``detail`` says where it was found, or why it was not.
+    name); ``home`` is its install directory, when known; ``detail``
+    says where it was found, or why it wasn't.
     """
 
     backend: str
@@ -70,14 +73,16 @@ class Availability:
 
 @dataclasses.dataclass(frozen=True)
 class Capabilities:
-    """A backend's named-vocabulary capability report.
+    """What one backend can do, using the blueprint's own vocabulary.
 
-    The vocabulary is the blueprint's own (docs/spec/blueprint-model.md):
-    control planes, drive media kinds, controller types, and media
-    materialization modes. ``vvfat`` reports the host-directory drive
-    QEMU alone provides — a directory-source media's realized shape,
-    which is only knowable after resolution, so it is judged where the
-    drive is rendered rather than at assignment.
+    The fields use the same terms the blueprint uses
+    (docs/spec/blueprint-model.md): control planes, drive media kinds,
+    controller types, and media materialization modes. ``vvfat``
+    reports whether this backend can serve a host directory as a
+    drive — QEMU is the only one that can. Whether a drive actually
+    resolves to a directory is only known after resolution runs, so
+    that check happens where the drive is rendered, not at assignment
+    time.
     """
 
     backend: str
@@ -86,23 +91,24 @@ class Capabilities:
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
     vvfat: bool = False
-    #: The pointing devices this backend can attach (F66) —
-    #: ``tablet``/``mouse``, the blueprint's own vocabulary. Empty is
-    #: the honest default: nothing built claims nothing.
+    #: The pointing devices this backend can attach (F66): ``tablet``
+    #: or ``mouse``, the blueprint's own terms. Defaults to empty, so
+    #: an adapter that hasn't set this claims no pointing devices.
     pointing_devices: Tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
 class Evaluation:
-    """One backend judged against one blueprint's demand.
+    """The result of checking one backend against one blueprint.
 
-    Availability and capability are **two answers because they are
-    two questions**: whether this host has the backend, and whether
-    the backend could build this machine at all. Assignment needs
-    both. Asking whether a blueprint would work on a host one is not
-    standing on needs the second alone, which is what
-    ``create-machine --dry-run --backend`` asks — so the two are
-    reported separately rather than collapsed into one verdict.
+    ``available`` and ``unmet`` answer two separate questions: whether
+    this host has the backend installed, and whether the backend
+    could build this machine at all. Assignment needs both answers.
+    But ``create-machine --dry-run --backend`` only needs the second
+    one — it asks whether a blueprint would work on a backend without
+    caring if this particular host has it installed — which is why
+    the two are kept as separate fields instead of being combined
+    into a single pass/fail verdict.
     """
 
     backend: str
@@ -113,117 +119,119 @@ class Evaluation:
 
 @dataclasses.dataclass(frozen=True)
 class Requirements:
-    """What one whole blueprint asks a backend for.
+    """What a blueprint needs a backend to provide, as a whole.
 
-    Judged against a candidate's :class:`Capabilities` at assignment
-    time — the whole blueprint at once, never drive by drive, because
-    a backend is picked for the machine and not for a drive.
+    Checked against a candidate backend's :class:`Capabilities` at
+    assignment time. The check covers the whole blueprint at once,
+    never one drive at a time, because a backend is chosen for the
+    whole machine, not per drive.
     """
 
     control_planes: Tuple[str, ...] = ()
     media: Tuple[str, ...] = ()
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
-    #: The declared ``pointing-device``, or ``None`` where the
-    #: blueprint left it to its default (F66) — a single value, unlike
-    #: the tuple axes above, since a machine declares at most one.
+    #: The blueprint's declared ``pointing-device``, or ``None`` if it
+    #: left this to the default (F66). Unlike the tuple fields above,
+    #: this is a single value, since a machine can declare at most
+    #: one pointing device.
     pointing_device: Optional[str] = None
 
 
 class BackendAdapter:
-    """The operations every backend provides, or honestly refuses.
+    """The operations every backend must provide, or explicitly refuse.
 
-    Subclasses implement the abstract members below; :meth:`unmet` is
-    shared, since judging a requirement against a report is the seam's
-    own arithmetic and not any backend's.
+    Subclasses implement the methods below that raise
+    ``NotImplementedError``. :meth:`unmet` is shared by all of them,
+    since comparing a requirement against a capability report is the
+    same math for every backend, not something each one computes on
+    its own.
 
-    The signatures are grouped as the seam inventory names them:
-    discovery, capability report, materialize and dispose, start /
-    stop / liveness, and the carriers a session exposes. Raw
-    interchange (a drive read out as a raw image, a native drive
-    materialized from one) belongs to the same inventory but lands
-    with the exporter family that needs it, which is unbuilt.
+    The methods are grouped into: discovery, capability report,
+    materialize and dispose, start / stop / liveness, and the
+    carriers a session exposes. Converting a drive to or from a raw
+    image file belongs to this same list of operations but isn't
+    implemented here — it will live with the exporter feature that
+    needs it, which hasn't been built yet.
     """
 
     #: The blueprint's spelling of this backend.
     name = ""
 
     #: The keys this backend's ``backend-settings`` section may carry.
-    #: The adapter owns this vocabulary because the section is written
-    #: in the backend's own configuration language and nothing above
-    #: the seam can judge it. **Empty is the honest default**: an
-    #: adapter that reads no settings refuses every key rather than
-    #: carrying configuration nothing will honor (P11).
+    #: Each adapter defines its own keys, because that section is
+    #: written in the backend's own configuration language and no
+    #: shared code can judge it. Defaults to empty: an adapter that
+    #: reads no settings rejects every key, rather than silently
+    #: accepting configuration it will never act on (P11).
     settings_keys = ()
 
     # -- discovery and capability ---------------------------------
 
     def discover(self, platform=None):
-        """Probe the host: is this backend usable here, and which?
+        """Probe the host: is this backend usable, and with which tool?
 
         ``platform`` is the guest platform of the machine about to
-        start, or ``None`` for a bare availability probe. A backend
-        whose host tooling differs by guest architecture — QEMU, which
-        ships one system binary per architecture — answers for the
-        tooling *that* machine will use, so a preflight can never pass
-        on one binary and then launch another. A backend with a single
-        host tool ignores it.
+        start, or ``None`` for a plain availability check. If a
+        backend's host tooling differs by guest architecture — QEMU
+        ships one system binary per architecture — this checks for
+        the specific binary that machine will actually use, so
+        preflight can never pass by checking one binary and then
+        launch a different one. A backend with only one host tool
+        ignores ``platform``.
         """
         raise NotImplementedError
 
     def capabilities(self):
-        """The named-vocabulary report this backend can honor."""
+        """What this backend can do, using the blueprint's vocabulary."""
         raise NotImplementedError
 
     def capture_format(self, plane):
-        """The pixel format this plane's screen carrier captures in.
+        """The pixel format this plane's screen carrier captures, or None.
 
-        ``None`` — the honest default, as ``settings_keys`` is empty
-        by default — means **this plane reads no framebuffer**, and a
-        landmark condition against a machine driving it is refused by
-        name at preflight (F65). The two answers separate the planes
-        the way they actually differ: QEMU's agentless-display plane
-        scrapes characters the guest already resolved out of VGA text
-        memory and there are no pixels to compare, while the VNC
-        plane and VirtualBox's display plane both interpret a
-        captured framebuffer and can hand the same pixels to a
-        matcher.
+        Returns ``None`` by default, meaning this plane doesn't read a
+        framebuffer at all, so preflight refuses any landmark
+        condition run against it, naming the reason (F65). QEMU's
+        agentless-display plane returns ``None`` because it reads
+        characters the guest has already resolved out of VGA text
+        memory — there are no pixels to compare there. The VNC plane
+        and VirtualBox's display plane both return a format, because
+        both read an actual captured framebuffer that a matcher can
+        compare pixel-by-pixel.
 
-        Naming the *format* rather than answering yes/no is the seam
-        point ``docs/spec/landmarks.md`` states: the reference
-        rendering is normalized through this format before the
-        pixel-equal comparison, so an asset captured on one plane
-        keeps its meaning on another whose capture quantizes
-        (a 16-bit thumbnail, say). Every built plane states ``"rgb"``
-        today, so the normalization is the identity and nothing
-        delivered pays for the hook.
+        This reports a format rather than a plain yes/no because
+        ``docs/spec/landmarks.md`` normalizes the reference image
+        through that same format before comparing, so an asset
+        captured on one plane still matches correctly on another
+        plane whose capture uses fewer bits per pixel (a 16-bit
+        thumbnail, for example). Every plane built so far reports
+        ``"rgb"``, so today that normalization is a no-op.
 
-        A session whose plane states a format offers ``framebuffer()``
-        — the carrier returning that capture as a Pillow image.
+        A session whose plane reports a format offers
+        ``framebuffer()``, the method that returns that capture as a
+        Pillow image.
         """
         return None
 
     def pointer_capable(self, plane):
-        """Whether this plane's management interface can deliver a
-        pointer event (F66).
+        """Whether this plane can deliver a pointer event at all (F66).
 
-        ``False`` — the honest default, as ``capture_format``'s is
-        ``None`` — means **this plane cannot deliver one**, and a
-        `click` against a machine driving it is refused by name at
-        preflight. This is a separate question from
-        :meth:`capture_format`: whether the wire can carry a pointer
-        event and whether a `click` can *aim* one (which needs a
-        framebuffer to search) are two different capabilities, and a
-        plane can hold one without the other.
+        Returns ``False`` by default. When it's ``False``, a `click`
+        against a machine on this plane is refused at preflight,
+        naming the reason. This is a different question from
+        :meth:`capture_format`: whether the management interface can
+        send a pointer event, versus whether `click` has a
+        framebuffer to search for its target's position. A plane can
+        have one without the other.
         """
         return False
 
     def unmet(self, requirements):
-        """Requirements this backend cannot honor, named one by one.
+        """List, by name, which requirements this backend can't meet.
 
-        The whole of "reported, never emulated": what comes back is
-        the text a preflight failure quotes, so a refusal always says
-        which requirement was refused rather than that something was.
+        This is what a preflight failure message quotes, so a refusal
+        always names the specific requirement that failed rather than
+        just saying something failed.
         """
         report = self.capabilities()
         missing = []
@@ -245,23 +253,24 @@ class BackendAdapter:
         return tuple(missing)
 
     def validate_settings(self, settings):
-        """Refuse a ``backend-settings`` section this backend cannot honor.
+        """Reject a ``backend-settings`` section this backend can't handle.
 
-        Called with **this backend's own section** — the one the
-        machine's assigned backend matches, other sections being inert
-        — at materialization, and again when a changed blueprint is
-        applied. A section that validates is one the launch will
-        render: an adapter whose validation and rendering could
-        disagree would promise configuration at create time and drop
-        it at start.
+        Called with the section that matches this machine's assigned
+        backend — sections for other backends are ignored — both at
+        materialization time and again whenever a changed blueprint
+        is applied. If a section passes validation here, start()
+        must be able to render it: an adapter whose validation and
+        rendering disagreed would accept configuration at create time
+        and then silently drop it at start.
 
-        The shared rule is the key set: anything outside
-        :attr:`settings_keys` is refused, naming the backend. An
-        adapter whose settings reach its backend as arguments extends
-        this with its own overlap rule, since what Reliquary owns
-        through first-class fields (memory, drives, boot order, CPU
-        count, identity) is only expressible in that backend's own
-        vocabulary.
+        The rule shared by every adapter: any key outside
+        :attr:`settings_keys` is rejected, naming the backend. An
+        adapter that turns its settings into command-line arguments
+        adds its own extra rule on top of that, refusing settings that
+        overlap fields Reliquary already owns directly — memory,
+        drives, boot order, CPU count, VM identity — since those are
+        only expressible through that backend's own configuration
+        syntax when they show up in this section.
         """
         unknown = sorted(key for key in (settings or ())
                          if key not in self.settings_keys)
@@ -281,29 +290,29 @@ class BackendAdapter:
     # -- materialize and dispose ----------------------------------
 
     def image_path(self, root, stem):
-        """Where a per-machine image for ``stem`` lands, extension and all.
+        """The full path, including extension, for a per-machine image.
 
-        The adapter owns its native image format (qcow2 under QEMU;
-        VDI/VMDK/VHDX elsewhere), so the machine model never spells
-        one.
+        Each adapter uses its own native image format — qcow2 for
+        QEMU, VDI/VMDK/VHDX for the others — so the machine model
+        itself never has to know which extension to use.
         """
         raise NotImplementedError
 
     def create_image(self, path, *, mode, size=None, base=None):
-        """Materialize one per-machine drive image.
+        """Create one per-machine drive image.
 
-        ``mode`` is the media's ``materialize``: ``new`` takes
-        ``size``, ``difference`` and ``copy`` take ``base``. Returns
-        the created path.
+        ``mode`` is the drive's ``materialize`` setting: ``new`` uses
+        ``size``, while ``difference`` and ``copy`` use ``base``.
+        Returns the path of the image created.
         """
         raise NotImplementedError
 
     def dispose(self, machine_dir):
-        """Remove the backend's own machine object, if it keeps one.
+        """Remove this backend's own machine object, if it keeps one.
 
-        ``destroy`` deletes the materialization directory afterwards,
-        so an adapter whose whole machine *is* that directory (QEMU)
-        has nothing to do here.
+        ``destroy`` deletes the machine's whole directory afterwards,
+        so an adapter whose machine object *is* that directory (QEMU)
+        has nothing extra to do here.
         """
 
     # -- start, stop, liveness ------------------------------------
@@ -312,50 +321,53 @@ class BackendAdapter:
               current=None):
         """Launch the machine and return its verified VM identity.
 
-        ``state`` is the machine's resolved state document — Reliquary
-        drive vocabulary in, backend configuration out; raw backend
-        arguments never cross this seam from callers. ``current`` is
-        the machine's previously recorded identity (or ``None``): a
-        still-reachable one refuses the launch so a live VM is never
-        orphaned. The returned record is what :func:`identity`
-        describes, and the machine model persists it verbatim,
-        atomically with the phase.
+        ``state`` is the machine's resolved state document. It takes
+        in Reliquary's own drive vocabulary and produces backend
+        configuration; callers never pass raw backend arguments
+        through here. ``current`` is the machine's previously
+        recorded identity, or ``None``. If ``current`` is still
+        reachable, the launch is refused, so a live VM is never
+        orphaned. The record this returns matches what
+        :func:`identity` builds, and the machine model saves it as-is,
+        together with the phase, in one atomic write.
         """
         raise NotImplementedError
 
     def stop(self, vm):
-        """Power off the identified VM, fail-closed on identity."""
+        """Power off the identified VM; refuse if identity doesn't match."""
         raise NotImplementedError
 
     def session(self, vm, cache=None):
         """Yield an identity-verified session over the running VM.
 
-        A context manager. Every carrier hangs off the session, and
-        every session verifies the recorded identity before it
-        commands anything.
+        A context manager. Every carrier (keyboard, screen, and so on)
+        is reached through the session, and the session checks the
+        recorded identity before it sends any command.
 
         ``cache`` is the resolved cache root — a plain directory, not
-        a :class:`~home.Context` — under which an adapter may keep
-        what it extracts from its own installation on this host
-        (``cache/support/<backend>/``, `text_recognize.cached_banks`).
-        Optional because it is a *speed* concern and never a
-        correctness one: an adapter given ``None`` does the same work
-        without keeping the result.
+        a :class:`~home.Context` — where an adapter may save things it
+        extracts from its own installation on this host
+        (``cache/support/<backend>/``, see
+        `text_recognize.cached_banks`). It's optional because caching
+        only affects speed, never correctness: an adapter given
+        ``None`` does the same work, it just doesn't save the result
+        for next time.
         """
         raise NotImplementedError
 
 
 def identity(backend, backend_id, token, endpoint, pid=None):
-    """Build the ``vm`` record every adapter records its VM by.
+    """Build the ``vm`` record every adapter uses to identify its VM.
 
-    The recorded-VM-identity doctrine, generalized: the backend, the
-    backend's own machine identifier (``backend-id`` — QEMU's readable
-    ``-name``, a VirtualBox machine UUID, a ``.vmx`` path, a Hyper-V VM
-    Id), a per-start ``token`` where the carrier is an addressable
-    endpoint that outlives its owner, and the ``endpoint`` itself,
-    whose shape is the adapter's. Every adapter operation verifies
-    this record before commanding; a mismatch fails closed and never
-    reaches a stop path.
+    Every adapter records a VM the same way: the backend name, the
+    backend's own machine identifier (``backend-id`` — QEMU's
+    readable ``-name``, a VirtualBox machine UUID, a ``.vmx`` path, or
+    a Hyper-V VM Id), a per-start ``token`` for cases where the
+    connection is an addressable endpoint that can outlive the
+    process that created it, and the ``endpoint`` itself, whose shape
+    is up to the adapter. Every adapter operation checks this record
+    before sending a command; if it doesn't match, the operation
+    fails rather than risk touching an unrelated VM.
     """
     record = {
         "backend": backend,
@@ -369,7 +381,7 @@ def identity(backend, backend_id, token, endpoint, pid=None):
 
 
 def adapter(name):
-    """The adapter for a backend name, or fail closed naming it."""
+    """The adapter for a backend name, or raise an error naming it."""
     if name not in _ADAPTERS:
         known = ", ".join(PRIORITY)
         raise StaticError(
@@ -384,14 +396,13 @@ def adapter(name):
 
 
 def _set_adapter(name, instance):
-    """Install an adapter for one backend; returns the displaced one.
+    """Install an adapter for one backend; returns the one it replaced.
 
-    The test seam, and the only way an adapter other than the four is
-    ever reached: the suite drives the machine model against a double
-    rather than a hypervisor, exactly as it drives the credential
-    store against one rather than a keyring. Nothing outside a test
-    calls this — assignment and every operation resolve through
-    :func:`adapter`.
+    Used only by tests: it's how the test suite runs the machine model
+    against a fake adapter instead of a real hypervisor, the same way
+    it runs the credential store against a fake instead of a real
+    keyring. Nothing outside a test calls this — assignment and every
+    other operation always go through :func:`adapter`.
     """
     previous = _INSTANCES.get(name)
     if instance is None:
@@ -404,20 +415,21 @@ def _set_adapter(name, instance):
 def discover(backends=None):
     """Probe each backend in priority order and report availability.
 
-    Availability only: nothing here selects a backend or touches a
-    machine's recorded one.
+    This only reports availability; it never picks a backend or
+    changes a machine's recorded one.
     """
     return tuple(adapter(name).discover()
                  for name in (backends or PRIORITY))
 
 
 def evaluate(name, requirements):
-    """Probe one backend and judge it, choosing nothing.
+    """Probe one backend and judge it against requirements, without picking it.
 
-    The judgment :func:`assign` is built from, exposed on its own
-    because a dry run asks the capability half without the
-    availability half — a backend nothing installed here can still
-    answer whether it could build this machine.
+    This is the same check :func:`assign` uses internally, exposed on
+    its own because a dry run wants only the capability half of the
+    answer, not the availability half — even a backend that isn't
+    installed on this host can still answer whether it's capable of
+    building this machine.
     """
     found = adapter(name)
     probe = found.discover()
@@ -429,17 +441,18 @@ def evaluate(name, requirements):
 def assign(requirements, *, declared=None, narrowed=None):
     """Pick the backend a machine materializes on.
 
-    A declared ``backend`` pins the choice and skips the walk: that
-    backend alone is probed, and assignment fails closed if it is
-    unavailable or incapable. A ``narrowed`` one is the same
-    walk-of-one reached differently — the blueprint declares no
-    backend and carries ``backend-settings`` for exactly one, so the
-    sections themselves say where this machine belongs — and it fails
-    closed the same way, naming what narrowed it. Otherwise Reliquary
-    walks :data:`PRIORITY` one by one, probing each for availability,
-    and takes the first that is available **and** capable of the whole
-    blueprint. The result is recorded in the machine state, so the
-    machine stays on that backend thereafter.
+    If the blueprint declares a ``backend``, that pins the choice and
+    skips the priority walk: only that backend is probed, and
+    assignment fails if it's unavailable or can't meet the
+    requirements. A ``narrowed`` backend reaches the same single-
+    backend check a different way — the blueprint declared no backend,
+    but its ``backend-settings`` only has a section for one backend,
+    so that's the one this machine is narrowed to — and it fails the
+    same way, naming what narrowed it. Otherwise, this walks
+    :data:`PRIORITY` in order, probing each backend for availability,
+    and picks the first one that's both available **and** capable of
+    the whole blueprint. The chosen backend is then recorded in the
+    machine state, so the machine stays on it from then on.
     """
     only = declared if declared is not None else narrowed
     if only is not None:

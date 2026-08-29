@@ -1,16 +1,19 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""The Session object: ambient state carried once (P26).
+"""Tests for the Session object: ambient state resolved once and reused by every call (P26).
 
 ``Session`` is deliberately unexported while the module-level
 surface stands, so these tests import ``reliquary.session``
-directly. The veneer carries no logic — each family's behavior is
-its own module's suite — so what is asserted here is the door: the
-construction refusal, the record pinned at construction from the
-record alone, the properties-file cargo, thin forwarding through a
-representative verb per family, the mechanical thinness of every
-veneer, and the two-sessions-two-homes case the process globals
-could never state.
+directly. Each Session method is a thin wrapper with no logic of
+its own — the real behavior for each family of calls is tested in
+its own module's suite — so what these tests check is the
+constructor: the refusal to construct without a home directory, the
+Context record being pinned (copied) at construction so a later
+change to the original does not reach the session, the selected
+properties file being carried on that record, thin forwarding
+through one representative verb per family, that every wrapper
+method really is that thin, and the two-sessions-two-homes case that
+module-level globals could never support.
 """
 
 import inspect
@@ -67,7 +70,8 @@ def _write_blueprint(home_dir, name):
         json.dump(specs, handle)
 
 
-# The door: a home opens it, and nothing else does.
+# The constructor: a home directory opens a session, and nothing
+# else does.
 
 def test_a_bare_home_string_opens_a_session(home):
     session = Session(home)
@@ -82,7 +86,7 @@ def test_a_context_opens_a_session(home):
 @pytest.mark.parametrize("homeless", [None, "", "empty", "cache-only"])
 def test_no_home_refuses_naming_it(home, homeless):
     # The same condition first-use ``dir.unassigned`` names,
-    # noticed at the door: one rule, one id.
+    # caught here at construction instead: one rule, one id.
     context = {"empty": Context(),
                "cache-only": Context(cache_dir=home)}.get(homeless, homeless)
     with pytest.raises(StaticError) as caught:
@@ -189,7 +193,7 @@ def test_binding_answers_from_the_carried_selection(home):
     assert session.describe_sources(script) == {"answered": binding.FILE}
 
 
-# A representative verb per family, driven through the door.
+# One representative verb per family, called on a constructed Session.
 
 def test_blueprint_authoring_and_resolution(home):
     session = Session(home)
@@ -235,7 +239,7 @@ def test_a_dry_script_run_through_the_session(home):
     assert run.plan["tier"] == "static"
 
 
-#: Every veneer, named against the engine function it forwards to.
+#: Every wrapper method, named against the engine function it forwards to.
 #: The dict is the roster: a method the session lacks, or one it
 #: grew that no engine verb backs, fails the completeness check.
 _AMBIENT = frozenset({"context", "properties_file"})
@@ -282,12 +286,12 @@ _VENEERS = {
 }
 
 
-# The veneer is thin and complete, mechanically. One method per
-# ambient-state verb, its signature the engine verb's minus the
-# ambient parameters the session carries — so an engine verb growing
-# a parameter fails here rather than drifting apart from its veneer,
-# and it fails as the *named* verb rather than as one method
-# reporting for all forty-four.
+# Each wrapper method is thin and complete, checked mechanically.
+# One method per ambient-state verb, its signature the engine verb's
+# minus the ambient parameters the session carries — so an engine
+# verb growing a parameter fails here rather than drifting apart
+# from its wrapper, and it fails as the *named* verb rather than as
+# one method reporting for all forty-four.
 
 @pytest.mark.parametrize("name", sorted(_VENEERS))
 def test_every_veneer_mirrors_its_engine_verb(name):

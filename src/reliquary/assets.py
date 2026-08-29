@@ -2,31 +2,35 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Authored-asset residency: the resolution source seam.
 
-Authored assets — machine blueprints (``.rlqb``, media included) and
-scripts (``.rlqs``) — resolve from a directory per kind: blueprints
-from the ``blueprints`` directory, scripts from the ``scripts`` one.
-Both are placeable (``home.py``), so where assets live is the same
-question as where anything else Reliquary touches lives, answered by
-the same six-slot model rather than by a residency knob of its own.
-That is what retired the old asset-root knob: it existed to name a
-project root because ``blueprints``/``scripts`` could not be named
-directly, and now they can.
+Authored assets — machine blueprints (``.rlqb``, which includes
+media) and scripts (``.rlqs``) — are found by looking in one
+directory per kind: blueprints in the ``blueprints`` directory,
+scripts in the ``scripts`` directory. Both directories can be
+relocated (see ``home.py``), using the same six-slot placement model
+that decides where everything else Reliquary reads and writes lives
+— there's no separate setting just for asset location. That's what
+made the old asset-root setting unnecessary: it used to exist only
+because there was no way to name the ``blueprints``/``scripts``
+directories directly, and now there is.
 
-The hermetic/convenient split it also carried is gone rather than
-relocated: a directory decides where a name resolves, and a miss is
-a miss. Nothing falls back to the shipped codex, which reaches a
-tree only when ``seed-blueprint`` is asked to put it there (P4).
+The old "hermetic vs. convenient" mode split is gone, not replaced
+by something else: a directory either has the file or it doesn't,
+and nothing falls back to the built-in codex content. The only way
+codex content reaches a project directory is the explicit
+``seed-blueprint`` command copying it there (P4).
 
-An asset's identity is its ``name`` field when the authored file
-declares one, else its filename stem; two files of one kind claiming
-the same effective name within a source is an error. Media are not a
-file kind at all — they are specs inside a blueprint, identified by
-their own names — so they resolve through the catalog rather than by
-this rule; scripts carry no ``name`` field and stay stem-identified.
+An asset's identity is the ``name`` field declared inside the file,
+if it has one, otherwise the filename without its extension. Two
+files of the same kind that resolve to the same effective name
+within one source is an error. Media aren't a file kind at all —
+they're specs written inside a blueprint file, identified by their
+own name field — so they're looked up through the catalog instead of
+by this file-naming rule. Scripts never have a ``name`` field, so
+they're always identified by their filename.
 
-An ``ObjectSource`` (JSON-imported objects supplied by an embedding
-caller, no files at all) is the planned third source and slots onto
-this same seam.
+A planned third source, ``ObjectSource`` (for objects an embedding
+program supplies directly as JSON, with no files involved), will fit
+into this same interface.
 """
 
 import os
@@ -36,16 +40,18 @@ from .home import (blueprints_dir, fonts_dir, landmarks_dir,
                    scripts_dir)
 
 
-# Authored-asset file extensions by kind. ``.json`` is the accepted
-# legacy spelling for blueprints; scripts have no legacy form.
+# File extensions recognized for each authored-asset kind. ``.json``
+# is still accepted as an older spelling for blueprints; scripts have
+# no older form to accept.
 #
-# One kind is deliberately absent, reserved in
-# docs/spec/asset-resolution.md rather than declared here: ``.rlqm``
-# retired with the composed model — a media is a spec inside a
-# ``.rlqb`` (D30). The two binary-asset kinds are both live now:
-# ``.rlqf`` fonts (F61) and ``.rlql`` landmarks (F65), each reading
-# from its own fixed leaf under the home (`fonts_dir`,
-# `landmarks_dir`) and each attaching its binaries by stem adjacency.
+# One kind is deliberately missing from this table, and is instead
+# just documented in docs/spec/asset-resolution.md: ``.rlqm`` was
+# retired when the composed blueprint model was introduced, since a
+# media is now just a spec written inside a ``.rlqb`` file (D30). The
+# two binary-asset kinds are both implemented now: ``.rlqf`` fonts
+# (F61) and ``.rlql`` landmarks (F65). Each reads from its own fixed
+# directory under the home (`fonts_dir`, `landmarks_dir`), and each
+# finds its binary data by looking for a file with a matching stem.
 KIND_EXTENSIONS = {
     "blueprint": (".rlqb", ".json"),
     "script": (".rlqs",),
@@ -89,9 +95,10 @@ class AssetSource:
     def document_files(self):
         """Return every composed ``.rlqb`` document in this source.
 
-        The composed model reads all ``.rlqb`` into one ``(name, type)``
-        component namespace (docs/spec/blueprint-model.md), rather
-        than indexing one file kind per extension.
+        All ``.rlqb`` files are read into one shared namespace of
+        specs identified by ``(name, type)`` (docs/spec/blueprint-model.md),
+        rather than being indexed separately by file extension the
+        way other asset kinds are.
         """
         raise NotImplementedError
 
@@ -101,14 +108,14 @@ class AssetSource:
 
 
 class DirectorySource(AssetSource):
-    """Resolve each asset kind from its own placeable directory.
+    """Resolve each asset kind from its own relocatable directory.
 
-    One source, because there is one question: which directory holds
-    this kind. Whether that directory came from an explicit
-    ``--blueprints-dir`` or derived from the home makes no difference
-    to how it is read — a project tree and a home folder are both
-    walked recursively by extension, which is what the two former
-    sources already did in the same helper.
+    There's only one kind of source, because there's really only one
+    question to answer: which directory holds files of this kind.
+    Whether that directory was set explicitly (``--blueprints-dir``)
+    or derived from the home location makes no difference to how it's
+    read — either way, it's walked recursively for matching file
+    extensions, using the same helper.
     """
 
     _DIRS = {
@@ -142,9 +149,11 @@ class DirectorySource(AssetSource):
 def source_for(context=None):
     """Build the :class:`AssetSource` for ``context``.
 
-    The directories resolve lazily, so building a source never
-    raises: an unassigned ``blueprints`` fails when the resolution
-    actually needs it, naming that directory (``home.py``).
+    The directories aren't looked up until they're actually needed,
+    so building a source here never fails on its own. If
+    ``blueprints`` (for example) isn't configured, that only raises
+    an error once something actually tries to resolve from it, naming
+    the missing directory (``home.py``).
     """
     return DirectorySource(context)
 
@@ -152,10 +161,10 @@ def source_for(context=None):
 def index_by_name(files, name_of, kind):
     """Map effective name -> path for ``files``, guarding conflicts.
 
-    ``name_of(path)`` returns the asset's declared ``name`` or ``None``;
-    the effective name falls back to the filename stem. Two files of
-    one kind sharing an effective name is an error naming both — the
-    residency conflict guard.
+    ``name_of(path)`` returns the asset's declared ``name`` field, or
+    ``None`` if it doesn't have one, in which case the filename stem
+    is used instead. If two files of the same kind end up with the
+    same effective name, this raises an error naming both files.
     """
     index = {}
     for path in files:
@@ -171,20 +180,22 @@ def index_by_name(files, name_of, kind):
 
 
 def guard_pool(kind, claims, other_kind, others):
-    """Refuse a name two kinds of the one ``@`` pool both claim.
+    """Raise an error if a name is claimed by two different kinds sharing one ``@`` pool.
 
-    Media, fonts (F61) and landmarks (F65) share **one** reference
-    pool (planning/design/authored-binary-assets.md), so a script
-    reading ``@welcome`` must find exactly one thing under that name.
-    Both maps are ``effective name -> a human location``, and the
-    refusal names both sides: what an author has to do about it is
-    rename one of two files, and a message naming neither is a
-    message they cannot act on.
+    Media, fonts (F61), and landmarks (F65) are all looked up through
+    one shared ``@`` reference pool (planning/design/authored-binary-assets.md),
+    so when a script reads ``@welcome``, exactly one thing has to
+    match that name. Both ``claims`` and ``others`` map an effective
+    name to a human-readable file location; the error names both
+    files, since fixing the conflict means renaming one of them, and
+    a message that doesn't name both files gives the author nothing
+    to act on.
 
-    Folded case-insensitively, like every other name in this pool
-    (``resolve.build_namespace``'s own rule), and it says which of
-    the two collisions it found — an exact duplicate and a
-    case-difference read very differently at a keyboard.
+    Names are compared case-insensitively, the same rule
+    ``resolve.build_namespace`` uses for its own namespace, and the
+    error says whether it found an exact duplicate name or names that
+    only differ by case — those look very different to someone
+    reading the error.
     """
     folded = {name.lower(): name for name in others}
     for name, where in claims.items():

@@ -1,33 +1,40 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Fixed-font text-screen recognition over a framebuffer (F51).
+"""Recognize text on screen from a framebuffer, using a fixed font
+(F51).
 
-Where a backend has no native VGA text scrape, the agentless-display
-control plane runs **one** recognizer over a captured PNG. The
-output is the seam's portable snapshot contract — character rows
-plus opaque, equality-comparable per-cell attribute tokens — so
-``DisplayConsole`` and the script language need no backend branch
-(planning/design/backend-adapter.md "The text-screen contract").
+When a backend cannot read text directly out of VGA memory, the
+agentless-display control plane runs one recognizer over a captured
+PNG instead. It returns the standard snapshot format every backend
+must produce — rows of characters plus one opaque, comparable
+attribute token per cell — so ``DisplayConsole`` and the script
+language do not need separate code per backend (see
+planning/design/backend-adapter.md, "The text-screen contract").
 
-The built-in bank is **drawn, not dumped** — ``fonts/cp437_8x16.bin``,
-authored by ``tools/gen_cp437_font.py``, so the project ships no
-glyphs it did not write. It is the default and what fixtures are
-rendered with, so the suite round-trips without a hypervisor —
-**it is not what reads a live guest**, which is drawn with the
-host's own fonts and read through them (:func:`banks_from_binary`,
-:func:`cached_banks`).
+The built-in font (``fonts/cp437_8x16.bin``) is drawn by
+``tools/gen_cp437_font.py``, not copied from anywhere, so the project
+never ships glyphs it did not create itself. It is the default font,
+and the one test fixtures are rendered with, so the test suite can
+round-trip without a real hypervisor. It is not the font used to read
+a live guest, though — a live guest's screen is drawn with whatever
+fonts the host itself has installed, and read back through those
+(see :func:`banks_from_binary`, :func:`cached_banks`).
 
-*Fonts*, plural, is the point. A run paints in more than one: a VGA
-BIOS installs its bank with an override table applied and draws its
-own messages that way, while a DOS guest loads its own font and
-draws with that. A framebuffer records only pixels, so nothing in a
-screenshot says which was in the VGA — every font a host offers is
-therefore collected, and a cell is matched against them **in
-order**, the first bank whose best match is inside the distance
-threshold deciding (F61, D109) — never a global nearest-of-all-of-
-them scan, which is what makes naming one first (:class:`Bank`, an
-authored font's declaration folded onto its bytes — ``fonts.py``)
-a real priority rather than one more candidate shape.
+Recognition tries more than one font on purpose. A single guest run
+can paint text with more than one font: the VGA BIOS installs its own
+bank (possibly with some glyphs patched by an override table) and
+draws its own messages with that, while a DOS guest later loads a
+font of its own and draws with that instead. A framebuffer only
+records pixels, so nothing in a screenshot says which font was
+actually loaded at the time — so every font the host offers is
+collected, and each screen cell is matched against them in order: the
+first bank whose best match falls inside the distance threshold wins
+(F61, D109). This is deliberately not a single scan across every font
+looking for the overall best match — trying the fonts in order, and
+stopping at the first good-enough match, is what makes the order (set
+by :class:`Bank`, which pairs an authored font's declaration with its
+bytes — see ``fonts.py``) an actual priority rather than just one more
+shape to compare.
 """
 
 from __future__ import annotations
@@ -65,26 +72,29 @@ CLASSIC_A = bytes([
 
 
 class Bank(bytes):
-    """A glyph bank plus what its bytes cannot say (F61, D109).
+    """A glyph bank, plus the extra facts plain bytes cannot carry
+    (F61, D109).
 
-    A ``bytes`` subclass — every existing caller that reads a bank
-    as bytes (slicing, :func:`check_bank`, :func:`glyph_bitmap`)
-    keeps working unmodified, and a bare ``bytes`` bank compares
-    and hashes equal to a :class:`Bank` wrapping the same data with
-    the same geometry and codepage — carrying three facts an
-    authored font's declaration states and a host-extracted bank
-    leaves at their defaults: ``cell_rows`` (16 or 8 — the same
-    4096 bytes read as 256 or 512 glyphs), ``codepage`` (``None``
-    keeps today's :func:`_cp437_char` mapping unconditionally; a
-    name is decoded through Python's own codec registry), and
-    ``source`` (a label for the failure report's "fonts tried").
+    This subclasses ``bytes``, so every existing caller that treats a
+    bank as plain bytes (slicing, :func:`check_bank`,
+    :func:`glyph_bitmap`) still works unmodified. A bare ``bytes``
+    bank compares and hashes equal to a :class:`Bank` wrapping the
+    same data with the same geometry and codepage. A :class:`Bank`
+    carries three extra facts that an authored font's declaration
+    states explicitly, and that a host-extracted bank leaves at their
+    defaults: ``cell_rows`` (16 or 8 — the same 4096 bytes read as
+    either 256 or 512 glyphs), ``codepage`` (``None`` keeps the
+    current :func:`_cp437_char` mapping; a codepage name is decoded
+    through Python's own codec registry instead), and ``source`` (a
+    label used in the failure report's "fonts tried" list).
 
-    Equality and hashing fold in ``cell_rows``/``codepage`` rather
-    than trusting raw bytes alone: two authored fonts that happen to
-    ship the same bank under different codepages must never collide
-    in the per-bank glyph cache and silently decode through the
-    wrong one. ``source`` is excluded on purpose — a display label
-    only, it must not fork the cache or the matching identity.
+    Equality and hashing take ``cell_rows`` and ``codepage`` into
+    account, not just the raw bytes: two authored fonts that happen to
+    ship the exact same bytes under different codepages must not
+    collide in the per-bank glyph cache and get silently decoded
+    through the wrong one. ``source`` is left out of equality and
+    hashing on purpose — it is only a display label, and must not
+    split the cache or change matching identity.
     """
 
     def __new__(cls, data, cell_rows=16, codepage=None, source=None):
@@ -121,27 +131,31 @@ def check_bank(data, source):
     return bytes(data)
 
 
-#: Glyph heights whose **override tables** a VGA BIOS may carry. A
-#: table is a run of ``(code, rows...)`` entries closed by a zero code
-#: byte, and the BIOS applies the one matching the mode it is setting.
-#: Sizes other than 8×16 are here only so a table for one of them can
-#: be stepped over to reach the next: their heights are not this
-#: recognizer's, and their entries are read for length alone.
+#: Glyph heights whose override tables a VGA BIOS may carry. A table
+#: is a run of (code, rows...) entries ending in a zero code byte, and
+#: the BIOS applies whichever one matches the video mode it is
+#: setting. Heights other than 8x16 are listed here only so a table
+#: for one of them can be skipped over to reach the next table: this
+#: recognizer does not use glyphs of those heights, and only reads
+#: their entries to know how many bytes to skip.
 _ALT_HEIGHTS = (_CELL_H, 14, 8)
 
-#: Ceilings on what will be believed to be an override table. A real
-#: one patches a handful of glyphs and sits immediately behind its
-#: bank; without bounds, arbitrary bytes far downstream could parse as
-#: a table and contribute glyph shapes that were never a font.
+#: Limits on what counts as a plausible override table. A real
+#: override table patches only a handful of glyphs and sits right
+#: after its bank. Without these limits, unrelated bytes further into
+#: the file could accidentally look like a table and contribute glyph
+#: shapes that were never part of any real font.
 _MAX_OVERRIDES = 64
 _MAX_OVERRIDE_TABLES = 4
 
 
 def _bank_bases(data):
-    """Offsets of every 8×16 bank in ``data``, in the order found.
+    """Find the byte offset of every 8x16 glyph bank in ``data``, in
+    the order they appear.
 
-    Located by :data:`CLASSIC_A`, since a font that did not share the
-    classic ``A`` would not be the CP437 bank a DOS guest draws from.
+    Each one is located by searching for :data:`CLASSIC_A`, since a
+    font that did not share that classic 'A' shape would not be the
+    CP437 bank a DOS guest actually draws with.
     """
     bases = []
     index = data.find(CLASSIC_A)
@@ -154,14 +168,17 @@ def _bank_bases(data):
 
 
 def _override_run(data, start, height):
-    """One override table at ``start``, as ``(entries, end)`` or None.
+    """Parse one override table starting at ``start``, returning
+    ``(entries, end)``, or None if there isn't a valid one there.
 
-    Structural only — nothing here knows a table's name or how many
-    entries any particular BIOS ships. A run qualifies when its codes
-    **ascend**, none of its glyphs is blank, and it is closed by a zero
-    code byte; that is what tells a real table from the same bytes read
-    at the wrong stride, which is how tables of different heights are
-    told apart when several follow one bank.
+    This only checks the table's structure — it doesn't know a
+    table's name, or how many entries any particular BIOS actually
+    ships. A run of bytes counts as a real table only if its codes
+    are strictly increasing, none of its glyphs is entirely blank,
+    and it ends with a zero code byte. Those checks are what
+    distinguish a real table from the same bytes read at the wrong
+    stride, which is how tables for different glyph heights are told
+    apart when several follow one bank.
     """
     stride = 1 + height
     entries = []
@@ -185,13 +202,16 @@ def _override_run(data, start, height):
 
 
 def _patched_variants(data, bank, start):
-    """Banks the override tables behind ``bank`` would install.
+    """Build the banks that the override tables following ``bank``
+    would produce once applied.
 
-    A stored bank and the bank a BIOS actually installs are different
-    fonts, and nothing in a screenshot says which one painted it — so
-    both are collected and the recognizer is left to match against
-    each. Tables for other glyph heights are stepped over rather than
-    interpreted.
+    The bank as stored in the binary, and the bank a BIOS actually
+    installs after applying its override table, are two different
+    fonts — and nothing in a screenshot says which one painted a
+    given character. So this collects both, and lets the recognizer
+    try matching against each. Tables for glyph heights other than
+    8x16 are skipped rather than applied, since this recognizer never
+    uses them.
     """
     variants = []
     off = start
@@ -213,26 +233,28 @@ def _patched_variants(data, bank, start):
 
 
 def banks_from_binary(data, source):
-    """Every distinct 8×16 font a binary embedding a VGA BIOS offers.
+    """Find every distinct 8x16 font embedded in a binary that carries
+    a VGA BIOS.
 
-    **A backend's fonts are read off the host, never shipped.** The
-    glyphs a guest paints are its emulated BIOS's, so they belong to
-    whatever the host has installed rather than to Reliquary — which
-    is also why no bank is vendored here for the purpose: copying
-    another project's font into this tree would be third-party
-    material in a repository whose licensing policy admits none
-    (CONTRIBUTING.md).
+    A backend's fonts are always read off the host, never shipped
+    with Reliquary. The glyphs a guest paints belong to whatever BIOS
+    the host has installed, not to Reliquary, which is also why no
+    bank is bundled in this repository for this purpose: copying
+    another project's font in would be third-party material, and the
+    project's licensing policy does not allow that (CONTRIBUTING.md).
 
-    **More than one font is painted during a single run**, and which
-    one is in the VGA at any moment is not knowable from a
-    framebuffer: a BIOS installs its bank with an override table
-    applied, its own messages are drawn that way, and a guest that
-    loads its own font afterwards paints with something else again.
-    So this returns *all* of them — every bank found, plus every
-    variant an override table behind one would install — and
-    :func:`recognize` matches a cell against the union rather than
-    guessing. Duplicates collapse, which is what keeps the cost of
-    the extra fonts proportional to how much they actually differ.
+    A single run can paint text with more than one font, and there is
+    no way to tell from a framebuffer which one is currently loaded in
+    the VGA: a BIOS installs its own bank, possibly with an override
+    table applied, and draws its own messages with that; a guest that
+    loads its own font afterward paints with something different
+    again. So this function returns every font it finds — every bank
+    located, plus every variant that an override table behind a bank
+    would produce — and :func:`recognize` matches each screen cell
+    against all of them rather than guessing which one is active.
+    Duplicate banks are collapsed, so the extra cost of trying more
+    fonts stays proportional to how much they actually differ from
+    each other.
     """
     banks = []
     for base in _bank_bases(data):
@@ -303,25 +325,28 @@ def support_dir(cache_dir, backend):
 
 
 def cached_banks(cache_dir, backend, extract):
-    """A backend's banks, extracted once and kept under ``cache_dir``.
+    """Return a backend's glyph banks, extracting them once and
+    caching the result under ``cache_dir``.
 
-    **The font is the host's, so it is cached rather than shipped.**
-    Reliquary vendors no emulator's glyphs: the bytes a guest paints
-    belong to whatever BIOS the host installed, and copying another
-    project's font into this tree would be third-party material the
-    licensing policy does not admit (CONTRIBUTING.md). Extracting on
-    first use and caching the result costs one scan of an installed
-    binary per home.
+    The font belongs to the host, so it is cached rather than shipped
+    with the project. Reliquary vendors no emulator's glyphs: the
+    bytes a guest paints belong to whatever BIOS the host installed,
+    and copying another project's font into this tree would be
+    third-party material the project's licensing policy does not
+    allow (CONTRIBUTING.md). Extracting the font on first use and
+    caching the result costs one scan of the installed binary per
+    home directory, not one scan per run.
 
-    It lands in ``cache/support/<backend>/`` because it is **wholly
-    regenerable**, which is the whole contract of that root: delete it
-    and the next read extracts it again. A cache file that is not a
-    whole bank is therefore re-extracted rather than raised on — the
-    file is ours, and a truncated one says the last write was
+    The cache file lives under ``cache/support/<backend>/`` because
+    it is completely regenerable — that is the rule for everything
+    under that cache root: delete the file and the next read just
+    extracts it again. So a cache file that isn't a complete bank is
+    re-extracted rather than treated as an error: the file belongs to
+    Reliquary, and a truncated one just means the last write was
     interrupted, not that the caller did anything wrong.
 
-    ``cache_dir`` of ``None`` extracts every time, which is what an
-    embedding caller with no home assigned gets.
+    ``cache_dir`` of ``None`` extracts the font every time, which is
+    what an embedding caller with no cache directory assigned gets.
     """
     size = _GLYPHS * _CELL_H
     path = None
@@ -345,22 +370,25 @@ def cached_banks(cache_dir, backend, extract):
 
 @lru_cache(maxsize=1)
 def glyph_bank():
-    """256 glyphs × 16 row bytes (MSB = leftmost pixel).
+    """Return Reliquary's own built-in glyph bank: 256 glyphs of 16
+    row bytes each, most significant bit is the leftmost pixel.
 
-    **Reliquary's own bank, drawn rather than dumped** — produced by
-    ``tools/gen_cp437_font.py``, which authors the ASCII and
-    box-drawing shapes outright and computes a well-separated glyph
-    for every code nobody drew. It is the default and what
-    :func:`render` draws with, so the suite round-trips without a
-    hypervisor, and **it is not what reads a live guest** — that is
-    drawn in the host's own fonts and read through those
-    (:func:`cached_banks`).
+    This bank is drawn by ``tools/gen_cp437_font.py``, not copied
+    from anywhere: the script draws the ASCII and box-drawing shapes
+    by hand, and computes a distinct glyph for every remaining code
+    that has no hand-drawn shape. It is the default font, and the one
+    :func:`render` draws with, so the test suite can round-trip
+    without a real hypervisor. It is not the font used to read a live
+    guest, though — that is drawn using the host's own installed
+    fonts and read back through those (:func:`cached_banks`).
 
-    Its one hard requirement is that all 256 codes be **distinct**,
-    which a bank of drawn glyphs alone did not manage: a code with no
-    shape came out blank, collided with the space, and could never be
-    recognized. It is not a VGA face and does not have to be — the
-    faces a guest paints with come off the host.
+    The one hard requirement on this bank is that all 256 codes
+    produce distinct glyphs. A bank of only hand-drawn glyphs did not
+    manage that on its own: any code left undrawn came out blank,
+    which is identical to a space and could never be told apart from
+    one. This bank does not have to look like a real VGA font, and
+    does not — the fonts a guest actually paints with always come
+    from the host.
     """
     path = _font_path()
     with open(path, "rb") as handle:
@@ -369,15 +397,16 @@ def glyph_bank():
 
 
 def glyph_bitmap(code, bank=None):
-    """8×16 boolean rows for CP437 code ``code`` (0..255).
+    """Return the 8x16 boolean pixel rows for CP437 code ``code``
+    (0-255).
 
-    ``bank``'s own ``cell_rows`` (a plain ``bytes`` bank is always
-    16, matching every host-extracted and shipped font) decides how
-    the 4096 bytes slice: 16 rows read 256 glyphs directly, 8 rows
-    read 512 and address only the first 256 (Reliquary's codes are
-    always the 8-bit CP437 range) — row-doubled here so an 8-row
-    glyph still compares against the fixed 8×16 captured cell every
-    match runs against.
+    ``bank.cell_rows`` decides how the 4096 bytes are sliced into
+    glyphs (a plain ``bytes`` bank is always 16 rows, matching every
+    host-extracted and shipped font): 16 rows read directly as 256
+    glyphs, or 8 rows read as 512 glyphs, of which only the first 256
+    are addressed (Reliquary's codes are always in the 8-bit CP437
+    range). An 8-row glyph is doubled here so it still compares
+    against the fixed 8x16 cell size every match is run against.
     """
     data = glyph_bank() if bank is None else bank
     cell_rows = getattr(bank, "cell_rows", 16) if bank is not None else 16
@@ -393,11 +422,13 @@ def glyph_bitmap(code, bank=None):
 
 
 def attribute_token(fg, bg):
-    """Opaque equality-comparable token for a foreground/background pair.
+    """Return an opaque token for one foreground/background color
+    pair, comparable for equality.
 
-    ``fg`` / ``bg`` are ``(r, g, b)`` triples. The packing is stable
-    across runs (unlike ``hash()``), which is what keeps a recorded
-    transcript and a live run agreeing on highlight identity.
+    ``fg`` and ``bg`` are each an ``(r, g, b)`` triple. The token is
+    packed the same way on every run (unlike Python's ``hash()``,
+    which varies between runs), so a recorded transcript and a live
+    run agree on which cells share the same highlight color.
     """
     fr, fg_, fb = fg
     br, bg_, bb = bg
@@ -446,15 +477,16 @@ def _glyph_bits(code, bank=None):
 
 
 def as_banks(bank):
-    """Normalize a ``bank`` argument to a tuple of whole banks.
+    """Normalize a ``bank`` argument into a tuple of whole banks.
 
-    A caller may name one font or several, and passing ``None`` means
-    Reliquary's own. Several is the honest case for a live guest: a
-    run paints in more than one font and a framebuffer does not say
-    which (see :func:`banks_from_binary`). A :class:`Bank` instance
-    passes through unchanged rather than being coerced to plain
-    ``bytes`` — coercing would strip the geometry and codepage an
-    authored font's declaration attached.
+    A caller may pass one font, several fonts, or ``None`` for
+    Reliquary's own built-in font. Passing several is the realistic
+    case for a live guest: a single run can paint text in more than
+    one font, and a framebuffer doesn't say which one was used where
+    (see :func:`banks_from_binary`). A :class:`Bank` instance passes
+    through unchanged rather than being converted to plain ``bytes``
+    — converting it would throw away the geometry and codepage that
+    an authored font's declaration attached to it.
     """
     if bank is None:
         return (glyph_bank(),)
@@ -467,16 +499,19 @@ def as_banks(bank):
 
 @lru_cache(maxsize=32)
 def _bank_glyph_bits(bank):
-    """One bank's 256 glyphs as flat bits, as ``(code, bits)`` pairs.
+    """Return one bank's 256 glyphs as flat bit lists, as
+    ``(code, bits)`` pairs.
 
-    Per bank, not a union: the match order is a real priority (F61,
-    D109) — the first bank whose best match is inside the threshold
-    decides, so a later bank's shapes must never be folded in with
-    the leading one's. Cached on the bank's own identity (its bytes
-    *and* its declared geometry/codepage, via :class:`Bank`'s own
-    equality) so a host driving two backends with different fonts in
-    one process never mixes them, and two authored fonts that happen
-    to share a bank under different codepages never collide either.
+    This is cached per bank, not merged across banks: font order is a
+    real priority (F61, D109) — the first bank whose best match falls
+    inside the threshold wins, so a later bank's glyph shapes must
+    never get mixed in with an earlier bank's. The cache key is the
+    bank's full identity — its bytes, plus its declared
+    ``cell_rows``/``codepage`` via :class:`Bank`'s own equality check
+    — so a host running two backends with different fonts in the same
+    process never mixes their glyphs, and two authored fonts that
+    happen to share the same bytes under different codepages never
+    collide in the cache either.
     """
     return tuple((code, tuple(_glyph_bits(code, bank)))
                  for code in range(_GLYPHS))
@@ -497,16 +532,19 @@ def _match_in_bank(bits, bank):
 
 
 def _match_glyph_with_distance(bits, banks):
-    """Best code, the bank it came from, and its Hamming distance.
+    """Return the best matching code, the bank it came from, and its
+    Hamming distance.
 
-    **The first bank whose best match is inside the threshold
-    decides** (F61, D109): banks are tried in the order given, and a
-    bank past the threshold is not consulted further once an earlier
-    one already believes it. Only a universal miss falls through
-    every bank, and even then the closest guess across all of them
-    is returned — never acted on as a real match (:func:`_match_cell`
-    substitutes a space past the threshold regardless of code), but
-    honest about how close the nearest wrong answer was.
+    The first bank whose best match falls inside the distance
+    threshold wins (F61, D109): banks are tried in the given order,
+    and once an earlier bank has produced a match inside the
+    threshold, later banks are not tried. Only when every bank misses
+    does this fall through all of them, and even then the closest
+    guess found across all banks is returned — it is never treated as
+    a real match (:func:`_match_cell` substitutes a space once the
+    distance is past the threshold, regardless of what code was
+    guessed), but returning it is honest about how close the nearest
+    wrong answer actually was.
     """
     if not any(bits):
         return 0x20, banks[0] if banks else None, 0
@@ -521,15 +559,17 @@ def _match_glyph_with_distance(bits, banks):
 
 
 def _match_cell(pixels, width, height, banks):
-    """``(cp437_code, fg, bg, matched, bank)`` for one cell.
+    """Recognize one cell, returning
+    ``(cp437_code, fg, bg, matched, bank)``.
 
-    ``matched`` is False where the nearest glyph was too far to be
-    believed and a space was substituted. That is not the same fact
-    as "this cell is blank", and conflating the two is how a screen
-    drawn in an unknown font reads as ordinary text (see
-    :func:`recognize`). ``bank`` is the bank the winning match came
-    from — ``None`` when unmatched, since the substituted space is
-    decoded the same way regardless of codepage.
+    ``matched`` is False when the nearest glyph found was too far
+    away to be trusted, and a space was substituted instead. That is
+    a different fact from "this cell is actually blank" — treating
+    the two as the same is how a screen drawn in a font this
+    recognizer doesn't have ends up silently read as ordinary text
+    (see :func:`recognize`). ``bank`` is the bank the winning match
+    came from, or ``None`` when nothing matched, since a substituted
+    space decodes the same way regardless of codepage.
     """
     primary, secondary = _cell_colours(pixels)
     if primary == secondary:
@@ -560,15 +600,17 @@ def _cp437_char(code):
 
 
 def _decode(code, bank):
-    """Character for a matched code, through ``bank``'s own codepage.
+    """Return the character for a matched code, decoded through
+    ``bank``'s own codepage.
 
-    ``None`` (every host-extracted or shipped bank, and the
-    unmatched-cell case) keeps :func:`_cp437_char`'s mapping
-    unconditionally (D109: nothing already recorded moves). A
-    :class:`Bank` with an explicit ``codepage`` decodes through
-    Python's own codec registry instead — validated when the
-    declaration was read, so a lookup failure here would be this
-    module's own bug rather than a caller's mistake.
+    When ``bank``'s codepage is ``None`` (true for every
+    host-extracted or shipped bank, and for the unmatched-cell case),
+    this keeps :func:`_cp437_char`'s mapping unconditionally —
+    nothing already recorded changes meaning (D109). A :class:`Bank`
+    with an explicit ``codepage`` is decoded through Python's own
+    codec registry instead. The codepage name was already validated
+    when the font's declaration was read, so a lookup failure here
+    would be a bug in this module, not a mistake by the caller.
     """
     codepage = getattr(bank, "codepage", None) if bank is not None else None
     if codepage is None:
@@ -577,17 +619,20 @@ def _decode(code, bank):
 
 
 class Screen(tuple):
-    """``(text_rows, attribute_rows)`` — and how well it was read.
+    """``(text_rows, attribute_rows)``, plus how well the screen was
+    actually read.
 
-    A plain 2-tuple to every caller that unpacks or indexes it, which
-    is the seam's contract and stays untouched, carrying one extra
-    fact for anyone who asks: ``unreadable``, the ``(row, col)`` of
-    every cell whose nearest glyph was too far away to be believed.
+    To every caller that unpacks or indexes it, this behaves as a
+    plain 2-tuple — that is the contract every backend must honor,
+    and it stays unchanged — but it also carries one extra fact for
+    anyone who asks: ``unreadable``, the ``(row, col)`` of every cell
+    whose nearest glyph match was too far away to be trusted.
 
-    It rides on the reading rather than being returned beside it
-    because the question is asked far from where it can be answered —
-    a script's failure report and `rlq screen` both want it, and
-    neither is anywhere near the pixels.
+    This fact travels attached to the reading itself, rather than
+    being returned as a separate value, because it gets asked for far
+    away from where it could otherwise be answered — a script's
+    failure report and `rlq screen` both need it, and neither is
+    anywhere near the pixel data by the time they ask.
     """
 
     def __new__(cls, text_rows, attribute_rows, unreadable=(),
@@ -595,34 +640,37 @@ class Screen(tuple):
         screen = super().__new__(cls, (text_rows, attribute_rows))
         screen.unreadable = tuple(unreadable)
         #: The banks this read was matched against, in try order —
-        #: each bank's ``source`` label, or ``"default"`` for one
-        #: that carries none. Empty for a screen built with none of
-        #: this (the ``(rows, attrs)`` tuple form other callers still
-        #: construct directly).
+        #: each bank's ``source`` label, or ``"default"`` for a bank
+        #: that has none. Empty for a screen built without this
+        #: information (the plain ``(rows, attrs)`` tuple form other
+        #: callers still construct directly).
         screen.fonts_tried = tuple(fonts_tried)
         return screen
 
 
 def unreadable_cells(screen):
-    """The cells a screen could not read, for any screen.
+    """Return the cells a screen could not read, for any kind of
+    screen.
 
-    A backend that scrapes resolved characters out of text memory has
-    nothing to report and returns a plain tuple, so asking it this
-    yields none — correctly, since a scrape recognizes nothing and
-    cannot misrecognize anything.
+    A backend that reads characters directly out of text memory has
+    nothing to report here, so asking it this question returns none —
+    correctly, since a direct read never recognizes glyphs and so can
+    never misrecognize one.
     """
     return getattr(screen, "unreadable", ())
 
 
 def _geometry(width, height, cols, rows):
-    """The cell size for this framebuffer, or say it is not a screen.
+    """Compute the cell size for this framebuffer, or report that it
+    is not a text screen at all.
 
-    Both refusals are :class:`UnreadableScreen` rather than the
-    author's fault: a guest chooses its own video mode, and every
-    VirtualBox boot passes through a graphics-mode BIOS splash before
-    reaching text. What reaches a caller is the *reason* the read
-    produced nothing — the shape that was captured — never a bare
-    absence (P10).
+    Both failure cases raise :class:`UnreadableScreen` rather than
+    being treated as a bug in the caller: a guest picks its own video
+    mode, and every VirtualBox boot passes through a graphics-mode
+    BIOS splash screen before reaching a text mode. What a caller
+    gets back is the reason nothing could be read — the actual shape
+    that was captured — never just a bare failure with no explanation
+    (P10).
     """
     if width % cols != 0 or height % rows != 0:
         raise UnreadableScreen(
@@ -640,34 +688,37 @@ def _geometry(width, height, cols, rows):
 
 
 def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
-    """Recognize a text screen from a PNG path or ``PIL.Image``.
+    """Recognize a text screen from a PNG path or a ``PIL.Image``.
 
-    Returns a :class:`Screen` — ``(text_rows, attribute_rows)`` to
-    anyone unpacking it, text rows right-stripped like QEMU's VGA
-    scrape, attribute rows per-cell opaque tokens from
-    :func:`attribute_token`, length ``cols`` each (not stripped).
+    Returns a :class:`Screen` — which behaves as ``(text_rows,
+    attribute_rows)`` to anyone unpacking it. Text rows are
+    right-stripped, matching QEMU's VGA scrape; attribute rows hold
+    one opaque token per cell from :func:`attribute_token`, each row
+    ``cols`` cells long and not stripped.
 
-    **A cell that matches nothing is a space, and says so.** The
-    nearest glyph is taken only when it is near enough to believe;
-    past `_MAX_DISTANCE` a space is substituted, because a wrong
-    character is worse for a script's `wait` than a blank. That
-    substitution used to be silent, which made a screen drawn in a
-    font this host does not have read as ordinary text — plausible,
-    wrong, and indistinguishable from a screen that was simply
-    blank there. Those cells are now on the returned screen as
-    ``unreadable``, so a caller can say how much of what it is
-    holding was actually read.
+    A cell that matches no glyph closely enough is reported as a
+    space, and marked as such. The nearest glyph is only accepted
+    when it is close enough to trust; past `_MAX_DISTANCE`, a space
+    is substituted instead, because giving a script's `wait` a wrong
+    character is worse than giving it a blank. This substitution used
+    to happen silently, which meant a screen drawn in a font the host
+    doesn't have got misread as ordinary text — a plausible-looking
+    but wrong reading, indistinguishable from a screen that really
+    was blank there. Those cells now show up in the returned screen's
+    ``unreadable`` list, so a caller can tell how much of what it got
+    back was actually read correctly.
 
-    ``bank`` is the font to read through — one 4096-byte bank, or
-    **any number of them**, and a caller reading a live guest should
-    supply every font that guest could be painting with
-    (:func:`banks_from_binary`). One is rarely enough: a BIOS draws
-    its own messages with its bank as installed, a DOS guest draws
-    with what it loaded afterwards, and a framebuffer records the
-    pixels without saying which was in the VGA. Nineteen glyphs
-    separate the two fonts a stock VirtualBox install offers, `W`
-    and `m` among them — enough to miss every `wait` on a word
-    containing either.
+    ``bank`` is the font (or fonts) to read through: one 4096-byte
+    bank, or any number of them. A caller reading a live guest should
+    supply every font that guest could plausibly be painting with
+    (see :func:`banks_from_binary`), because one font is rarely
+    enough — the BIOS draws its own messages with its own installed
+    bank, a DOS guest later draws with whatever font it loaded, and a
+    framebuffer just records pixels without saying which font was
+    active in the VGA at the time. The two fonts a stock VirtualBox
+    install offers differ in nineteen glyphs, including `W` and `m` —
+    enough to make every `wait` on a word containing either letter
+    fail if only one font is tried.
     """
     if isinstance(source, Image.Image):
         image = source.convert("RGB")
@@ -706,19 +757,23 @@ def recognize(source, *, cols=_COLS, rows=_ROWS, bank=None):
 def render(text_rows, attribute_rows=None, *,
            cols=_COLS, rows=_ROWS, cell_w=_CELL_W, cell_h=_CELL_H,
            fg=(170, 170, 170), bg=(0, 0, 0), bank=None):
-    """Render character rows into a RGB ``PIL.Image`` using the glyph bank.
+    """Render character rows into an RGB ``PIL.Image``, using a glyph
+    bank.
 
-    The test twin of :func:`recognize`: fixtures are produced here so
-    the suite never needs a hypervisor. ``attribute_rows``, when
-    given, supplies per-cell ``(fg, bg)`` RGB pairs; otherwise every
-    cell uses ``fg`` / ``bg``. Cells wider than 8 leave the extra
-    columns blank (9-dot VGA); taller cells pad with background.
+    This is the test counterpart of :func:`recognize`: test fixtures
+    are produced here so the test suite never needs a real
+    hypervisor. ``attribute_rows``, when given, supplies a per-cell
+    ``(fg, bg)`` RGB pair; otherwise every cell uses the single
+    ``fg``/``bg`` pair given. Cells wider than 8 pixels leave the
+    extra columns blank (matching real 9-dot VGA cells); taller cells
+    pad the extra rows with background color.
 
-    ``bank`` draws with a font other than the default — exactly one,
-    since something drawing a screen has a font loaded and it is the
-    *reader* that cannot know which. That asymmetry is what makes a
-    screen painted in one font and read through several testable
-    without a hypervisor.
+    ``bank`` draws with a font other than the default — exactly one
+    font, because whatever draws a real screen has exactly one font
+    loaded at a time; it is only the *reader* (:func:`recognize`)
+    that cannot know which font that was. This asymmetry is what
+    makes it possible to test a screen painted in one font and read
+    back through several fonts, without needing a real hypervisor.
     """
     if cell_w < _CELL_W or cell_h < _CELL_H:
         raise StaticError(

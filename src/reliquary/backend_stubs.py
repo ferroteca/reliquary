@@ -2,27 +2,31 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The two unbuilt adapters: VMware Workstation and Hyper-V.
 
-Each is a real entry in the backend priority order (D66) and a real
-host probe — discovery works, because knowing whether the backend
-is installed costs nothing and is honest either way. Everything past
-discovery is unbuilt, and says so.
+Each is a real entry in the backend priority order (D66) and does a
+real host probe — discovery actually works, since checking whether
+the backend is installed costs nothing and gives an honest answer
+either way. Everything past discovery is not built yet, and these
+adapters say so.
 
-**They report no capabilities**, which is the whole of P11 at this
-seam: an untested capability is an unclaimed one, so a stub claims
-nothing and the assignment walk passes over it even where the backend
-is installed. The order's tail is therefore intent recorded, not
-shipped behavior (D66) — and the day an adapter is built, what
-changes is this report, not the walk.
+They report no capabilities at all. That's what P11 requires here: a
+capability nothing has tested is a capability nothing may claim, so a
+stub claims none, and the assignment walk skips it even on a host
+where the backend is actually installed. So the tail of the priority
+order records an intent, not a working feature (D66) — the day one of
+these adapters is actually built, what changes is this capability
+report, not the priority walk itself.
 
-A pinned ``backend`` naming one of these fails preflight naming the
-backend and the gap, rather than raising the abstract-method
-``NotImplementedError``: the request is legal and this build does not
-satisfy it, which is a PREFLIGHT ERROR under the error taxonomy
-(D58). The bare ``NotImplementedError`` inherited from
-:class:`~reliquary.backends.BackendAdapter` guards the operations
-assignment can never reach.
+If a blueprint pins ``backend`` to one of these, assignment fails at
+preflight, naming both the backend and the fact that it isn't built
+yet — rather than hitting the abstract method's bare
+``NotImplementedError``. The request is a legal one that this build
+just can't satisfy, which the error taxonomy classifies as a
+PREFLIGHT ERROR (D58). The ``NotImplementedError`` inherited from
+:class:`~reliquary.backends.BackendAdapter` still guards every
+operation assignment can never actually reach.
 
-VirtualBox left this module with F50 (``backend_virtualbox``).
+VirtualBox used to be a stub in this module too, before it was built
+out into its own module for F50 (``backend_virtualbox``).
 """
 
 import os
@@ -33,7 +37,7 @@ from .backends import Availability, BackendAdapter, Capabilities
 
 
 def _which(binary, directories=()):
-    """The first of ``binary`` on PATH or in a conventional location."""
+    """The first match for ``binary`` on PATH or in a common install location."""
     found = shutil.which(binary)
     if found:
         return found
@@ -52,9 +56,10 @@ def _program_files():
 
 
 class _StubAdapter(BackendAdapter):
-    """Discovery only: available or not, and capable of nothing."""
+    """Discovery only: reports available or not, and capable of nothing."""
 
-    #: What the probe looks for, for the diagnostic's sake.
+    #: What the probe looks for on the host, used in the diagnostic
+    #: message when it isn't found.
     looks_for = ""
 
     def capabilities(self):
@@ -101,9 +106,10 @@ class VMwareAdapter(_StubAdapter):
 class HyperVAdapter(_StubAdapter):
     """Microsoft Hyper-V, driven through its PowerShell module.
 
-    Hyper-V ships no console binary to look for: the probe is the
-    module the host either has or has not, so it is Windows-only by
-    construction rather than by policy.
+    Hyper-V ships no console binary to look for, so the probe checks
+    for its PowerShell module instead. That module only exists on
+    Windows, which is what makes this adapter Windows-only — not a
+    separate check, just a consequence of what it's looking for.
     """
 
     name = "hyperv"

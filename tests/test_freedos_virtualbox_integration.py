@@ -72,8 +72,9 @@ def _pin_virtualbox(home):
 def test_freedos_plain_install_and_verify_on_virtualbox(integration_home):
     """F52 Done-when: FreeDOS install+verify on VirtualBox, unmodified
     script."""
-    # VirtualBox is what this tier *is*, so a host without it fails
-    # naming the gap (P11) rather than skipping: the tier was asked
+    # VirtualBox is what this integration tier tests, so a host
+    # without it should fail with a clear message naming the gap
+    # (P11), rather than skip: running this tier was explicitly asked
     # for.
     find_vboxmanage()
     home = integration_home

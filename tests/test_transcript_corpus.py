@@ -184,8 +184,9 @@ def test_a_capture_reconstructs_every_screen_it_holds(fixture):
 
     Cheap, and it is the format's own claim rather than the layer's:
     the reader checks each digest as it goes, so a delta chain that
-    lost its footing or a hand-edited fixture fails here rather than
-    surfacing as a mysterious divergence in the replay above.
+    went wrong partway through, or a hand-edited fixture, fails here
+    rather than surfacing as a mysterious divergence in the replay
+    above.
     """
     entries, _reader = replay.read(fixture)
     frames = [entry for entry in entries if entry.kind == "frame"]

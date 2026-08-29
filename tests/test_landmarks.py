@@ -250,9 +250,10 @@ def test_a_bare_landmark_is_a_whole_screen_exact_match(home):
 
 
 def test_the_built_in_park_zone_is_excluded_from_every_match(home):
-    # F66: unconditional and unauthored -- a captured cursor sitting in
-    # the bottom-right corner (the park position for this landmark's
-    # own 64x32 pinned size) never breaks an otherwise-clean match.
+    # F66: this exclusion is automatic and not something the user
+    # declares -- a captured cursor sitting in the bottom-right
+    # corner (the park position for this landmark's own 64x32
+    # pinned size) never breaks an otherwise-clean match.
     declaration = _declaration(home)
     parked = _paint(_plain(), (48, 24, 64, 32), (255, 255, 255))
     assert match(declaration, parked).matched
@@ -353,8 +354,9 @@ def test_a_capture_off_the_pinned_size_matches_nothing_and_says_so(home):
 
 def test_the_reference_side_is_normalized_through_the_capture_format(home):
     declaration = _declaration(home)
-    # The one format a plane states today is the identity, which is
-    # what makes the hook cost nothing on the VNC plane.
+    # The only capture format registered today is "rgb", whose
+    # normalizer is the identity function -- which is why this hook
+    # costs nothing on the VNC plane.
     assert match(declaration, _plain(), capture_format="rgb").matched
     with pytest.raises(InternalError):
         match(declaration, _plain(), capture_format="rgb565")

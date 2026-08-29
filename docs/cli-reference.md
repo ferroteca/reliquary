@@ -5,69 +5,74 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # CLI reference
 
-> **Descriptive.** The CLI's norm is
-> [docs/spec/cli.md](spec/cli.md); where this reference disagrees
-> with it, this reference has the bug.
+> **Descriptive.** The authoritative definition of the CLI is
+> [docs/spec/cli.md](spec/cli.md). Where this reference disagrees
+> with it, this reference is wrong.
 
 This is the complete reference for the `rlq` command-line interface
-(alias: `reliquary`). Every command is its API twin's name,
-dash-separated (`create-machine` ↔ `create_machine`); flags may
-appear before or after the command word.
+(also available as `reliquary`). Every command name matches its
+Python API function name, dash-separated instead of underscored
+(`create-machine` corresponds to `create_machine`). Flags may appear
+before or after the command word.
 
 ## Global options
 
-Six flags place Reliquary's working directories. Each is also
-settable in the environment, an explicit flag winning; what none of
-them names derives from what does. The home variable is
-`RELIQUARY_HOME`; the other five follow the
-`RELIQUARY_<NAME>_DIR` pattern.
+Six flags set Reliquary's working directories. Each one can also be
+set with an environment variable, and an explicit flag always wins
+over that; any directory that isn't set by either one gets derived
+from the others that are. The home directory's variable is
+`RELIQUARY_HOME`; the other five follow the pattern
+`RELIQUARY_<NAME>_DIR`.
 
 - `--home-dir <path>` - The Reliquary home (default:
   `Documents/reliquary`, falling back to `~/reliquary`)
-- `--blueprints-dir <path>` - Where blueprints (media included)
-  resolve from and seed to, walked recursively by extension
-  (default: `<home>/blueprints`)
-- `--scripts-dir <path>` - Where scripts resolve from and seed to,
-  walked recursively (default: `<home>/scripts`)
-- `--cache-dir <path>` - The regenerable cache root (default:
-  `<home>/cache`)
+- `--blueprints-dir <path>` - Where blueprints (media included) are
+  resolved from and seeded to; searched recursively by file
+  extension (default: `<home>/blueprints`)
+- `--scripts-dir <path>` - Where scripts are resolved from and
+  seeded to; searched recursively (default: `<home>/scripts`)
+- `--cache-dir <path>` - The cache directory root, which can always
+  be regenerated (default: `<home>/cache`)
 - `--media-dir <path>` - Cached media payloads (default:
   `<cache>/media`)
-- `--machines-dir <path>` - Machine materializations (default:
-  `<cache>/machines`)
+- `--machines-dir <path>` - Where machines are materialized
+  (default: `<cache>/machines`)
 - `--blueprint <name>` - Select a blueprint's sole machine, or
   name the blueprint for `create-machine` / `list-*`
-- `--machine <id>` - Select a machine by full id
-  (`<blueprint>-<n>`), exactly — no prefix matching and no
-  bare-number form
+- `--machine <id>` - Select a machine by its full id
+  (`<blueprint>-<n>`), written out exactly — no prefix matching, and
+  you can't pass just the number
 - `--platform <name>` - Guest platform adapter (default: `dos`)
 - `--timeout <seconds>` - Default timeout for commands
-- `--json` - Print the command's result as one JSON document on
-  stdout: exactly what the command's API twin returns (a void twin
-  prints `{}`). Diagnostics stay on stderr and exit codes are
-  unchanged. Stream-bearing commands (`run-script`, `fetch-media`)
-  reject `--json` — their machine-readable form is `--progress jsonl`.
-  `run-script --dry-run` is not stream-bearing: a plan is a document,
-  so it takes `--json` like any other result.
-- `--progress (auto | pretty | plain | jsonl)` - Live rendering, on
-  the stream-bearing commands (`run-script`, `fetch-media`) only, and
-  refused under `run-script --dry-run`, which has no stream to render.
-  See [Live progress](#live-progress) below.
+- `--json` - Print the command's result as a single JSON document on
+  stdout: exactly what the corresponding Python API function
+  returns (a function with no return value prints `{}`). Diagnostics
+  still go to stderr, and exit codes don't change. Commands that
+  stream progress (`run-script`, `fetch-media`) reject `--json` —
+  their machine-readable form is `--progress jsonl` instead.
+  `run-script --dry-run` doesn't stream, though: a dry-run plan is
+  just a document, so it takes `--json` like any other result.
+- `--progress (auto | pretty | plain | jsonl)` - Controls the live
+  progress display, only on commands that stream progress
+  (`run-script`, `fetch-media`). Refused under `run-script
+  --dry-run`, since a dry run has no stream to render. See
+  [Live progress](#live-progress) below.
 - `--version` - Show version and exit
 
-`--display` is accepted on `start-machine` and `run-script`.
-Flags may appear before or after the command word.
+`--display` is accepted by both `start-machine` and `run-script`. As
+noted above, flags may appear before or after the command word.
 
 `--blueprint` and `--machine` are mutually exclusive.
 
 ## Output, exit codes, and live progress
 
-**The result is stdout; everything else is stderr.** A command that
-returns a value prints exactly that value's plain rendering on stdout
-— the same thing `--json` serializes — so ids, paths, and tables pipe
-clean with no flags. Narration, warnings, prompts, progress, and error
-reports go to stderr. Colour is emitted only to a terminal and never
-under `NO_COLOR`.
+**The result goes to stdout; everything else goes to stderr.** A
+command that returns a value prints exactly that value's plain-text
+rendering to stdout — the same value `--json` would serialize — so
+ids, paths, and tables all pipe cleanly with no extra flags needed.
+Narration, warnings, prompts, progress, and error reports all go to
+stderr instead. Color is only ever printed to an actual terminal,
+and never when `NO_COLOR` is set.
 
 ### Exit codes
 
@@ -80,129 +85,147 @@ under `NO_COLOR`.
 | `4` | RUN FAILURE — the operation started and failed |
 | `5` | cancelled — Ctrl-C ended the run at an event boundary |
 
-**These are not the script surface's codes alone.** `2`, `3` and `4`
-were named for a script run's tiers and mean the same on every
-command: a malformed blueprint is `2`, naming a machine that does not
-exist is `3`, a media fetch that fails halfway is `4`. A capability
-this build has not implemented is `3` — the request is legal and the
-world, which includes what this build implements, does not satisfy
-it.
+**These exit codes aren't only used for script runs.** `2`, `3`, and
+`4` were originally named for the tiers of a script run, but they
+mean the same thing on every command: a malformed blueprint exits
+`2`, naming a machine that doesn't exist exits `3`, and a media
+fetch that fails partway through exits `4`. Asking for a capability
+this build hasn't implemented yet also exits `3` — the request
+itself is legal, and "the world" that doesn't satisfy it includes
+what this particular build happens to implement.
 
-`1` never means you got something wrong. It is Reliquary detecting a
-broken invariant of its own, or an outright bug, and a bug prints a
-traceback with it.
+Exit code `1` never means you did something wrong. It means
+Reliquary detected something broken in its own internal
+assumptions, or hit an outright bug — and when it's a bug, it
+prints a traceback along with the exit code.
 
-Cancelled is deliberately neither success nor failure. Ctrl-C on a
-foreground run requests a stop; the run ends at the next event
-boundary (an input already in flight completes), reports a
-`cancelled` terminal event, and leaves the machine exactly as it
-stands — nothing is torn down.
+Cancelled (exit code `5`) is deliberately neither a success nor a
+failure. Pressing Ctrl-C on a foreground run just requests a stop:
+the run finishes whatever it's currently doing (an input already in
+flight completes), reports a `cancelled` terminal event, and leaves
+the machine exactly as it was — nothing gets torn down.
 
 ### Live progress
 
-`--progress` selects how a run or a fetch reports itself while it
-happens. Nothing is written to disk: the stream is live output, and
-the run returns it to whoever started it.
+`--progress` controls how a run or a fetch reports itself while
+it's happening. Nothing gets written to disk — this is a live
+output stream, returned directly to whoever started the run.
 
-- `auto` (default) — `pretty` when stderr is a terminal, else `plain`.
-- `pretty` — an in-place live line with elapsed time against its
-  limit. Forces the terminal rendering where `auto` would not (a CI
-  log that renders ANSI, a pager).
-- `plain` — one line per event plus a periodic heartbeat, for a
-  redirected log.
-- `jsonl` — **stdout carries the run's event stream as JSON Lines and
-  nothing else.** Each line has `seq`, `time`, `elapsed`, `kind`, and
-  the kind's own fields; the last line is the terminal event, which is
-  the machine-readable result. Diagnostics stay on stderr.
+- `auto` (the default) — `pretty` when stderr is an actual
+  terminal, otherwise `plain`.
+- `pretty` — a single line that updates in place, showing elapsed
+  time against its limit. Forces terminal-style rendering even
+  where `auto` wouldn't (for example, a CI log that renders ANSI,
+  or a pager).
+- `plain` — one line per event, plus a periodic heartbeat — meant
+  for a redirected log file.
+- `jsonl` — **stdout carries the run's event stream as JSON Lines,
+  and nothing else.** Each line has `seq`, `time`, `elapsed`,
+  `kind`, and fields specific to that kind of event; the last line
+  is the terminal event, which is the machine-readable result.
+  Diagnostics still go to stderr.
 
-`plain` and `jsonl` never prompt: a property no source answers is a
-PREFLIGHT ERROR before the machine starts, so a program can never
-hang on a question it cannot see.
+`plain` and `jsonl` never prompt interactively: a property that no
+source can answer is a PREFLIGHT ERROR raised before the machine
+even starts, so an automated program can never hang waiting on a
+question it has no way to see.
 
-Consumers of the `jsonl` stream should ignore event kinds and fields
-they do not recognize — the stream grows additively.
+Anything reading the `jsonl` stream should ignore event kinds and
+fields it doesn't recognize — new ones get added to the stream over
+time, but existing ones never change meaning.
 
 ## Machine lifecycle commands
 
 ### `rlq create-machine --blueprint NAME`
 
 Create a new machine from a blueprint. If any media the machine
-attaches is located by a `${key}` property reference, that key is
-bound before materialization — from `--property KEY=VALUE`, a
-blueprint parameter, `RELIQUARY_PROPERTY_<KEY>`, the properties file
-(`--properties PATH`), or an interactive ask — so a blueprint can
-name a non-redistributable ISO by `${windows.iso}` and each host
-supplies its own path or URL. The **resolved** location is recorded
-in the machine state; `start` never re-resolves it. A key that no
-source answers fails the create before any drive is materialized. A
-bound value that is itself a reference is refused — a location binds
-once, it does not chain. `recreate-machine` and `apply-blueprint`
-take the same `--property` / `--properties`.
+attaches has its location given as a `${key}` property reference,
+that key gets resolved before the machine is materialized — checked
+in order from `--property KEY=VALUE`, a blueprint parameter,
+`RELIQUARY_PROPERTY_<KEY>`, the properties file
+(`--properties PATH`), or an interactive prompt. This lets a
+blueprint name a non-redistributable ISO as `${windows.iso}`, with
+each host supplying its own path or URL. The **resolved** location
+gets recorded in the machine's state; `start` never resolves it
+again later. If no source can answer a key, the create fails before
+any drive gets materialized. A resolved value that turns out to
+itself be a reference is rejected — a location only resolves once,
+it doesn't chain through multiple references. `recreate-machine`
+and `apply-blueprint` accept the same `--property` / `--properties`
+flags.
 
-`--dry-run` reports what a create would do and does none of it:
-nothing is seeded, fetched, locked or written, and nothing is ever
-asked for. It prints the machine id it would allocate, the backend
-it would land on, each drive's resolved plan, and each media as
-`cached`, `would-download`, `would-extract`, `local-present` or
-`unbound` — resolved, never fetched, and never hashed. It fails
-where a create would fail, so a nonzero exit is the verdict.
+`--dry-run` reports what a `create-machine` would do without
+actually doing any of it: nothing gets seeded, fetched, locked, or
+written, and it never prompts for anything. It prints the machine
+id it would allocate, the backend it would run on, each drive's
+resolved plan, and each media's status as `cached`,
+`would-download`, `would-extract`, `local-present`, or `unbound` —
+media get resolved, but never actually fetched or hashed. It fails
+wherever a real create would fail, so a nonzero exit code is the
+verdict on whether the create would have worked.
 
 `--backend NAME` overrides the blueprint's `backend` field, pinning
-assignment at materialization — the named backend must be available
-and capable on this host, failing closed on either count. With
-`--dry-run` the question is whether the blueprint would work *there*,
-so its capability decides and it need not be installed here: absence
-is reported rather than raised.
+the assignment at materialization time — the named backend has to
+be both available and capable on this host, and the command fails
+if it's either. With `--dry-run`, the question changes to whether
+the blueprint *would* work on that backend, so only its capability
+matters and it doesn't need to actually be installed on this host —
+if it's not installed, that's reported, not treated as a failure.
 
 ### `rlq start-machine (--blueprint NAME | --machine ID) [--display]`
 
-Start a machine (a selector is required). Returns when QEMU is
-ready.
+Start a machine. You have to give a selector (`--blueprint` or
+`--machine`). Returns as soon as QEMU is up and running.
 
 ### `rlq stop-machine [ID] (--blueprint NAME | --machine ID)`
 
-Stop a running machine. The machine id may be given as a positional
-argument (`rlq stop-machine freedos-0` is a short alias for
-`rlq stop-machine --machine freedos-0`).
+Stop a running machine. You can give the machine id as a plain
+positional argument instead — `rlq stop-machine freedos-0` is
+shorthand for `rlq stop-machine --machine freedos-0`.
 
 ### `rlq restart-machine [ID] (--blueprint NAME | --machine ID) [--display]`
 
-Stop a machine if it is running, then start it — one act rather
-than two, holding the per-machine lock across both halves so
-nothing can start it or change its media in between. A machine that
-is already stopped is simply started. The machine id may be given
-as a positional argument (`rlq restart-machine freedos-0` is a short
-alias for `rlq restart-machine --machine freedos-0`).
+Stop the machine if it's running, then start it — this happens as
+one operation, not two, holding the per-machine lock the whole time
+so nothing else can start it or change its media in between. If the
+machine is already stopped, this just starts it. You can give the
+machine id as a plain positional argument instead —
+`rlq restart-machine freedos-0` is shorthand for
+`rlq restart-machine --machine freedos-0`.
 
 ### `rlq destroy-machine [ID] (--blueprint NAME | --machine ID)`
 
-Destroy a machine, stopping it first if it is running — the
-per-machine lock is held across both halves, as for
-`restart-machine`. The machine id may be given as a positional
-argument (`rlq destroy-machine freedos-0` is a short alias for
-`rlq destroy-machine --machine freedos-0`). Frees the machine number for reuse.
+Destroy a machine, stopping it first if it's running — the
+per-machine lock stays held across both steps, just like
+`restart-machine`. You can give the machine id as a plain
+positional argument instead — `rlq destroy-machine freedos-0` is
+shorthand for `rlq destroy-machine --machine freedos-0`. This frees
+the machine number for reuse.
 
 ### `rlq recreate-machine (--blueprint NAME | --machine ID)`
 
 Destroy a machine and recreate it under the same id — exactly
-`destroy-machine` + `create-machine`. The current blueprint is
-re-resolved, so drives regenerate as declared.
+`destroy-machine` followed by `create-machine`. The blueprint gets
+resolved fresh, so drives regenerate the way they're currently
+declared.
 
 ### `rlq apply-blueprint (--blueprint NAME | --machine ID)`
 
-Adopt the current blueprint into a **stopped** machine, and return
-a script-diverged machine to its blueprint shape. Absorbable
-changes — memory, cpus, boot order, control planes, metadata,
-added/removed/re-pointed and empty drives, and re-fetched `use`
-media — are applied and the baseline digest re-recorded; a changed
-`size` or `materialize` on an already-materialized media image
-fails closed (use `recreate-machine`).
+Bring the current blueprint into a **stopped** machine, and bring a
+machine that's diverged (say, from a script) back to its blueprint
+shape. Changes the machine can absorb without rebuilding anything —
+memory, CPU count, boot order, control planes, metadata, drives
+added, removed, re-pointed, or left empty, and re-fetched `use`
+media — get applied, and the baseline digest gets re-recorded. A
+changed `size` or `materialize` on a media image that's already
+been materialized causes this to refuse (use `recreate-machine`
+instead).
 
 ### `rlq get-machine-dir (--blueprint NAME | --machine ID)`
 
-Print the machine's cache directory as an absolute path — the door
-to out-of-band file exchange (valid in any phase, touching
-nothing).
+Print the machine's cache directory as an absolute path — this is
+how you exchange files with a machine outside its normal drives.
+Works in any phase, and doesn't touch anything.
 
 ### `rlq list-machines [--blueprint NAME]`
 
@@ -210,39 +233,44 @@ List all machines, optionally filtered by blueprint.
 
 ### `rlq list-blueprints`
 
-List your blueprints — the ones in the `blueprints` directory —
-with the path of each. Yours alone: the built-in library is a
-separate set with its own verb below, and no listing spans the two.
+List your own blueprints — the ones in the `blueprints` directory —
+with each one's path. This only covers your own: the built-in
+library is a separate set with its own command below, and no single
+listing covers both.
 
 ### `rlq list-codex`
 
-List the built-in library's blueprints by name. Nothing of yours
-appears, so which command you ran is the provenance — there is no
-column saying where a row came from. Each entry's description shares
-its printed table row and is also present in the `--json` record.
+List the built-in library's blueprints by name. None of your own
+blueprints show up here — since you ran `list-codex` specifically,
+that itself tells you where these came from, so there's no column
+saying so. Each entry's description is shown in its table row, and
+also included in the `--json` output.
 
-Nothing resolves out of the library: a name your directories do not
-hold is refused, and the refusal names `rlq seed-blueprint <name>`
-where the library has it.
+Nothing ever resolves straight out of the library on its own: a
+name your own directories don't hold is refused, and that refusal
+tells you to run `rlq seed-blueprint <name>` if the library actually
+has it.
 
 ### `rlq (seed-blueprint | seed-script) <name> [--only]`
 
-Copy a built-in artifact into the home. By default a blueprint or
-script also brings its closure (referenced scripts; media travel
-inside the blueprint itself); `--only` copies just the named file.
-There is no `seed-media`: media are components inside a `.rlqb` and
-are seeded with the blueprint that declares them.
+Copy a built-in blueprint or script into your home directory. By
+default, this also brings along everything it references (a
+blueprint's scripts; media travel inside the blueprint file
+itself); `--only` copies just the one named file. There's no
+`seed-media` command: media are components inside a `.rlqb` file,
+and get seeded along with whichever blueprint declares them.
 
 ### `rlq delete-blueprint <name>`
 
-Remove the home blueprint file (``.rlqb``).
-Refuses while any machine of that blueprint exists, naming their
-ids — destroy them first. Never deletes codex blueprints.
+Remove a blueprint file (`.rlqb`) from your home directory. Refuses
+to run while any machine created from that blueprint still exists,
+naming their ids in the error — destroy them first. This never
+deletes codex blueprints.
 
 ### `rlq delete-script <name>`
 
-Remove the home script file (``.rlqs``).
-Refuses while any blueprint still refers to the script. Never
+Remove a script file (`.rlqs`) from your home directory. Refuses to
+run while any blueprint still refers to the script. This never
 deletes codex scripts.
 
 ### `rlq list-scripts [--blueprint NAME]`
@@ -253,178 +281,205 @@ List scripts, optionally filtered by blueprint.
 
 ### `rlq run-script <label> (--blueprint NAME | --machine ID) [--display] [--progress MODE]`
 
-Run a script against a blueprint's machine. Resolves the blueprint,
-creates a machine if none exists, and runs the script, streaming its
-progress live.
+Run a script against a blueprint's machine. This resolves the
+blueprint, creates a machine if one doesn't already exist, and runs
+the script, streaming its progress live as it goes.
 
-**The run returns its output and stores nothing.** There is no run
-directory, no saved transcript, and no run-management commands: the
-event stream is rendered as `--progress` asks and is gone when the run
-ends. Keep it by redirecting `--progress jsonl`, or take the returned
-stream from the `run_script()` twin. The run's *product* is yours —
-the value you read with `get-machine-var`, the image you swapped out,
-the results directory the guest wrote into — and Reliquary attaches
-no meaning to any of it.
+**The run returns its output and stores nothing.** There's no run
+directory, no saved transcript, and no commands for managing past
+runs — the event stream is rendered however `--progress` asks and
+is gone as soon as the run ends. Keep a copy by redirecting
+`--progress jsonl` to a file, or by reading the stream returned from
+the `run_script()` Python function. The run's actual *product* is
+yours to keep — the value you read back with `get-machine-var`, the
+image you swapped out, the results directory the guest wrote
+into — and Reliquary doesn't interpret any of it.
 
-A script declares the properties it consumes; each is bound before
-the machine starts, from the first source that answers:
+A script declares the properties it needs; each one is resolved
+before the machine starts, from the first of these sources that
+answers it:
 
-1. `--property KEY=VALUE` — the caller's answer for this run
-   (repeatable; never a secret — argv is not a credential store).
+1. `--property KEY=VALUE` — an answer given for this specific run
+   (repeatable; never usable for a secret — a command-line argument
+   isn't a credential store).
 2. a **blueprint parameter** — a value the blueprint fixes for its
-   machines, or a `{"property": "<key>"}` redirect to another key.
-3. `RELIQUARY_PROPERTY_<KEY>` — an environment value (the CI
-   injection path); the key uppercases with `.`, `-`, `_` all
-   mapped to `_`.
+   machines, or a `{"property": "<key>"}` redirect pointing at a
+   different key.
+3. `RELIQUARY_PROPERTY_<KEY>` — a value from an environment variable
+   (the way to inject one from CI); the key is uppercased, with
+   `.`, `-`, and `_` all mapped to `_`.
 4. the **properties file** — `user.properties`, or the file named by
-   `--properties PATH`; a secret is read from the credential store.
-5. an **interactive ask** — only on a terminal, once per unresolved
-   key. Without a terminal, an unresolved property fails before the
-   machine starts, so a program never hangs on a hidden prompt.
+   `--properties PATH`; a secret's value is read from the host's
+   credential store.
+5. an **interactive prompt** — only when running on a terminal, once
+   per key that's still unresolved. Without a terminal, an
+   unresolved property fails before the machine even starts, so an
+   automated program never hangs waiting on a prompt it can't see.
 
-A `secret` property expands only in `enter` and `type`; its value is
-kept out of the event stream and diagnostics (shown as `«secret»`),
-and once one reaches the guest, automatic failure screenshots are
-suppressed for the rest of the run. `--properties PATH` selects the
-file for binding, exactly as for the property commands above.
+A `secret` property can only be expanded inside `enter` and `type`
+statements; its actual value is kept out of the event stream and
+out of diagnostics (shown as `«secret»` instead). Once a secret has
+reached the guest, automatic failure screenshots are suppressed for
+the rest of that run. `--properties PATH` selects which file to
+read properties from, exactly like it does for the property
+commands above.
 
-When a run fails, the report names what was pending, which clock
-expired and the scope that supplied it, the route through the phase
-graph with its revisit counts, the screen row that came nearest to
-matching, an automatic screenshot, and the command to try next.
+When a run fails, the report names what was still pending, which
+timer expired and where it came from, the path taken through the
+script's phase graph along with how many times each phase was
+revisited, the screen row that came closest to matching, an
+automatic screenshot, and a suggested next command to try.
 
 ### `rlq run-script <name> --dry-run [--blueprint NAME | --machine ID]`
 
-Parse and statically check a script; print its resolved timing plan
-(each observation's effective timeout, each guest-input verb's
-effective pacing, and the scope that supplied each), for each
-declared property the source that would supply it — flag, blueprint
-parameter, environment, properties file, or the ask — never its
-value, and how many statements no static pass can promise will run.
-Read-only: it seeds nothing, creates no machine, runs no guest step,
-never prompts and never reads a secret's value.
+Parse and statically check a script, then print its resolved timing
+plan (each observation's effective timeout, each guest-input
+statement's effective pacing, and which scope supplied each one),
+the source that would supply each declared property (a flag, a
+blueprint parameter, the environment, the properties file, or a
+prompt — never the actual value), and how many statements can't be
+statically guaranteed to run. This is read-only: it seeds nothing,
+creates no machine, runs no guest step, never prompts, and never
+reads a secret's actual value.
 
-**The selector is optional here alone**, because its presence
-chooses the tier. Without one, `<name>` is a bare script stem and
-every legality rule applies. With `--blueprint` or `--machine`,
-`<name>` may be a blueprint scripts-map label and the machine rules
-apply as well, media-slot preflight included. Static errors exit 2.
+**This is the one command where the selector is optional**, because
+whether you give one decides which level of checking you get.
+Without a selector, `<name>` has to be a bare script filename stem,
+and every general legality rule applies. With `--blueprint` or
+`--machine`, `<name>` can instead be a label from the blueprint's
+scripts map, and the machine-specific rules also apply, including
+checking media-slot targets ahead of time. Static errors exit with
+code 2.
 
-`--dry-run` returns a document rather than a stream, so `--json`
-prints it and `--progress` and `--display` are refused.
+`--dry-run` returns a document instead of a stream, so `--json` can
+print it, and `--progress` and `--display` are both refused.
 
 ## Media and cache
 
 ### `rlq list-media`
 
-List media names resolvable from the active source (the media specs
-across its `.rlqb` files) — yours alone. The library's media are
-components of blueprints you have not seeded, and there is no
-`seed-media`, so nothing lists parts that cannot be ordered on their
-own.
+List media names that can be resolved from the active source (the
+media specs across all its `.rlqb` files) — this only shows your
+own. The library's media are components inside blueprints you
+haven't seeded yet, and since there's no `seed-media` command,
+nothing lists parts that can't be ordered on their own anyway.
 
 ### `rlq fetch-media <name> [--progress MODE]`
 
-Resolve a media by name and fetch and verify its payload into the
-cache. Stream-bearing: transfer and verification report live under the
-same `--progress` vocabulary a run uses, with byte totals only where
-the source names one — hashing and extraction report elapsed time
-alone, and each mirror attempt is its own event.
+Resolve a media by name, and fetch and verify its payload into the
+cache. This streams progress, using the same `--progress`
+vocabulary a script run does: the transfer and verification report
+live, with byte totals shown only when the source provides one —
+hashing and extraction just report elapsed time, and each mirror
+attempt shows up as its own event.
 
 ### `rlq clean-media [<name>]`
 
-Reclaim cached payloads from `cache/media/`. With no argument it is
-blunt: everything goes. The cache holds only what Reliquary can fetch
-or derive again, so nothing there is irreplaceable — a file you
-supplied yourself stays wherever you keep it and is never copied in.
-Anything a running machine is holding open is skipped. Naming a media
-evicts just that one.
+Delete cached payloads from `cache/media/`. With no argument, this
+is blunt: everything in the cache goes. The cache only ever holds
+things Reliquary can fetch or derive again, so nothing in it is
+irreplaceable — a file you supplied yourself stays wherever you keep
+it and is never copied into the cache in the first place. Anything
+a running machine currently has open is skipped. Name a specific
+media to delete just that one.
 
 ### `rlq prune-media [--dry-run]`
 
-Drop cached payloads outside the **attachment closure**: what the
-active scope can still attach stays, and what only existed to produce
-it goes. After an install, that means the extracted ISO stays and the
-zip it came out of does not — re-deriving the husk is one download
-away, and it is usually the larger file. `--dry-run` reports what
-would go without touching anything.
+Delete cached payloads that nothing in the active scope still
+needs: anything your namespace can still attach stays, and anything
+that only existed to produce that gets deleted. After an install,
+for example, the extracted ISO stays, but the zip file it was
+extracted from doesn't — re-deriving that intermediate file is only
+one download away, and it's usually the larger of the two files
+anyway. `--dry-run` reports what would be deleted, without actually
+touching anything.
 
 ### `rlq add-media <name> <file>`
 
-Declare a media for a file you already have. Codex blueprints for
-commercial systems ship pinned but without a URL — Reliquary has no
-right to distribute a Windows ISO — so they name the build their
-scripts target and leave you to supply it.
+Declare a media entry for a file you already have. Codex blueprints
+for commercial systems ship with a pinned hash but no URL —
+Reliquary has no right to redistribute a Windows ISO — so they just
+name the build their scripts are written for, and leave it to you
+to supply the actual file.
 
-This writes `blueprints/<name>.rlqb` declaring that media, located at
-your file and pinned to its SHA-256, which it computes for you. The
-file is not copied or moved: the blueprint points at it where it sits.
-Prints the blueprint path.
+This writes a `blueprints/<name>.rlqb` file that declares the media,
+pointing at your file and pinned to its SHA-256 hash, which it
+computes for you. The file itself isn't copied or moved — the
+blueprint just points at it wherever it already sits. Prints the
+path of the new blueprint file.
 
-The result is an ordinary blueprint you own — edit it freely, and if
-the pin needs to differ from the codex's (a different edition, your
-own rip), that is your copy's business. `add-media` refuses to
-overwrite an existing blueprint of that name.
+What you get is an ordinary blueprint you own outright — edit it
+freely, and if its pinned hash needs to differ from the codex's own
+(say, a different edition, or your own disc rip), that's entirely
+up to your copy. `add-media` refuses to overwrite an existing
+blueprint of the same name.
 
 ### `rlq insert-media <slot> (<media> | --file PATH) (--blueprint NAME | --machine ID)`
 
 ### `rlq eject-media <slot> (--blueprint NAME | --machine ID)`
 
 Insert or eject removable media (floppy/cdrom slots). Works
-running or stopped: on a running machine the change is applied live
-over QMP (a change the guest observes); on a stopped machine it is
-present at the next `start`. Either way it persists in the machine
-state until a later `insert`/`eject` or `apply-blueprint`.
+whether the machine is running or stopped: on a running machine,
+the change is applied live over QMP (something the guest will
+actually notice); on a stopped machine, it takes effect at the next
+`start`. Either way, it persists in the machine's state until a
+later `insert`/`eject` or `apply-blueprint`.
 
-`<media>` names a declared media, fetched and hash-verified like any
-other. `--file PATH` mounts **your own image** instead: an anonymous
-medium, attached in place, mutable and unverified. Nothing is copied
-and no hash is pinned, so you can rebuild the image between rounds
-and mount it again — the fast agentless loop, with no reboot and no
-guest agent (see [Iterating live](#iterating-against-a-live-machine)).
+`<media>` names a declared media, which gets fetched and
+hash-verified like any other. `--file PATH` mounts **your own
+image** instead: an unnamed medium, attached in place, mutable and
+never hash-verified. Nothing gets copied and no hash gets pinned,
+so you can rebuild the image between rounds and mount it again —
+this is the fast agentless loop, with no reboot and no guest agent
+needed (see [Iterating live](#iterating-against-a-live-machine)).
 
 ### `rlq set-boot-order <key>... (--blueprint NAME | --machine ID)`
 
-Set the boot order on a **stopped** machine (a launch-time firmware
-order). Persists in the machine state until the next `set-boot-order`
-or `apply-blueprint`.
+Set the boot order on a **stopped** machine (this is the firmware's
+own boot order, used at launch). It persists in the machine's
+state until the next `set-boot-order` or `apply-blueprint`.
 
 ## Driving a machine from a program
 
-These are the mechanics for the loop an automating program runs:
-put work in, run it, read the result out, iterate. Reliquary supplies
-the transports and attaches no meaning to what travels through them.
+This section covers the mechanics of an automation loop: send work
+in, run it, read the result back out, repeat. Reliquary just moves
+the data — it doesn't interpret what it means.
 
 ### `rlq wait-machine-var <key> [<value>] (--blueprint NAME | --machine ID)`
 
-Read the same variable on a loop until it arrives, and print it.
+Poll for a machine variable until it appears, and print it.
 `--timeout SECONDS` (default 120) and `--interval SECONDS` (default
-1) bound the wait; omitting `<value>` waits for any value at all.
+1) bound how long and how often it polls; leave out `<value>` to
+wait for the variable to be set to anything at all.
 
-For the case a plain read cannot serve: **another actor sets it.**
-A `run-script` run blocks until it finishes, so its variables are
-already final when it returns — contract those with
-`rlq run-script … --expect key=value` instead. A wait is for a
-variable produced by a run on another thread, or one you are
-following rather than driving. An expired wait exits `4`; the twin
+This is for the case a plain read can't handle: **something else is
+setting the variable.** A `run-script` run blocks until it
+finishes, so its variables are already final by the time it
+returns — check those with `rlq run-script … --expect key=value`
+instead of waiting for them. A wait is for a variable set by a run
+happening on another thread, or one you're watching rather than
+driving yourself. An expired wait exits `4`; the Python equivalent
 raises `WaitExpired`, which is both a `RunFailure` and a Python
-`TimeoutError`, so a caller holding the loop can simply ask again.
+`TimeoutError`, so code holding the polling loop can simply try
+again.
 
 ### `rlq get-machine-var <key> (--blueprint NAME | --machine ID)`
 
-Read a machine variable a script set with the `set` verb — the
-script-to-host channel for a small value. Prints the value, or
-nothing at all when it is unset (`null` under `--json`); either way
-the command succeeds, which is what makes polling a plain loop.
+Read a machine variable that a script set with its `set`
+statement — this is the channel a script uses to hand a small value
+back to the host. Prints the value, or prints nothing at all if
+it's unset (`null` under `--json`); either way the command
+succeeds, which is exactly what makes polling in a plain loop work.
 
-Variables are cleared at each `start`, so one always reports what the
-*current* boot produced. Keys are yours, except the reserved `rlq` and
-`reliquary` namespaces.
+Variables get cleared on every `start`, so this always reports what
+the *current* boot has produced. The keys are yours to choose,
+except for the reserved `rlq` and `reliquary` namespaces.
 
-**Readiness rides this.** Reliquary ships no readiness script: your
-own ready script sets a variable as its last step, and you poll
-`get-machine-var` until it appears. What "ready" means belongs to
-whatever you are building, not to Reliquary.
+**This is also how readiness checks work.** Reliquary doesn't ship
+a built-in readiness script — you write your own ready script that
+sets a variable as its last step, and poll `get-machine-var` until
+that variable shows up. What "ready" actually means is up to
+whatever you're building, not up to Reliquary.
 
 ```powershell
 # in your script:  set ready "yes"
@@ -433,26 +488,29 @@ rlq get-machine-var ready --machine rig-0
 
 ### Moving files across the boundary
 
-**Reliquary does not.** It puts no file on a machine's drives, reads
-none back, and never tells you which letter the guest gave a disk —
-what is inside a volume is yours, opened with your own tools. What it
-supplies is the drives a file crosses on, and there are three ways
-over:
+**Reliquary itself doesn't move files for you.** It doesn't put
+files onto a machine's drives, doesn't read any back, and never
+tells you which drive letter the guest assigned to a disk —
+whatever's inside a volume is yours to open with your own tools.
+What Reliquary supplies is the drives a file can cross on, and
+there are three ways to do it:
 
 - **A directory-source drive.** A media whose `location` is a host
-  directory attaches as a drive: you write into that directory and
-  the guest reads it, the guest writes and you read it back. The
-  backend snapshots the directory when it is attached, so the machine
-  has to be stopped for a change to be visible either way.
+  directory attaches as a drive: you write files into that
+  directory and the guest reads them, or the guest writes and you
+  read them back on your side. The backend takes a snapshot of the
+  directory when it's attached, so the machine has to be stopped
+  for a change to become visible, in either direction.
 - **A whole image, swapped live** — `insert-media --file`, below.
-- **The machine directory** — `rlq get-machine-dir`. While the machine
-  is stopped its drives are plain files: a directory-source drive *is*
-  its directory, and an image drive is a raw or qcow2 file that any
-  image library opens.
+- **The machine directory itself** — `rlq get-machine-dir`. While
+  the machine is stopped, its drives are just plain files: a
+  directory-source drive *is* its host directory, and an image
+  drive is a raw or qcow2 file, which any disk-image library can
+  open.
 
 ```powershell
 # the exchange directory is declared in the blueprint as a drive
-copy .uild\TEST.EXE .\exchangerlq start-machine --machine rig-0
+copy .uild\TEST.EXE .\exchangerlq start-machine --machine rig-0
 rlq run-script test --machine rig-0
 rlq stop-machine --machine rig-0
 type .\exchange\RESULT.TXT
@@ -461,11 +519,12 @@ type .\exchange\RESULT.TXT
 
 ### Iterating against a live machine
 
-When a reboot per round is the bottleneck, swap the medium instead.
-`insert-media --file` mounts an image you built; the guest sees the
-media change live, and ejecting flushes its writes back to that same
-file. Whole images rather than single files, and the images are
-yours to build and read with your own tools.
+When rebooting between rounds is the bottleneck, swap the medium
+instead. `insert-media --file` mounts an image you built yourself;
+the guest sees the media change live, and ejecting it flushes its
+writes back to that same file. This works with whole images, not
+single files, and building and reading those images is up to your
+own tools.
 
 ```powershell
 # build round-1.img yourself, then:
@@ -479,30 +538,34 @@ rlq eject-media floppy0 --machine rig-0
 rlq insert-media floppy0 --file .\round-2.img --machine rig-0
 ```
 
-**Mount the first image before starting, and keep every round the
-same size.** A floppy drive's geometry is fixed when the backend
-attaches its medium at launch, and a live change does not revise it:
-a slot that was empty at start takes the backend's own default, and
-a differently sized image would reach the guest as read and write
-errors rather than as a new disk. Reliquary records the launched
-size and refuses a mismatch rather than hand you a broken drive.
+**Mount the first image before starting the machine, and keep every
+round the exact same size.** A floppy drive's geometry gets fixed
+when the backend attaches its medium at launch, and a live media
+change doesn't revise that — a slot that started out empty takes
+the backend's own default geometry, and an image of a different
+size would reach the guest as read and write errors, not as a new,
+differently sized disk. Reliquary records the size the drive
+launched with, and refuses a mismatched image rather than hand you
+a broken drive.
 
 ## User properties
 
-Values scripts consume without embedding them — a registered owner,
-a login name, a product key — live in `<home>/user.properties`, a
-flat file of `key = value` lines that belongs to you, not to any
-machine or script. Reliquary edits it *surgically*: your comments,
-blank lines, and ordering survive every command below untouched.
+Values a script uses without them being written directly into it —
+a registered owner's name, a login name, a product key — live in
+`<home>/user.properties`, a flat file of `key = value` lines that
+belongs to you, not to any machine or script. Reliquary edits this
+file *surgically*: your comments, blank lines, and the ordering of
+everything else survive every command below untouched.
 
 Keys are dot-separated segments of ASCII letters, digits, `_` and
-`-`, each starting with a letter. The `rlq` and `reliquary`
-namespaces are reserved for Reliquary's own facts. Values are the
-trimmed remainder of the line, verbatim — no quoting, no escapes,
-no line continuations (despite the extension, this is not the Java
-properties format). A value starting with `@` names a value *kind*:
-`@secret` is a secret marker, and a literal leading `@` is written
-`@@`.
+`-`, and each segment has to start with a letter. The `rlq` and
+`reliquary` namespaces are reserved for Reliquary's own facts.
+Values are just the trimmed remainder of the line, written
+verbatim — no quoting, no escape sequences, no line continuations
+(despite the file extension, this isn't the Java properties
+format). A value that starts with `@` names a value *kind*:
+`@secret` is the marker for a secret, and a literal leading `@`
+character is written as `@@`.
 
 ```properties
 # reliquary user properties
@@ -514,20 +577,22 @@ accounts.default-password = @secret
 ```
 
 Every command below accepts `--properties PATH`, which **replaces**
-the home's file for that invocation rather than layering over it.
-Pointing it at a project-committed file makes a run hermetic —
-nothing from your personal file can reach it. The environment
-variable `RELIQUARY_PROPERTIES` selects the same way.
+your home directory's properties file for that one invocation,
+rather than merging with it. Pointing it at a file committed to
+your project makes a run self-contained — nothing from your
+personal properties file can reach it. The `RELIQUARY_PROPERTIES`
+environment variable selects a file the same way.
 
 ### `rlq list-properties [PREFIX]`
 
-List keys with their values, sorted. A secret shows as `@secret`,
-never its value. `PREFIX` selects that key and its dotted
-descendants — a namespace, not a raw string match, so
-`products.windows-98` matches `products.windows-98.install-key`
-but not `products.windows-98-extra`. A secret whose credential is
-missing on this host is reported as a warning on stderr; the
-listing itself is unchanged.
+List keys with their values, sorted. A secret shows up as
+`@secret`, never its actual value. `PREFIX` limits the results to
+that key and its dotted descendants — this matches a namespace, not
+just a raw string prefix, so `products.windows-98` matches
+`products.windows-98.install-key` but not `products.windows-98-extra`.
+A secret whose credential is missing on this host gets reported as
+a warning on stderr, but the listing itself doesn't change because
+of it.
 
 ### `rlq get-property <key>`
 
@@ -535,60 +600,64 @@ Print one value. A secret prints only its kind.
 
 ### `rlq set-property <key> <value>`
 
-Create or replace an ordinary property, rewriting or appending
-only that key's line. Changing a property between ordinary and
-secret requires `unset-property` first, so a secret can never be
-downgraded to a plaintext value by one command.
+Create or replace an ordinary property, rewriting or adding only
+that one key's line. Changing a property between ordinary and
+secret requires running `unset-property` first — so a single
+command can never accidentally downgrade a secret to a plaintext
+value.
 
 ### `rlq set-property <key> --secret`
 
-Store a secret. The value never appears on the command line —
-process listings and shell history are not credential stores — so
-there is deliberately no value argument. On a terminal you are
-prompted without echo; otherwise the value is read from stdin to
-EOF with one trailing newline stripped, which keeps the CLI a
-complete binding for programs:
+Store a secret. The value never appears on the command line
+itself — process listings and shell history aren't credential
+stores — so there's deliberately no value argument to this command.
+On a terminal, you get prompted for it without the input being
+echoed back; otherwise, the value is read from stdin until EOF,
+with one trailing newline stripped, which keeps the CLI fully
+usable from a program:
 
 ```powershell
 "swordfish" | rlq set-property accounts.default-password --secret
 ```
 
-The value goes to the host credential store and only the `@secret`
-marker is written to the file. Secrets are scoped by the absolute
-path of the properties file holding the marker, so a `--properties`
-file and your home file never share one, and copying a properties
-file elsewhere copies names and markers but not credentials.
+The actual value goes into the host's credential store, and only
+the `@secret` marker gets written to the properties file. Secrets
+are scoped by the absolute path of whichever properties file holds
+the marker, so a `--properties` file and your home file never share
+a credential — and copying a properties file elsewhere copies the
+names and markers, but not the underlying credentials.
 
 ### `rlq unset-property <key>`
 
-Remove a property, leaving the rest of the file as it was. For a
-secret this removes both the marker and its credential — and it is
-also the cleanup door for an orphaned credential (below).
+Remove a property, leaving the rest of the file untouched. For a
+secret, this removes both the marker and its stored credential —
+and it's also how you clean up an orphaned credential (see below).
 
-A malformed properties file is reported with its path and line
-number and is never partly rewritten.
+A malformed properties file gets reported with its path and line
+number, and is never left partly rewritten.
 
-**No plaintext fallback.** If this host has no usable credential
-store, storing or reading a secret fails closed rather than
-falling back to the file. Updates are ordered so an interruption
-can never strand a marker whose credential Reliquary reported as
-stored: the credential is written first and the marker second, and
-on removal the marker goes first. The recoverable leftover is an
-*orphaned credential* — stored, with no marker — which a later
-ordinary `set-property` on that key refuses to write over, naming
-`unset-property` as the way to clear it.
+**There's no plaintext fallback.** If this host has no usable
+credential store, storing or reading a secret fails outright rather
+than falling back to writing it into the file. Updates are ordered
+so an interruption can never leave behind a marker whose credential
+doesn't actually exist: setting a secret writes the credential
+first and the marker second, and removing one deletes the marker
+first. The only thing that can be left behind is an *orphaned
+credential* — stored, but with no marker pointing at it — which a
+later, ordinary `set-property` on that key refuses to write over,
+telling you to run `unset-property` to clear it first.
 
-> **Not yet:** binding these properties into a script run — the
-> layered sources, the declared derivation, and the runtime secret
-> rules — arrives with the rest of milestone 8
+> **Not yet:** actually binding these properties into a script
+> run — the layered sources, how they're declared, and the runtime
+> rules for secrets — is coming with the rest of milestone 8
 > (`docs/spec/script-properties.md`).
 
 ## Keyboard and command input
 
-Guest-console verbs match the script language. Select a machine with
-`--blueprint` / `--machine`, like every other command: the endpoint
-behind it belongs to the machine's backend adapter, and is never
-addressed directly.
+These guest-console commands match the verbs in the script
+language. Select a machine with `--blueprint` / `--machine`, like
+every other command — the actual connection behind it belongs to
+the machine's backend adapter, and is never addressed directly.
 
 ### `rlq type TEXT`
 
@@ -600,39 +669,44 @@ Type a line and press Enter.
 
 ### `rlq press KEY [KEY ...]`
 
-Send portable key names (and `+` chords) from the script vocabulary.
+Send one or more portable key names (and `+`-joined chords) from the
+script language's vocabulary.
 
 ### `rlq exec COMMAND [--timeout SECONDS] [--check]`
 
-Enter a command in a running guest, wait for the DOS prompt to
-return, and **print the text the command produced** — the run
-family's one-shot member, returning its output exactly as
-`run-script` does and storing nothing. Twin: `exec(command, *,
-machine=, blueprint=, timeout=120, check=False)`, which returns
-those rows.
+Type a command into a running guest, wait for the DOS prompt to
+come back, and **print the text the command produced.** This is the
+one-shot member of the run family — it returns its output exactly
+the way `run-script` does, and stores nothing. Python equivalent:
+`exec(command, *, machine=, blueprint=, timeout=120, check=False)`,
+which returns those same rows.
 
-The capture is agentless, so the output is what the command left on
-the visible 80x25 screen: a command that scrolls more than a
-screenful leaves only its tail. When you need more than that, have
-the guest write a file onto a drive you can read on the host, or set
-a machine variable. Reliquary reads no meaning into any of it.
+There's no agent involved, so the output captured is just whatever
+the command left on the visible 80x25 screen — a command whose
+output scrolls past a full screen leaves only its tail visible.
+When you need more than that, have the guest write a file to a
+drive you can read from the host, or have it set a machine variable
+instead. Reliquary doesn't interpret any of this output.
 
-`--check` answers the question the output cannot: **did it work?**
-For a setup command — loading a driver or a TSR — the output is
-nothing and the success is everything, so without this both look
-the same. With it, a command that signalled failure exits `4`
-naming the command, and the output still prints:
+`--check` answers a question the output alone can't: **did the
+command actually work?** For a setup command — loading a driver or
+a TSR — there's normally no output at all, and success is
+everything, so without `--check` a success and a failure look
+identical. With `--check`, a command that signalled failure makes
+`exec` exit `4`, naming the command — and the output still gets
+printed regardless:
 
 ```powershell
 rlq exec "D:\DRIVER.EXE" --check --machine driver-rig-0
 ```
 
-On DOS the question is an `IF ERRORLEVEL 1` probe with a sentinel
-Reliquary composes and reads back — its own text, not the guest's.
-It costs one extra command at the prompt, which is why it is opt-in,
-and it sees only commands that **ran** and signalled failure: a
-mistyped one leaves ERRORLEVEL alone and reads as success. Normative:
-[cli.md](spec/cli.md).
+On DOS, this works by running an `IF ERRORLEVEL 1` probe afterward,
+with a sentinel value that Reliquary itself composes and reads
+back — its own text, not the guest's. That costs one extra command
+at the prompt, which is why it's opt-in, and it can only catch
+commands that **actually ran** and signalled failure — a mistyped
+command leaves ERRORLEVEL untouched and reads as a success. See
+[cli.md](spec/cli.md) for the authoritative details.
 
 ### `rlq select ITEM [--exclude TEXT]`
 
@@ -646,10 +720,11 @@ Print the current 80-by-25 text screen.
 
 ### `rlq wait CONDITION`
 
-Wait for the script language's `wait` condition: bare text is a
-normalized literal matched within one screen row, `/regex/` a
-regular expression, `machine=stopped` the machine powering off.
-The match must hold on a settled screen. Exit `4` on expiry.
+Wait for the script language's `wait` condition: plain text is
+matched literally (after normalizing) within one screen row,
+`/regex/` is a regular expression, and `machine=stopped` waits for
+the machine to power off. A match only counts once the screen has
+settled and stopped changing. Exits with code `4` if it times out.
 
 ### `rlq screenshot [NAME]`
 

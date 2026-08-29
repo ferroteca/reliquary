@@ -11,23 +11,25 @@ class GuestExec(Protocol):
 
     def wait_ready(self, timeout: float = 90, *,
                    prompt: str | None = None) -> None:
-        """Wait until the adapter can execute guest commands.
+        """Wait until the adapter is ready to execute guest commands.
 
-        ``prompt`` is what ready looks like when the platform's
-        default evidence cannot say — on agentless DOS, the exact
-        text of a customized prompt (D113). An adapter whose
-        readiness is reported rather than observed may ignore it.
+        ``prompt`` tells the adapter what "ready" looks like, for
+        cases where the platform's own default check for readiness
+        cannot tell — on agentless DOS, this is the exact text of a
+        customized command prompt (D113). An adapter that is told
+        readiness directly, rather than having to observe it, may
+        ignore this argument.
         """
         ...
 
     def execute(self, command: str, timeout: float = 120, *,
                 check: bool = False) -> None:
-        """Execute one guest command and wait for completion.
+        """Execute one guest command and wait for it to finish.
 
-        ``check`` opts into reporting whether the command signalled
-        failure, raising rather than returning the verdict — how a
-        platform asks is its own business (DOS probes ERRORLEVEL; an
-        agent would read an exit status), and what every adapter owes
-        is the same answer.
+        ``check=True`` makes this raise an error if the command
+        failed, instead of just returning without saying. How a
+        platform actually detects failure is up to it (DOS checks
+        ERRORLEVEL, an agent would read an exit status), but every
+        adapter must answer this same question the same way.
         """
         ...

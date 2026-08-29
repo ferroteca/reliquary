@@ -21,7 +21,7 @@ And when one doesn't, that's not the end of the conversation. It might
 mean the idea's a poor fit — or that our sense of the project is too
 narrow and should change. Tell us either way. The most valuable thing
 you could hand us isn't a feature or a fix; it's a better sense of what
-this should be. That door is wide open.
+this should be. We mean that — say so.
 
 Reliquary is pre-release. Contributions that add built-in blueprints
 (with their media, source, and archive components) or scripts should
@@ -110,9 +110,9 @@ before they can be merged. This covers code, documentation, blueprints,
 scripts, and artwork. It does not cover bug reports, feature requests,
 review comments, or discussion.
 
-The instrument is [CLA.md](CLA.md), signed separately and once. A
-statement in a pull request or a commit trailer is **not** a substitute:
-an assignment must be executed as its own agreement, and the project
+You sign this once, as its own document: [CLA.md](CLA.md). A statement
+in a pull request or a commit trailer is **not** a substitute: the
+assignment must be a signed agreement in its own right, and the project
 keeps a durable record linking each accepted contribution to it.
 
 Where the law of your jurisdiction does not permit copyright to be
@@ -164,7 +164,7 @@ A close translation is a port no matter what the source licence permits.
 If you have read another project's implementation of something, say so
 before submitting work in that area — that is a normal and welcome thing
 to disclose, not an accusation to avoid. `AGENTS.md` records the full
-doctrine and the specific projects it names.
+rule, and the specific projects it names.
 
 ### The project name
 

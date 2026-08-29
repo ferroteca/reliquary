@@ -2,32 +2,36 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The agentless display console: the first real control plane.
 
-A control plane composes an adapter's carriers and presents
-capabilities to a platform workflow
-(planning/design/guest-communication.md). This one composes key
-injection and text readback: it has no guest prerequisite, and it is
-the DOS default and permanent fallback.
+A control plane combines an adapter's low-level carrier methods and
+offers them to a platform workflow (see
+planning/design/guest-communication.md). This one combines key
+injection and reading text off the screen. It needs no cooperation
+from inside the guest, and it is the default fallback for DOS.
 
-**Nothing here is QEMU.** The console reads the seam's text-screen
-contract — character rows plus opaque, equality-comparable per-cell
-attribute tokens — so the menu machinery below never interprets an
-attribute value, only compares tokens for equality and frequency to
-find and follow the selection highlight. VGA attribute bytes satisfy
-that contract today; a fixed-font recognizer hashing each cell's
-foreground/background pair into a token satisfies it identically, and
-this algorithm carries over unchanged. Where a backend has no native
-text carrier, that one shared recognizer lives in
-:mod:`reliquary.text_recognize` — composed here, never once per
-adapter.
+**This module does not depend on QEMU.** It only relies on the
+text-screen contract every backend adapter must satisfy: rows of
+characters, plus one opaque attribute token per cell that can be
+compared for equality but never interpreted. The menu-tracking code below only ever compares these
+tokens to each other and counts how often they appear — it never
+looks at what a token actually means — so it works whether the
+tokens are VGA attribute bytes (true today) or, on a backend with no
+native text screen, a hash of each cell's foreground/background
+color pair. The same tracking code runs unchanged either way. Where
+a backend cannot read text natively, the one shared recognizer that
+produces those hashed tokens lives in :mod:`reliquary.text_recognize`
+and is called from here — not duplicated in each adapter.
 
-**Whether a screen has stopped changing is not decided here.** That
-measure is :mod:`screen_stability`'s, and this module is one of its
-callers rather than the owner of a copy: the menu machinery met the
-half-drawn-screen hazard first and grew its own hold-for-two-reads
-and its own learned animation mask, both of which turned out to be
-special cases of the general measure. What stays here is what was
-never about settling — whether a keypress changed anything at all,
-and which row the highlight moved to. Those are classification.
+**This module does not decide whether a screen has stopped
+changing.** That is :mod:`screen_stability`'s job, and this module is
+just one of its callers, not a second copy of it. The menu-tracking
+code here used to have its own version of that check — it hit the
+problem of half-drawn screens first, and grew its own "wait for two
+matching reads" logic and its own learned mask of self-animating
+cells — before both were generalized into the shared
+screen_stability check. What is still handled here is what
+screen_stability does not cover: whether a keypress changed anything
+at all, and which row the highlight moved to. That is classification,
+not settling.
 """
 
 import difflib
@@ -36,26 +40,29 @@ import time
 from . import screen_stability
 from .errors import RunFailure, StaticError
 
-#: How often the screen is read while waiting for it to settle.
-#: A quiescence window is only observable by sampling inside it, so
-#: this is the menu machinery's own poll rather than a tuned constant:
-#: what counts as settled is :mod:`screen_stability`'s to say.
+#: How often (in seconds) this module re-reads the screen while
+#: waiting for it to settle. This is only a poll interval — whether
+#: the screen actually counts as settled is decided by
+#: :mod:`screen_stability`, not by this constant.
 _SETTLE_POLL = 0.1
 
-#: How many reads a baseline takes before trusting its mask, and the
-#: number is forced rather than chosen. **Settling and recognizing
-#: decoration want different amounts of looking**: a clock ticking in
-#: a corner moves two cells, which is settled on sight, yet nothing
-#: can know it is a clock until it has ticked repeatedly. Stopping at
-#: the first settled frame would hand back an empty mask and leave the
-#: menu treating its own furniture as the effect of a keypress. A cell
-#: must change `repeats` times to qualify as decoration, which cannot
-#: be observed in fewer than that many reads plus the one they are
-#: measured against.
+#: How many reads the baseline needs before its animation mask can be
+#: trusted. This value is forced by the math below, not picked freely.
+#: Telling that the screen has stopped changing takes only a couple of
+#: reads, but telling that a *cell* changes on its own (a clock
+#: ticking in a corner, say) takes more: after one change, there is no
+#: way to tell a clock's tick apart from the effect of a keypress. If
+#: the baseline stopped at the first settled frame, its mask would
+#: come back empty, and the menu code would then mistake the clock's
+#: own tick for something a keypress did. A cell only counts as
+#: self-animating once it has changed `repeats` times, and seeing
+#: `repeats` changes needs `repeats` reads plus the one read they are
+#: each compared against — hence the `+ 1`.
 _BASELINE_READS = screen_stability.DEFAULT_ANIMATION_REPEATS + 1
 
-#: Which way each cursor key moves a selection bar. Used only to break
-#: a tie between equally good candidate moves, never to require one.
+#: Which way each cursor key moves the selection bar (down = +1,
+#: up = -1). Used only to break a tie between two equally good
+#: candidate moves — a move is never required to match this.
 _DIRECTIONS = {"down": 1, "up": -1}
 
 
@@ -75,29 +82,32 @@ _PLAIN = {
 
 
 def normalize_row(text):
-    """One screen row as matching sees it (script-spec, "Normalized
-    text matching"): trailing padding trimmed and every run of
-    whitespace collapsed to one space. The script runtime and the
-    handle stratum's ``wait_text`` match through this same function,
-    which is what makes ``rlq wait`` and a script's ``wait`` one
-    verb (D116).
+    """Normalize one screen row the way text matching does (see
+    script-spec, "Normalized text matching"): trim trailing padding
+    and collapse every run of whitespace to a single space. The
+    script runtime and the handle layer's ``wait_text`` both match
+    text through this same function, which is what keeps ``rlq
+    wait`` and a script's ``wait`` behaving identically (D116).
     """
     return " ".join(text.split())
 
 
 def char_keys(character):
-    """Map one character to a simultaneous key-name combination.
+    """Map one character to the key names that must be pressed together
+    to type it.
 
-    The names are **the seam's key vocabulary, which is QEMU's qcode
-    set** (D103) — which is why the tables above spell `spc` and
-    `ret` rather than `space` and `enter`. The adapter translates
-    them into its backend's own input events; on QEMU that is the
-    identity, and on VirtualBox a scancode lookup.
+    These names are the key vocabulary every adapter must accept,
+    which is QEMU's qcode set (D103) — that is why the tables above
+    spell `spc` and `ret` rather than `space` and `enter`. Each
+    adapter translates these names into its own backend's input
+    events: on QEMU that is a direct pass-through, on VirtualBox a
+    scancode lookup.
 
-    This is the character half of key mapping. The *language's*
-    `press` names are a separate, genuinely portable vocabulary
-    (`script_validation.PORTABLE_KEY_NAMES`), resolved onto this set
-    by `script_runner.resolve_key` before anything reaches the seam.
+    This handles only characters. The language's `press` names are a
+    separate, genuinely portable vocabulary
+    (`script_validation.PORTABLE_KEY_NAMES`); `script_runner.resolve_key`
+    converts those into this module's names before anything reaches
+    the adapter.
     """
     if character in _PLAIN:
         return [_PLAIN[character]]
@@ -112,7 +122,8 @@ def char_keys(character):
 
 
 def _normalize(text):
-    """Fold case and whitespace for tolerant menu-text comparison."""
+    """Fold case and collapse whitespace, so menu-text comparison
+    ignores both."""
     return " ".join(text.split()).casefold()
 
 
@@ -167,7 +178,8 @@ def _match_menu_row(rows, item, exclude=()):
 
 
 def _masked_attributes(attributes, mask):
-    """Attribute rows with self-animating cells nulled for comparison."""
+    """Return `attributes` with each cell listed in `mask` replaced by
+    None, so self-animating cells are ignored when comparing frames."""
     view = [list(row) for row in attributes]
     for row, column in mask:
         view[row][column] = None
@@ -194,34 +206,46 @@ def _rows_by_attribute(frame):
 
 
 def _relocated_bar(before, attributes, direction=None):
-    """The bar found as the row-unique attribute that changed rows.
+    """Find the bar as the attribute token confined to one row that
+    moved to a different row.
 
-    **This is what a selection bar *is*** — an attribute confined to
-    one row that moves to another — and saying it that way rather
-    than as "the rarest attribute on screen" is what makes tracking
-    survive a real framebuffer. Counting cells assumes a row wears one
-    attribute, which holds for VGA bytes scraped out of text memory
-    and fails for tokens recovered from pixels: a blank cell shows
-    only one colour, so nothing can tell its foreground from its
-    background, and it can never carry the same token as a lettered
-    cell beside it. A bar therefore reads as *two* tokens, and the
-    blank one is the backdrop's — the most common token on screen,
-    which is the opposite of what rarity looks for.
+    A selection bar is an attribute token that appears on exactly one
+    row, and that row changes when a cursor key is pressed. Looking
+    for that — rather than for "the rarest attribute token on
+    screen" — is what lets this keep working on a real framebuffer.
 
-    Confinement is immune to all of that. It also survives the menu
-    that rewrites every row per keypress, because retranslating text
-    changes which cells carry a token, never the fact that the bar's
-    lettered cells are the only ones wearing theirs.
+    Counting cells per row (the fallback approach in `_bar_move`
+    below) assumes every cell in a row carries the same attribute.
+    That is true for VGA bytes read straight out of text memory, but
+    false for tokens recovered from pixels: a blank cell shows only a
+    background color, so there is no way to tell its foreground from
+    its background, and it ends up with a different token than a
+    lettered cell right next to it. A highlighted row can then show
+    *two* different tokens — the lettered cells carry the bar's own
+    distinctive token, while the blank cells carry the same token as
+    the ordinary background, which is the most common token on
+    screen, the opposite of what a rarity check is looking for.
 
-    Confinement alone is decisive only above two items. With exactly
-    one unhighlighted row that row's token is confined too, so two
-    attributes make an equally good move — in *opposite directions*,
-    which is what ``direction`` then settles: a selection bar travels
-    the way the cursor key points. It is a tie-break rather than a
-    filter, so a menu that wraps its bar from bottom to top is left
-    to the reading below instead of being classified wrongly.
+    Checking confinement to one row sidesteps that problem, because it
+    only asks whether the token appears on any other row, not how many
+    cells in the row carry it. It also survives a menu that rewrites
+    every row on each keypress (a language chooser retranslating
+    itself as the highlight moves): retranslating text changes which
+    cells carry a token, but not the fact that the bar's lettered
+    cells are still the only ones carrying theirs.
 
-    Returns (row, that row's bar attribute), or (None, None) when no
+    Confinement alone can only settle the question above two menu
+    items. With exactly one unhighlighted row, that row's own
+    attribute is confined to one row too, so two attributes both look
+    like equally good moves — in *opposite* directions. That is what
+    `direction` then resolves: a selection bar moves the way the
+    cursor key points. `direction` only breaks a tie between two
+    candidates; it never rules a candidate out by itself, so a menu
+    whose bar wraps from the bottom row to the top is left for
+    `_bar_move`'s fallback reading rather than being classified
+    wrongly here.
+
+    Returns (row, that row's bar attribute), or (None, None) if no
     single attribute made an unambiguous move.
     """
     was = _rows_by_attribute(before)
@@ -246,23 +270,25 @@ def _relocated_bar(before, attributes, direction=None):
 
 
 def _bar_move(before, attributes, direction=None):
-    """Locate the menu highlight from an observed attribute change.
+    """Find the row the menu highlight moved to, comparing attributes
+    before and after a keypress.
 
-    Prefers :func:`_relocated_bar`. Where no attribute made an
-    unambiguous move — the bar was erased rather than moved, or the
-    screen repainted too broadly to tell — it falls back to the
-    frequency reading below, which is what tracked the bar before and
-    still answers the uniform-attribute screens a text-memory scrape
-    produces.
+    Tries `_relocated_bar` first. If no attribute made an unambiguous
+    move — the bar was erased rather than moved, or the screen
+    repainted too broadly to tell — falls back to the frequency check
+    below, which is how this module tracked the bar before
+    `_relocated_bar` existed, and which still works on the
+    uniform-attribute screens a text-memory scrape produces.
 
     The fallback: the rows whose attributes changed after a cursor
-    keypress are the old and new cursor positions, and of those the
-    newly highlighted row is the one whose changed cells now carry
-    the rarest attribute on screen — the normal menu color covers
-    many rows, the selection bar exactly one. It answers None when
-    nothing changed, or when no changed row gained a bar-like
-    attribute, a row whose changed cells took on a widespread
-    attribute being a bar erased or a partial repaint.
+    keypress are the old and new highlighted rows, and of those, the
+    new one is whichever changed row's cells now carry the rarest
+    attribute on screen — the normal menu color covers many rows, the
+    selection bar covers exactly one. Returns None when nothing
+    changed, or when no changed row picked up a bar-like attribute (a
+    row whose changed cells took on a widespread attribute is read as
+    the bar having been erased, or as a partial repaint, not as a
+    move).
     """
     row, attribute = _relocated_bar(before, attributes, direction)
     if row is not None:
@@ -287,20 +313,23 @@ def _bar_move(before, attributes, direction=None):
 
 
 class DisplayConsole:
-    """Keyboard input and text-screen composition over one session.
+    """Keyboard input and text-screen reading, built on one session.
 
-    Shared by `Machine` methods and interaction adapters that hold a
-    session across several exchanges. The session is an adapter's, and
-    the console reaches the backend through its carriers alone.
+    Shared by `Machine` methods and by interaction adapters that hold
+    a session open across several exchanges. The session belongs to an
+    adapter; this console only ever reaches the backend through the
+    session's carrier methods.
     """
 
     def __init__(self, session):
         self._session = session
-        #: Whether this console's screens are interpreted from pixels
-        #: rather than read as resolved characters. Carried through
-        #: from the adapter's session because it decides how coarsely
-        #: a quiescence caller may quantize its cadence, and a
-        #: transcript wrapper must not lose it.
+        #: Whether this console reads screen text by recognizing
+        #: pixels (True) or reads it directly as already-resolved
+        #: characters (False). Carried through from the adapter's
+        #: session because callers waiting for the screen to settle
+        #: use it to decide how often they can afford to re-read the
+        #: screen, and a transcript wrapper around a session must pass
+        #: this value through unchanged.
         self.recognizes_text = getattr(
             session, "recognizes_text", False)
 
@@ -321,37 +350,40 @@ class DisplayConsole:
     def screen(self, font_banks=()):
         """Return the screen as (character rows, attribute rows).
 
-        ``font_banks`` (F61) are authored fonts a script's `font`
-        statement named, tried before whatever fonts the session
-        itself reads through — a scraping session (QEMU's native
-        text-memory read) recognizes no pixels and simply ignores it.
+        ``font_banks`` (F61) are fonts named by a script's `font`
+        statement. They are tried before whatever fonts the session
+        itself reads through. A session that reads text directly
+        (QEMU's native text-memory read) never looks at pixels, so it
+        simply ignores this argument.
         """
         return self._session.text_screen(font_banks)
 
     def framebuffer(self):
         """Return the plane's captured framebuffer as a Pillow image.
 
-        The landmark matcher's reading path (F65), beside the text
-        one above and never through it: a landmark compares pixels,
-        so recognizing glyphs first would be work thrown away. A
-        plane whose screen carrier resolves characters rather than
-        capturing pixels refuses this by name — preflight has already
-        turned that machine's landmark conditions away
-        (`backends.BackendAdapter.capture_format`).
+        This is the read path the landmark matcher uses (F65) —
+        separate from the text-reading methods above, and never
+        routed through them, because a landmark comparison works
+        directly on pixels, so recognizing glyphs first would be
+        wasted work. A plane whose screen carrier resolves characters
+        rather than capturing pixels refuses this call by name;
+        preflight has already rejected that machine's landmark
+        conditions (`backends.BackendAdapter.capture_format`).
         """
         return self._session.framebuffer()
 
     def click(self, x, y, park, buttons=1):
         """Click at one framebuffer pixel, then park the cursor (F66).
 
-        Composed here, never in an adapter (D103's reasoning applied
-        to the pointer): a move-and-press, a release at the same
-        point, and a park move to ``park`` — three ``pointer_event``
-        calls over the one carrier method, so growth (a drag, a
-        chord) stays composition above the seam. The park position is
-        the caller's to resolve (``landmarks.park_position``), since
-        it is a property of the screen a landmark pinned, not of this
-        console.
+        Composed here, never inside an adapter, for the same reason
+        D103 gives for other input: a click is a move-and-press, a
+        release at the same point, and a park move to ``park`` — three
+        ``pointer_event`` calls over the one carrier method, so future
+        growth (a drag, a multi-button chord) stays composition in
+        this shared code instead of becoming adapter code. Resolving
+        the park position is the caller's job
+        (``landmarks.park_position``), since it depends on the screen
+        a landmark pinned, not on anything this console knows.
         """
         self._session.pointer_event(x, y, buttons)
         self._session.pointer_event(x, y, 0)
@@ -473,28 +505,33 @@ class DisplayConsole:
         return selected
 
     def _first_look(self, deadline, item, exclude):
-        """One read before any settling, so a countdown is not lost.
+        """Take one read before any settling, so a running countdown
+        is not lost.
 
-        **A menu that boots itself cannot be studied first.** The
-        baseline below spends `_BASELINE_READS` reads learning which
-        cells repaint on their own, and on a screenshot backend at
-        seconds per read that is longer than a boot menu's countdown:
-        the machinery times out the very menu it is preparing to
-        steer. The edge is sharper than slowness alone — a countdown
-        *is* decoration, so those reads are spent learning the timer
-        that is running out.
+        A menu with a running countdown cannot safely be studied
+        before acting on it. `_menu_baseline` below spends
+        `_BASELINE_READS` reads learning which cells repaint on their
+        own, and on a screenshot-based backend, where each read can
+        take seconds, that is longer than a typical boot menu's
+        countdown — this code would time out the very menu it is
+        trying to steer. It is not just a matter of being slow: a
+        countdown itself counts as self-animating, so those baseline
+        reads would be spent learning the shape of the very timer
+        that is about to run out.
 
-        Where the item is already on screen — which it is whenever a
-        `wait` has just matched it, the ordinary way a `select` is
-        reached — one read is enough to locate it and press. Any key
-        cancels the countdown on every menu we have met, so the first
-        probe keypress buys the time the baseline would have spent,
-        and the mask is learned afterward on a screen that has
-        stopped counting.
+        If the item is already on screen — which is normally true,
+        since a script's `select` is usually reached right after a
+        `wait` matched that same text — one read is enough to find it
+        and press a key. Every boot menu tested so far cancels its
+        countdown on any keypress, so this first, exploratory
+        keypress buys back the time the baseline would have spent,
+        and `_menu_baseline` learns the animation mask afterward, once
+        the countdown has already stopped.
 
-        Falls back to the full baseline when the item is *not* there
-        yet, which is the case that needs settling anyway: the screen
-        is still arriving, and there is nothing to race.
+        Falls back to the full baseline when the item is not on
+        screen yet. That is the case where settling is unavoidable
+        anyway: the screen is still being drawn, and there is no
+        countdown left to race.
         """
         rows, raw = self.screen()
         try:
@@ -505,26 +542,32 @@ class DisplayConsole:
         return empty, rows, _masked_attributes(raw, empty)
 
     def _menu_baseline(self, deadline, quiet=5.0):
-        """Wait for the menu to finish painting, then learn its noise.
+        """Wait for the menu to finish painting, then read back which
+        cells are animating on their own.
 
         Returns (animation mask, text rows, masked attribute rows).
-        Both halves are :mod:`screen_stability`'s: it says when the
-        paint has finished, and the region it set aside as decoration
-        *is* the mask — a clock, a countdown, a blinking indicator,
-        which must be ignored when watching for the effect of a
-        keypress or the screen would never settle.
+        `screen_stability` is responsible for both halves: it decides
+        when the screen has stopped changing, and the cells it set
+        aside as decoration along the way become the mask — a clock,
+        a countdown, a blinking indicator, anything that must be
+        ignored when watching for the effect of a keypress, or the
+        screen would never register as settled.
 
-        **The measure is continuous where the learned mask was a
-        snapshot**, and that closes a gap rather than reproducing
-        one: there is no learning phase to get wrong, decoration that
-        begins mid-menu is absorbed within a few samples instead of
-        never entering the mask at all, and a cell that changes *once*
-        stays content — so a menu's own initial paint can no longer be
-        mistaken for animation and blind the tracking to the very
-        cells it must watch. A screen that never holds still is
-        answered after the cap regardless, the mask having absorbed
-        the churn; where nearly everything repaints the mask empties
-        itself, which is the same bail-out this code made by hand.
+        `screen_stability` learns which cells are decoration
+        continuously, as it reads, rather than in one separate
+        learning phase the way this module used to. That closes a gap
+        rather than just moving it: there is no separate learning
+        phase to get wrong, decoration that only starts partway
+        through the menu's lifetime is absorbed into the mask within a
+        few more reads instead of never being recognized, and a cell
+        that changes only once is not treated as decoration — so a
+        menu's own initial paint can no longer be mistaken for
+        animation and blind the tracking to cells it actually needs to
+        watch. A screen that never holds fully still is still answered
+        once the time cap is hit, using whatever mask has been learned
+        by then; on a screen where nearly everything keeps repainting,
+        the mask ends up empty, which is the same fallback this code
+        used to apply by hand.
         """
         end = min(deadline, time.monotonic() + quiet)
         monitor = screen_stability.ScreenStability()
@@ -544,18 +587,20 @@ class DisplayConsole:
     def _follow_keypress(self, attributes, deadline, mask, key=None):
         """Track where a keypress moved the menu highlight.
 
-        ``key`` is the cursor key just sent, which settles the
-        two-item menus where confinement alone cannot tell the bar
-        from the row it left (:func:`_relocated_bar`).
+        ``key`` is the cursor key just sent. It resolves the two-item
+        menu case where confinement alone can't tell the bar's new
+        row apart from the row it left (see :func:`_relocated_bar`).
 
-        Waits out the repaint the keypress caused and classifies the
-        change. An unclassifiable difference (a half-drawn screen —
-        the repaint paused mid-way, say to load translations from
-        media) is never acted on: the screen is re-observed until the
-        finished repaint shows where the bar landed, or nothing more
-        changes. Sending more keys at a menu that is still repainting
-        loses them to its type-ahead flush. Returns (responded, rows,
-        attributes, moved row or None, that row's bar attribute).
+        Waits out the repaint the keypress caused, then classifies the
+        change. A difference that can't yet be classified — a
+        half-drawn screen, say because the repaint paused partway
+        through to load translated text from disk — is never acted
+        on: the screen is read again until either a finished repaint
+        shows where the bar landed, or nothing more changes. Sending
+        more keys while a menu is still repainting would just lose
+        them when its type-ahead buffer gets flushed. Returns
+        (responded, rows, attributes, moved row or None, that row's
+        bar attribute).
         """
         observed = self._settled_screen(attributes, deadline, mask)
         if observed is None:
@@ -565,11 +610,14 @@ class DisplayConsole:
             moved, attribute = _bar_move(
                 attributes, changed, _DIRECTIONS.get(key))
             if moved is not None:
-                # The bar's own token, not the dominant one among the
-                # row's changed cells: on a recognized framebuffer the
-                # latter is the bar's *blank* cells, whose token is the
-                # backdrop's, and every later relocation by `highlight`
-                # would match every row on screen.
+                # Use the bar's own token from `_bar_move`, not the
+                # dominant token among the row's changed cells. On a
+                # framebuffer read through pixel recognition, most of
+                # a row's cells are blank, and a blank cell's token is
+                # the same as the ordinary background's. If
+                # `highlight` were set to that dominant token instead,
+                # every later attempt to relocate the bar by searching
+                # for `highlight` would match every row on screen.
                 return True, rows, changed, moved, attribute
             attributes = changed
             observed = self._settled_screen(attributes, deadline, mask)
@@ -577,20 +625,24 @@ class DisplayConsole:
                 return True, rows, attributes, None, None
 
     def _settled_screen(self, before, deadline, mask, wait=2.5):
-        """Wait out the repaint following a keypress; None if none came.
+        """Wait out the repaint following a keypress; return None if
+        no repaint happened.
 
-        Two questions, and only the second is this module's. **Did
-        anything change at all** is the menu's own — a keypress at the
-        edge of a menu legitimately changes nothing, and the caller
-        reads ``None`` as a dead key — so it stays here, asked against
-        the mask. **Has the screen finished changing** is
-        :mod:`screen_stability`'s, because returning at the first
-        difference would hand back a half-drawn screen and slow menus
-        repaint over many reads.
+        This answers two separate questions, and only the second one
+        belongs to :mod:`screen_stability`. Did anything change at
+        all? That is this module's own question — a keypress at the
+        edge of a menu can legitimately change nothing, and the
+        caller reads a ``None`` result as a dead key — so it is
+        checked here, against the mask. Has the screen finished
+        changing? That is :mod:`screen_stability`'s question, because
+        returning as soon as the first difference appears would hand
+        back a half-drawn screen; slow menus can take several reads to
+        finish repainting.
 
-        The cap bounds only the wait for the first change; a screen
-        that has started changing is followed until it settles or the
-        deadline expires, when the last read wins.
+        The time cap only bounds the wait for the *first* change. Once
+        the screen has started changing, it is followed until it
+        settles or the deadline runs out, in which case the last read
+        is used.
         """
         first = min(deadline, time.monotonic() + wait)
         monitor = screen_stability.ScreenStability()

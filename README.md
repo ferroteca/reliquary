@@ -3,14 +3,15 @@
 [![License](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.12-blue.svg)](https://www.python.org/downloads/)
 
-Reliquary helps to automate guest VMs, it can script OS installations from standard vendor installation media and
-produce bootable disk images without manual interaction. It can help execute one-off commands and capture the results.
-It is built on its own agentless QEMU guest automation layer, which owns QEMU lifecycle, media, QMP identity checks,
-keyboard input, screen access, screenshots, and per-run state.
+Reliquary automates guest virtual machines. It can script an OS installation from the vendor's own install media and
+produce a bootable disk image with no manual steps. It can also run one-off commands inside a guest and capture the
+results. Reliquary is built on its own agentless QEMU automation layer, which handles the QEMU process itself, media,
+QMP identity checks, keyboard input, reading the screen, screenshots, and the state Reliquary keeps between runs.
 
-Reliquary machines are ephemeral: disposable rigs for scripted installs and automated guest tasks, cheap to destroy and
-recreate. The machine is never the product — often nothing durable comes out at all (the point was to run some tests).
-Reliquary is not a VM manager for machines you keep.
+Reliquary machines are meant to be thrown away. They are cheap to destroy and recreate, built for scripted installs
+and automated guest tasks. The machine itself usually is not what you keep — often nothing durable comes out of a run
+at all, because the point was just to run some tests. Reliquary is not a VM manager for machines you want to keep
+around long-term.
 
 ## When to use Packer, Vagrant, os-autoinst, or Reliquary
 
@@ -23,50 +24,53 @@ test environments: bring a VM up from a box, sync project files, run
 provisioners, execute guest commands over SSH or WinRM, collect normal
 test output, and destroy or recreate the environment when needed.
 
-Reliquary is for the cases where that cooperative guest channel is not
-available, not trustworthy, or is itself the thing being created or
-tested. It drives a guest through the VM's observable console: keyboard
-events in, screen text and screenshots out, with media changes and run
-records captured by the host. That makes it useful for text-mode
-installers, legacy systems such as DOS, broken or partially configured
-guests, boot menus, setup flows before SSH/WinRM/guest tools exist, and
-tests where the screen or installer behavior is the assertion surface.
+Reliquary is for cases where a channel like SSH, WinRM, or a guest agent is
+not available, not trustworthy, or is itself the thing being built or
+tested. It drives a guest through the VM's console the way a person at the
+keyboard would: it sends keyboard events in, and reads back screen text and
+screenshots, while the host records media changes and run history. That
+makes it useful for text-mode installers, legacy systems such as DOS,
+broken or partially configured guests, boot menus, setup flows that run
+before SSH/WinRM/guest tools exist, and tests where what matters is what
+actually shows up on the screen or how the installer behaves.
 
 If your guest can already accept SSH, WinRM, cloud-init, a guest agent,
 or a normal configuration-management/provisioning path, Packer and
 Vagrant are usually the better default. Use Reliquary when the important
 part of the workflow lives before that point, below it, or outside it.
 
-os-autoinst, the engine under openQA, covers much of that
-console-driven ground at production scale: booting systems under test,
-driving installers and applications, matching screens with needles,
-checking serial and screen output, and recording job artifacts. If you
-need openQA's scheduler, worker farm, web UI, asset management, and job
-history around that engine, use openQA. Reliquary's overlap is with
-os-autoinst itself, not with openQA as a service.
+os-autoinst, the engine under openQA, does this same kind of console-driven
+automation, but at production scale: it boots systems under test, drives
+installers and applications, matches screens against reference images
+called needles, checks serial and screen output, and records job
+artifacts. If you need openQA's scheduler, worker farm, web UI, asset
+management, and job history around that engine, use openQA. Reliquary
+overlaps with os-autoinst itself, not with openQA as a hosted service.
 
-Reliquary lives in the smaller local-tool and embedding-library space.
-It is meant to be run directly from a source tree or a user's machine,
-as a QEMU automation harness a script, test runner, CI job, or coding
-agent can call without adopting a scheduler, worker farm, web service,
-or image-needle workflow. Its current strongest case
-is agentless text-mode automation — especially DOS and other guests
-where VGA text, keyboard input, virtual FAT media, and compact run
-records are enough and a larger OS-testing service would be more
-machinery than the job needs. Its planned authoring niche is local
-demonstration-driven drafting: do the task once, then turn the observed
-keystrokes, media changes, and screen states into ordinary script and
-asset files that can be reviewed and edited.
+Reliquary fits a smaller niche: it is a local tool and embedding library,
+meant to be run directly from a source tree or a user's own machine. It is
+a QEMU automation harness that a script, test runner, CI job, or coding
+agent can call without adopting a scheduler, worker farm, web service, or
+image-matching workflow. Its strongest case today is agentless text-mode
+automation — especially DOS and other guests where VGA text, keyboard
+input, virtual FAT media, and compact run records are enough, and a
+larger OS-testing service would be more machinery than the job needs. Its
+planned approach to writing new scripts is demonstration-driven: you do
+the task once by hand, and Reliquary turns the keystrokes, media changes,
+and screen states it observed into ordinary script and asset files that
+you can review and edit.
 
 ## Blueprints and machines
 
-The first thing to learn is Reliquary's central model. A **blueprint** is a reusable JSON design you author and keep —
-a `<name>.rlqb` file, conventionally under `<reliquary_home>/blueprints/`. A **machine** is a disposable realization Reliquary builds from it,
-identified by a generated id — one blueprint, many machines. The blueprint is one file holding named components — a
-`machine` plus the `media`, `source`, and `archive` components it draws on. Machines are created, run, destroyed, and
-recreated freely: the blueprint (media components and all) and its scripts are always enough to rebuild one, so nothing
-Reliquary materializes is ever precious. Editing a blueprint never changes an existing machine by itself; a machine
-keeps the snapshot it was created from. To adopt blueprint edits, destroy the machine and create it again.
+The first thing to learn is Reliquary's core model: blueprints and machines. A **blueprint** is a reusable JSON design
+you write and keep — a `<name>.rlqb` file, normally under `<reliquary_home>/blueprints/`. A **machine** is a
+disposable copy that Reliquary builds (materializes) from that blueprint, identified by a generated id — one
+blueprint can produce many machines. The blueprint is a single file holding named components: a `machine` plus the
+`media`, `source`, and `archive` components it uses. You can create, run, destroy, and recreate machines freely: the
+blueprint (including its media components) and its scripts are always enough to rebuild one, so nothing Reliquary
+builds needs to be protected from deletion. Editing a blueprint never changes a machine that already exists on its
+own — a machine keeps the snapshot it was created from. To pick up blueprint edits, destroy the machine and create it
+again.
 
 ### A blueprint, and the machines it makes
 
@@ -99,17 +103,18 @@ rlq create-machine --blueprint msdos   # prints msdos-1
 ```
 
 Now put a disk in one of them. `insert-media` changes that machine
-and nothing else — it survives stop and start, and `msdos-0` never
-hears about it:
+and nothing else — it survives stop and start, and `msdos-0` is
+unaffected:
 
 ```powershell
 rlq insert-media --machine msdos-1 floppy0 dos-622-disk1
 ```
 
-That is the split worth remembering: **the blueprint is the design,
-and a machine's own state is what has happened to it since.** Memory,
-drive slots and boot order come from the blueprint, so changing them
-means editing the file. What is *in* a drive is the machine's.
+That is the split worth remembering: **the blueprint is the design, and a
+machine's own state is whatever has happened to it since it was
+created.** Memory, drive slots and boot order come from the blueprint, so
+changing them means editing the file. What is *in* a drive belongs to the
+machine.
 
 A different design is a different blueprint. This one has sixteen
 times the memory and a CD-ROM, so it is `blueprints/dos-cd.rlqb`
@@ -135,13 +140,14 @@ rather than a variant of the first:
 Its machines are `dos-cd-0`, `dos-cd-1`, and so on — the id always
 names the blueprint it came from.
 
-Editing a blueprint does not reach back into machines already built
-from it; each keeps the snapshot it was created from. `rlq
-apply-blueprint --machine msdos-0` adopts the edits into a stopped
-machine, absorbing what it can — memory, boot order, CPU count — and
-failing closed where it cannot, such as a changed size on an image
-that has already been materialized. `rlq recreate-machine` is the
-answer when it refuses: destroy and rebuild under the same id.
+Editing a blueprint does not change machines already built from it; each
+one keeps the snapshot it was created from. `rlq apply-blueprint
+--machine msdos-0` applies the edits to a stopped machine — it picks up
+what it safely can, such as memory, boot order, and CPU count, and
+refuses (fails closed) where it cannot, such as a changed size on an
+image that has already been built. When it refuses, `rlq
+recreate-machine` is the answer: it destroys and rebuilds the machine
+under the same id.
 
 Read the [Blueprint guide](docs/blueprint-guide.md) for the format,
 the [CLI reference](docs/cli-reference.md) for commands, and the
@@ -176,7 +182,8 @@ python -m pip install -e .
 
 ## Scripting OS installations
 
-Installing registers two equivalent commands: `rlq` (the short form used throughout the docs) and `reliquary`.
+Installing the package registers two equivalent commands: `rlq` (the short form used throughout the docs) and
+`reliquary`.
 
 ```powershell
 rlq --help
@@ -185,16 +192,16 @@ rlq seed-blueprint freedos
 rlq run-script install --blueprint freedos
 ```
 
-From a clean home that is **two commands** to a usable machine, and the first one is the point: `seed-blueprint`
-copies the codex's `freedos` blueprint — its LiveCD media rides inside it — and the scripts it names into your own
-directories, as ordinary files you own and can read before you run them. Nothing arrives from the built-in library
-unasked, so what the second command runs is a recipe you chose.
+From a clean home, that is **two commands** to a usable machine, and the first one is the important part:
+`seed-blueprint` copies the codex's `freedos` blueprint — its LiveCD media travels inside it — along with the scripts
+it names, into your own directories, as ordinary files you own and can read before you run them. Nothing runs from
+the built-in library without you asking for it, so what the second command runs is a recipe you chose.
 
-That second command materializes a machine from your copy, inserts the
-fetched, hash-verified LiveCD to the blueprint's empty CD drive, boots it, and drives the FreeDOS installer end to end —
-language, partitioning, the reboot, the "Plain DOS system" package set — until the guest powers itself off and the
-script ejects the CD. The machine is left with FreeDOS installed on its hard disk; confirm it boots, then start and stop
-it freely:
+That second command builds (materializes) a machine from your copy, inserts the fetched, hash-verified LiveCD into
+the blueprint's empty CD drive, boots the machine, and runs the FreeDOS installer end to end — language,
+partitioning, the reboot, and the "Plain DOS system" package set — until the guest powers itself off and the script
+ejects the CD. The machine is left with FreeDOS installed on its hard disk. Confirm it boots, then start and stop it
+freely:
 
 ```powershell
 rlq run-script verify --blueprint freedos
@@ -202,40 +209,34 @@ rlq start-machine --blueprint freedos
 rlq stop-machine --blueprint freedos
 ```
 
-The blueprint's third script is the one a program wants: `ready` boots the installed disk, waits for a DOS prompt, and
-**leaves the machine running** with a machine variable set, which is the handoff to whatever drives it next.
-`--expect` contracts the run on that variable, so one command either hands you a live guest or fails saying why:
+The blueprint's third script is the one a program wants: `ready` boots the installed disk, waits for a DOS prompt,
+and **leaves the machine running** with a machine variable set — that variable is the signal to whatever drives the
+machine next. `--expect` checks the run against that variable, so one command either hands you a live guest or fails
+and says why:
 
 ```powershell
 rlq run-script ready --blueprint freedos --expect ready=yes
 rlq exec "ver" --blueprint freedos
 ```
 
-To inspect a script without running it, `--dry-run` prints the
-resolved timing plan — each observation's timeout, each guest
-input's pacing, and where each came from — along with each declared
-property's source and how much of the script no static pass can
-promise will run, a statement inside a handler being the guest's
-decision rather than the plan's. It starts no machine and sends no
-keystroke. The selector is optional here and nowhere else, because
-its presence is what asks for the machine checks as well:
+To check a script without running it, `--dry-run` prints the resolved timing plan: the timeout for each thing the
+script waits on, the pacing for each keystroke or input it sends, and where each of those values came from. It also
+shows where each declared property's value came from, and how much of the script cannot be guaranteed to run just by
+reading it — what happens inside a handler is the guest's decision, not something the plan can promise. `--dry-run`
+starts no machine and sends no keystroke. Normally the `--blueprint` / `--machine` selector is required; with
+`--dry-run` it is optional, and giving it anyway is what makes `--dry-run` also run the machine-specific checks:
 
 ```powershell
 rlq run-script freedos-install --dry-run
 rlq run-script install --blueprint freedos --dry-run
 ```
 
-The same question about a machine — is this blueprint sound, and
-what would it build? — is `rlq create-machine --dry-run`, which
-reports the machine
-id it would allocate, the backend it would land on, every drive's
-resolved plan, and where each media would come from, while building
-none of it. Nothing is seeded, fetched or written, and nothing is
-asked for; a media that is not cached yet is simply reported as one
-that would be downloaded. `--backend` turns it into a question about
-somewhere else: whether the blueprint would work on VirtualBox or
-Hyper-V, answered from what that backend can do, with nothing
-installed and nothing booted.
+Asking the same question about a machine instead of a script — is this blueprint sound, and what would it build? —
+is `rlq create-machine --dry-run`. It reports the machine id it would allocate, the backend it would run on, the
+resolved plan for every drive, and where each media would come from, without actually building any of it. Nothing is
+seeded, fetched, or written — a media that is not cached yet is just reported as one that would be downloaded.
+`--backend` turns this into a question about a different backend: whether the blueprint would work on VirtualBox or
+Hyper-V, answered from what that backend can do, with nothing installed and nothing booted.
 
 ```powershell
 rlq create-machine --blueprint freedos --dry-run
@@ -247,15 +248,15 @@ Vendor media is cached and verified against pinned SHA-256 hashes on every use, 
 at once with `--home-dir` or the `RELIQUARY_HOME` environment variable).
 
 A run **returns its output** and stores nothing: it streams its progress live — `--progress pretty` for a person,
-`--progress jsonl` for a program — and the stream is gone when the run ends. Redirect it if you want to keep it. When a
-run fails, the report names what it was waiting for, which clock expired, the route it took, the screen row that came
-nearest, a screenshot, and the command to try next. Pass `--display` to show the QEMU window instead of running
-headless — helpful when debugging a script.
+`--progress jsonl` for a program — and the stream is gone once the run ends. Redirect it if you want to keep it. When
+a run fails, the report names what it was waiting for, which timeout expired, which branch of the script it took,
+the screen row that came closest to matching, a screenshot, and the command to try next. Pass `--display` to show
+the QEMU window instead of running headless — helpful when debugging a script.
 
 **Screens that text cannot describe are watched as images.** A
 *landmark* is a `<name>.rlql` declaration in your `landmarks/`
 directory with one or more PNG renderings beside it
-(`<name>.1.png`, `<name>.2.png` — alternative paintings of the same
+(`<name>.1.png`, `<name>.2.png` — alternative screenshots of the same
 screen), and a script watches one exactly where it would watch for a
 string:
 
@@ -263,18 +264,14 @@ string:
 wait @setup-page timeout=2m
 ```
 
-The whole screen has to match pixel for pixel, which is the safe
-direction: a screen that has drifted times out visibly instead of
-firing input at the wrong page. Rectangles in the declaration soften
-that where a screen has furniture on it — an `ignore` region is
-excluded outright, and a `fuzzy` region carries its own tolerance
-(`"similarity": "97%"`). When nothing matches, the failure report
-names the closest rendering, the regions it failed on, and the
-percentage each reached. Landmark watching needs a control plane
-that captures a framebuffer — `control-planes: ["vnc"]` on QEMU —
-and a machine driving one that does not says so before the run
-touches the guest. The format is specified in
-[docs/spec/landmarks.md](docs/spec/landmarks.md).
+The whole screen has to match pixel for pixel by default, which is the safe choice: a screen that has drifted times
+out visibly instead of sending input to the wrong page. Rectangles in the declaration relax that rule where a screen
+has changing decoration on it, such as a clock or a cursor — an `ignore` region is excluded from the match entirely,
+and a `fuzzy` region is matched with its own tolerance (`"similarity": "97%"`). When nothing matches, the failure
+report names the closest rendering, the regions it failed on, and the percentage each one reached. Watching a
+landmark needs a control plane that can capture a framebuffer — `control-planes: ["vnc"]` on QEMU — and if the
+machine's control plane cannot do that, Reliquary says so before the run touches the guest. The format is specified
+in [docs/spec/landmarks.md](docs/spec/landmarks.md).
 
 **GUI screens are clicked, not guessed at.** A landmark's `spots`
 name points on it a script can click:
@@ -283,37 +280,34 @@ name points on it a script can click:
 click @setup-page spot="next"
 ```
 
-`click` finds the landmark the same way `wait` does — matched on a
-settled frame, timing out visibly if it never appears — then
-delivers a left click at the named spot (or the lone one, on a
-landmark declaring exactly one) and parks the cursor out of frame.
-It needs an absolute pointing device: declare `"pointing-device":
-"tablet"` on the machine, since a relative mouse cannot be aimed
-without guessing (a PS/2 mouse's guest driver applies acceleration
-the host cannot observe), and a `mouse` machine is refused by name
-before the run starts.
+`click` finds the landmark the same way `wait` does: it waits for a matching, settled frame, and times out visibly
+if the landmark never appears. It then sends a left click at the named spot (or the only spot, if the landmark
+declares exactly one), and moves the cursor out of frame afterward. It needs an absolute pointing device — declare
+`"pointing-device": "tablet"` on the machine, because a relative mouse cannot be aimed without guessing (a PS/2
+mouse's guest driver applies acceleration the host cannot observe) — and a machine declaring `mouse` is refused by
+name before the run starts.
 
 ## The machine layer
 
 Beneath the scripts, Reliquary is a general automation harness for running remote tasks in QEMU guests, usable on its
 own through the CLI and Python interfaces documented below.
 
-DOS is the default and currently the only complete platform workflow. It boots a DOS guest, types at its keyboard, reads
-its VGA text screen, runs commands, takes screenshots, and retrieves files written by the guest. Other platform names
-reserve the generic QEMU lifecycle but their provisioning and guest-task semantics currently raise
-`NotImplementedError` until an adapter is implemented.
+DOS is the default and currently the only complete platform workflow. It boots a DOS guest, types at its keyboard,
+reads its VGA text screen, runs commands, takes screenshots, and retrieves files written by the guest. Other
+platform names reserve the same general QEMU lifecycle, but calling a provisioning or guest-task operation on them
+currently raises `NotImplementedError`, until an adapter for that platform is implemented.
 
 ## The platform model
 
 A blueprint names its guest platform in the required `platform` field;
 `new-blueprint` scaffolds `dos` by default. DOS is the only complete
-workflow today — other platform names reserve the generic QEMU
-lifecycle but raise `NotImplementedError` for provisioning and
-guest-task semantics until an adapter is implemented. Platform-specific
-behavior is never inferred from an image. Future adapters can define how
-a guest is provisioned, how a remote task is launched, and how its
-result is collected while reusing the same ownership-verified QEMU
-machine layer.
+workflow today — other platform names reserve the same general QEMU
+lifecycle, but raise `NotImplementedError` for provisioning and
+guest-task operations until an adapter is implemented. Reliquary never
+guesses the platform from an image. Future adapters can define how a
+guest is provisioned, how a remote task is launched, and how its result
+is collected, while reusing the same QEMU machine layer and its identity
+checks.
 
 ## Why the DOS adapter exists
 
@@ -340,28 +334,30 @@ it is equally agentless — see `control-planes` in the
 [blueprint field reference](docs/blueprint-reference.md).
 
 Any DOS with a bootable image works. A machine's drives each name a
-**media** component, and the media owns its content — a blank
-`materialize: new` disk of `size`, a `difference`/`copy` over a
-payload, or a `use` attach (an ISO, or a host directory served as a
-virtual FAT drive) — and Reliquary materializes any per-machine image
-under `cache/machines/<id>/disks/`. Any QEMU-supported image format
-works; `*.img` and `*.iso` are taken as raw. Reliquary hands back a
-guest program's raw output, and interpreting it is left to the caller.
+**media** component, and that media component determines its own
+content — a blank `materialize: new` disk of a given `size`, a
+`difference`/`copy` over a payload, or a `use` attach (an ISO, or a
+host directory served as a virtual FAT drive). Reliquary builds
+(materializes) any per-machine image under
+`cache/machines/<id>/disks/`. Any QEMU-supported image format works;
+`*.img` and `*.iso` are treated as raw. Reliquary hands back a guest
+program's raw output as-is; interpreting it is left to the caller.
 
 ## The workflow
 
-1. **Describe the machine.** Author a `<name>.rlqb` blueprint (by hand,
+1. **Describe the machine.** Write a `<name>.rlqb` blueprint (by hand,
    with `rlq new-blueprint`, or by seeding one from the codex) declaring
-   the platform, memory, and drives; each drive names a **media**
-   component, and the media owns how it materializes — a blank `new`
-   disk, a `difference`/`copy` over a payload, or a `use` attach. To
-   hand the guest its own files, a media whose `source` is a host
-   directory (`materialize: use`) is the natural surface: that directory
-   *is* the drive.
-2. **Create a machine.** `rlq create-machine --blueprint <name>`
-   materializes one under a generated id (or `run-script` creates one on
-   demand). The blueprint (media components and all) and its scripts are
-   always enough to rebuild it, so a machine is never precious.
+   the platform, memory, and drives. Each drive names a **media**
+   component, and that media component decides how it is built
+   (materialized) — a blank `new` disk, a `difference`/`copy` over a
+   payload, or a `use` attach. To hand the guest its own files, the
+   natural way is a media whose `source` is a host directory
+   (`materialize: use`): that directory *is* the drive.
+2. **Create a machine.** `rlq create-machine --blueprint <name>` builds
+   one under a generated id (or `run-script` creates one on demand). The
+   blueprint (including its media components) and its scripts are
+   always enough to rebuild it, so a machine is never something you
+   need to protect from deletion.
 3. **Drive it.** Run an attached `.rlqs` script with
    `rlq run-script <label> --blueprint <name>`, or operate the machine
    interactively — `rlq start-machine`, then `exec` / `wait` / `screen` /
@@ -369,13 +365,13 @@ guest program's raw output, and interpreting it is left to the caller.
 4. **Take the results.** A run returns its output to you and keeps
    nothing of its own. A small value comes back through a machine
    variable (`rlq get-machine-var`); a whole image comes back by
-   swapping it out. Files are yours to move: `rlq get-machine-dir`
+   swapping it out. Moving files is your job: `rlq get-machine-dir`
    prints the machine directory, and while the machine is stopped its
-   directory-source and image drives are ordinary host state to read
-   or prepare with your own tools.
+   directory-source and image drives are ordinary host files you can
+   read or prepare with your own tools.
 5. **Recreate freely.** `destroy-machine` deletes a machine entirely and
    `recreate-machine` rebuilds it under the same id; `apply-blueprint`
-   adopts blueprint edits into a stopped machine.
+   applies blueprint edits to a stopped machine.
 
 ## Requirements
 
@@ -415,11 +411,12 @@ The home's own default is `reliquary/` under your Documents folder (the Windows 
 redirected, e.g. into OneDrive — `~/Documents` on macOS, and `xdg-user-dir DOCUMENTS` on Linux/BSD). When no Documents
 folder can be determined, it falls back to `~/reliquary`.
 
-A flag beats the environment, and both beat the default. Assigning the cache moves media and machines with it unless you
-have placed those too, so `--cache-dir D:\reliquary-cache` is enough to keep the bulk off a synced Documents folder. From
-Python the same record is explicit: open your session on a `reliquary.Context(...)` filling any of the slots — or on a
-bare home path — and the rest derive the same way. The library honours no environment and picks no default: the session
-demands its home at the door.
+A flag overrides the environment variable, and both override the default. Setting the cache directory moves media
+and machines with it, unless you have set those directories separately too — so `--cache-dir D:\reliquary-cache` is
+enough on its own to keep the bulk of the data off a synced Documents folder. From Python, the same choice is
+explicit: open your session on a `reliquary.Context(...)` filling in any of the directory arguments — or on a bare
+home path — and the rest are derived the same way. The library reads no environment variables and picks no default:
+you must give the session a home directory when you create it.
 
 The layout is:
 
@@ -446,38 +443,30 @@ Documents/reliquary/
                           output to whoever started it
 ```
 
-A machine is wholly its machines-directory entry — there is no
-root-home machine model. Everything under the cache is regenerable. When
-you have not named a home, the one Reliquary picked is printed to
-standard error.
+A machine exists entirely as its entry under the machines directory — there is no separate record of it at the
+home's root. Everything under the cache can be regenerated. When you have not named a home directory, the one
+Reliquary picked is printed to standard error.
 
-Blueprints (with their media/source/archive components) and scripts are
-read from the `blueprints` and `scripts` directories above, each walked
-recursively by file extension. Fonts and landmarks are read the same
-way, from `fonts` and `landmarks` — those two are fixed leaves under
-the home rather than separately placeable, so a project tree holding
-its own blueprints and scripts still finds them under the home. A name those directories do not hold is
-**not** taken from anywhere else — the built-in codex is not a
-fallback tier, so a name they do not hold is refused rather than
-supplied (the refusal names `rlq seed-blueprint <name>` when the
-library has it). For a project, point the directories at your tree:
+Blueprints (with their media/source/archive components) and scripts are read from the `blueprints` and `scripts`
+directories above, each searched recursively by file extension. Fonts and landmarks are read the same way, from
+`fonts` and `landmarks` — but those two directories are always under the home and cannot be relocated separately, so
+a project tree holding its own blueprints and scripts still finds fonts and landmarks under the home. If a name is
+not found in these directories, Reliquary does **not** look anywhere else for it — the built-in codex is not a
+fallback, so a name it does not hold is refused rather than silently supplied (the refusal names `rlq seed-blueprint
+<name>` when the codex library does have that name). For a project, point the directories at your own tree:
 
 ```powershell
 rlq --blueprints-dir .\vm --scripts-dir .\vm run-script install --blueprint freedos
 ```
 
-Your source-controlled files are the only source, so a run is
-reproducible and never picks up whatever happens to be in your home.
-Seeding works wherever you point it —
-`rlq --blueprints-dir .\vm seed-blueprint freedos` copies a first draft
-into your project, and you commit it. The embedding API is stricter
-still: it assigns no directory at all, so a library call fails closed
-rather than reading a developer's home — and it cannot reach the
-library either, the codex verbs being CLI-only.
-A machine records which blueprint file it was built from, so a
-`--blueprint <name>` selection only ever picks a machine built from the
-blueprint the current invocation resolves — two projects that share a
-blueprint name never disturb each other's machines.
+Your source-controlled files are the only source, so a run is reproducible and never picks up whatever happens to be
+sitting in your home directory. Seeding works wherever you point it — `rlq --blueprints-dir .\vm seed-blueprint
+freedos` copies a first draft into your project, for you to commit. The embedding (Python) API is stricter still: it
+assigns no directory at all, so a library call refuses (fails closed) rather than reading a developer's home
+directory — and it cannot reach the codex library either, since the codex commands are CLI-only. A machine records
+which blueprint file it was built from, so a `--blueprint <name>` selection only ever picks a machine built from the
+blueprint that the current command resolves to — two projects that happen to share a blueprint name never disturb
+each other's machines.
 
 ## First session
 
@@ -497,10 +486,10 @@ rlq seed-blueprint freedos
 rlq create-machine --blueprint freedos
 ```
 
-`create-machine` materializes the machine's per-machine images under
+`create-machine` builds the machine's per-machine images under
 `cache/machines/<id>/disks/` and prints the generated id. (If a
-machine of this blueprint already exists — e.g. one installed by
-`run-script install` — you can start it directly.)
+machine from this blueprint already exists — for example, one installed
+by `run-script install` — you can start it directly.)
 
 ### 2. Start it
 
@@ -509,12 +498,13 @@ rlq start-machine --blueprint freedos
 ```
 
 Reliquary picks the backend, starts it headless, assigns the VM a
-unique identity, and records it in the machine's `machine.json` (as a
-`vm` section, written while running). Later commands find the running
-VM through the machine selector, so nothing about the connection is
-ever copied by hand — how the backend is reached is its adapter's
-business. The machine stays running until you stop it. Add
-`--display` for a visible, manually interactive window.
+unique identity, and records that identity in the machine's
+`machine.json` (in a `vm` section, written while the machine is
+running). Later commands find the running VM through the machine
+selector, so you never have to copy any connection details by hand —
+how the backend is reached is handled internally by its adapter. The
+machine stays running until you stop it. Add `--display` for a visible
+window you can interact with manually.
 
 ### 3. Reach the DOS prompt
 
@@ -525,10 +515,11 @@ prompt before running commands:
 rlq wait-ready --blueprint freedos
 ```
 
-A guest whose `AUTOEXEC.BAT` customizes the prompt says what it draws —
-`rlq wait-ready --prompt "[C:\]>" --blueprint freedos`; the standard
-prompt is always recognized. For any other boot-time evidence,
-`rlq wait <pattern>` is the general wait over the whole screen.
+If a guest's `AUTOEXEC.BAT` customizes the prompt, tell Reliquary what it
+looks like — `rlq wait-ready --prompt "[C:\]>" --blueprint freedos`;
+the standard prompt is always recognized without asking. For any other
+boot-time signal, `rlq wait <pattern>` is the general-purpose wait over
+the whole screen.
 
 ### 4. Run DOS commands
 
@@ -537,11 +528,12 @@ rlq exec "dir" --blueprint freedos
 rlq exec "myprog.exe > result.log" --blueprint freedos
 ```
 
-`exec` types the command and waits for the DOS prompt to return. To
-retrieve detailed output, name a directory-source media (`source` a
-host directory, `materialize: use`) on a machine drive and have the
-program write to it; while the machine is stopped, that directory is
-ordinary host state (`rlq get-machine-dir` prints the path).
+`exec` types the command and waits for the DOS prompt to come back. To
+capture detailed output, put a directory-source media (`source` set to
+a host directory, `materialize: use`) on a machine drive, and have the
+program write to it. While the machine is stopped, that directory is
+just an ordinary folder on the host (`rlq get-machine-dir` prints its
+path).
 
 ### 5. Inspect the guest
 
@@ -560,11 +552,11 @@ are filename stems, not paths.
 rlq stop-machine --blueprint freedos
 ```
 
-Stopping verifies the VM's recorded identity before closing it and
-flushes guest writes to any virtual FAT drive. QEMU snapshots a
-directory-source media's directory when the drive is attached, so after
-changing its host files, stop and restart the machine before using them
-in the guest.
+Stopping checks the VM's recorded identity before shutting it down, and
+flushes any guest writes to a virtual FAT drive back to disk. QEMU takes
+a snapshot of a directory-source media's directory when the drive is
+attached, so after changing its files on the host, stop and restart the
+machine before the guest will see the changes.
 
 ## Command guide
 
@@ -613,19 +605,21 @@ rlq prune-media [--dry-run]
 rlq add-media NAME FILE
 ```
 
-`list-media` names the media resolvable from the active source —
-yours, and only yours. `fetch-media` resolves one by name and warms
-its cached payload.
+`list-media` lists the media names that resolve from your own active
+blueprints and scripts directories — never from the built-in codex.
+`fetch-media` resolves one by name and downloads it into the cache.
 
-Everything cached lives in one place, `cache/media/`, keyed by the name
-of the media it is — a container is a media like any other, so there is
-no separate archive cache. `clean-media` reclaims what can be fetched
-or derived again; `prune-media` is the informed version, keeping what
-the scope can still attach and dropping what only existed to produce
-it, so after an install the extracted ISO stays and the zip husk goes.
-`add-media` is the door for payloads nothing can locate — a licensed
-ISO you cannot redistribute — verified against the blueprint's pin and
-then never reclaimed behind your back.
+Everything cached lives in one place, `cache/media/`, keyed by the
+media's own name — an archive (a container such as a zip or tar file)
+is a media like any other, so there is no separate archive cache.
+`clean-media` deletes anything that can simply be re-fetched or
+rebuilt. `prune-media` is smarter about it: it keeps whatever the
+current blueprints can still use and deletes anything that existed
+only to produce something else, so after an install the extracted ISO
+stays and the zip it was extracted from is deleted. `add-media` is how
+you add a payload Reliquary cannot fetch on its own — a licensed ISO
+you are not allowed to redistribute, for example — checked against the
+blueprint's pinned hash and never deleted automatically afterward.
 
 (Media are specs inside a `.rlqb` now, so there is no `delete-media`
 command — removing one means editing the blueprint that declares it.)
@@ -639,31 +633,32 @@ rlq get-machine-dir (--blueprint NAME | --machine ID)
 rlq insert-media SLOT --file PATH (--blueprint NAME | --machine ID)
 ```
 
-This is the loop an automating program runs: put work into the guest,
-run it, read the result back, iterate. Reliquary supplies the
-transports and attaches no meaning to what travels through them —
-there is no pass/fail vocabulary and no result parsing, because those
-belong to whatever you are building.
+This is the loop a program driving Reliquary runs: put work into the
+guest, run it, read the result back, repeat. Reliquary only supplies
+the channels the data travels over — it does not interpret what
+travels through them. There is no built-in pass/fail vocabulary and no
+result parsing, because that is up to whatever you are building.
 
 Values come back as **machine variables**: a script's `set result
-"PASS"` writes one, and `get-machine-var result` reads it from any
-process. They are cleared at each start, so one always reports what the
-current boot produced. Readiness rides the same channel — your own
-ready script sets a variable and you poll for it; Reliquary ships no
-readiness script of its own.
+"PASS"` writes one, and `get-machine-var result` reads it back from any
+process. They are cleared each time the machine starts, so a variable
+always reports what the current boot produced. Readiness works the
+same way — your own ready script sets a variable and you poll for it;
+Reliquary does not ship a readiness script of its own.
 
-**Files are yours to move, and Reliquary supplies the drives they
-cross on.** It puts no file on a machine's drives, reads none back,
-and never tells you which letter the guest gave a disk — what is
-inside a volume is yours, reached with your own tools. There are
-three ways across, and none of them asks Reliquary to look inside a
-filesystem:
+**Moving files is your job; Reliquary just supplies the drives they
+cross on.** It does not put files onto a machine's drives, does not
+read any back, and never tells you which drive letter the guest gave a
+disk — what is inside a volume is yours to reach with your own tools.
+There are three ways to get files across, and none of them requires
+Reliquary to look inside a filesystem:
 
 - **A directory-source drive.** Point a media at a host directory and
   the guest sees it as a drive. You write into that directory and the
   guest reads it; the guest writes and you read it back on the host.
-  The backend snapshots the directory at attach, so a stopped machine
-  is what makes a change visible either way.
+  The backend takes a snapshot of the directory when the drive is
+  attached, so stopping the machine is what makes a change visible on
+  the other side.
 - **A whole image, swapped live.** `insert-media --file` mounts an
   image you built, without a reboot, and ejecting flushes the guest's
   writes back to that same file. Build and read it with whatever
@@ -684,14 +679,15 @@ rlq stop-machine --machine rig-0
 rlq get-machine-dir --machine rig-0
 ```
 
-`--progress` selects the live rendering: `pretty` for a person,
-`plain` for a log, `jsonl` for a program (stdout carries the event
-stream and nothing else, the last line being the outcome). Exit codes
-carry the outcome too, and they are the same on every command rather
-than a script run's alone — `2` your input is illegal on its face,
-`3` it is legal and the world does not satisfy it, `4` the operation
-started and failed, `5` cancelled, `1` a fault of Reliquary's own and
-never a mistake of yours.
+`--progress` selects how progress is shown while it runs: `pretty` for
+a person, `plain` for a log, `jsonl` for a program (stdout carries only
+the event stream, with the last line being the outcome). Exit codes
+report the outcome too, and they mean the same thing on every command,
+not just a script run — `2` means your input was invalid on its face,
+`3` means it was valid but the actual situation did not satisfy it,
+`4` means the operation started and then failed, `5` means it was
+cancelled, and `1` means a fault in Reliquary itself, never a mistake
+on your part.
 
 ### Keyboard and command input
 
@@ -759,14 +755,15 @@ Run `reliquary --help` or `reliquary COMMAND --help` for the complete current sy
 
 ## Python usage
 
-The CLI is a thin veneer over the embedding API: every command maps
-one-to-one onto a session method with the same semantics — the
-session is the only door, and the library assigns no default home,
-so you open one on yours. To run a whole script,
-`session.run_script("install", blueprint="freedos")` is the one call.
-To drive a machine directly, create and start it, then attach the
-interaction adapter to the machine's own directory — that is where
-its recorded identity lives, so ownership is verified against it:
+The CLI is a thin layer over the embedding (Python) API: every command
+maps one-to-one onto a session method with the same behavior. The
+session is the only entry point, and the library assigns no default
+home directory, so you open one on your own path. To run a whole
+script, `session.run_script("install", blueprint="freedos")` is the
+one call you need. To drive a machine directly, create and start it,
+then attach the interaction adapter to the machine's own directory —
+that is where its recorded identity lives, so ownership is verified
+against it:
 
 ```python
 import reliquary
@@ -787,28 +784,37 @@ finally:
     session.stop_machine(machine_id)
 ```
 
-A guest whose `AUTOEXEC.BAT` customizes the prompt says so at the call — `guest.wait_ready(prompt="[C:\\]>")`,
-the exact text the guest draws — because readiness has no earlier screen to read it off; `execute` needs nothing,
-reading the prompt off the screen it types into.
+If a guest's `AUTOEXEC.BAT` customizes the prompt, say so at the call —
+`guest.wait_ready(prompt="[C:\\]>")`, the exact text the guest
+displays — because at that point there is no earlier screen
+`wait_ready` could read the prompt from. `execute` needs no such
+argument, since it reads the prompt directly off the screen it is
+typing into.
 
 `Machine` also exposes the VGA text screen directly: `machine.screen_text()`
 returns the 80x25 rows, and `machine.wait_text(pattern, timeout=60)` polls until one row of the screen matches a
-regular expression (whitespace-collapsed, never across rows) and the screen under it has settled, returning the
-matching screen — or raises `WaitExpired`, which is both a `RunFailure` and a `TimeoutError`. It is the script
-language's `wait` at the API, as `rlq wait` is on the CLI. This is how to block on specific output, such as a boot
-menu:
+regular expression (whitespace-collapsed, never matched across rows) and the screen underneath it has stopped
+changing. It returns the matching screen, or raises `WaitExpired`, which is both a `RunFailure` and a `TimeoutError`.
+This is the script language's `wait` verb, available at the API level, the same way `rlq wait` exposes it on the
+CLI. This is how to wait for specific output, such as a boot menu:
 
 ```python
 machine.wait_text(r"Welcome to FreeDOS")
 ```
 
 Once a cursor-key menu is displayed, `machine.cursor_menu_select()`
-navigates it by feedback: it presses up/down, follows the selection highlight through the VGA attribute bytes, and
-presses Enter only after the highlight sits on the row matching the given text (case-insensitive; an exact row match
-wins over rows merely containing the item, which otherwise must be unique). `exclude=` takes text snippets whose rows
-are never selected, as another way to disambiguate. The item must match when navigation starts; a menu that rewrites its
-rows as the highlight moves (the FreeDOS installer's language chooser translates every entry into the newly highlighted
-language) is then navigated by row, and the returned text is what the selected row displayed when Enter was pressed:
+navigates it by watching what actually happens on screen: it presses
+up/down, follows the selection highlight through the VGA attribute
+bytes, and presses Enter only once the highlight sits on the row
+matching the given text (case-insensitive; an exact row match wins over
+rows that merely contain the item, which otherwise must be unique).
+`exclude=` takes text snippets whose rows are never selected, as
+another way to disambiguate. The item must match when navigation
+starts. If a menu rewrites its own rows as the highlight moves — the
+FreeDOS installer's language chooser translates every entry into the
+newly highlighted language — navigation then follows the row position
+instead, and the returned text is whatever the selected row displayed
+at the moment Enter was pressed:
 
 ```python
 machine.wait_text(r"Welcome to FreeDOS")
@@ -816,9 +822,9 @@ machine.cursor_menu_select("Use FreeDOS 1.4 in Live Environment mode")
 ```
 
 These screen and keyboard operations live on the platform-neutral
-`Machine`, so they work on any guest displaying through VGA text mode — boot menus and loaders included, before any
-operating system is up. Module-level conveniences (`reliquary.cursor_menu_select(item, home=machine_dir)`,
-`reliquary.screen_text(home=machine_dir)`, ...) wrap the same methods.
+`Machine` class, so they work on any guest displaying through VGA text mode — boot menus and loaders included, even
+before any operating system is up. Module-level convenience functions (`reliquary.cursor_menu_select(item,
+home=machine_dir)`, `reliquary.screen_text(home=machine_dir)`, and so on) just wrap the same methods.
 
 `Machine.qmp()` exposes the identity-verified QMP session when a caller needs raw monitor access. The yielded QEMU
 session provides both `cmd()` for QMP and
@@ -832,14 +838,14 @@ with machine.qmp() as qmp:
 
 ### Running scripts and managing machines
 
-The lifecycle and scripting verbs are all available as Python calls
-with the same names as their CLI twins: `create_machine` /
+The lifecycle and scripting commands are all available as Python calls
+with the same names as their CLI counterparts: `create_machine` /
 `start_machine` / `stop_machine` / `destroy_machine` /
-`recreate_machine` / `apply_blueprint`, and `run_script` for the
-`.rlqs` language. `run_script` **returns the
-run's output** — the whole event stream, plus the final script phase
-and the machine's phase — and writes nothing to disk; it raises by
-error class on failure. See the [API reference](docs/api-reference.md)
+`recreate_machine` / `apply_blueprint`, and `run_script` for running a
+`.rlqs` script. `run_script` **returns the run's output** — the whole
+event stream, plus the final script phase and the machine's phase —
+and writes nothing to disk; on failure it raises an exception of the
+matching error class. See the [API reference](docs/api-reference.md)
 for the full surface and [`docs/spec/api.md`](docs/spec/api.md)
 for the end-goal design.
 

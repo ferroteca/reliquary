@@ -628,6 +628,19 @@ def test_start_rejects_already_running(rig):
     assert "already running" in str(caught.value)
 
 
+def test_start_reconciles_a_vm_shut_down_some_other_way(rig):
+    """A stale ``running`` never talked to the backend before refusing
+    -- the gap `list_machines` closed on read, start closes on write."""
+    machine_id = _ready(rig)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.session_error = PreflightError(
+        "the recorded reliquary VM is no longer reachable",
+        rule_id="machine.vm-unreachable")
+    start_machine(machine_id, context=rig.home)
+    assert len(rig.backend.starts) == 1
+    assert rig.state(machine_id)["phase"] == "running"
+
+
 def test_stop_returns_phase_to_ready(rig):
     machine_id = _ready(rig)
     rig.force(machine_id, "running", vm=True)
@@ -1023,6 +1036,16 @@ def test_apply_requires_stopped(rig):
     assert "must be stopped" in str(caught.value)
 
 
+def test_apply_reconciles_a_vm_shut_down_some_other_way(rig):
+    machine_id = _ready(rig)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.session_error = PreflightError(
+        "the recorded reliquary VM is no longer reachable",
+        rule_id="machine.vm-unreachable")
+    apply_blueprint(machine=machine_id, context=rig.home)
+    assert rig.state(machine_id)["phase"] == "ready"
+
+
 # --- media insertion -------------------------------------------------
 
 def _installer(rig):
@@ -1068,6 +1091,18 @@ def test_set_boot_order_rejects_running(rig):
     rig.force(machine_id, "running")
     with pytest.raises(PreflightError):
         set_boot_order(machine_id, ["cdrom0"], context=rig.home)
+
+
+def test_set_boot_order_reconciles_a_vm_shut_down_some_other_way(rig):
+    machine_id = _installer(rig)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.session_error = PreflightError(
+        "the recorded reliquary VM is no longer reachable",
+        rule_id="machine.vm-unreachable")
+    set_boot_order(machine_id, ["cdrom0"], context=rig.home)
+    state = rig.state(machine_id)
+    assert state["phase"] == "ready"
+    assert state["boot"] == ["cdrom0"]
 
 
 def test_set_boot_order_rejects_undeclared(rig):
@@ -1127,6 +1162,38 @@ def test_eject_on_running_ejects_live(rig):
         eject_media(machine_id, "cdrom0", context=rig.home)
     live.assert_called_once()
     assert live.call_args.args[2] is None
+
+
+def test_insert_reconciles_a_vm_shut_down_some_other_way(rig):
+    """A dead machine's medium change persists for the next start,
+    rather than crashing on a live change no VM can receive."""
+    machine_id = _installer(rig)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.session_error = PreflightError(
+        "the recorded reliquary VM is no longer reachable",
+        rule_id="machine.vm-unreachable")
+    with mock.patch("reliquary.machines._change_media_live") as live:
+        insert_media(machine_id, "cdrom0", "freedos-livecd",
+                     context=rig.home)
+    live.assert_not_called()
+    state = rig.state(machine_id)
+    assert state["phase"] == "ready"
+    assert state["drives"]["cdrom0"]["media"] == "freedos-livecd"
+
+
+def test_eject_reconciles_a_vm_shut_down_some_other_way(rig):
+    machine_id = _installer(rig)
+    insert_media(machine_id, "cdrom0", "freedos-livecd", context=rig.home)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.session_error = PreflightError(
+        "the recorded reliquary VM is no longer reachable",
+        rule_id="machine.vm-unreachable")
+    with mock.patch("reliquary.machines._change_media_live") as live:
+        eject_media(machine_id, "cdrom0", context=rig.home)
+    live.assert_not_called()
+    state = rig.state(machine_id)
+    assert state["phase"] == "ready"
+    assert state["drives"]["cdrom0"]["media"] is None
 
 
 def test_a_live_change_goes_through_the_adapter_session(rig):
@@ -1460,6 +1527,21 @@ def test_a_stopped_machine_is_refused(rig):
     with pytest.raises(PreflightError) as caught:
         machines_exec("DIR", machine=machine_id, context=rig.home)
     assert "is not running" in str(caught.value)
+
+
+def test_exec_reconciles_a_vm_shut_down_some_other_way(rig):
+    """Shared with wait_ready (`_running_guest`, D114's one twin): the
+    refusal now names the true cause, and the phase is left correct
+    for whoever looks next."""
+    machine_id = _plain_rig(rig)
+    rig.force(machine_id, "running", vm=True)
+    rig.backend.session_error = PreflightError(
+        "the recorded reliquary VM is no longer reachable",
+        rule_id="machine.vm-unreachable")
+    with pytest.raises(PreflightError) as caught:
+        machines_exec("DIR", machine=machine_id, context=rig.home)
+    assert "is not running" in str(caught.value)
+    assert rig.state(machine_id)["phase"] == "ready"
 
 
 def test_the_command_output_is_returned(rig):

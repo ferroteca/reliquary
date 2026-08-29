@@ -3,21 +3,22 @@
 """The user properties file.
 
 `<reliquary_home>/user.properties` is a flat, user-owned file of
-`key = value` lines. A person edits it directly; Reliquary edits
-it *surgically* — every comment, blank line, and ordering choice
-outside the one line a command names survives untouched, which is
-why the format is line-based rather than JSON. The normative spec
-is docs/spec/script-properties.md.
+`key = value` lines. A person edits it directly, and Reliquary only
+ever changes the one line a command names — every comment, blank
+line, and ordering choice elsewhere in the file is left exactly as
+it was. That is why the format is line-based instead of JSON. The
+normative spec is docs/spec/script-properties.md.
 
 Despite the familiar extension this is deliberately not the Java
 properties format: no unicode escapes, no line continuations, no
 quoting. A value is the trimmed remainder of its line, verbatim.
 
 Secret values never live in this file. A secret property's line
-carries the `@secret` marker and its value belongs to the host
-credential store, which lands with the store itself (milestone 8,
-T2 in planning/TASKS.md); until then a secret set fails closed
-rather than writing a value the file must never hold.
+carries the `@secret` marker, and its actual value belongs in the
+host credential store, which lands with the store itself (milestone
+8, T2 in planning/TASKS.md). Until then, trying to set a secret
+fails with an error rather than writing a value into a file that
+must never hold it.
 """
 
 import os
@@ -35,15 +36,18 @@ _SECRET_TOKEN = "@secret"
 class PropertiesError(StaticError):
     """A malformed properties file, key, or value.
 
-    A STATIC ERROR (exit 2): the file's own text settles every one of
-    these, and the caller wrote the text. It subclassed the root
-    directly while the four classes were read as tiers of a script
-    run; D58 generalized them to every surface, and a properties file
-    is authored input like any other.
+    A STATIC ERROR (exit code 2): the file's own text decides every
+    one of these problems, and the person who wrote that text caused
+    them. It subclasses the root error class directly, the way it did
+    back when the four error classes lined up with stages of a script
+    run; D58 made those four classes apply everywhere, not just to
+    scripts, and a properties file counts as authored input the same
+    way a script does.
     """
 
 def secret_marker():
-    """Return the value a secret property presents as."""
+    """Return the marker value shown in place of a secret property's
+    real value."""
     return {"secret": True}
 
 def is_secret(value):
@@ -53,15 +57,17 @@ def is_secret(value):
 def _properties_path(context=None, properties_file=None):
     """Return the path of the selected properties file.
 
-    An explicit `properties_file` *replaces* the home's file rather
-    than layering over it, so pointing it at a project-controlled
-    file makes a run hermetic. A `Context` carrying
-    `properties_file` selects the same way when no argument does —
-    the record is the carrier the session hands around (P26's
-    cargo). The CLI's `--properties` flag and the
-    `RELIQUARY_PROPERTIES` environment variable both arrive through
-    that slot, honoured in the CLI's own construction step and
-    never here: the library reads no environment.
+    Passing an explicit `properties_file` replaces the home
+    directory's file rather than adding to it, so pointing it at a
+    project's own file makes a run self-contained regardless of the
+    environment it runs in. A `Context` object carrying a
+    `properties_file` field is used the same way when no argument is
+    given — `Context` is the object the session passes down through
+    its calls, carrying settings like this one (P26). The CLI's
+    `--properties` flag and the `RELIQUARY_PROPERTIES` environment
+    variable both end up setting that `Context` field, when the CLI
+    builds its `Context`; this function itself never reads
+    environment variables.
     """
     if properties_file is None and isinstance(context, Context):
         properties_file = context.properties_file
@@ -230,9 +236,9 @@ def _read(path):
         try:
             _check_key(key)
         except PropertiesError as error:
-            # The key charter is one rule wherever the key was
-            # written, so the id travels and only the location is
-            # added here.
+            # The rules for a valid key are the same no matter where
+            # the key came from, so the same rule_id is reused here;
+            # only the file and line number are added.
             raise PropertiesError(f"{path}:{number}: {error}",
                                   rule_id=error.rule_id) from error
         if key in entries:
@@ -267,27 +273,30 @@ def has_credential(key, context=None, properties_file=None):
 def get_secret(key, context=None, properties_file=None):
     """Return a secret's plaintext value, or None if it has none.
 
-    The one door to a stored secret's value, for binding it into a
-    run. It is deliberately not exported to the CLI: `get-property`
-    and `list-properties` reveal only the marker.
+    This is the only function that returns a stored secret's actual
+    value, used for binding it into a run. It is deliberately not
+    exposed to the CLI: `get-property` and `list-properties` reveal
+    only the marker.
     """
     _check_key(key)
     path = _properties_path(context, properties_file)
     return credentials.read_secret(credentials.scope_for(path), key)
 
 def _refuse_orphan(path, key):
-    """Fail closed on a credential left behind with no marker.
+    """Refuse to overwrite a credential that has no marker line for it.
 
-    The fail-safe order stores a credential before publishing its
-    marker, so a credential without one is an interrupted secret
-    set. Writing over it would discard a secret the user believes
-    is stored, so the cleanup is theirs to ask for.
+    `set_property` stores the credential before it writes the marker
+    line, so a credential with no marker means a previous secret set
+    was interrupted partway through. Overwriting it would silently
+    discard a secret the user believes is already stored, so this
+    makes the caller ask for the cleanup explicitly instead.
     """
     try:
         present = credentials.has_secret(credentials.scope_for(path), key)
     except credentials.CredentialError:
-        # A host that cannot answer cannot be checked; ordinary
-        # values must not become unreachable because of it.
+        # If the credential store can't even answer, skip this check
+        # — an unavailable store must not block setting an ordinary
+        # (non-secret) value.
         return
     if present:
         raise PropertiesError(
@@ -300,15 +309,15 @@ def set_property(key, value, secret=False, context=None,
                  properties_file=None):
     """Create or replace a property, preserving the rest of the file.
 
-    Changing a property between ordinary and secret requires
-    `unset_property` first, so a secret can never be downgraded to
-    a plaintext value by a single command.
+    Changing a property between ordinary and secret requires calling
+    `unset_property` first, so a secret can never be downgraded to a
+    plaintext value by a single command.
 
-    A secret's value is stored in the host credential store and only
-    its marker is written to the file, in that order: the credential
-    lands first, so an interruption can leave an orphaned credential
-    (recoverable, and reported) but never a marker whose credential
-    was reported bound and is absent.
+    A secret's value is stored in the host credential store first,
+    and only afterward is its marker written to the file. That order
+    means an interruption can leave an orphaned credential (which is
+    detected and reported), but never a marker pointing at a
+    credential that isn't actually there.
     """
     _check_key(key)
     path = _properties_path(context, properties_file)
@@ -339,12 +348,13 @@ def set_property(key, value, secret=False, context=None,
     properties.save()
 
 def unset_property(key, context=None, properties_file=None):
-    """Remove a property, marker and credential alike.
+    """Remove a property: its marker line and its credential alike.
 
-    The marker goes first, then the credential: an interruption
-    leaves an orphaned credential rather than a marker pointing at
-    nothing. Unsetting a key with no marker still clears an
-    orphaned credential — this is the cleanup door.
+    The marker line is deleted first, then the credential, so an
+    interruption leaves an orphaned credential rather than a marker
+    pointing at nothing. Calling unset on a key with no marker line
+    still clears any orphaned credential left for it — that is how an
+    orphaned credential gets cleaned up.
     """
     _check_key(key)
     path = _properties_path(context, properties_file)
@@ -354,23 +364,25 @@ def unset_property(key, context=None, properties_file=None):
     if properties.unset(key):
         properties.save()
     if current is not None and not was_secret:
-        # An ordinary value and an orphaned credential cannot
-        # coexist — a set refuses the orphan first — so there is
-        # nothing here worth waking the host store for.
+        # An ordinary property and an orphaned credential can't both
+        # exist for the same key — set_property already refuses to
+        # create an ordinary value over an orphaned credential — so
+        # there's nothing to check in the credential store here.
         return
     try:
         credentials.delete_secret(credentials.scope_for(path), key)
     except credentials.CredentialError:
-        # Clearing an ordinary property must not depend on a store
-        # this host may not even have; a secret's must.
+        # Removing an ordinary property must still succeed even if
+        # this host has no working credential store; removing a
+        # secret must not.
         if was_secret:
             raise
 
 def list_properties(prefix=None, context=None, properties_file=None):
-    """Return the properties projection: key to value or marker.
+    """Return the properties as a dict mapping key to value or marker.
 
-    A prefix selects that key and its dotted descendants — it is a
-    namespace, not a raw string match.
+    A prefix selects that key and its dotted descendants — it works
+    like a namespace, not like a plain string match.
     """
     path = _properties_path(context, properties_file)
     properties = _read(path).projection()

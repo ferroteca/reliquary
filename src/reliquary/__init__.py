@@ -2,20 +2,22 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """OS installation scripting over agentless QEMU guest automation.
 
-The session is the only door (P26): all consumer interaction with
-ambient state — whatever resolves a working directory, touches
-machine or media state, or reads ambient configuration — passes
-through a :class:`Session`, opened on at minimum a home directory.
-What the root exports beside it is the vocabulary: the types, the
-errors, the ``Context`` record the session is opened on,
-``default_home_dir()``, and the free parsers — pure
-data-in/data-out work, so tooling never invents a home to parse a
-string. Two families stay module-level by name: the guest-console
-family (the carrier stratum — ``Machine`` and its functions
-address a machine's own directory, their session respell deferred
-to the control-plane design), and the backend seam's read-only
-vocabulary. The codex verbs are CLI-only (D87) and appear on no
-surface here.
+``Session`` is the one way to interact with reliquary's working
+directories, machine state, and media state (P26): every such call
+goes through a :class:`Session`, opened on at least a home directory.
+Besides ``Session``, this module exports the types, the error
+classes, the ``Context`` record a ``Session`` is opened on,
+``default_home_dir()``, and the standalone parsing functions — those
+are pure functions that take input and return output with no
+directory lookups, so a tool using them never has to invent a home
+directory just to parse a string. Two groups of functions are
+exported directly, by name, rather than through ``Session``: the
+guest-console functions (``Machine`` and its related functions, which
+address one machine's own directory directly — giving these a
+``Session``-based interface is left for the control-plane design), and
+the backend discovery functions, which are read-only. The codex
+functions (for the built-in blueprint library) are available only
+from the CLI (D87) and are not exported here at all.
 """
 
 from .session import Session

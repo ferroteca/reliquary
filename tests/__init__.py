@@ -2,16 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Tests for reliquary.
 
-Importing this package **arms the guard** against live external
-effects: no unit test reaches a hypervisor or the network, because
-the names that would are replaced below at import time.
+Importing this package blocks live external effects: no unit test
+can reach a hypervisor or the network, because this file replaces
+the functions that would do that, below, at import time.
 
 That makes the import itself load-bearing. pytest, the runner
 (D106), imports each module as ``tests.test_*`` because this file
-makes the directory a package, so the arming runs before any test
-does. `test_external_effect_guards` asks for the package by name
-anyway — deliberately, and with no dependency on `reliquary`
-importing — and then asserts that the arming took (T26).
+makes the directory a package, so the blocking is in place before
+any test runs. `test_external_effect_guards` imports the package by
+name anyway — deliberately, without relying on `reliquary` having
+imported it — and then checks that the blocking took effect (T26).
 """
 
 import contextlib
@@ -72,7 +72,9 @@ def live_external_effects():
         subprocess.run = previous_run
 
 
-# `load_tests` lived here for `python -m unittest tests`, and went
-# with the last `TestCase` (F60): with every module pytest-native
-# that entry point collects nothing at all and reports success —
-# the green-run-over-nothing failure this whole conversion was for.
+# `load_tests` used to live here, for `python -m unittest tests`. It
+# was removed along with the last `TestCase` (F60). Now that every
+# module is pytest-native, that unittest entry point collects
+# nothing and reports success instead of failing — a green run over
+# no tests at all, which is exactly what this conversion was meant
+# to prevent.

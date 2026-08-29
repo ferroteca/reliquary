@@ -1,45 +1,56 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Working-directory resolution, layout, and containment.
+"""Resolving, laying out, and deriving reliquary's working directories.
 
-Reliquary has six working directories and every one of them is
-placeable: ``home``, ``blueprints``, ``scripts``, ``cache``, ``media``
-and ``machines``. Each starts **unassigned**. A value arrives in the
-``Context`` record a session is opened on — the CLI builds one per
-invocation from its ``--*-dir`` flags, the ``RELIQUARY_*_DIR``
-environment variables (except ``RELIQUARY_HOME`` for the home), and
-the default home — and every default is
-*derived* rather than pre-set:
+Reliquary has six working directories, and every one of them can be
+placed independently: ``home``, ``blueprints``, ``scripts``,
+``cache``, ``media``, and ``machines``. Each one starts out
+unassigned. A directory gets a value through the ``Context`` record a
+``Session`` is opened on. The CLI builds one ``Context`` per
+invocation, from its ``--*-dir`` flags, then the ``RELIQUARY_*_DIR``
+environment variables (``RELIQUARY_HOME`` for the home directory
+specifically), then the default home directory. Any directory that's
+still unassigned after that gets its default location computed, not
+hardcoded:
 
-- assigning ``home`` gives default locations under it to
-  ``blueprints``, ``scripts`` and ``cache``;
-- assigning ``cache`` — explicitly, *or* by the derivation above —
-  gives default locations under it to ``media`` and ``machines``.
+- assigning ``home`` gives ``blueprints``, ``scripts``, and ``cache``
+  their default locations, as subdirectories of it;
+- assigning ``cache`` — whether directly, or because it was itself
+  derived from ``home`` above — gives ``media`` and ``machines``
+  their default locations, as subdirectories of it.
 
-Derivation reaches only what is still unassigned, so assigning
-``cache`` alone conjures no home, and assigning ``machines`` alone
-leaves ``media`` wherever the rest of the resolution puts it. There
-is no process-global assignment: the record carries everything, so
-two sessions in one process are unremarkable (P26).
+This derivation only fills in directories that are still unassigned.
+So assigning ``cache`` alone does not invent a ``home`` — there isn't
+one — and assigning ``machines`` alone leaves ``media`` to be resolved
+however the rest of this process resolves it. None of this state is
+global to the process — the ``Context`` record carries everything —
+so having two ``Session`` objects at once in one program causes no
+conflict (P26).
 
-**A record with no home is a fail-closed error at the session's
-door**: construction refuses (``dir.unassigned``), naming the home,
-before any call could find a directory unassigned — an assigned
-home reaching all six by derivation. The same refusal survives at
-first use inside the engine, for a resolution reached with a bare
-record; one rule, one id, wherever it is noticed.
+**A ``Context`` with no home directory assigned is an error, and
+``Session`` construction catches it immediately**: construction
+raises ``StaticError`` with ``rule_id="dir.unassigned"``, naming the
+missing home directory, before any later call could hit an
+unassigned directory — since an assigned home makes all six
+directories resolvable through derivation. The same check exists
+again, deeper in the engine, for the case where some code resolves a
+directory directly from a bare ``Context`` rather than going through
+``Session``. It's the same rule and the same rule_id in both places.
 
-The two surfaces differ only in whether an assignment is made on the
-caller's behalf. The **CLI** gives ``home`` its default whenever
-neither a flag nor the environment named one, so one assignment
-reaches all six and the refusal is unreachable at the keyboard: a
-property of that default rather than an exemption from the rule,
-which matters because a property survives the default changing and
-an exemption would have to be re-argued. The **embedding API**
-assigns nothing — a session demands its home at the door — so a
-library call never silently picks up the developer's home. Honouring
-the environment is likewise the CLI's private construction step and
-never the library's: nothing here reads the environment.
+The CLI and the embedding API differ only in whether they assign a
+default home on the caller's behalf. The **CLI** fills in the default
+home directory whenever neither a flag nor an environment variable
+named one, so from that one assignment all six directories become
+resolvable, and a user running the CLI can never actually trigger the
+"no home assigned" error — that's a result of the default being
+applied, not a special case carved out of the rule. That distinction
+matters because it means the guarantee still holds even if the
+default value itself changes later. The **embedding API** assigns no
+default at all — a ``Session`` requires its home directory to be
+given explicitly — so a library call never silently reuses whatever
+home directory happens to belong to the developer running it.
+Likewise, only the CLI reads environment variables during its own
+construction step; nothing in this module reads them.
 """
 
 import os
@@ -53,9 +64,10 @@ from .errors import StaticError
 DIRECTORIES = ("home", "blueprints", "scripts", "cache", "media",
                "machines")
 
-#: What each derived directory hangs off, and the leaf it takes
-#: there. ``home`` is absent because nothing derives it: it is the
-#: one directory that must be assigned or done without.
+#: For each directory that can be derived, which directory it's
+#: derived from and the subdirectory name it takes there. ``home`` has
+#: no entry, because nothing derives it — it's the one directory that
+#: must either be assigned directly or left unassigned.
 _DERIVED_FROM = {
     "blueprints": ("home", "blueprints"),
     "scripts": ("home", "scripts"),
@@ -65,14 +77,15 @@ _DERIVED_FROM = {
 }
 
 def environment_variable(name):
-    """The environment variable that assigns directory ``name``.
+    """Return the environment variable name that assigns directory ``name``.
 
-    One mechanical rule — ``RELIQUARY_`` plus the flag's own name —
-    so ``--blueprints-dir`` is ``RELIQUARY_BLUEPRINTS_DIR`` and there
-    is nothing per-directory to remember. ``home`` is the one
-    user-facing exception: its established spelling is
-    ``RELIQUARY_HOME``. Honoured by the CLI's construction step alone;
-    this module never reads it.
+    Follows one mechanical rule: ``RELIQUARY_`` plus the flag's own
+    name, uppercased — so ``--blueprints-dir`` maps to
+    ``RELIQUARY_BLUEPRINTS_DIR``, with nothing to memorize per
+    directory. ``home`` is the one exception users actually see: its
+    variable is ``RELIQUARY_HOME``, not ``RELIQUARY_HOME_DIR``. Only
+    the CLI's construction step actually reads these variables; this
+    module never does.
     """
     if name == "home":
         return "RELIQUARY_HOME"
@@ -117,38 +130,44 @@ def documents_dir():
 
 
 def default_home_dir():
-    """The home the CLI assigns when the caller named none.
+    """Return the home directory the CLI uses when the caller named none.
 
-    ``Documents/reliquary``, falling back to ``~/reliquary`` where no
-    Documents folder can be determined. Computed, never assigned here:
-    assigning is the CLI's act, and this is only the value it uses.
+    Returns ``Documents/reliquary``, or ``~/reliquary`` if no Documents
+    folder can be found. This function only computes that path; it's
+    the CLI's job to actually assign it.
     """
     return os.path.join(documents_dir() or os.path.expanduser("~"),
                         "reliquary")
 
 
 class Context:
-    """A per-call assignment of the six working directories.
+    """Holds the six working-directory assignments for one call or session.
 
-    A plain record: each slot holds an absolute path or ``None`` for
-    unassigned, and all resolution lives in this module's functions.
-    That keeps it a handful of nullable strings, which binds cleanly
-    from C or Java where keyword arguments would not (P7) — and it
-    leaves ``cache_dir`` free to be the resolver it reads as.
+    A plain data record: each field holds an absolute path, or
+    ``None`` if unassigned, and all the logic for resolving those
+    paths lives in this module's functions instead of on the class.
+    Keeping it this simple — a handful of strings that can be
+    ``None`` — means it can be constructed cleanly from C or Java too,
+    where Python-style keyword arguments aren't available (P7), and it
+    leaves the name ``cache_dir`` free to also be read as "the thing
+    that resolves the cache directory."
 
-    Every engine function that resolves a working directory takes a
-    ``context=``: a plain string is sugar for ``Context(home_dir=...)``,
-    and a ``Context`` pins whatever slots it fills, the rest deriving.
-    The session pins the whole record once at construction and hands
-    it to every call (P26); the CLI builds exactly one per
-    invocation — from its flags, the environment, and the default
-    home — and opens its session on it.
+    Every engine function that resolves a working directory accepts a
+    ``context=`` argument: passing a plain string is shorthand for
+    ``Context(home_dir=<that string>)``, and passing a ``Context``
+    pins whatever fields it has set, letting the rest be derived. A
+    ``Session`` resolves the whole record once, at construction, and
+    passes it to every call it makes (P26). The CLI builds exactly
+    one ``Context`` per invocation — from its flags, the environment,
+    and the default home directory — and opens its ``Session`` on
+    that.
 
-    ``properties_file`` rides beside the six (P26): the selected
-    properties file is ambient state exactly as the directories are,
-    so the one record carries it too. ``None`` selects nothing, and
-    the selection in ``properties.py`` then falls through exactly as
-    if no record carried one.
+    ``properties_file`` is carried alongside the six directories
+    (P26): which properties file is selected is state that travels
+    with a call the same way the directories do, so it lives in this
+    same record. ``None`` means no file was explicitly selected, and
+    ``properties.py`` then falls back to its own default exactly as
+    if this record had never carried a value at all.
     """
 
     __slots__ = ("home_dir", "blueprints_dir", "scripts_dir",
@@ -181,10 +200,10 @@ _EMPTY = Context()
 
 
 def as_context(context):
-    """Coerce ``None`` / a bare home string / a ``Context`` into one.
+    """Coerce ``None``, a bare home-directory string, or a ``Context`` into a ``Context``.
 
-    A bare string assigns the home and nothing else, so the other
-    five derive from it.
+    A bare string assigns only the home directory; the other five
+    directories are then derived from it.
     """
     if context is None:
         return _EMPTY
@@ -194,7 +213,7 @@ def as_context(context):
 
 
 def _unassigned(name):
-    """The fail-closed diagnostic for a directory nobody assigned."""
+    """Build the StaticError raised when directory ``name`` was never assigned."""
     routes = [name]
     parent = _DERIVED_FROM.get(name)
     while parent is not None:
@@ -211,7 +230,7 @@ def _unassigned(name):
 
 
 def _resolve(name, context):
-    """Resolve one directory: the record's slot, then derivation."""
+    """Resolve directory ``name``: use the record's own value if set, else derive it."""
     context = as_context(context)
     assigned = getattr(context, "%s_dir" % name)
     if assigned:
@@ -225,14 +244,18 @@ def _resolve(name, context):
     except StaticError as error:
         if getattr(error, "rule_id", None) != "dir.unassigned":
             raise
-        # The caller asked for `name`; naming its unassigned ancestor
-        # would answer a question nobody put. The routes to fix it
-        # include that ancestor, so nothing is lost by restating.
+        # The caller asked to resolve `name`, so the error should
+        # name `name`, not the unassigned ancestor directory that
+        # `name` derives from — that would answer a question nobody
+        # asked. The error message for `name` already lists that
+        # ancestor as one of the ways to fix it, so nothing is lost by
+        # raising this instead of letting the ancestor's own error
+        # propagate.
         raise _unassigned(name) from None
 
 
 def _derive_from(name, context):
-    """Resolve one directory from ``context`` alone, or ``None``."""
+    """Resolve directory ``name`` using only ``context``; return None if it can't be resolved."""
     assigned = getattr(context, "%s_dir" % name)
     if assigned:
         return assigned
@@ -247,16 +270,17 @@ def _derive_from(name, context):
 
 
 def pinned(context=None):
-    """Return ``context`` with every derivable slot filled, from it
-    alone.
+    """Return a new ``Context`` with every derivable field filled in.
 
-    The resolution a caller would get who pinned every slot:
-    per-call assignment then derivation, from the record alone.
-    This is the session's construction step (P26 — the session
-    carries the six directories, once). A slot the record cannot
-    derive — anything, when it holds no home — stays ``None`` rather
-    than raising, because whether an unfilled slot is an error is the
-    caller's rule, not this record's.
+    Fills in each directory the same way a caller resolving it
+    manually would: use what's explicitly assigned, then derive the
+    rest, using only what's in ``context`` itself. This is what a
+    ``Session`` calls at construction time to resolve its six
+    directories once and hold onto that result (P26). A field that
+    can't be derived — which happens for every field when there's no
+    home directory — is left as ``None`` here rather than raising an
+    error, because whether a missing field is actually an error is
+    for the caller to decide, not this function.
     """
     context = as_context(context)
     slots = {"%s_dir" % name: _derive_from(name, context)
@@ -295,41 +319,44 @@ def machines_dir(context=None):
 
 
 def fonts_dir(context=None):
-    """Return the authored-font directory.
+    """Return the directory where authored fonts live.
 
-    Not one of the six placeable directories: it is a fixed leaf
-    under ``home`` — ``<home>/fonts`` — never independently
-    assigned. `authored-binary-assets.md` is explicit that a binary
-    asset kind (a font, a landmark) adds no seventh placeable root
-    (P12); it resolves out of a directory that already exists,
-    exactly as `landmarks_dir` below joins this same layout. A
-    project whose ``scripts``/``blueprints`` live outside the home
-    therefore still finds its fonts under the home alone — an
-    accepted cost of not widening the six-slot model for one more
-    read-only kind.
+    This is not one of the six placeable directories — it's always a
+    fixed subdirectory of ``home``, ``<home>/fonts``, and can never be
+    assigned independently. `authored-binary-assets.md` states
+    explicitly that adding a new binary asset kind (a font, a
+    landmark) does not add a seventh placeable directory (P12); each
+    one resolves to a subdirectory of a directory that already
+    exists, the same way `landmarks_dir` below does. So a project
+    whose ``scripts`` or ``blueprints`` live outside the home
+    directory still has its fonts under the home directory regardless
+    — an accepted tradeoff, rather than widening the six-directory
+    model for one more read-only kind of asset.
     """
     return os.path.join(home_dir(context), "fonts")
 
 
 def landmarks_dir(context=None):
-    """Return the authored-landmark directory.
+    """Return the directory where authored landmarks live.
 
-    ``<home>/landmarks`` — the fixed leaf `fonts_dir` above already
-    settled the shape of (F65). A landmark is the second authored
-    binary kind and answers to the same rule: it adds no seventh
-    placeable root, it is read-only, and its variant renderings sit
-    beside the declaration by stem adjacency rather than in a
-    directory of their own.
+    ``<home>/landmarks`` — a fixed subdirectory, the same pattern
+    `fonts_dir` above already established (F65). A landmark is the
+    second kind of authored binary asset, and follows the same rule
+    as a font: it does not add a seventh placeable directory, it is
+    read-only, and its different renderings sit next to the
+    declaration by filename-stem matching rather than each getting
+    their own directory.
     """
     return os.path.join(home_dir(context), "landmarks")
 
 
 def effective_home(explicit):
-    """Return the explicit operation home, or the resolved home.
+    """Return ``explicit`` if given, else the resolved home directory.
 
-    For the small set of modules (``machine.py``, the backend
-    adapters) that take an already-resolved plain directory rather
-    than a ``Context`` — sometimes a real reliquary home, sometimes a
-    machine's own materialization directory standing in for one.
+    Used by the small set of modules (``machine.py``, the backend
+    adapters) that take an already-resolved plain directory path
+    instead of a ``Context`` — sometimes that's a real reliquary home
+    directory, and sometimes it's a machine's own materialization
+    directory being used in its place.
     """
     return os.path.abspath(explicit) if explicit else home_dir()

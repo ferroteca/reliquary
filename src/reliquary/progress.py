@@ -1,22 +1,25 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Live renderings of the run event stream.
+"""Ways of showing the run event stream to a person or a program.
 
-``--progress (auto | pretty | plain | jsonl)`` selects one
-(docs/spec/cli.md, "Running scripts"); the API twins take the
-same ``progress=`` value under parity. Every renderer reads the one
-:mod:`reliquary.events` stream, so none can report what the stream
-does not carry.
+``--progress`` picks one of ``auto``, ``pretty``, ``plain``, or
+``jsonl`` (docs/spec/cli.md, "Running scripts"); the equivalent API
+functions take the same values through their own ``progress=``
+argument. Every renderer reads events from the single
+:mod:`reliquary.events` stream, so none of them can show anything the
+stream doesn't actually carry.
 
-The output discipline (docs/spec/cli.md, "Output discipline"):
-the human modes render **everything** to stderr and leave stdout
-empty — the outcome travels by exit code. ``jsonl`` is the named
-exception: its stdout events *are* the result, the last line being
-the terminal event, with diagnostics still on stderr.
+Per the output rules in docs/spec/cli.md ("Output discipline"), the
+two human-facing modes (``pretty`` and ``plain``) write everything to
+stderr and leave stdout empty — the caller finds out whether the run
+succeeded from the exit code, not from stdout. ``jsonl`` is the one
+exception: its events on stdout *are* the result, with the last line
+being the terminal event, while diagnostics still go to stderr.
 
-``plain`` and ``jsonl`` are noninteractive by construction: nothing
-prompts, so a missing input is a PREFLIGHT ERROR before the machine
-starts rather than a program hanging on a hidden question.
+``plain`` and ``jsonl`` never prompt the user for input, by design:
+if something needed were never supplied, that's a PREFLIGHT ERROR
+raised before the machine even starts, rather than the program
+silently hanging while it waits on a question nobody can see.
 """
 
 import os
@@ -27,7 +30,8 @@ from .errors import StaticError
 
 MODES = ("auto", "pretty", "plain", "jsonl")
 
-#: Modes that never prompt — a program can never hang on a question.
+#: Modes that never prompt the user, so the program can't hang waiting
+#: on a question nobody can see.
 NONINTERACTIVE = frozenset({"plain", "jsonl"})
 
 _HEARTBEAT_INTERVAL = 5.0
@@ -36,11 +40,12 @@ _BAR_WIDTH = 20
 
 
 def resolve_mode(progress, *, stream=None):
-    """Resolve ``auto`` against the terminal; validate the rest.
+    """Turn ``auto`` into ``pretty`` or ``plain``; validate anything else.
 
-    ``auto`` is the BuildKit vocabulary's default and resolves by
-    whether the *rendering* stream is a tty, which for the human modes
-    is stderr.
+    ``progress`` defaults to ``auto`` (the same default name BuildKit
+    uses) and picks ``pretty`` or ``plain`` by checking whether the
+    stream being rendered to — stderr, for the human modes — is
+    connected to a terminal.
     """
     if progress is None:
         progress = "auto"
@@ -55,12 +60,12 @@ def resolve_mode(progress, *, stream=None):
 
 
 def interactive(progress):
-    """Whether ``progress`` permits prompting at all."""
+    """Return whether ``progress`` allows prompting the user at all."""
     return resolve_mode(progress) not in NONINTERACTIVE
 
 
 def renderer(progress, *, out=None, err=None):
-    """Build the renderer ``progress`` names."""
+    """Build the renderer object for the ``progress`` mode named."""
     mode = resolve_mode(progress, stream=err)
     if mode == "jsonl":
         return JsonlRenderer(out if out is not None else sys.stdout)
@@ -71,7 +76,7 @@ def renderer(progress, *, out=None, err=None):
 
 
 def stream_for(progress, *, redact=None, out=None, err=None):
-    """An :class:`~reliquary.events.EventStream` rendering as asked."""
+    """Build an :class:`~reliquary.events.EventStream` in the mode asked for."""
     return _events.EventStream(
         renderer(progress, out=out, err=err), redact=redact)
 
@@ -84,8 +89,11 @@ def _isatty(handle):
 
 
 def _color_ok(handle):
-    """ANSI is emitted per stream, only to a tty, and never under
-    ``NO_COLOR``."""
+    """Return whether to emit ANSI color codes to ``handle``.
+
+    Color is decided separately for each stream: only when that
+    stream is a terminal, and never when ``NO_COLOR`` is set.
+    """
     return _isatty(handle) and not os.environ.get("NO_COLOR")
 
 
@@ -103,10 +111,11 @@ def _bytes(count):
 
 
 def describe(event):
-    """One human line for an event, or ``None`` to render nothing.
+    """Return one line of human-readable text for ``event``, or None.
 
-    Renderers may omit what the stream carries; they may never add to
-    it.
+    A renderer is allowed to leave out some of what the stream
+    carries, but it must never show something the stream doesn't
+    actually carry.
     """
     kind = event.kind
     fields = event.fields
@@ -129,9 +138,10 @@ def describe(event):
     if kind == _events.OBSERVATION_ARM:
         return prefix + f"wait {fields.get('description')}"
     if kind == _events.OBSERVATION_MATCH:
-        # A text condition is satisfied by a row and names it; a
-        # landmark by a *variant*, which is the fact an author acts on
-        # when several renderings are in play (F65).
+        # A text condition is matched by a screen row, and names that
+        # row; a landmark condition is matched by a variant instead,
+        # which is what a script author needs to know when several
+        # renderings of the same landmark are in play (F65).
         row = fields.get("row")
         variant = fields.get("variant")
         seen = f": {row!r}" if row else f": {variant}" if variant else ""
@@ -186,12 +196,12 @@ def describe(event):
 
 
 def _guard_report(fields):
-    """One line naming the cadence measured and what it bought.
+    """Return one line naming the cadence measured and what it bought.
 
-    Said plainly because the alternative is silence: a run whose
-    guard stood down looks exactly like one whose guard passed, and
-    the author who wrote `stability=` has no other way to learn the
-    host could not honor it.
+    This is stated explicitly because the alternative is silence: a
+    run whose quiescence guard gave up looks exactly like one whose
+    guard succeeded, and the script author who wrote `stability=` has
+    no other way to find out the host couldn't actually honor it.
     """
     cadence = fields.get("cadence")
     window = fields.get("window")
@@ -206,7 +216,7 @@ def _guard_report(fields):
 
 
 def _failure_report(fields):
-    """The failure report: what was pending, which clock, what to try."""
+    """Return the failure report: what was pending, which clock, what to try."""
     lines = [f"FAILED: {fields.get('error')}"]
     for label, key in (("pending", "pending"),
                        ("clock", "clock"),
@@ -218,24 +228,27 @@ def _failure_report(fields):
         if value:
             lines.append(f"  {label}: {value}")
     for miss in fields.get("landmark-miss") or ():
-        # The landmark half of the nearest miss (F65): the variant
-        # that came closest, and the regions it failed on with the
-        # percentage each achieved. One line each, because a
-        # branching wait may have been watching several.
+        # The landmark half of the nearest-miss report (F65): names
+        # the variant that came closest to matching, and the regions
+        # it failed on along with the percentage each one matched.
+        # One line per variant, because a wait with several branches
+        # may have been watching more than one landmark at once.
         lines.append(f"  landmark miss: {miss}")
     unclear = fields.get("unreadable-cells")
     if unclear:
-        # Beside the nearest miss rather than instead of it: the miss
-        # is measured against rows that may never have been read, and
-        # this says how far to trust them.
+        # Shown alongside the nearest-miss report, not instead of it:
+        # the nearest miss is measured against screen rows that may
+        # include cells that were never actually readable, so this
+        # line says how far to trust that measurement.
         lines.append(
             f"  unreadable: {unclear} cells matched no glyph and were "
             "read as spaces; the screen may use a font this host "
             "does not have")
     restored = fields.get("restored")
     if restored:
-        # What a scope took back before this report was written. The
-        # machine no longer shows it, so the report has to.
+        # Lists what a `with` scope put back before this failure
+        # report was written. The machine itself no longer shows the
+        # old state, so this line is the only record of it.
         lines.append("  restored: " + "; ".join(restored))
     route = fields.get("route")
     if route:
@@ -262,7 +275,7 @@ def _terminal_report(fields):
 
 
 class _HumanRenderer:
-    """Shared stderr rendering: one line per event, plus heartbeats."""
+    """Base class for stderr rendering: one line per event, plus heartbeats."""
 
     color = False
 
@@ -303,11 +316,12 @@ class _HumanRenderer:
 
     @staticmethod
     def _line(fields):
-        """The 'elapsed / limit' pair a tick shows — never a bar.
+        """Return the 'elapsed / limit' text a tick shows. Never a progress bar.
 
-        Phases and observations have no honest denominator of
-        *progress*, only of time, so they are rendered as the two
-        numbers rather than as a filled bar.
+        Phases and observations have no meaningful measure of how much
+        of the work is done, only of how much time has passed, so
+        they're shown as these two numbers rather than as a filled-in
+        bar that would imply a fraction complete.
         """
         phase = fields.get("phase") or "-"
         step = fields.get("step")
@@ -320,7 +334,7 @@ class _HumanRenderer:
 
 
 class PlainRenderer(_HumanRenderer):
-    """A redirected log's rendering: no ANSI, a periodic heartbeat."""
+    """Rendering for a redirected log: no ANSI colors, a periodic heartbeat line."""
 
     def __init__(self, stream, *, interval=_HEARTBEAT_INTERVAL):
         super().__init__(stream)
@@ -336,7 +350,7 @@ class PlainRenderer(_HumanRenderer):
 
 
 class PrettyRenderer(_HumanRenderer):
-    """An attached terminal's rendering: an in-place live line."""
+    """Rendering for an attached terminal: one live line updated in place."""
 
     def __init__(self, stream):
         super().__init__(stream)
@@ -362,7 +376,7 @@ class PrettyRenderer(_HumanRenderer):
 
 
 class JsonlRenderer:
-    """The programmatic rendering: the event stream on stdout, alone."""
+    """Rendering for programs: the raw event stream on stdout, nothing else."""
 
     def __init__(self, stream):
         self.stream = stream
@@ -372,7 +386,9 @@ class JsonlRenderer:
         self.stream.flush()
 
     def tick(self, **fields):
-        # A tick is a display concern; the stream carries only events.
+        # Ticks are only for live human display; the jsonl stream
+        # carries recorded events and nothing else, so this is a
+        # no-op.
         return
 
     def clear(self):

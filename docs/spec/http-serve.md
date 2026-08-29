@@ -6,30 +6,31 @@ SPDX-License-Identifier: GPL-3.0-only
 # Local HTTP server for installer answer files
 
 > **Status:** implemented - milestone 5 completed on
-> 2026-07-22. Packer parity is the settled shape, and the
-> milestone's decide-first round is recorded here: scripts declare
-> named run-scoped served content, inline or from a script-relative
-> file,
-> `$rlq.http.ip` / `$rlq.http.port` / `$rlq.http.url` bind the live
-> address, and QEMU reaches
-> the host through user-mode networking's host gateway. Distinct
-> from the deleted property-binding "response file" concept
+> 2026-07-22. The design settled on matching Packer's approach, and
+> the decisions made before implementation are recorded here:
+> scripts declare named, run-scoped served content, either inline or
+> from a script-relative file; `$rlq.http.ip` / `$rlq.http.port` /
+> `$rlq.http.url` bind the live address; and QEMU reaches the host
+> through user-mode networking's host gateway. This is a different
+> feature from the "response file" concept that was proposed for
+> property binding and then dropped
 > (planning/DECISIONS.md).
 
 ## Purpose
 
-Guests whose installers already accept a declarative answer file
-- Kickstart, preseed, AutoYaST, Windows `unattend.xml`, and kin -
-should consume that path rather than a keystroke script that
-reinvents it. Packer's builders solve delivery with an ephemeral
-local HTTP server the guest fetches from during the build.
-Reliquary adopts the same pattern.
+Some guest installers already accept a declarative answer file -
+Kickstart, preseed, AutoYaST, Windows `unattend.xml`, and similar
+formats. For those, a script should use that answer file rather
+than a keystroke script that recreates the same information by
+typing it in. Packer's builders deliver the answer file with an
+ephemeral local HTTP server that the guest fetches from during the
+build. Reliquary uses the same approach.
 
-This does not compete with those formats, and it does not weaken
-agentless keystroke scripting for guests that lack them
-(docs/spec/script-spec.md "The procedural–declarative seam"; language goal
-G1 is about the control plane, not a ban on the installer's own
-answer-file mechanism).
+This does not replace those answer-file formats, and it does not
+weaken agentless keystroke scripting for guests that don't have one
+(docs/spec/script-spec.md "The procedural–declarative seam";
+language goal G1 governs the control plane, not the installer's own
+answer-file mechanism, so it does not prohibit using one).
 
 ## Contract
 
@@ -58,11 +59,12 @@ The feature is a run-scoped answer-file server:
 - The guest reaches the server over the VM network. Reliquary does
   not push answer files into the guest.
 
-This is strong alignment with U1, U4, and U5: installer-native
-answer files make unattended installs easier, keep shareable
-automation as authored assets beside blueprints and media
-definitions, and give customized installs a clear data seam without
-turning `.rlqs` into a general computation language.
+This serves U1, U4, and U5 directly: installer-native answer files
+make unattended installs easier, keep shareable automation as
+authored assets alongside blueprints and media definitions, and
+give customized installs a clear, well-defined way to supply data
+without turning `.rlqs` into a general-purpose programming
+language.
 
 ## Script Surface
 
@@ -121,8 +123,9 @@ syntax strips incidental indentation by default, while Python
 triple-quoted strings preserve indentation exactly unless the
 caller separately applies `textwrap.dedent()` or
 `inspect.cleandoc()`. Reliquary makes the common installer-answer
-case the default and uses an explicit modifier for the
-non-adjusted form.
+case (indentation stripped) the default, and requires an explicit
+modifier, `indent=literal`, to get the other case (indentation
+preserved).
 
 Property expansion uses the same `${key}` spelling as script
 strings. Inline content expands only after dedent. File-backed
@@ -151,7 +154,8 @@ to the language's usual "blocks contain nodes" rule, justified by
 the fact that installer answer files are themselves line-oriented
 documents.
 
-The executable lifetime controls are ordinary statements:
+Starting and stopping the server while the script runs uses
+ordinary statements:
 
 ```rlqs
 http start
@@ -168,7 +172,7 @@ running and does nothing if it is already stopped. Authors may stop
 the server as soon as the guest no longer needs the answer file; if
 they omit the final stop, the run performs it implicitly.
 
-For odd installers that need a changed response at a later step,
+For installers that need a different response at a later step,
 `http start` may carry content entries directly in a block. These
 entries are validated like declarations and replace same-named
 declared content for that start:
@@ -286,11 +290,11 @@ numbers. Setting both to the same value pins the server to that
 port. If no port in the range can be bound when `http start`
 executes, the run fails naming the range.
 
-The API exposes the same settings through the parsed script surface,
-not through separate `run_script` parameters. A caller that wants a
-different range edits or generates the script it owns, preserving
-CLI-API parity and keeping the run's behavior inspectable from the
-authored asset.
+The API exposes the same settings by parsing the script, not
+through separate `run_script` parameters. A caller that wants a
+different port range edits or generates the script it owns. This
+keeps the CLI and the API behaving the same way, and it keeps the
+run's behavior visible by reading the script itself.
 
 ## QEMU Reachability
 
@@ -300,9 +304,10 @@ explicit backend networking settings. The guest-reachable host
 address is QEMU user networking's host gateway, `10.0.2.2`, so
 `$rlq.http.ip` is `10.0.2.2` on this path.
 
-This is an interim backend default, not a first-class blueprint NIC
-model. A later milestone that grows backend adapters and richer
-device modeling owns portable network devices. Until then:
+This is a temporary default for the QEMU backend, not a network
+model defined on the blueprint. A later milestone will add more
+backend adapters and richer device modeling, and portable network
+devices belong to that milestone. Until then:
 
 - the script's `http` block declares the need for host-reachable
   networking;
@@ -313,11 +318,12 @@ device modeling owns portable network devices. Until then:
   host reachable, or preflight fails naming the conflict;
 - no behavior is inferred from the guest.
 
-The implementation should prefer the least surprising QEMU shape
-that works for installer fetches under the DOS-on-QEMU vertical:
-user networking with an emulated NIC appropriate for the platform.
-If a platform has no supported network path yet, the capability
-check fails before the run.
+For DOS guests running under QEMU, the implementation should use
+the most predictable QEMU network configuration that lets the
+installer fetch from the server: user-mode networking with an
+emulated network card appropriate to the platform. If a platform
+has no supported network path yet, the capability check fails
+before the run starts.
 
 ## CLI and API
 
