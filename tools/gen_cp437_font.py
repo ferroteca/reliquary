@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Generate Reliquary's original CP437 8x16 glyph bank.
+"""Generate Reliquary's own CP437 8x16 glyph bank.
 
-Original work: a fixed-width bitmap font in the CP437 code layout,
-drawn for Reliquary's text-screen recognizer (F51). It is *not* a
-dump of an IBM ROM or a third-party font file — shapes are authored
-here so the project owns every byte it ships.
+This is original work: a fixed-width bitmap font in the CP437 code
+layout, drawn for Reliquary's text-screen recognizer (F51). It is
+*not* a dump of an IBM ROM or a third-party font file — every shape
+is drawn here so the project owns every byte it ships.
 """
 
 from __future__ import annotations
@@ -278,9 +278,10 @@ def _box_drawing(code):
     }
     which = arms.get(code)
     if which is None:
-        # The double-line set (0xB5-0xBE, 0xC6-0xD8) was never drawn.
-        # Saying so lets the caller construct one rather than emit a
-        # blank, which would collide with the space and make the code
+        # The double-line box-drawing codes (0xB5-0xBE, 0xC6-0xD8) were
+        # never drawn. Returning None for them tells build_font to
+        # fall back to _constructed instead of leaving them blank,
+        # which would collide with the space and make the code
         # unrecognizable.
         return None
     if "N" in which:
@@ -299,27 +300,31 @@ def _box_drawing(code):
 
 
 def _constructed(code):
-    """A drawn-for-nobody glyph, computed from its own code.
+    """Build the bitmap for a code with no hand-drawn glyph, computed from the code.
 
-    Codes outside the drawn ranges still have to be *recognizable* —
-    a bank where several codes share a bitmap cannot round-trip, and
-    the recognizer would answer whichever collided code it met first.
-    The earlier single-pixel placeholder failed both ways: 128 codes
-    apart it repeated, and one lit pixel sits a distance of 1 from a
-    blank cell where 24 is the threshold for a match at all.
+    Every one of the 256 codes still has to be *recognizable* — if
+    two codes shared a bitmap, the recognizer couldn't tell them
+    apart, and would just answer whichever of the two codes it
+    matched first. The earlier version used a single lit pixel as a
+    placeholder here, and that failed in two ways: the same pattern
+    repeated every 128 codes, and a single lit pixel is only a
+    distance of 1 from a blank cell, while 24 is the distance the
+    recognizer requires before it calls something a match at all.
 
-    So these are a first-order Reed–Muller codeword over the cell's
-    128 pixels: pixel ``p`` is the parity of ``a & p``, optionally
-    inverted, with ``a`` and the inversion carrying the code. Any two
-    differ in 64 of 128 pixels — the widest separation 128 pixels can
-    give 256 symbols. They look like noise, which is honest: nobody
-    drew a glyph for these codes, and a dense block is easy to tell
-    from a letter at a glance.
+    So this uses a first-order Reed–Muller codeword instead: pixel
+    ``p`` of the cell's 128 pixels is the parity of ``a & p``, then
+    flipped or not, with both ``a`` and the flip encoding the code.
+    Any two codewords differ in 64 of the 128 pixels — the largest
+    gap that 128 pixels can guarantee between 256 different symbols.
+    They look like noise, and that's honest: nobody drew a glyph for
+    these codes, and a block of noise is easy to tell apart from an
+    actual letter at a glance.
 
-    The code is offset so the all-blank codeword would land on the
-    space, and the first pixel is forced clear so its opposite is not
-    solidly inked — a uniform cell has no foreground to tell from its
-    background and reads as a space either way.
+    The code is offset first so that the all-blank codeword lands on
+    the space character, and the first pixel is always forced clear,
+    so a codeword and its bitwise opposite are never both solid ink —
+    a fully solid cell has no dark-on-light shape to read, and looks
+    like a space either way.
     """
     offset = code ^ 0x20
     seed = offset & 0x7F

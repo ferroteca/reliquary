@@ -1,24 +1,26 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Assert the built artifacts carry what they must.
+"""Check that the built wheel and sdist carry what they must.
 
-The wheel carries no suite, so nothing inside it checks itself. That
-job lives here, and it is a better fit either way: this *names* what
-has to be present rather than inferring it from a suite that happened
-to pass.
+The wheel ships no test suite, so nothing inside the wheel checks
+itself. That check lives here instead, and it fits better here
+anyway: this file states directly what has to be present, rather than
+trusting a test suite that happened to pass.
 
-The sdist does carry the suite (D105), and it is asserted in both
-directions — present, because an sdist that cannot be verified is the
-thing D105 refused, and whole, because setuptools' default sdist
-rules ship top-level `tests/*.py` without the subdirectories under
-them. A corpus that silently stopped shipping would leave a suite
-that still passes.
+The sdist does carry the test suite (D105), and this checks it two
+ways: that the suite is present at all — an sdist whose suite can't
+be verified is exactly what D105 ruled out — and that it is complete,
+because setuptools' default sdist rules ship the top-level
+`tests/*.py` files but drop the subdirectories under them. If the
+fixture corpus silently stopped shipping, the suite inside the sdist
+would still pass, having nothing left to check.
 
-What it guards is package data — the files setuptools ships only
-because `[tool.setuptools.package-data]` says so, and which therefore
-disappear silently when that list drifts. A missing `.lark` grammar
-or `schemas/*.json` breaks an installed Reliquary at first use while
-every source-tree test still passes.
+What this checks is package data: files that setuptools ships only
+because `[tool.setuptools.package-data]` lists them, and which
+therefore vanish silently the moment that list falls out of date. A
+missing `.lark` grammar file or a missing `schemas/*.json` file
+breaks an installed copy of Reliquary the first time it runs, even
+though every test in the source tree still passes.
 
 Run it after `python -m build`:
 
@@ -30,8 +32,9 @@ import sys
 import tarfile
 import zipfile
 
-# Package data the wheel must carry: without these an installed
-# Reliquary fails at runtime, and no source-tree test would notice.
+# Files the wheel must carry. Without these, an installed copy of
+# Reliquary fails at runtime, and no test running from the source
+# tree would catch it.
 WHEEL_REQUIRED = (
     "reliquary/script_grammar.lark",
     "reliquary/schemas/blueprint-schema-v1.json",
@@ -50,12 +53,12 @@ WHEEL_REQUIRED_TREES = (
 # The wheel is the runtime: the suite is not in it.
 WHEEL_FORBIDDEN_TREES = ("tests/",)
 
-# The sdist is the source package — the runtime and the suite that
-# verifies it (D105). The suite's subdirectories are named one by one
-# because that is the half a manifest drops silently: setuptools'
-# default rules ship `tests/*.py` and none of the trees below, which
-# leaves an archive whose suite passes while checking nothing it was
-# written to check.
+# The sdist is the source package: the runtime plus the test suite
+# that verifies it (D105). Each subdirectory of the suite is listed
+# by name here because that's the half setuptools drops silently by
+# default — its default sdist rules ship the top-level `tests/*.py`
+# files but none of the trees below them, leaving an archive whose
+# suite passes while checking nothing it was written to check.
 SDIST_REQUIRED_TREES = (
     "tests/",
     "tests/fixtures/conformance/blueprint/valid/",
@@ -68,13 +71,15 @@ SDIST_REQUIRED_TREES = (
     "tests/fixtures/text_recognize/",
 )
 
-# What the source package does not carry, each for its own reason.
-# `planning/` is maintainer governance (D96). `docs/` is the
-# repository's prose, and README.md reaches a consumer through the
-# distribution metadata without it. `tests/source_tree/` is the part
-# of the suite that reads those two: shipped, it would sweep an
-# absent tree and report success, so it is kept out where it cannot
-# run at all rather than left to run hollow.
+# What the sdist must not carry, each left out for its own reason.
+# `planning/` is maintainer governance (D96), not something a
+# consumer needs. `docs/` is the repository's own prose — a consumer
+# gets what they need from README.md, which reaches them through the
+# distribution metadata regardless. `tests/source_tree/` is the part
+# of the suite that checks `planning/` and `docs/` exist: shipped in
+# the sdist, where those two are missing, it would just find nothing
+# there and report success, so it is left out entirely rather than
+# left in to pass without checking anything real.
 SDIST_FORBIDDEN_TREES = ("planning/", "docs/", "tests/source_tree/")
 
 
