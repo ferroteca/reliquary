@@ -3,180 +3,215 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: GPL-3.0-only
 -->
 
-# Blueprint device growth: five items under one gate
+# Blueprint device growth: five items checked against one rule
 
-> **Status:** the design for **F5**'s blueprint-device-growth
-> piece (planning/proposed/FEATURES.md, the GUI era's "Decide
-> first" bullet) — owner round, 2026-08-24. **Nothing here is
-> pledged**, and this document **admits no vocabulary**: every
-> disposition below either defers admission or refuses it, and a
-> field arriving later still takes the surface-change rule
-> ([../SURFACES.md](../SURFACES.md)) at its own admission. The
-> adjudicated calls and their rejected alternatives are recorded
-> in place, the way the other F5 designs record theirs.
+> **Status:** this is the design for the blueprint-device-growth
+> piece of **F5** (planning/proposed/FEATURES.md, the GUI era's
+> "Decide first" bullet) — owner round, 2026-08-24. **Nothing here
+> is pledged, and this document adds no new blueprint vocabulary**:
+> every item below either puts off adding a field or refuses to add
+> one at all. If a field does get added later, it still has to go
+> through the surface-change rule ([../SURFACES.md](../SURFACES.md))
+> at that later point. The decisions made here, and the alternatives
+> rejected along the way, are written down in place — the same way
+> the other F5 design documents record theirs.
 
-## The gate, applied twice per item
+## The same rule, checked twice for each item
 
-**P25**: a name enters the portable spec when more than one
-backend can honor it, and **demand is necessary and never
-sufficient**. So every candidate here answers two questions —
-does any demand name it, and does it apply across backends — and
-the dispositions below differ because they fail *different*
-gates. That difference is the finding: "not admitted" is four
-distinct arguments, not one.
+**P25** says: a name only enters the portable blueprint spec once
+more than one backend can actually honor it, and **there being
+demand for it is necessary but never sufficient on its own**. So
+every candidate device or field in this document gets checked
+against two separate questions: does anything actually demand it,
+and does it work the same way across backends? The dispositions
+below differ from each other because different candidates fail
+*different* one of those two checks. That's the actual finding here
+— "not added yet" isn't one argument repeated five times, it's four
+different arguments.
 
-## Network: live demand, and it is not blueprint-shaped
+## Network: real demand exists, but it isn't a machine-shape question
 
-The one item with delivered demand. The script `http` block
-(docs/spec/http-serve.md) declares that the guest must reach the
-host, QEMU satisfies it with user-mode NAT as **an interim
-backend default the norm itself defers** — "not a first-class
-blueprint NIC model; a later milestone that grows backend
-adapters and richer device modeling owns portable network
-devices" — and that later milestone's round is this one. The norm
-also already states where the need lives: "serving answer files
-is a run behavior, not machine shape."
+This is the one item here with demand that's already been delivered.
+The script's `http` block (docs/spec/http-serve.md) declares that the
+guest needs to reach the host, and today QEMU satisfies that with
+user-mode NAT as **a temporary default that the spec itself says will
+be replaced**: docs/spec/http-serve.md already states this is a
+temporary default for the QEMU backend, not a network device model
+defined on the blueprint, and that a later milestone — one that adds
+more backend adapters and richer device modeling — will own portable
+network devices. This document is that later milestone. The spec also
+already says where the need actually lives: serving answer files is a
+run behavior, not machine shape.
 
-The disposition keeps that shape and generalizes it:
+This design keeps that same shape and extends it to every backend:
 
-- **Host-reachability is a capability derived from the script's
-  declared need.** A run whose script declares `http` requires a
-  guest-to-host path; each adapter satisfies it with its own NAT
-  device — QEMU user-mode, VirtualBox NAT, VMware NAT, Hyper-V's
-  default switch — and an adapter that cannot is a named
-  capability failure before the run (P11), which is what the
-  interim's "if a platform has no supported network path yet, the
-  capability check fails" clause already promises.
-- **The NIC model joins the per-platform defaults table.** The
-  norm asks for "an emulated NIC appropriate for the platform";
-  that is a platform fact (what the era's guests hold drivers
-  for), owned where memory defaults live and translated per
-  backend like every capability. It is never blueprint
-  vocabulary.
-- **A first-class `network` field waits for machine-shaped
-  demand** — a guest-reachable service, guest internet access;
-  nothing names either today. When it arrives, its agnostic
-  vocabulary is *attachment* (`none` / `nat`), never card names:
-  cards are what the platform table and the backends own.
+- **Host-reachability becomes a capability derived from what the
+  script declares it needs**, not a blueprint field. A run whose
+  script declares `http` needs a guest-to-host path. Each backend
+  adapter satisfies that with its own NAT device — QEMU's user-mode
+  networking, VirtualBox NAT, VMware NAT, Hyper-V's default switch —
+  and a backend that can't provide one fails as a named capability
+  failure before the run even starts (P11). That's exactly what the
+  spec's existing promise — that the capability check fails when a
+  platform has no supported network path yet — already commits to.
+- **The specific network card model joins the per-platform defaults
+  table**, the same table platform memory defaults already live in.
+  The spec calls for an emulated network card appropriate to the
+  platform — which card is appropriate is a fact about the platform
+  (which drivers that era of guest actually has), translated per
+  backend the same way every other capability is. It never becomes
+  something a blueprint names directly.
+- **A first-class `network` field in the blueprint waits until there's
+  demand that's actually about machine shape** — something like a
+  guest-reachable service, or guest internet access. Nothing names
+  either of those today. If that field does eventually get added, its
+  cross-backend vocabulary should describe *attachment* (`none` /
+  `nat`), never specific card names — which card is used stays owned
+  by the platform table and the backends, not the blueprint.
 
-- **WEIGHED AND DECLINED — admitting `network: none|nat` now**:
-  clears P25's applicability half, but the delivered http path
-  works without it and demand is necessary.
-- **WEIGHED AND DECLINED — leaving the QEMU interim as is**:
-  cheapest, but it leaves the norm's own deferral unanswered by
-  the round it pointed at.
+- **Weighed and declined — adding `network: none|nat` right now**:
+  this would satisfy the "works the same across backends" half of
+  P25's rule, but the existing http path already works without it,
+  and P25 requires actual demand too, which doesn't exist yet.
+- **Weighed and declined — leaving the QEMU-only default as it is**:
+  the cheapest option, but it would leave the spec's own promise —
+  that this gets addressed by a later milestone — unanswered by the
+  very milestone it pointed to.
 
-## Firmware: applicability clears, demand is absent
+## Firmware: works the same across backends, but nothing needs it yet
 
-All four backends do UEFI (OVMF, VirtualBox EFI, VMware
-`firmware=efi`, Hyper-V Gen2). Every platform in the model —
-dos, win9x, winnt, openbsd — boots BIOS, and F5's own platforms
-are BIOS-era. So the field is **designed here and not
-admitted**: it arrives with the first platform that needs
-`uefi`, and a field nothing can meaningfully write until then is
-surface pretending to exist.
+All four backends can do UEFI: QEMU with OVMF, VirtualBox with its
+EFI firmware, VMware with `firmware=efi`, Hyper-V with Generation 2.
+But every platform Reliquary's model currently has — dos, win9x,
+winnt, openbsd — boots BIOS, and F5's own platforms are all BIOS-era.
+So this field is **designed here, but not actually added yet**: it
+gets added once the first platform that needs `uefi` shows up. A
+field nothing can meaningfully set yet would just be surface area
+that exists for no reason.
 
-The settled shape, so that arrival is mechanical:
+Here's the shape it's designed to take, so adding it later is a
+purely mechanical step:
 
-- **`firmware: "bios" | "uefi"`**, omitted resolving to the
-  platform's default — `bios` for every platform today, defaults
-  that differ arriving with the platforms that justify them (the
-  arrival rule `control-planes` and `pointing-device` already
-  use). Capability-checked per backend: `firmware` joins
-  `backends.Requirements` at admission.
-- **UEFI implies a per-machine NVRAM varstore**: created at
-  materialization from the backend's template, living under the
-  machine's backend dir, persisting across stop/start — boot
-  entries are machine state — and destroyed with the machine.
-  Never under `cache/media`: it is machine identity, not
-  regenerable payload.
-- **Boot-order semantics unchanged**: the order is stated to the
-  firmware, the exception that already works; a backend that
-  cannot state UEFI boot order is a named capability failure,
-  never a silent reordering.
+- **`firmware: "bios" | "uefi"`**, defaulting to whatever the
+  platform's own default is when left unset — `bios` for every
+  platform today. A platform with a different default arrives only
+  once a platform that actually justifies it exists — the same rule
+  `control-planes` and `pointing-device` already follow when they
+  grow new values. Each backend checks this field the normal way:
+  `firmware` joins `backends.Requirements` once this is actually
+  added.
+- **UEFI implies a per-machine NVRAM variable store.** It gets
+  created at materialization time from the backend's own template,
+  lives inside the machine's backend directory, and persists across
+  stop/start — because UEFI boot entries are part of the machine's
+  state, not something regenerated fresh each time. It's destroyed
+  along with the machine, and it never lives under `cache/media`,
+  because it's machine identity, not a regenerable payload.
+- **Boot-order behavior doesn't change.** The boot order is stated to
+  the firmware, the same exception that already works today. A
+  backend that can't state a UEFI boot order fails as a named
+  capability failure — it never silently reorders things instead.
 
-- **WEIGHED AND DECLINED — admitting the field now, default
-  `bios`**: saves a later act, but admits vocabulary whose only
-  non-default value is refused or untested on every current
-  platform.
+- **Weighed and declined — adding the field now, defaulting to
+  `bios`**: this would save a small amount of work later, but it
+  would add blueprint vocabulary whose only non-default value is
+  currently refused or untested on every platform that exists.
 
-## Display adapter: fails the applicability gate
+## Display adapter: backends don't agree on this, so it stays per-backend
 
-Each backend ships its own emulated card — QEMU `std`/`cirrus`,
-VirtualBox its SVGA, VMware its own, Hyper-V its own — so there
-is no portable vocabulary to admit, whatever the demand. What
-the GUI era actually needs — a mode the recognizer reads — is a
-capability question, not a device name. Disposition: per-backend
-behind `backend-settings`, permanently, citing P25. This is the
-refusal P25 was written for, and it needs no re-examination
-clause: a portable card vocabulary would require the backends to
-converge on emulating the same hardware, which is not a thing
-this project waits on.
+Every backend ships its own emulated graphics card — QEMU's `std` or
+`cirrus`, VirtualBox's own SVGA card, VMware's own, Hyper-V's own —
+so there's no vocabulary here that could work the same way across
+backends, no matter how much demand exists for it. What the GUI era
+actually needs — a display mode the screen recognizer can read — is
+a question about capability, not about which specific device is
+attached. Disposition: this stays per-backend, configured through
+`backend-settings`, permanently, per P25. This is exactly the kind of
+case P25 exists to refuse, and it doesn't need a clause saying when
+to revisit it: a shared vocabulary here would require every backend
+to converge on emulating identical hardware, and that's not something
+this project is waiting around for.
 
-## Audio: fails the demand gate
+## Audio: nothing needs it, so it stays out
 
-No installer needs sound; nothing names it. `backend-settings`,
-until demand exists *and* a portable vocabulary does. Unlike the
-display adapter, the applicability half is open (SB16-era
-emulation is common across backends), so audio's refusal is
-demand-shaped and would re-open on a use case — but no watch is
-kept: the use case arriving is the watch.
+No installer needs sound, and nothing names a need for it. It stays
+configured through `backend-settings` until both demand exists *and*
+a vocabulary exists that works the same way across backends. Unlike
+the display adapter above, the cross-backend half of this is actually
+fine — SB16-era sound emulation is common across backends — so audio
+is only being refused because of missing demand, and a real use case
+showing up would reopen the question. No one is watching for that to
+happen, though: the use case arriving *is* what would prompt someone
+to notice.
 
-## USB: implied by the device that needs it, never a field
+## USB: comes from whatever device needs it, never its own field
 
 `pointing-device: tablet`
 ([blueprint-model.md](../../../docs/spec/blueprint-model.md), F66,
-delivered) is the demand, and an
-adapter that renders the tablet renders its USB controller
-unasked. A bare `usb: true` would declare a controller with
-nothing on it — machine shape with no consumer. **The rule,
-stated once because it recurs**: a USB *device* arrives under
-the model's own growth rule (ARCHITECTURE.md, standing
-constraints — "new media kinds, controllers, and USB devices
-must extend the same convention, a new medium name"), and the
-controller is always implied by its devices.
+already delivered) is the actual demand here, and a backend adapter
+that renders the tablet renders its USB controller automatically,
+without being asked separately. A bare `usb: true` field would just
+declare a controller with nothing plugged into it — machine shape
+with nothing that actually uses it. **The rule here, stated once
+because it'll come up again**: a USB *device* gets added following
+the model's own existing growth rule (ARCHITECTURE.md, standing
+constraints — new kinds of media, controllers, and USB devices must
+all extend the same medium-naming convention, rather than showing up
+as opaque raw arguments passed straight to a backend), and the
+controller itself is always just implied by whatever devices need
+it.
 
-## Controller defaults and slot ranges: rules, not changes
+## Controller defaults and slot ranges: writing down rules, not changing anything today
 
-The parser's controller vocabulary is already the model's whole
-set (`ide`, `sata`, `scsi`, `nvme`, `virtio`) with backends
-reporting what they honor — the `control-planes` pattern, in
-force today. What this round adds is the two growth rules:
+The parser's controller vocabulary is already the model's complete
+set (`ide`, `sata`, `scsi`, `nvme`, `virtio`), with each backend
+reporting which of them it actually honors — the same pattern
+`control-planes` already uses, already in force today. What this
+document adds is two rules for how that grows over time:
 
-- **The controller default becomes per-(platform, medium) in the
-  platform table** — `ide` for every current platform, so
-  nothing changes today; a non-`ide` default arrives with the
-  platform that justifies it, by the arrival rule.
-- **Slot ranges widen per controller type at that type's
-  admission**, additive as F5's entry already holds; uniqueness
-  stays by slot, and the admitting round owns the arithmetic of
-  the type it admits.
-- **The recorded constraint stands untouched**: which disk a
-  guest sees first is a fact no declaration supplies (P10), and
-  boot order remains the stated exception — declared to the
-  firmware, never read back from it.
+- **The controller default becomes per-(platform, medium), living in
+  the platform table** — `ide` for every current platform, so nothing
+  actually changes today. A platform whose default should be
+  something other than `ide` gets added only once that platform
+  exists to justify it, following the same arrival rule as above.
+- **Slot ranges widen per controller type, exactly when that
+  controller type gets added** — purely additive, the way F5's own
+  entry already describes. Uniqueness is still tracked by slot, and
+  whichever round adds a new controller type owns working out that
+  type's own slot arithmetic.
+- **The existing rule doesn't change**: which disk a guest sees first
+  is never something a declaration can state directly (P10), and boot
+  order stays the one stated exception — it's declared to the
+  firmware, never read back out of it.
 
-## Hyper-V generation: derived, never a knob
+## Hyper-V generation: computed, never its own setting
 
-Generation is a function of declared capability: `bios` → Gen1,
-`uefi` → Gen2 — which today, with every platform BIOS, means
-**always Gen1**. Gen2's constraints (no floppy, no IDE) are
-ordinary `unmet()` arithmetic when the time comes: `uefi` plus a
-floppy on Hyper-V is a named refusal, never a silent adjustment.
+Which Hyper-V generation a machine gets is computed from the
+`firmware` field once it exists: `bios` means Generation 1, `uefi`
+means Generation 2 — which today, since every platform is still
+BIOS-only, means **it's always Generation 1**. Generation 2's
+restrictions (no floppy, no IDE) become ordinary capability-check
+arithmetic once that time comes: asking for `uefi` plus a floppy
+drive on Hyper-V becomes a named refusal, never something Reliquary
+silently works around.
 
-- **WEIGHED AND DECLINED — a `backend-settings.hyperv.generation`
-  pin**: two sources for one fact once `firmware` exists —
-  exactly the overlap the `backend-settings` rules forbid ("a
-  section may not touch what Reliquary owns") — and until then a
-  knob choosing between states only one of which works.
+- **Weighed and declined — a separate
+  `backend-settings.hyperv.generation` setting**: this would create
+  two different sources of truth for the same fact once `firmware`
+  exists, which is exactly the overlap the `backend-settings` rules
+  forbid (a `backend-settings` section may not touch anything
+  Reliquary itself already owns). And until `firmware` exists, it
+  would just be a knob letting someone pick between two states only
+  one of which actually works.
 
-## What this design delivers
+## What this design actually delivers
 
-Nothing, deliberately: the round's product is the dispositions
-and the shapes, so that each later admission is a small act
-citing this document rather than a fresh argument. The one
-delivered-surface consequence — generalizing http
-host-reachability beyond QEMU — lands with the backends that
-gain http support, under the capability seam this document
-confirms, and amends docs/spec/http-serve.md's interim clause in
-the same act.
+Deliberately, nothing yet. What this round produces is the set of
+decisions and the shapes they'll take, so that adding any one of them
+later is a small, mechanical step that cites this document, rather
+than requiring a fresh argument each time. The one exception —
+something that actually changes shipped behavior — is extending
+host-reachability beyond QEMU: that lands as each backend gains `http`
+support, using the same capability-check approach this document
+confirms, and it amends the temporary QEMU-only clause in
+docs/spec/http-serve.md as part of that same change.

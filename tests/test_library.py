@@ -54,9 +54,10 @@ def _index():
         return json5reader.loads(h.read())
 
 
-#: The shipped artifacts, gathered at collection so a codex that stops
-#: shipping is a collection-time count of zero rather than a green run
-#: over nothing.
+#: The shipped artifacts, gathered here at collection time rather than
+#: inside each test. That way, if the codex ever stops shipping any
+#: artifacts, the parametrized test count itself drops to zero,
+#: instead of every test silently passing over nothing to check.
 CODEX_BLUEPRINTS = _codex_files("blueprints", EXT)
 CODEX_SCRIPTS = _codex_files("scripts", ".rlqs")
 
@@ -65,10 +66,10 @@ CODEX_SCRIPTS = _codex_files("scripts", ".rlqs")
 def home(tmp_path):
     """A scratch home the codex can be seeded into.
 
-    These are the codex's own tests — seeding, the closure, the
-    never-overwrite rule — and every one of them asks for what it
-    wants by name, seeding being the only way the library reaches a
-    tree (D88).
+    These are the codex's own tests: seeding, the closure it brings,
+    and the never-overwrite rule. Every one of them asks for what it
+    wants by name — seeding is the only way the library's content
+    reaches a tree at all (D88).
     """
     with fake_backend.installed():
         yield str(tmp_path)
@@ -147,7 +148,9 @@ def test_it_lists_the_shipped_blueprints_with_descriptions():
 
 
 def test_it_reports_nothing_of_yours(home):
-    """No provenance, no tiers: the command *is* the provenance."""
+    """list_codex reports only what's actually shipped in the codex —
+    it never scans the user's own tree to guess what might belong
+    there too."""
     bp_dir = os.path.join(home, "blueprints")
     os.makedirs(bp_dir)
     with open(os.path.join(bp_dir, "mine.rlqb"), "w",
@@ -229,14 +232,16 @@ def test_an_unseeded_codex_name_is_refused_with_the_fix(home):
 # The readiness example, and the property that makes it one (T9).
 #
 # Every other codex script ends with the guest powered off, because
-# each has finished with it. A readiness example has the opposite job —
-# it hands a *live* machine to whatever comes next — and that is the
-# whole reason it exists, so it is what these guard. A plausible
-# example that quietly powered the machine off would demonstrate
-# nothing the other two do not.
+# each one is finished with it by then. A readiness example has the
+# opposite job: it hands a *live* machine to whatever comes next, and
+# that's the whole reason it exists — so that's what the tests below
+# guard. An example that looked right but quietly powered the machine
+# off at the end would demonstrate nothing the other two examples
+# don't already.
 #
-# Whether it *works* is the integration test's to prove (P18: a codex
-# example that does not is a defect). These are its shape.
+# Whether it actually *works* is the integration test's job to prove
+# (P18: a codex example that doesn't work is a defect). These tests
+# only check its shape.
 
 READY_LABEL = "ready"
 READY_STEM = "freedos-ready"
@@ -253,7 +258,9 @@ def ready_script(home):
 
 
 def test_the_blueprint_names_it_and_seeding_brings_it(home):
-    """Wired, not merely shipped: a file nothing names is inert."""
+    """The blueprint actually references this script by name, not just
+    ships it alongside — a file nothing names would just sit there
+    unused."""
     seed_blueprint(BLUEPRINT, context=home)
     component = load_namespace(home).machines[BLUEPRINT]
     assert component.scripts[READY_LABEL] == READY_STEM
@@ -266,9 +273,9 @@ def test_it_leaves_the_machine_running(ready_script):
     verbs = [statement.verb for statement in script.statements]
     assert "start" in verbs
     assert "stop" not in verbs
-    # The codex's own idiom for "and now it is off" — waiting the
-    # machine down after a poweroff — is what this example must
-    # not do, and what `freedos-verify` does.
+    # The codex's own idiom for confirming a machine is off — waiting
+    # for `machine=stopped` after a poweroff — is exactly what this
+    # example must NOT do; that's `freedos-verify`'s job instead.
     assert "machine=stopped" not in text
 
 
@@ -337,12 +344,13 @@ def test_the_codex_ships_artifacts_of_both_kinds():
     assert CODEX_SCRIPTS, "no codex scripts shipped"
 
 
-# The shipped codex against its own index.
+# The shipped codex tree, checked against its own index.
 #
-# Machine against machine: `codex.json` is the index the listing
-# reads, and the tree beside it is what actually ships. Whether
-# docs/spec/codex.md describes both truthfully is R9's audit
-# (planning/RECURRING.md).
+# This compares two machine-readable things against each other, not
+# prose: `codex.json` is the index the listing reads, and the tree
+# beside it is what actually ships. Whether docs/spec/codex.md
+# describes both of these truthfully is a separate question, covered
+# by R9's audit instead (planning/RECURRING.md).
 
 def test_every_codex_blueprint_is_indexed():
     # The reverse of test_builtin_blueprint_index_names_existing_files:

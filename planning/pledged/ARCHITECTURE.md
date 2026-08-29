@@ -7,40 +7,47 @@ SPDX-License-Identifier: GPL-3.0-only
 
 > **Status:** principles the project has **pledged** but does not
 > yet honor. Nothing here is in force: a principle only binds once
-> it reaches the standing list, and a shortfall against an entry
-> below is unbuilt work rather than a bug.
+> it reaches the standing list in root ARCHITECTURE.md, and if the
+> code falls short of an entry below, that's just work not done
+> yet — not a bug.
 >
-> That distinction is the point of this file. **Promotion is what
-> arms a principle**: before it, an entry is pledged vision; after
-> it, root [ARCHITECTURE.md](../../ARCHITECTURE.md) asserts the thing is
-> true of the code, so a divergence becomes a *defect* the
-> gap-is-a-bug rule can act on — that rule being stated in the
-> root document's own banner (D48).
+> That's the whole reason this file exists separately from the root
+> one. Moving a principle to the root list is what makes it binding:
+> before that move, an entry here is just a pledge; after it, root
+> [ARCHITECTURE.md](../../ARCHITECTURE.md) is claiming the thing is
+> actually true of the code, so from that point on, any gap between
+> the code and the entry is a bug — that's the gap-is-a-bug rule
+> stated in the root document's own status note (D48).
 >
-> Three locations hold three states. A principle is drafted in
-> [proposed/ARCHITECTURE.md](../proposed/ARCHITECTURE.md), moves here
-> when it is pledged, and moves to the root list when the code
-> actually honors it. All three share one global P-namespace;
-> numbers are permanent, never reused, and no placeholder is left
-> behind by either move.
+> A principle moves through three files as it matures. It starts out
+> drafted in [proposed/ARCHITECTURE.md](../proposed/ARCHITECTURE.md),
+> moves here once it's pledged, and moves to the root list once the
+> code actually honors it. All three files share one P-number
+> namespace: numbers are permanent, never reused, and no move —
+> either one — leaves a placeholder behind.
 >
-> The second move is **automatic on full delivery** (D34): whoever
-> lands the work that makes the code honor a principle promotes it
-> in the same change — adds it to the standing list, deletes it
-> here — rather than holding it for a separate sign-off; the moving
-> commit is the record, and no [DECISIONS.md](../DECISIONS.md) entry
-> marks a promotion (D63). **A principle's bar is
-> *honored as a rule*, not full delivery** (D48): it cannot be
-> exhaustively proven, and holding it here until it is perfect
-> keeps every shortfall invisible, which is the worse outcome.
-> The condition is that every known residue is filed as a defect
-> in the same change — that conversion being the whole point of
-> arming it. (Full delivery remains the bar for a *use case*,
-> which is a discrete journey and can be tested end to end.)
+> The move to the root list happens **automatically once the code
+> honors the principle** (D34): whoever lands the work that gets the
+> code there moves the principle in the same change — adds it to the
+> root list, removes it from here — rather than waiting for separate
+> sign-off. The commit that moves it is the whole record; there's no
+> separate [DECISIONS.md](../DECISIONS.md) entry for a promotion
+> (D63). The bar for moving a principle is lower than the bar for
+> moving a use case: a principle only has to be **honored as a
+> rule** (D48) — there's no way to prove a rule is followed
+> everywhere, and refusing to promote it until that's proven would
+> just hide every real shortfall instead of tracking it. So the
+> condition for promotion is that every known shortfall gets filed
+> as its own defect in the same change that promotes the principle —
+> filing those defects is what makes the promotion honest. A use
+> case is different: it's a specific journey you can test start to
+> finish, so it waits for full delivery before it moves.
 >
-> A principle in force is clarified, retired, or superseded — never
-> changed in nature. One pledged here may still be reshaped, its
-> number intact, with work already scheduled against it re-checked
-> in the same edit. A dead proposal is recorded in
-> [DECISIONS.md](../DECISIONS.md) and triggers the planning-doc sweep,
-> its P-number the search key.
+> A principle already in force can only be clarified, retired, or
+> superseded — never have its actual meaning changed. One that's
+> only pledged here can still be reworked freely, keeping its
+> number; any work already scheduled against it gets rechecked as
+> part of that same edit. If a proposal dies at any point, it's
+> recorded in [DECISIONS.md](../DECISIONS.md) and removed, which
+> triggers the planning-doc sweep; its P-number is what you search
+> for to find everything that cited it.

@@ -3,63 +3,77 @@ SPDX-FileCopyrightText: 2026 Paul Galbraith
 SPDX-License-Identifier: GPL-3.0-only
 -->
 
-# The recurring register
+# Recurring obligations
 
-The standing obligations: checks the project owes on a rhythm
-rather than once, each carrying the mark of its last discharge.
-Nothing here is a queue — an obligation is never done, struck or
-promoted; it stands until it is retired by deletion, and the
-commit is the record ([README.md](README.md)).
+This is the list of recurring obligations: checks the project owes
+on a repeating schedule instead of just once, each one recording
+when it was last checked. This isn't a queue — an obligation is
+never marked done, crossed off, or promoted to something else. It
+stays on this list until it's retired by deleting its entry, and
+the commit that deletes it is the record ([README.md](README.md)).
 
-**Why**: the every-commit suite enforces only what is
-machine-readable — a shipped schema, a conformance corpus, the
-command manifest, the code's own enumerations, a fenced example
-block (**P24**, root [ARCHITECTURE.md](../ARCHITECTURE.md)). The
-prose norms bind just as hard, and this register is their
-enforcement instrument: what the suite cannot check on every
-commit is checked here on a stated rhythm instead.
+**Why this list exists**: the test suite that runs on every commit
+can only enforce things that are machine-readable — a shipped
+schema, a conformance corpus, the command manifest, an enumeration
+in the code, a fenced example block (**P24**, root
+[ARCHITECTURE.md](../ARCHITECTURE.md)). The rules written in prose
+bind just as strongly, but the suite can't check them
+automatically. This list is how they get checked instead: on a
+stated schedule rather than on every commit.
 
-**The semantics**, stated once so no entry restates them:
+**How this list works**, stated once here so no entry below has to
+repeat it:
 
-- **A staleness bound is a ceiling, never an appointment.** It
-  states when the last run's evidence expires. Nothing is
-  scheduled and nothing is promised; running early is always
-  allowed, and so is running everything due in one batch.
-- **Overdue is a signal, never a defect.** An entry past its
-  bound is a visible fact asking to be discharged; nothing
-  escalates on its own, and lateness files nothing.
-- **The mark is state, never diary.** One line, overwritten in
-  place by each discharge; past runs live in git history, and no
-  entry narrates its history or keeps dates beyond the mark.
-- **Findings are filed where findings go** — the issue tracker,
-  [TASKS.md](TASKS.md), or a defect against the norm — under
-  [design/audits.md](design/audits.md)'s caution that a finding
-  is not a fact until re-tested. The register holds obligations,
-  never results.
-- **The discharge is recorded by its commit.** A run edits the
-  mark and nothing else here, and the commit that advances it is
-  where the run's account belongs.
+- **"Stale after" is a deadline, not a scheduled appointment.** It
+  says when the evidence from the last check expires. Nothing here
+  is actually scheduled and nothing is promised in advance; running
+  a check early is always fine, and so is running every overdue
+  check in one batch.
+- **Being overdue is just a signal, not a defect by itself.** An
+  entry past its deadline is a visible fact that a check is due;
+  nothing escalates automatically, and being late doesn't file a
+  bug on its own.
+- **"Last performed" is current state, not a log.** It's one line,
+  overwritten in place each time the check runs; earlier runs are
+  still visible in git history, and no entry writes out its own
+  history or keeps any date beyond that one line.
+- **Whatever a check finds gets filed where findings belong** — the
+  issue tracker, [TASKS.md](TASKS.md), or a defect against the norm
+  it checked — following [design/audits.md](design/audits.md)'s
+  caution that a finding isn't established fact until it's
+  re-tested. This list holds only the obligations, never the
+  results of running them.
+- **The commit is what records a check having run.** Running a
+  check only changes its "last performed" line here — nothing
+  else — and the commit that updates that line is where the record
+  of what the run found belongs.
 
-**The mechanics.** Entries carry **R-numbers** issued against
-[SEQUENCES.md](SEQUENCES.md), evaporating on retirement the way
-a task's number does (D42's work class — an obligation is
-standing work, not vision). Entering an obligation is a governed
-act like all writing under `planning/`, and the entry is the
-standing approval: performing a run needs no further permission.
-[design/audits.md](design/audits.md) stays the un-committed idea
-pen; an idea graduates by being entered here.
+**How entries are numbered and approved.** Each entry gets an
+**R-number**, issued from [SEQUENCES.md](SEQUENCES.md); like a
+task's number, an R-number is retired for good once the entry is
+removed, never reused (D42's classification: an obligation is
+standing work, not a vision statement). Adding an obligation here
+is a governed change like any other writing under `planning/`, but
+once it's added, the entry itself is the standing approval —
+actually running the check needs no further sign-off.
+[design/audits.md](design/audits.md) is where an idea for a check
+waits until it's accepted; it becomes a real obligation by being
+added here.
 
-**What a spec audit is.** The norm is the authority and a
-divergence is a bug in the code
-([docs/spec/README.md](../docs/spec/README.md)), so the audit
-reads the prose against what ships and asks both directions:
-does the code do everything the norm states (the V13 class —
-specified, enforced nowhere), and does the norm state everything
-the code does (the `fetch_media` class — shipped, declared
-nowhere)? The inventory comparison is the cheap half, inherited
-from the suite's prose parsers; judging the *content* of each
-rule is the half no inventory could reach, and it is why a
-discharge is judgment work, never a script's verdict alone.
+**What a spec audit actually checks.** A spec is the authority, so
+if the code and the spec disagree, that's a bug in the code, not
+the spec ([docs/spec/README.md](../docs/spec/README.md)). Running
+an audit means reading the spec's prose against what actually
+ships, and checking both directions: does the code do everything
+the spec says it should (the V13 class of gap — specified, but not
+enforced anywhere), and does the spec mention everything the code
+actually does (the `fetch_media` class of gap — shipped, but not
+documented anywhere)? Comparing the two inventories is the easy
+half, and it's already handled by the test suite's own prose
+parsers. Judging whether each individual rule actually holds is the
+half no automated inventory can reach — which is why running one of
+these audits takes a person's judgment, not just a script's
+verdict.
 
 ## The obligations
 
@@ -76,11 +90,13 @@ discharge is judgment work, never a script's verdict alone.
 ### R2 — Audit docs/spec/api.md
 
 - **Check**: [api.md](../docs/spec/api.md) against the package's
-  declared surface. The spec declares itself end-goal design, and
-  the inventory and twin-identity halves are the manifest's,
-  checked every commit — the audit reads what remains: behavior
-  asserted in present tense, and the design's claims about
-  today.
+  actual declared surface. The spec itself says it describes the
+  end-goal design, not just what's built today. Two parts of it are
+  already checked every commit by the command manifest — which API
+  calls exist, and that each one has its matching CLI twin — so
+  this audit covers what's left: statements written as present-tense
+  behavior, and any of the design's claims about what's true right
+  now.
 - **Stale after**: one month.
 - **Last performed**: never.
 
@@ -96,9 +112,9 @@ discharge is judgment work, never a script's verdict alone.
 ### R4 — Audit docs/spec/blueprint-model.md
 
 - **Check**: [blueprint-model.md](../docs/spec/blueprint-model.md)
-  against the parser, for the semantics beyond the schema —
-  structure is the shipped schema's half of the norm, checked
-  every commit through the corpus.
+  against the parser, for the meaning that goes beyond the schema's
+  structure — the schema itself is checked every commit, through
+  the conformance corpus.
 - **Stale after**: one month.
 - **Last performed**: never.
 
@@ -131,9 +147,10 @@ discharge is judgment work, never a script's verdict alone.
 ### R8 — Audit docs/spec/instance-model.md
 
 - **Check**: [instance-model.md](../docs/spec/instance-model.md)
-  against machine state handling, for the semantics beyond
-  `machine-state.schema.json` — ownership, locking, recovery;
-  the phase vocabulary's structural half is the schema's.
+  against how machine state is actually handled, for the meaning
+  that goes beyond `machine-state.schema.json` — ownership,
+  locking, recovery. The phase vocabulary's structure is already
+  covered by the schema.
 - **Stale after**: one month.
 - **Last performed**: never.
 
@@ -171,7 +188,7 @@ discharge is judgment work, never a script's verdict alone.
   an equivalent) has reached somewhere Reliquary could depend on
   without maintaining a fork itself — merged upstream, or released
   in an official build. A fork staying a fork, however capable,
-  does not discharge this.
+  doesn't satisfy this check.
 - **Stale after**: six months — an upstream merge is an
   infrequent event, not a point release.
 - **Last performed**: 2026-08-24.

@@ -18,8 +18,8 @@ SPDX-License-Identifier: GPL-3.0-only
 > format's normative model — the root shape, spec identity, the
 > location grammar, containment, and the reference closure — is
 > [the composed blueprint model](blueprint-model.md), and is not
-> restated here. One model in two documents is how a spec comes to
-> contradict itself (D32).
+> restated here. Stating the same model in two documents is how a
+> spec comes to contradict itself (D32).
 
 Media are the machine-independent payloads a machine mounts:
 installer ISOs, boot floppies, driver disks. They are **specs inside
@@ -59,16 +59,17 @@ A `media` component owns all content and materialization.
 
 ### `name`
 
-The string machine drives and script `insert`s reference. Explicit,
-or derived from content — a location's filename or containment path
-stem, repaired to the name charter with a warning when it must be
-(`144m/FDBOOT.img` → `FDBOOT`). A media with no filename-bearing
-content — a blank — **must** name itself, except the one anonymous
-citizen: a content-free blank written in place at a drive, which
-belongs to no namespace and takes its slot's name when materialized.
-Identity is `(name, type)` in one catalog; identical specs coexist
-across files, differing ones collide, and names collide
-case-insensitively.
+The string machine drives and script `insert` statements reference
+it by. It's given explicitly, or derived from content — from a
+location's filename, or from the last segment of a containment
+path — repaired to fit the name charter, with a warning, when it has
+to be (`144m/FDBOOT.img` becomes `FDBOOT`). A media with no
+filename-bearing content — a blank — **must** name itself, with one
+exception: a content-free blank written in place at a drive belongs
+to no namespace at all, and takes its slot's name when materialized.
+Identity is the pair `(name, type)` in one catalog: identical specs
+can coexist across files, specs that differ collide, and names
+collide case-insensitively.
 
 ### `materialize`
 
@@ -88,9 +89,11 @@ lets the drive-inline blank be written `{"size": "20M"}`. `new` / `difference` /
 image under `cache/machines/<id>/disks/<name>.<ext>` (named for the
 media, not the slot); `use` attaches the shared payload — the
 `cache/media/` file, the `local` file, or the directory a
-location names — **directly**, with no per-machine copy. This is what a machine
-drive's declaration reaches: **to change how a drive materializes,
-change (or point at a different) media.**
+location names — **directly**, with no per-machine copy. A
+machine's drive declaration only ever points at a media by name —
+it has no materialize setting of its own. **So to change how a
+drive materializes, you change the media it names, or point the
+drive at a different media.**
 
 ### `size`
 
@@ -106,17 +109,18 @@ fetch time. Absent only for a blank.
 
 ### `sha256`
 
-The payload's hash, verified on every use. **Required when the
-rung is remote** (untrusted); optional for local and derived
-payloads. The check happens at resolution rather than parse, since a
-referenced rung may resolve to a URL. Optional is a feature: a local
-media may
-omit it to attach a drive image you are still *evolving* (a pin
-would fail on every edit); hermetic workflows add the hash when they
-want the pin. The hash is the build pin *independent of the location
-kind* — a trusted local payload can still verify the media is the
-exact build the scripts target. Hex, accepted in either case;
-Reliquary's canonical writes are lowercase.
+The payload's hash, verified on every use. **Required once the
+rung is remote** (an untrusted source); optional for local and
+derived payloads. The check happens at resolution rather than parse,
+since a referenced rung may resolve to a URL. Being optional is
+deliberate: a local media may leave `sha256` out so you can attach a
+drive image you're still *evolving* (a pinned hash would fail on
+every edit); a hermetic workflow — one that wants a fully
+reproducible, pinned build — adds the hash when it wants that
+guarantee. The hash pins the build independent of where the payload
+comes from: even a trusted local payload can use it to verify the
+media is the exact build the scripts target. Hex, accepted either
+case; Reliquary's own canonical writes are lowercase.
 
 ### `read-only`
 
@@ -133,19 +137,21 @@ location's filename misnames it (or omits it) — the extension is
 what declares the image format to machine drives. Otherwise derived
 from the location's filename or its containment path.
 
-**A host directory is a payload shape, not a mode:** a media whose
-`location` is a host *directory* with `materialize: use` is the live vvfat
-attach — the guest reads and writes it like a disk, the directory
-reflecting its writes by machine stop (live on QEMU's vvfat). While
-the machine is stopped the directory *is* the drive's content, an
-ordinary host directory to prepare or harvest with any tool
-(out-of-band exchange, [instance model](instance-model.md)). Nothing
-is hash-checked — the directory trades verification for liveness,
-where a pinned payload is the reproducible path — and one directory
-should not be shared by concurrently running machines. A relative
-directory resolves against the invocation's asset root, so a
-checked-in blueprint stays portable; a directory that does not exist
-fails closed naming the path.
+**A host directory is a payload shape, not a separate mode:** when a
+media's `location` is a host *directory* and its `materialize` is
+`use`, that's a live vvfat attach — QEMU's virtual FAT feature. The
+guest reads and writes the directory like a disk, live while the
+machine runs, and the directory reflects those writes once the
+machine stops. While the machine is stopped, the directory is just
+an ordinary host directory: prepare it or read what's in it with any
+tool you like (out-of-band exchange, [instance
+model](instance-model.md)). Nothing about it is hash-checked — a
+directory gives up the guarantee a pinned, hash-verified payload
+gives you, in exchange for being writable — and one directory should
+never be shared between machines running at the same time. A
+relative directory path resolves against the invocation's asset
+root, so a checked-in blueprint stays portable; a directory that
+doesn't exist fails with an error naming the path.
 
 ## Where a payload comes from
 
@@ -159,16 +165,17 @@ What matters for acquisition is what each shape costs at fetch time:
 - A **remote** rung downloads once into `cache/media/<name>.<ext>`
   and is verified against the media's `sha256`, which is required
   once any rung is remote. Mirror rungs are tried in order; the
-  hash, not the URL, is the arbiter, so a failing mirror is simply
-  the cue to try the next.
+  hash, not the URL, decides whether a download is correct, so a
+  failing mirror is simply the cue to try the next one.
 - A **local** payload is used **in place** and never copied into the
   cache. Its hash is optional, which is the point: a drive image you
   are still evolving would fail a pin on every edit.
 - A **contained** payload is extracted from its parent, which is
-  fetched first by the same rules — so one remote rung high in a
-  tree downloads once and every descendant derives from the cached
-  parent. Container reading is roster-gated by format: zip today, an
-  unsupported container failing closed and naming its format.
+  fetched first, by these same rules — so one remote rung high in a
+  tree downloads once, and every descendant derives from that
+  cached parent. Only certain container formats can actually be read
+  from — zip, today — and an unsupported format fails with an error
+  naming the format it found.
 - A **property-supplied** location resolves through the property
   chain at `create` / `apply`, never at `start`.
 
@@ -179,8 +186,10 @@ naming anywhere to get it — the licensed, non-redistributable case
 ([the codex's licensing rule](codex.md#non-redistributable-media)).
 The user supplies the payload themselves, in one of two ways:
 
-- **`add-media <name> <file>`** — the home-CLI path. It computes the
-  file's `sha256` and writes a `blueprints/<name>.rlqb` declaring a
+- **`add-media <name> <file>`** — the CLI command that writes into
+  the home directory. It computes the
+  file's `sha256` and writes a `blueprints/<name>.rlqb` declaring
+  a
   media located at that file. The file is **not copied**: the
   declaration points at it where it sits, and the result is an
   ordinary blueprint the user owns and can edit (D41). **Nothing
@@ -212,18 +221,20 @@ command sees.
 
 Fetch prefers what is already on disk, cheapest source first: a
 payload that verifies is used as-is; otherwise a cached (or `local`)
-container that verifies is re-extracted; only then are the mirror rungs
-tried.
+container that verifies is re-extracted; only then are the mirror
+rungs tried.
 
 The embedding API counterpart is
 `fetch_media(name, context=None, on_mismatch="fail")` — the CLI and
 the API move together (planning/SURFACES.md). `fetch_media` is the
 blocking form: a typed result, errors raised by class. Its
-asynchronous twin `start_fetch(...)` is **backlog work** (D35 —
-the async pillar left the numbered arc for lack of a use case,
-drafted as U19; proposed/FEATURES.md "Asynchronous runs"); the
+asynchronous twin `start_fetch(...)` is **not scheduled** (D35 —
+asynchronous work was taken off the project's planned schedule for
+lack of a use case to justify it; the demand exists only as the
+draft use case U19; proposed/FEATURES.md "Asynchronous runs"); the
 blocking `fetch_media` and its foreground `--progress` rendering
-stay in milestone 9. Design as settled, for when it returns:
+stay in milestone 9. The design is already settled, for when it
+returns:
 `start_fetch(...)` (same parameters) returns a
 pull-only fetch handle — `status()`, `events(follow=)` as a blocking
 iterator over the same event kinds
@@ -292,7 +303,8 @@ and verification event kinds the run-event stream defines
 Progress is honest: a download shows byte totals only when the
 source names them, hashing and extraction render as elapsed-only
 phases with no invented denominators, and each mirror attempt is
-its own event, so a follower sees the walk. The renderer modes
+its own event, so anyone following along sees each mirror being
+tried in turn. The renderer modes
 are noninteractive exactly as on `run-script`: under `plain` and
 `jsonl` the [mismatched-file checkpoint](#mismatched-files)
 below never prompts — an unapproved mismatch fails fast, the
@@ -314,8 +326,8 @@ how Reliquary is running:
   the mismatch fails fast with an error naming the file and both
   hashes.
 - The deletion can be **pre-approved**: `--on-mismatch refetch`
-  on commands that fetch media — the flag mirrors the twin's
-  parameter under the twin-name identity rule — or the embedding
+  on commands that fetch media — the flag mirrors its API twin's
+  parameter, under the naming rule — or the embedding
   API's `on_mismatch="refetch"` option
   (`fetch_media(name, context=None, on_mismatch="fail")`; the CLI
   accepts `fail | refetch` explicitly and maps interactive runs
@@ -389,5 +401,5 @@ the verified inputs — small, hash-pinned, and machine-independent —
 without shipping the payloads themselves (U4). A media reused across
 several blueprints is written once and referenced by name, or
 declared identically in each and deduplicated by identity; the
-residency split decides which source supplies it. What crosses the wire is the pinned
-identity, never the licensed bytes.
+artifact-residency split decides which source supplies it. What
+crosses the wire is the pinned identity, never the licensed bytes.

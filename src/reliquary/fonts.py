@@ -1,24 +1,29 @@
 # SPDX-FileCopyrightText: 2026 Paul Galbraith
 # SPDX-License-Identifier: GPL-3.0-only
-"""Authored glyph fonts: the declaration, and the shared ``@`` pool (F61).
+"""Authored glyph fonts: the declaration, and the shared ``@`` name pool (F61).
 
-A font is one authored asset per file, stem-identified like a script
-(``assets.py``) rather than name-fielded like a blueprint or media --
-``<name>.rlqf``, a JSON5 declaration, with ``<name>.bin`` beside it by
-stem adjacency: the raw 4096-byte bank
+A font is one authored asset per file. Like a script (see
+``assets.py``), it's identified by its filename stem, not by a
+``name`` field the way a blueprint or media is: ``<name>.rlqf`` is a
+JSON5 declaration, and ``<name>.bin`` -- the raw 4096-byte glyph
+bank -- sits beside it, matched purely by sharing that stem
 (``planning/design/authored-binary-assets.md``, "the binaries sit
-beside it, attached by adjacency"). What the declaration states is
-exactly what the bytes cannot say (D109): the cell geometry -- 256
-glyphs of 16 rows and 512 of 8 are the same 4096 bytes, so it is
-declared rather than inferred (P10) -- and the codepage its indices
-mean, decoded through Python's own codec registry rather than a
-bespoke table this module would otherwise have to carry.
+beside it, attached by adjacency"). The declaration states exactly
+what the raw bytes can't say on their own (D109): the cell
+geometry -- 256 glyphs of 16 rows, and 512 glyphs of 8 rows, are
+both the same 4096 bytes, so there's no way to tell them apart from
+the bytes alone, and Reliquary never guesses (P10) -- and the
+codepage the glyph indices mean, decoded through Python's own codec
+registry instead of a lookup table this module would otherwise have
+to maintain itself.
 
-Resolution is the ordinary one: ``.rlqf`` files walk out of
-``home.fonts_dir`` (``assets.py``), indexed by filename stem, and a
-name is checked against the one ``@`` pool media (and, once built,
-landmark) names already share -- a font claiming a name a media
-already holds is an error naming both files.
+Fonts resolve the same way every other authored asset does:
+``.rlqf`` files are found under ``home.fonts_dir`` (see
+``assets.py``), indexed by filename stem. A font's name is checked
+against the same shared ``@`` name pool that media names already
+use (and, once landmarks are built, landmark names too) -- a font
+claiming a name a media already holds is an error naming both
+files.
 """
 
 import codecs
@@ -31,19 +36,21 @@ from .errors import PreflightError, StaticError
 from .text_recognize import Bank, check_bank
 
 #: The two geometries a 4096-byte bank can declare (D109): 256 glyphs
-#: of 16 rows, or 512 of 8 -- Reliquary only ever addresses the first
-#: 256 either way, its codes being the ordinary 8-bit CP437 range.
+#: of 16 rows, or 512 glyphs of 8 rows. Either way, Reliquary only
+#: ever addresses the first 256 of them -- codes in the ordinary
+#: 8-bit CP437 range.
 _CELL_ROWS = (8, 16)
 
 
 class FontError(StaticError):
     """A font declaration diagnostic that can say *where* it happened.
 
-    The legality tier, like every other authored-document diagnostic:
-    decided from the declaration's own text, so it is a STATIC ERROR
-    and exits ``2``, rendered by the same skeleton
+    This is a legality-tier diagnostic, like every other
+    authored-document error: decided purely from the declaration's
+    own text. That makes it a STATIC ERROR, which exits with code
+    ``2`` and is rendered the same way
     :class:`document.BlueprintError` and
-    :class:`script_nodes.ScriptParseError` already use (D70).
+    :class:`script_nodes.ScriptParseError` already are (D70).
     """
 
     def __init__(self, message, *, rule_id=None, path=None, position=None):
@@ -79,15 +86,15 @@ def _field_error(doc, path, key, message, rule_id):
 def load_font_declaration(path):
     """Parse and validate one ``.rlqf`` file, failing closed by name.
 
-    The three refusals work item 1 owes: ``cell-rows`` outside
-    ``{8, 16}``, a ``codepage`` no codec registry entry answers to
+    Three checks can fail here: ``cell-rows`` outside ``{8, 16}``, a
+    ``codepage`` that no codec registry entry answers to
     (:func:`codecs.lookup`, so this module carries no codepage table
     of its own), and a declaration with no adjacent bank file. A
     bank whose *length* disagrees with its declared geometry is
     caught later, when the bank is actually read
-    (:func:`load_font_bank`) -- every valid ``cell-rows`` implies the
-    same 4096-byte total, so the check is the ordinary
-    :func:`text_recognize.check_bank` one.
+    (:func:`load_font_bank`) -- every valid ``cell-rows`` value
+    implies the same 4096-byte total, so that check is just the
+    ordinary :func:`text_recognize.check_bank` one.
     """
     with open(path, encoding="utf-8") as handle:
         text = handle.read()
@@ -134,14 +141,16 @@ def load_font_declaration(path):
 def load_font_namespace(context=None):
     """``{name: FontDeclaration}`` for every ``.rlqf`` the source holds.
 
-    Collision-checked against the shared ``@`` pool media names
-    already occupy (``authored-binary-assets.md``, "one reference
-    pool") -- a font and a media claiming the same name is an error
-    naming both files, folded case-insensitively like every other
-    name in this pool (:func:`resolve.build_namespace`'s own rule).
-    Landmarks are the pool's third kind and check themselves against
-    this one (``landmarks.py``); checking back from here would put
-    the two modules in a cycle for a refusal either side can raise.
+    Checked for collisions against the shared ``@`` name pool that
+    media names already occupy (``authored-binary-assets.md``, "one
+    reference pool") -- a font and a media claiming the same name is
+    an error naming both files, folded case-insensitively like every
+    other name in this pool (the same rule
+    :func:`resolve.build_namespace` already applies). Landmarks are
+    the pool's third kind, and they check themselves against this
+    function's result (``landmarks.py``) rather than the other way
+    around -- checking back from here would put the two modules in a
+    cycle, when either side raising the refusal works equally well.
     """
     source = assets.source_for(context)
     index = assets.index_by_name(
@@ -170,10 +179,10 @@ def resolve_font(name, namespace):
 def load_font_bank(name, context=None):
     """Resolve ``@name`` through the font source and return its ``Bank``.
 
-    The bank a script's ``font`` statement actually reads through:
-    the declaration's geometry and codepage, folded onto the raw
-    bytes (:func:`text_recognize.Bank`), labelled ``@name`` for the
-    failure report's "fonts tried".
+    This is the actual bank a script's ``font`` statement reads
+    through: the declaration's geometry and codepage, applied to the
+    raw bytes (:func:`text_recognize.Bank`), and labelled ``@name``
+    so a failure report can list it under "fonts tried".
     """
     declaration = resolve_font(name, load_font_namespace(context))
     with open(declaration.bin_path, "rb") as handle:

@@ -5,82 +5,99 @@ SPDX-License-Identifier: GPL-3.0-only
 
 # Script authoring by recording
 
-> **Status:** the settled design for U6's authoring recorder
-> (planning/proposed/USE-CASES.md U6; owner rounds, 2026-07-21 —
-> the adjudication trail is in planning/DECISIONS.md). **Nothing
-> here is pledged.** The recorder is **F1** in
-> planning/proposed/FEATURES.md, which carries its deliverables and
-> the cut they need at pledge; the design travelled with it when
-> both were withdrawn from `pledged/` (D61, 2026-07-27). The design
-> is settled and stands as written — what is unpledged is the
-> delivery, not the shape.
+> **Status:** this is the settled design for U6's authoring recorder
+> (planning/proposed/USE-CASES.md U6; owner rounds, 2026-07-21 — the
+> decisions behind it are recorded in planning/DECISIONS.md).
+> **Nothing here is pledged.** The recorder is feature **F1** in
+> planning/proposed/FEATURES.md, which lists its deliverables and how
+> they'll be split up when it's pledged. This design document moved
+> along with F1 when both were withdrawn from `pledged/` (D61,
+> 2026-07-27). The design itself is settled and stands as written —
+> what's unpledged is only when it gets built, not what it looks
+> like.
 
-The authoring recorder serves U6: a person performs the task once
-in a console session Reliquary supervises, and Reliquary drafts
-the script and captures the landmark assets that reproduce it.
-Settled design:
+The authoring recorder exists to serve U6: a person performs a task
+once, in a console session Reliquary is watching, and Reliquary
+drafts the script plus captures the landmark image assets needed to
+reproduce that task later. Here is the settled design:
 
-**Recording requires Reliquary to be the console.** Input typed
-into a backend's own display window never passes through
-Reliquary and cannot be followed; recording happens in a
-Reliquary-owned viewer over the `vnc` control plane, where every
-keystroke, click, and media swap is observable. The viewer is a
-real component, and the recording prerequisite on every backend —
-QEMU included.
+**Recording requires Reliquary itself to be the console the person
+types into.** Input typed directly into a backend's own display
+window never passes through Reliquary at all and can't be recorded.
+So recording instead happens inside a viewer Reliquary owns, running
+over the `vnc` control plane, where every keystroke, click, and media
+swap is actually observable. This viewer is a real piece of software
+that has to be built, and it's a prerequisite for recording on every
+backend — including QEMU.
 
-**First capture drafts, the author tailors.** Input events
-segment the session's timeline; the stable screen before each
-input proposes the wait condition (a VGA text match in text mode,
-a landmark in GUI mode), the input proposes the action, and
-observed timing proposes generous timeouts. What the recorder
-cannot know — which screen features are load-bearing, how long a
-step may honestly take — it flags as generated comments in the
-draft. Text-mode capture comes first and needs no new language
-surface; GUI capture rides the landmark/click work, and a click's
-position seeds its landmark's spot. The draft is ordinary script
-text, self-contained by default — landmarks travel as embedded
-resolve-in-place blocks (docs/spec/landmarks.md) — with
-factored
-catalog files on request; written once and user-owned from then
-on, like `import-vm` output.
+**The first capture produces a draft; the author tailors it by
+hand.** Each input event splits the session's timeline into steps:
+the stable screen that appeared right before an input becomes the
+proposed wait condition (a VGA text match in text mode, a landmark
+image in GUI mode), the input itself becomes the proposed action, and
+however long the recorder actually observed the guest taking becomes
+a proposed, generously padded timeout. Anything the recorder can't
+know on its own — which features of a screen are actually
+load-bearing, how long a step can honestly be expected to take — it
+flags with a generated comment in the draft rather than guessing
+silently. Text-mode capture comes first and needs no new language
+feature to support it. GUI capture rides on the existing
+landmark/click work, and a click's screen position seeds where its
+matching landmark image comes from. The draft itself is ordinary
+script text. By default it's self-contained — landmark images travel
+as embedded, resolve-in-place blocks (docs/spec/landmarks.md) — with
+the option to factor them out into separate catalog files instead.
+Once written, it belongs to the user from then on, the same way
+`import-vm`'s output does.
 
-**Round-trip composes with tailoring — playback is the
-positioning mechanism.** Authored customization must survive
-re-capture, so later sessions never regenerate or text-merge the
-script. Instead, playback of the user's tailored script carries
-the machine to the point of change — a breakpoint, or the exact
-statement where the script fails against a changed guest — and
-the person takes over the console, demonstrates, and hands back.
-The recorder emits a *fragment* — new waits, actions, and assets
-— anchored at the phase and statement of the user's own script.
-Because the anchor comes from executing that script, not from
-diffing it against a stored base, round-trip is robust to
-arbitrary tailoring: no pristine draft is retained, no merge
-happens. (os-autoinst's interactive mode is the concept precedent —
-concepts only, per AGENTS.md.)
+**Re-recording works together with hand-tailoring, using playback to
+find the right spot.** Any customization the author made by hand has
+to survive a later re-capture, so a later recording session never
+regenerates the script from scratch and never text-merges into it.
+Instead, Reliquary plays back the user's already-tailored script to
+carry the machine forward to the point that needs to change — either
+a breakpoint the author set, or the exact statement where the script
+now fails because the guest has changed — and the person then takes
+over the console, demonstrates the new behavior, and hands control
+back. The recorder then produces a *fragment*: new waits, actions,
+and image assets, anchored at that specific phase and statement of
+the user's own script. Because this anchor point comes from actually
+running the script, not from comparing it against some stored
+original copy, this process works no matter how heavily the script
+has been tailored — there's no pristine draft kept around anywhere,
+and no merge step happens. (This mirrors a concept from os-autoinst's
+interactive mode — only the concept is borrowed, per AGENTS.md, not
+any of its code.)
 
-**Two tracks, two write boundaries.** A changed screen for an
-unchanged step is an *asset refresh*: a new landmark variant,
-never touching the script — the numbered-adjacency variant shape
-(`<name>.<n>.png` beside the declaration, or beside the script
-for an embedded landmark; docs/spec/landmarks.md) makes
-refresh
-file-creation, never file-rewrite. New or changed steps
-are *step capture*: the fragment is emitted beside the script for
-the author to splice in their editor; an explicit opt-in apply
-may perform the surgical insertion at the anchor, touching no
-other byte — a named exception in the family of installing an
-embedded definition. Round-trip is append-shaped everywhere;
-nothing Reliquary wrote once is rewritten.
+**There are two separate kinds of update, each writing to disk in a
+different way.** When a step is unchanged but its screen now looks
+different, that's an *asset refresh*: it produces a new landmark
+image variant and never touches the script file at all. The numbered
+variant naming scheme (`<name>.<n>.png`, placed beside wherever the
+landmark is declared — beside the script itself for an embedded
+landmark; docs/spec/landmarks.md) means a refresh only ever creates a
+new file, it never rewrites an existing one. When a step is new or
+has actually changed, that's a *step capture*: the resulting fragment
+is written out beside the script, for the author to manually splice
+into their editor. An explicit, opt-in `apply` step can instead
+perform that insertion automatically, surgically, at the anchor
+point, without touching any other byte of the file — this is a named
+exception within the same family as installing an embedded
+definition. Either way, every update this process makes is
+purely additive: nothing Reliquary has already written ever gets
+rewritten.
 
-**Shared machinery.** Run-to-point, breakpoints, and human
-takeover are runner features that also serve ordinary debugging —
-"take over from here" is a natural suggested next command in a
-failure report. Handover events (control passing between script
-and human) join the run-events stream as event kinds, so a
-capture session is one run record with mixed drivers. The
-`record` command family lands on the CLI and the embedding API
-together, under parity. Blueprints are untouched: a session runs
-on an ordinary machine, and media swaps are already
-`insert`/`eject`.
+**This reuses machinery that already exists for other purposes.**
+Running to a specific point, breakpoints, and letting a human take
+over control are all runner features that are also useful for
+ordinary debugging — "take over from here" is a natural next command
+to suggest in a failure report, independent of recording. Handover
+events — control passing back and forth between the script and a
+human — join the run-events stream as their own event kind, so a
+recording session ends up as a single run record with a mix of
+automated and human-driven steps. The `record` family of commands
+lands on both the CLI and the embedding API together, keeping the two
+in step with each other. Blueprints themselves are untouched by any
+of this: a recording session runs on an ordinary machine, and media
+swaps already use the existing `insert`/`eject` mechanism.
 
