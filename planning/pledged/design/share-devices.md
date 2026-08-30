@@ -7,15 +7,17 @@ SPDX-License-Identifier: GPL-3.0-only
 
 > **Status:** design from two owner rounds, 2026-08-29 — the second
 > folded the existing vvfat directory-drive into this same device
-> kind. **Nothing here is pledged, and this document adds no
-> blueprint vocabulary by itself**: the `share` device kind becomes
-> real only when a feature entry citing this document goes through
-> the surface-change rule ([../SURFACES.md](../SURFACES.md)). It
-> follows the same two-question method as
-> [device-growth.md](device-growth.md): is there actual demand, and
-> does the capability work across more than one backend (P25)? This
-> candidate passes both, which is why this document designs a field
-> instead of declining one.
+> kind — **pledged the same day as F68–F71**
+> ([../FEATURES.md](../FEATURES.md), which carries the work lists;
+> the split follows the sprint-size rule). This document adds no
+> blueprint vocabulary by itself: the vocabulary lands as those
+> features are delivered, under the surface-change rule
+> ([../../SURFACES.md](../../SURFACES.md)). It follows the same
+> two-question method as
+> [device-growth.md](../../proposed/design/device-growth.md): is
+> there actual demand, and does the capability work across more than
+> one backend (P25)? This candidate passes both, which is why this
+> document designs a field instead of declining one.
 
 ## The need
 
