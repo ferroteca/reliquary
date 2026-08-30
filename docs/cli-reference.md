@@ -489,27 +489,28 @@ rlq get-machine-var ready --machine rig-0
 ### Moving files across the boundary
 
 **Reliquary itself doesn't move files for you.** It doesn't put
-files onto a machine's drives, doesn't read any back, and never
-tells you which drive letter the guest assigned to a disk —
-whatever's inside a volume is yours to open with your own tools.
-What Reliquary supplies is the drives a file can cross on, and
+files onto a machine's drives or shares, doesn't read any back, and
+never tells you which drive letter the guest assigned to a volume —
+whatever's inside one is yours to open with your own tools. What
+Reliquary supplies is the drives and shares a file can cross on, and
 there are three ways to do it:
 
-- **A directory-source drive.** A media whose `location` is a host
-  directory attaches as a drive: you write files into that
-  directory and the guest reads them, or the guest writes and you
-  read them back on your side. The backend takes a snapshot of the
-  directory when it's attached, so the machine has to be stopped
-  for a change to become visible, in either direction.
+- **A share.** A `share` device whose media is a host directory
+  presents that directory to the guest for as long as the machine
+  runs (F68): you write files into it and the guest reads them, or
+  the guest writes and you read them back on your side. The only
+  model that actually renders today is `vvfat`, and QEMU takes a
+  snapshot of the directory when the machine starts, so with it the
+  machine has to be stopped for a change to become visible, in either
+  direction.
 - **A whole image, swapped live** — `insert-media --file`, below.
 - **The machine directory itself** — `rlq get-machine-dir`. While
-  the machine is stopped, its drives are just plain files: a
-  directory-source drive *is* its host directory, and an image
-  drive is a raw or qcow2 file, which any disk-image library can
-  open.
+  the machine is stopped, its drives and shares are just plain
+  files: a share *is* its host directory, and an image drive is a
+  raw or qcow2 file, which any disk-image library can open.
 
 ```powershell
-# the exchange directory is declared in the blueprint as a drive
+# the exchange directory is declared in the blueprint as a share
 copy .uild\TEST.EXE .\exchangerlq start-machine --machine rig-0
 rlq run-script test --machine rig-0
 rlq stop-machine --machine rig-0

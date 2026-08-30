@@ -14,9 +14,10 @@ serial driver.
 - **Input** is sent as keyboard events through QEMU's control protocol
 - **Output** is read directly from VGA text memory, without OCR
 - **Files** are yours to move yourself. Reliquary just supplies the
-  drive — a directory-source media serves a host directory to the
-  guest as a virtual FAT drive, and `insert-media --file` swaps a
-  whole image live — but it never reaches inside a volume itself
+  drive or share to cross on — a `share` device presents a host
+  directory to the guest, today rendered as a QEMU virtual FAT drive
+  (`model: vvfat`), and `insert-media --file` swaps a whole image
+  live — but it never reaches inside a volume itself
 - **Command completion** is detected by watching for the DOS prompt
   to come back — either the standard `X:\path>` shape, or exactly
   the prompt the guest was already showing, so a customized prompt
@@ -29,7 +30,7 @@ serial driver.
 
 ## Declaring the machine
 
-A machine's platform, memory, boot order, and drives are all
+A machine's platform, memory, boot order, and devices are all
 declared in its blueprint (`<name>.rlqb`) — see the
 [blueprint guide](blueprint-guide.md), the
 [field reference](blueprint-reference.md), and the
@@ -37,15 +38,17 @@ declared in its blueprint (`<name>.rlqb`) — see the
 by name, and the media controls its actual content —
 `materialize: new` for a blank disk of a given `size`, `difference`
 or `copy` for a disk built on top of a payload, or `use` to attach a
-payload as-is (an ISO, or a host directory served as a virtual FAT
-drive). `platform` has to be `dos`; memory defaults to 16 MB; the
-boot order defaults to the slot-0 floppy, or failing that the
-slot-0 hard disk, or failing that the first CD-ROM.
+file payload as-is (an ISO, for instance). `platform` has to be
+`dos`; memory defaults to 16 MB; the boot order defaults to the
+slot-0 floppy, or failing that the slot-0 hard disk, or failing that
+the first CD-ROM.
 
-To hand the guest its own programs, declare a media whose `source`
-is a host directory, with `materialize: use`, and name it from a
-drive — that host directory *is* the drive, readable and writable
-while the machine is stopped.
+To hand the guest its own programs, add a **share** instead of a
+drive: a device whose media is a host directory, with `materialize:
+use` — that directory *is* the share, readable and writable on the
+host while the machine is stopped, and live to the guest while it
+runs (a directory payload can only attach to a share now; a drive
+refuses one).
 
 ## Reading the guest's own font
 
@@ -58,33 +61,48 @@ you can ask it: `rlq seed-script freedos-dump-font` (U11) brings in
 a codex script that boots to a prompt, reads the live VGA character
 table, and writes it out as 4096 raw bytes.
 
-Those bytes cross over on a drive you supply yourself — the codex
+Those bytes cross over on a share you supply yourself — the codex
 blueprint doesn't declare one, because a host directory needs your
-own path (see above). Add a `floppy0` drive whose media is a host
-directory before running the script:
+own path (see above). Add a `share0` device, naming the model
+explicitly (F68's interim state: an unstated model is refused
+everywhere until F69 ships QEMU's live default), and the media it
+points at:
 
 ```json
 "devices": {
-  "floppy0": {
-    "type": "media",
-    "location": "./font-exchange",
-    "materialize": "use"
-  }
+  "share0": { "media": "font-exchange", "model": "vvfat" }
+}
+```
+
+```json
+{
+  "type": "media",
+  "name": "font-exchange",
+  "location": "./font-exchange",
+  "materialize": "use"
 }
 ```
 
 Run `rlq apply-blueprint --blueprint <name>` to give an existing,
-stopped machine the new drive its blueprint just gained, then run
+stopped machine the new share its blueprint just gained, then run
 `rlq run-script freedos-dump-font --blueprint <name>`, which boots
 the guest, writes `FONT.BIN` into that directory, and powers the
-machine off. DOS assigns floppy letters independently of whatever
-else is attached, so a lone `floppy0` is always `A:`, no matter how
-many hard disks or CD-ROMs the machine also has. If a blueprint
-never actually gained the slot, the run fails the same way it would
-against a real, empty floppy drive — there's no cheaper check
-available than the guest's own answer, since a directory-source
-drive has no image file for a live insert or eject to check against
-ahead of time.
+machine off. If a blueprint never actually gained the slot, the run
+fails the same way it would against a real, empty drive — there's no
+cheaper check available than the guest's own answer, since a share
+has no image file for a live insert or eject to check against ahead
+of time.
+
+**The script's hardcoded target drive letter is still unverified
+(F68).** Before this feature, a directory media attached directly to
+`floppy0`, which DOS always letters `A:` regardless of what else is
+attached — that's the assumption `freedos-dump-font.rlqs` was
+written against. A share renders disk-shaped, not floppy-shaped, so
+it no longer lands on `A:` by construction; what letter DOS actually
+assigns it (after `hdd0`/`cdrom0`, and whatever MSCDEX consumes) has
+not yet been confirmed against a real boot. The script's own header
+comment carries an `XXX(F68)` marker for this; treat this section the
+same way until that's resolved.
 
 The dumped bytes are just the raw cell bitmaps — declaring what
 they actually *mean* (the cell geometry, and the codepage the
@@ -107,9 +125,9 @@ rlq exec "myprog.exe > result.log" --blueprint my-dos
 rlq stop-machine --blueprint my-dos
 ```
 
-If `my-dos` names a directory-source media on one of its drives,
-`result.log` ends up in that host directory once the machine stops
-(`rlq get-machine-dir` prints the machine's directory).
+If `my-dos` declares a share, `result.log` ends up in that host
+directory once the machine stops (`rlq get-machine-dir` prints the
+machine's directory).
 
 ## Python API
 

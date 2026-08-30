@@ -89,7 +89,7 @@
       "type": "object"
     },
     "devices": {
-      "description": "The resolved, enabled drives and NICs, keyed by device key, sharing one map (D121). A drive entry carries its medium and slot plus the realized cache path (a per-machine image under disks/, an attached payload, a host directory, or null for an empty removable slot). A NIC entry carries its declared attachment, the resolved interface (null when none was named), and the platform-resolved chipset.",
+      "description": "The resolved, enabled drives, NICs, and shares, keyed by device key, sharing one map (D121). A drive entry carries its medium and slot plus the realized cache path (a per-machine image under disks/, an attached payload, or null for an empty removable slot — never a host directory now, F68). A NIC entry carries its declared attachment, the resolved interface (null when none was named), and the platform-resolved chipset. A share entry carries its resolved media, always-'use' materialize, the host directory path, and the resolved model.",
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/deviceState"}
     },
@@ -112,10 +112,11 @@
       "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
     },
     "deviceState": {
-      "description": "A resolved drive or a resolved NIC (D121) — the two shapes never overlap (driveState requires medium, networkState requires attachment, and additionalProperties is false on both), so oneOf discriminates safely, unlike the blueprint schema's bare-string device shorthand.",
+      "description": "A resolved drive, NIC, or share (D121, F68) — the three shapes never overlap (driveState requires medium, networkState requires attachment, shareState requires media/materialize/path/model and forbids both, and additionalProperties is false on all three), so oneOf discriminates safely, unlike the blueprint schema's bare-string device shorthand.",
       "oneOf": [
         {"$ref": "#/$defs/driveState"},
-        {"$ref": "#/$defs/networkState"}
+        {"$ref": "#/$defs/networkState"},
+        {"$ref": "#/$defs/shareState"}
       ]
     },
     "driveState": {
@@ -158,6 +159,18 @@
         "model": {"enum": ["pcnet", "ne2k", "virtio"]}
       },
       "required": ["attachment", "interface", "model"],
+      "additionalProperties": false
+    },
+    "shareState": {
+      "description": "One resolved share slot (F68). media, materialize (always 'use' — a share never has an empty-slot form), and path are always present, the same way a 'use' drive's are; path is the host directory itself, never a per-machine image. model is whatever the blueprint named, or the assigned backend's own default when it named none (D122) — resolved after backend assignment, so it is never silently 'vvfat'.",
+      "type": "object",
+      "properties": {
+        "media": {"type": "string"},
+        "materialize": {"const": "use"},
+        "path": {"type": "string"},
+        "model": {"enum": ["vvfat", "9p", "virtio-fs"]}
+      },
+      "required": ["media", "materialize", "path", "model"],
       "additionalProperties": false
     },
     "driveGeometry": {

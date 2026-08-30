@@ -48,11 +48,11 @@
         },
         "cpus": {"type": ["string", "integer"]},
         "devices": {
-          "description": "Drives and NICs share one slot-keyed map (D121).",
+          "description": "Drives, NICs, and shares share one slot-keyed map (D121, F68).",
           "type": "object",
           "propertyNames": {
             "description": "Slot keys are fixed and never take a reference: an object key is authored graph.",
-            "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?|net[0-3])$"
+            "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?|net[0-3]|share[0-3]?)$"
           },
           "additionalProperties": {"$ref": "#/$defs/device"}
         },
@@ -90,10 +90,11 @@
     },
 
     "device": {
-      "description": "A drive (floppy/hdd/cdrom) or a NIC (net), discriminated by slot key medium, not by shape — anyOf rather than oneOf because a bare media name and a bare attachment name are both plain strings and can't be told apart by shape alone; the parser is what actually discriminates, by the slot key (D121).",
+      "description": "A drive (floppy/hdd/cdrom), a NIC (net), or a share (F68), discriminated by slot key medium, not by shape — anyOf rather than oneOf because a bare media name and a bare attachment name are both plain strings and can't be told apart by shape alone; the parser is what actually discriminates, by the slot key (D121).",
       "anyOf": [
         {"$ref": "#/$defs/drive"},
-        {"$ref": "#/$defs/networkDevice"}
+        {"$ref": "#/$defs/networkDevice"},
+        {"$ref": "#/$defs/shareDevice"}
       ]
     },
 
@@ -145,6 +146,27 @@
           },
           "additionalProperties": false
         }
+      ]
+    },
+
+    "shareDevice": {
+      "description": "A media name, an object naming media plus an optional model (F68), or a media written in place. No null — an empty share means nothing.",
+      "oneOf": [
+        {"$ref": "#/$defs/mediaName"},
+        {
+          "type": "object",
+          "required": ["media"],
+          "properties": {
+            "media": {"$ref": "#/$defs/mediaName"},
+            "model": {
+              "description": "The share mechanism, overriding the assigned backend's own default (D122). A closed vocabulary: never widened to admit a reference pattern.",
+              "enum": ["vvfat", "9p", "virtio-fs"]
+            },
+            "enabled": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        },
+        {"$ref": "#/$defs/media"}
       ]
     },
 

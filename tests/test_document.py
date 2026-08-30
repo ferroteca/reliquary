@@ -617,3 +617,104 @@ def test_boot_refuses_a_network_slot():
         _parse([{"type": "machine", "name": "rig", "platform": "dos",
                  "devices": {"net0": "nat"}, "boot": ["net0"]}])
     assert caught.value.rule_id == "drive.boot-undeclared"
+
+
+# Share devices (F68): a host directory presented to the guest. Value
+# forms mirror a drive's — a media name, an object, or an inline media
+# — minus `null`, since an empty share means nothing.
+
+def _machine_with_shares(shares):
+    return _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                    "devices": shares}]).machines["rig"]
+
+
+def test_a_bare_media_name_is_shorthand_for_a_share():
+    machine = _machine_with_shares({"share0": "hostdir"})
+    share0 = machine.shares["share0"]
+    assert (share0.media, share0.model) == ("hostdir", None)
+
+
+def test_a_share_object_carries_an_explicit_model():
+    machine = _machine_with_shares(
+        {"share0": {"media": "hostdir", "model": "vvfat"}})
+    assert machine.shares["share0"].model == "vvfat"
+
+
+def test_a_share_model_is_optional():
+    machine = _machine_with_shares({"share0": "hostdir"})
+    assert machine.shares["share0"].model is None
+
+
+def test_every_share_model_is_accepted_by_the_parser():
+    # The parser accepts the whole vocabulary (D122); whether a given
+    # model actually renders is a capability question, judged later.
+    for model in ("vvfat", "9p", "virtio-fs"):
+        machine = _machine_with_shares(
+            {"share0": {"media": "hostdir", "model": model}})
+        assert machine.shares["share0"].model == model
+
+
+def test_an_unknown_share_model_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_shares(
+            {"share0": {"media": "hostdir", "model": "hgfs"}})
+    assert caught.value.rule_id == "value.not-in-vocabulary"
+
+
+def test_a_share_may_disable_itself():
+    machine = _machine_with_shares(
+        {"share0": {"media": "hostdir", "enabled": False}})
+    assert machine.shares["share0"].enabled is False
+
+
+def test_a_share_object_with_unknown_keys_is_treated_as_inline_media():
+    # Mirrors _drive()'s dispatch: fields outside _SHARE_FIELDS mean
+    # this is an inline media spec, not a share-attribute object.
+    machine = _machine_with_shares(
+        {"share0": {"location": "./hostdir"}})
+    share0 = machine.shares["share0"]
+    assert share0.inline is not None
+    assert share0.inline.location[0].local == "./hostdir"
+
+
+def test_a_share_object_without_media_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_shares({"share0": {"model": "vvfat"}})
+    assert caught.value.rule_id == "share.without-media"
+
+
+def test_a_null_share_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_shares({"share0": None})
+    assert caught.value.rule_id == "share.null-not-allowed"
+
+
+def test_share_slots_run_zero_to_three():
+    machine = _machine_with_shares({"share3": "hostdir"})
+    assert machine.shares["share3"].media == "hostdir"
+    with pytest.raises(StaticError) as caught:
+        _machine_with_shares({"share4": "hostdir"})
+    assert caught.value.rule_id == "device.slot-out-of-range"
+
+
+def test_a_machine_with_no_shares_declares_none():
+    machine = _machine_with_shares({})
+    assert machine.shares == {}
+
+
+def test_drives_nics_and_shares_share_one_devices_map():
+    doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                   "devices": {"hdd0": "blank", "net0": "nat",
+                               "share0": "hostdir"}}])
+    machine = doc.machines["rig"]
+    assert set(machine.devices) == {"hdd0", "net0", "share0"}
+    assert set(machine.drives) == {"hdd0"}
+    assert set(machine.network) == {"net0"}
+    assert set(machine.shares) == {"share0"}
+
+
+def test_boot_refuses_a_share_slot():
+    with pytest.raises(StaticError) as caught:
+        _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                 "devices": {"share0": "hostdir"}, "boot": ["share0"]}])
+    assert caught.value.rule_id == "drive.boot-undeclared"

@@ -368,22 +368,57 @@ def test_an_empty_removable_slot_renders_a_medium_less_drive():
         "media=cdrom,if=ide,index=0,id=cdrom0"]
 
 
-def test_a_host_directory_renders_as_vvfat(root):
-    # Whether a path is a directory can only be known once it is
-    # resolved on disk, so that check happens here, at render time,
-    # not earlier when the drive is declared.
-    work = os.path.join(root, "work")
-    os.makedirs(work)
-    drives = {"hdd0": {"medium": "hdd", "slot": 0, "path": work}}
-    values = _drive_values(qemu_module.drive_args(drives))
-    assert any("fat:rw:" in value for value in values)
-
-
 def test_a_removable_drive_carries_its_key_as_the_launch_id(root):
     drives = {"floppy0": {"medium": "floppy", "slot": 0,
                           "path": _image(root, "boot.img")}}
     values = _drive_values(qemu_module.drive_args(drives))
     assert "id=floppy0" in values[0]
+
+
+# Share devices (F68): a host directory presented to the guest. Only
+# `model: vvfat` renders — the capability report never claims 9p or
+# virtio-fs yet, so unmet() has already refused those at assignment.
+
+def test_a_vvfat_share_renders_as_a_synthesized_fat_drive(root):
+    work = os.path.join(root, "work")
+    os.makedirs(work)
+    shares = {"share0": {"media": "hostdir", "materialize": "use",
+                         "path": work, "model": "vvfat"}}
+    values = _drive_values(qemu_module.share_args(shares, {}))
+    assert any("fat:rw:" in value for value in values)
+
+
+def test_a_share_carries_its_slot_key_as_its_id(root):
+    work = os.path.join(root, "work")
+    os.makedirs(work)
+    shares = {"share0": {"media": "hostdir", "materialize": "use",
+                         "path": work, "model": "vvfat"}}
+    values = _drive_values(qemu_module.share_args(shares, {}))
+    assert "id=share0" in values[0]
+
+
+def test_a_share_continues_the_ide_bus_after_the_last_cdrom(root):
+    drives = {
+        "hdd0": {"medium": "hdd", "slot": 0,
+                 "path": _image(root, "blank.qcow2")},
+        "cdrom0": {"medium": "cdrom", "slot": 0,
+                   "path": _image(root, "live.iso")},
+    }
+    work = os.path.join(root, "work")
+    os.makedirs(work)
+    shares = {"share0": {"media": "hostdir", "materialize": "use",
+                         "path": work, "model": "vvfat"}}
+    values = _drive_values(qemu_module.share_args(shares, drives))
+    assert "if=ide,index=2" in values[0]
+
+
+def test_a_share_with_an_unsupported_model_is_an_internal_error(root):
+    # unmet() refuses this at assignment (F69/F70 not delivered yet),
+    # so reaching the renderer at all is a bug, not a blueprint mistake.
+    shares = {"share0": {"media": "hostdir", "materialize": "use",
+                         "path": root, "model": "9p"}}
+    with pytest.raises(InternalError):
+        qemu_module.share_args(shares, {})
 
 
 # Network devices (D120): attachment and interface in, QEMU
@@ -748,6 +783,14 @@ def test_the_qemu_adapter_reports_the_network_devices_it_renders():
     report = qemu_module.QemuAdapter().capabilities()
     assert report.network_models == ("pcnet", "ne2k", "virtio")
     assert report.network_attachments == ("nat", "bridged")
+
+
+def test_the_qemu_adapter_claims_only_vvfat_by_name_and_no_live_default():
+    # F68 alone: 9p is the eventual live default (F69), not yet built,
+    # so an unstated-model share stays refused on this backend too.
+    report = qemu_module.QemuAdapter().capabilities()
+    assert report.share_models == ("vvfat",)
+    assert report.share_default is None
 
 
 def test_the_qemu_adapter_can_deliver_a_pointer_event_on_either_plane():

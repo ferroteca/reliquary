@@ -751,10 +751,10 @@ reference a value, never compute with one.
 ## Where to next
 
 - [Field reference](blueprint-reference.md) — `platform`,
-  `backend`, `devices` (drives and NICs: media components and
-  network attachments), `boot`, `control-planes`, `parameters`,
-  `backend-settings`, and the state-only fields, with every rule
-  and per-field examples.
+  `backend`, `devices` (drives, NICs, and shares: media components,
+  network attachments, and host directories), `boot`,
+  `control-planes`, `parameters`, `backend-settings`, and the
+  state-only fields, with every rule and per-field examples.
 - [Cookbook](blueprint-cookbook.md) — complete blueprints for
   common machine shapes, with the state documents they resolve
   into.

@@ -124,11 +124,11 @@ case; Reliquary's own canonical writes are lowercase.
 
 ### `read-only`
 
-Present the drive read-only so a floppy or hard disk is not
-corrupted; orthogonal to `materialize`. **Defaults true on a
-cdrom** (no backend meaningfully writes a virtual ISO, so a writable
-cdrom is rejected), opt-in elsewhere; for a directory source it
-protects the host directory.
+Present the drive (or share, F68) read-only so a floppy, hard disk,
+or shared directory is not corrupted; orthogonal to `materialize`.
+**Defaults true on a cdrom** (no backend meaningfully writes a
+virtual ISO, so a writable cdrom is rejected), opt-in elsewhere; for
+a directory payload it protects the host directory.
 
 ### `extension`
 
@@ -137,14 +137,19 @@ location's filename misnames it (or omits it) — the extension is
 what declares the image format to machine drives. Otherwise derived
 from the location's filename or its containment path.
 
-**A host directory is a payload shape, not a separate mode:** when a
-media's `location` is a host *directory* and its `materialize` is
-`use`, that's a live vvfat attach — QEMU's virtual FAT feature. The
-guest reads and writes the directory like a disk, live while the
-machine runs, and the directory reflects those writes once the
-machine stops. While the machine is stopped, the directory is just
-an ordinary host directory: prepare it or read what's in it with any
-tool you like (out-of-band exchange, [instance
+**A host directory is a payload shape, not a separate mode:** a
+media's `location` may name a host *directory*, with `materialize:
+use` — the payload is the directory itself, the same way it may be a
+single file. Which *device* may carry that payload, and what the
+guest and host each see of it while the machine runs, is decided at
+the device layer, not here: only a `share` slot accepts a directory
+payload (F68); a drive slot refuses one at resolution
+(docs/spec/blueprint-model.md's `share` keys, and
+[share-devices.md](../../planning/pledged/design/share-devices.md)
+for the live mechanisms and their contracts). The one thing every
+mechanism agrees on: while the machine is stopped, the directory is
+just an ordinary host directory — prepare it or read what's in it
+with any tool you like (out-of-band exchange, [instance
 model](instance-model.md)). Nothing about it is hash-checked — a
 directory gives up the guarantee a pinned, hash-verified payload
 gives you, in exchange for being writable — and one directory should

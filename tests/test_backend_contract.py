@@ -53,7 +53,10 @@ class _QemuDriver:
 
     name = "qemu"
     extension = ".qcow2"
-    vvfat = True
+    #: The share models this backend can render explicitly, and the
+    #: model an unstated share resolves to (F68) — never vvfat itself.
+    share_models = ("vvfat",)
+    share_default = None
     control_planes = ("agentless-display", "vnc")
     #: The pixel format each plane's screen carrier captures in, or
     #: ``None`` where it captures none (F65). QEMU's default plane
@@ -142,7 +145,10 @@ class _VirtualBoxDriver:
 
     name = "virtualbox"
     extension = ".vdi"
-    vvfat = False
+    #: Neither share model nor default: this backend's own
+    #: shared-folder mechanism isn't built yet (F71).
+    share_models = ()
+    share_default = None
     control_planes = ("agentless-display",)
     #: VirtualBox has no text-memory readback: its display plane's
     #: screen *is* a framebuffer, so it states one.
@@ -225,14 +231,16 @@ def test_the_adapter_answers_to_one_name_everywhere(driver, adapter):
 
 def test_the_capability_report_claims_only_what_is_built(driver, adapter):
     # Both adapters serve the same DOS machine today; where they
-    # genuinely differ — vvfat, and the VNC plane QEMU alone wires —
-    # the driver states the claim so a backend cannot quietly widen it.
+    # genuinely differ — shares (F68), and the VNC plane QEMU alone
+    # wires — the driver states the claim so a backend cannot quietly
+    # widen it.
     report = adapter.capabilities()
     assert report.control_planes == driver.control_planes
     assert report.media == ("floppy", "hdd", "cdrom")
     assert report.controllers == ("ide",)
     assert report.materialize == ("new", "difference", "copy", "use")
-    assert report.vvfat is driver.vvfat
+    assert report.share_models == driver.share_models
+    assert report.share_default == driver.share_default
 
 
 def test_each_plane_states_the_capture_format_it_reads(driver, adapter):

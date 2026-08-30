@@ -77,12 +77,11 @@ class Capabilities:
 
     The fields use the same terms the blueprint uses
     (docs/spec/blueprint-model.md): control planes, drive media kinds,
-    controller types, and media materialization modes. ``vvfat``
-    reports whether this backend can serve a host directory as a
-    drive — QEMU is the only one that can. Whether a drive actually
-    resolves to a directory is only known after resolution runs, so
-    that check happens where the drive is rendered, not at assignment
-    time.
+    controller types, and media materialization modes.
+
+    Whether a drive or share actually resolves to a directory is only
+    known after resolution runs, so that check happens where the
+    device is materialized, not at assignment time.
     """
 
     backend: str
@@ -90,7 +89,6 @@ class Capabilities:
     media: Tuple[str, ...] = ()
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
-    vvfat: bool = False
     #: The pointing devices this backend can attach (F66): ``tablet``
     #: or ``mouse``, the blueprint's own terms. Defaults to empty, so
     #: an adapter that hasn't set this claims no pointing devices.
@@ -103,6 +101,18 @@ class Capabilities:
     #: The network attachments this backend can provide (D120): ``nat``
     #: or ``bridged``, the blueprint's own terms. Defaults to empty.
     network_attachments: Tuple[str, ...] = ()
+    #: The share models this backend can render when a share names one
+    #: explicitly (F68): ``vvfat``, ``9p``, or ``virtio-fs``. Defaults
+    #: to empty, the same way ``controllers`` does.
+    share_models: Tuple[str, ...] = ()
+    #: The model an *unstated*-model share resolves to on this backend
+    #: (F68) — never ``vvfat``, which only arrives by name (design:
+    #: planning/pledged/design/share-devices.md). ``None`` means this
+    #: backend cannot yet serve an unstated-model share at all, which
+    #: is honest today: the live default (``9p`` for QEMU) doesn't
+    #: exist until F69, and VirtualBox's own mechanism doesn't exist
+    #: until F71.
+    share_default: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -151,6 +161,15 @@ class Requirements:
     #: The distinct attachments this machine's ``network`` slots
     #: declare (D120): ``nat`` and/or ``bridged``.
     network_attachments: Tuple[str, ...] = ()
+    #: The distinct share models this machine's enabled shares name
+    #: explicitly (F68) — never includes an unstated one; see
+    #: ``share_unstated`` for that.
+    share_models: Tuple[str, ...] = ()
+    #: Whether any enabled share left ``model`` unstated (F68). An
+    #: unstated share needs the assigned backend's own live default,
+    #: so this is checked against ``share_default``, not
+    #: ``share_models`` — the two ask different questions.
+    share_unstated: bool = False
 
 
 class BackendAdapter:
@@ -271,6 +290,12 @@ class BackendAdapter:
         for attachment in requirements.network_attachments:
             if attachment not in report.network_attachments:
                 missing.append(f"network attachment {attachment!r}")
+        for model in requirements.share_models:
+            if model not in report.share_models:
+                missing.append(f"share model {model!r}")
+        if requirements.share_unstated and report.share_default is None:
+            missing.append("a share with no stated model (this backend "
+                           "has no live default yet)")
         return tuple(missing)
 
     def validate_settings(self, settings):

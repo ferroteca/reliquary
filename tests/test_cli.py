@@ -902,25 +902,21 @@ def test_add_media_writes_a_declaration_for_a_local_file(plain_home):
 
 @pytest.fixture
 def rig_home(home):
-    """A created `rig` machine with a directory-source floppy."""
-    exchange = os.path.join(home, "exchange")
-    os.makedirs(exchange)
+    """A created `rig` machine with an empty removable floppy."""
     os.makedirs(os.path.join(home, "blueprints"))
     _write_blueprint(home, "rig", [
         {"type": "machine", "name": "rig", "platform": "dos",
-         "devices": {"hdd0": "blank-20m", "floppy0": "exchange-dir"}},
+         "devices": {"hdd0": "blank-20m", "floppy0": None}},
         {"type": "media", "name": "blank-20m", "materialize": "new",
          "size": "20M"},
-        {"type": "media", "name": "exchange-dir", "materialize": "use",
-         "location": {"local": exchange}},
     ])
     _out("--home-dir", home, "create-machine", "--blueprint", "rig")
-    return home, exchange
+    return home
 
 
 def test_get_machine_var_reads_what_a_script_set(rig_home):
     from reliquary.machines import set_machine_var
-    home, _exchange = rig_home
+    home = rig_home
     set_machine_var("rig-0", "result", "PASS", context=home)
     code, out, _err = _out("--home-dir", home, "get-machine-var", "result",
                            "--machine", "rig-0")
@@ -929,7 +925,7 @@ def test_get_machine_var_reads_what_a_script_set(rig_home):
 
 
 def test_an_unset_variable_prints_nothing_and_succeeds(rig_home):
-    home, _exchange = rig_home
+    home = rig_home
     code, out, _err = _out("--home-dir", home, "get-machine-var", "ready",
                            "--machine", "rig-0")
     assert code == 0
@@ -937,7 +933,7 @@ def test_an_unset_variable_prints_nothing_and_succeeds(rig_home):
 
 
 def test_an_unset_variable_is_null_under_json(rig_home):
-    home, _exchange = rig_home
+    home = rig_home
     code, out, _err = _out("--home-dir", home, "get-machine-var", "ready",
                            "--machine", "rig-0", "--json")
     assert code == 0
@@ -946,7 +942,7 @@ def test_an_unset_variable_is_null_under_json(rig_home):
 
 def test_insert_media_mounts_a_file_by_path(rig_home):
     from reliquary.machines import load_machine_state
-    home, _exchange = rig_home
+    home = rig_home
     image = os.path.join(home, "round-1.img")
     with open(image, "wb") as handle:
         handle.write(b"BINARY")

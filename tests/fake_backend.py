@@ -99,10 +99,11 @@ class FakeAdapter(BackendAdapter):
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
-            vvfat=True,
             pointing_devices=("tablet", "mouse"),
             network_models=("pcnet", "ne2k"),
             network_attachments=("nat", "bridged"),
+            share_models=("vvfat", "9p", "virtio-fs"),
+            share_default="9p",
         )
         self.images = []
         self.starts = []

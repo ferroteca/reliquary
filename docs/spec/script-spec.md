@@ -2417,9 +2417,9 @@ The language deliberately has no file-exchange verbs (owner,
 2026-07-22). Moving files across the host/guest boundary is the
 caller's job, not the script's — the same way interpreting what a
 run produced is the caller's job (G2). While a machine is stopped,
-on every control plane, its drives are just plain host state: a
-[directory-source media](media-spec.md#the-media-component) *is*
-its directory, and drive images are readable and writable with the
+on every control plane, its drives and shares are just plain host
+state: a [share](media-spec.md#the-media-component) *is* its host
+directory (F68), and drive images are readable and writable with the
 user's own ordinary tools. So file exchange is ordinary host work
 done outside the script, against the machine directory
 (`get-machine-dir` reports where that is; the contract for it is
@@ -2428,12 +2428,12 @@ the language also keeps every quoted string in a script meaning
 one thing: string content is guest-facing text, never a host path.
 
 **This isn't a CLI or API capability either** (D108). Reliquary
-never places a file onto a machine's drives, never reads one back,
-and never maps a volume to a guest drive letter, on any surface: a
-machine's file content is deliberately outside what Reliquary
-handles (**P16**'s carve-out). A caller that needs to move a file
-in or out has to supply the drive and move the file itself — by
-attaching a directory-source media to a host directory, by
+never places a file onto a machine's drives or shares, never reads
+one back, and never maps a volume to a guest drive letter, on any
+surface: a machine's file content is deliberately outside what
+Reliquary handles (**P16**'s carve-out). A caller that needs to move
+a file in or out has to supply the device and move the file itself —
+by declaring a share whose media is a host directory (F68), by
 swapping an image live with `insert-media --file` (U20), or by
 opening the machine directory that `get-machine-dir` reports with
 their own tools. A future live guest-agent transfer feature would
@@ -2804,9 +2804,9 @@ per run, travels as ordinary script properties (`--property` or
 the `properties=` mapping, interpolated through property
 references); detailed results are a caller-authored artifact
 (JUnit XML, TAP) that the caller takes directly — swapped out as a
-disk image and opened with its own tools (U20), read off a
-directory-source results drive on the host, or captured as text
-through `exec` — and the caller is responsible for keeping it.
+disk image and opened with its own tools (U20), read off a share's
+directory on the host, or captured as text through `exec` — and the
+caller is responsible for keeping it.
 Reliquary deliberately has no test-result vocabulary of its own —
 no pass/fail schema, no result parsing (G2). Granularity comes
 from the run's own structure: one iteration is one returned

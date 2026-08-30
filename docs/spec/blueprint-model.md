@@ -102,10 +102,10 @@ never inferred — P10), `backend`, `memory`, `cpus`, `boot`,
 `control-planes`, `pointing-device`, `devices`, `backend-settings`,
 `description`, `scripts`, `parameters`, and `name`.
 
-`devices` maps a slot key (`hdd0`, `cdrom0`, `floppy0`, `net0`, …)
-to a drive or a NIC — the two kinds share one map and one key-clash
-check, discriminated by the key's own medium (D121). A drive value
-is one of:
+`devices` maps a slot key (`hdd0`, `cdrom0`, `floppy0`, `net0`,
+`share0`, …) to a drive, a NIC, or a share — the three kinds share
+one map and one key-clash check, discriminated by the key's own
+medium (D121). A drive value is one of:
 
 - a **media name** (string) — the catalog reference;
 - **`null`** — a declared but empty removable slot a script
@@ -119,7 +119,8 @@ The first round's four-way content selector (`size` / `base` /
 `media` / `hostdir`) is gone. A media name is the machine's one
 cross-boundary reference: **to change how a drive materializes,
 change the media, or point the drive at a different one.** A NIC
-value is described below, under `net` keys.
+value is described below, under `net` keys, and a share value under
+`share` keys (F68).
 
 #### What the topology fields mean
 
@@ -141,14 +142,14 @@ cannot carry.
   openbsd 512, win9x 64, winnt 256.
 - **`cpus`** defaults to 1.
 - **device keys** name a medium and a slot (`floppy` 0–1, `hdd`
-  0–3, `cdrom` 0–3, `net` 0–3), all sharing one keyspace and one
-  clash check (D121) — declaring `hdd0` and `net0` in the same
-  `devices` map is fine, but naming one slot twice, in either
-  spelling, is a **clash** and fails validation, as does a slot
-  outside its medium's range. Only drive keys (`floppy`/`hdd`/
+  0–3, `cdrom` 0–3, `net` 0–3, `share` 0–3), all sharing one
+  keyspace and one clash check (D121) — declaring `hdd0` and `net0`
+  in the same `devices` map is fine, but naming one slot twice, in
+  either spelling, is a **clash** and fails validation, as does a
+  slot outside its medium's range. Only drive keys (`floppy`/`hdd`/
   `cdrom`) get the **bare-medium-is-an-alias-for-slot-0** shorthand
-  (`hdd` ≡ `hdd0`); a NIC is always named by its full slot key. The
-  state always records the indexed form.
+  (`hdd` ≡ `hdd0`); a NIC or a share is always named by its full
+  slot key. The state always records the indexed form.
 - **`controller`** is valid on `hdd` and `cdrom` only — a floppy
   attaches to the floppy controller implicitly and **rejects the
   key**. Omitted, it resolves to `ide`, recorded into the state at
@@ -190,6 +191,34 @@ cannot carry.
   and D120 kept the first one always-authored while D122 made the
   second one authorable only when it actually matters, defaulting
   otherwise.
+- **`share` keys** (F68) name a host directory presented to the
+  guest for file exchange, for as long as the machine runs: either a
+  media name (string) — the catalog reference to a directory-payload
+  media — or an object carrying `media` plus optional `model` and
+  `enabled`. No `null` form: an empty drive bay is real hardware, but
+  a share with no directory means nothing. The referenced media's
+  `materialize` must be `use` — a share presents the directory in
+  place, never as a per-machine image — and it must resolve to a
+  directory: a share whose media resolves to a file fails closed
+  naming the path, and, symmetrically, a drive slot whose media
+  resolves to a directory now fails closed too (a directory payload
+  is legal only on a share). `model` names the live mechanism
+  (`vvfat`, `9p`, or `virtio-fs`), capability-checked against the
+  assigned backend the same way a NIC's `model` is (D122): honored
+  where the backend's capability report claims it, refused by name
+  otherwise. Omitted, an unstated `model` means the assigned
+  backend's own default live mechanism — **never** silently `vvfat`,
+  which only ever arrives by name. Which mechanisms a backend
+  actually offers, and what its default is, is a capability fact
+  reported at assignment, not fixed here — see
+  [share-devices.md](../../planning/pledged/design/share-devices.md)
+  for the full argument, the per-backend mechanisms, and the guest
+  driver each one needs. A `${key}` location binds the same way a
+  drive media's does (U21). `share` keys are refused in `boot`, the
+  same way `net` keys are: nothing boots from a shared directory, and
+  `insert-media`/`eject-media`/`set-boot-order` and the script's
+  `with boot`/`insert`/`eject` don't apply to a share — those stay
+  drive-only.
 - **`boot`** entries must each name a drive the machine
   **declares and has not disabled**, and are unique by slot: the
   same slot twice, in either spelling, fails validation. An empty
@@ -322,11 +351,11 @@ A media owns all content and materialization.
   regardless of where the payload comes from — even a trusted
   local payload can use it to verify it is the exact build the
   scripts target (U4).
-- **`read-only`** — present the drive read-only. Orthogonal to
-  `materialize`. **Defaults true on a cdrom** (no backend
-  meaningfully emulates writing a virtual ISO; a writable cdrom
-  is rejected); opt-in elsewhere. On a directory payload it
-  protects the host directory.
+- **`read-only`** — present the drive (or share, F68) read-only.
+  Orthogonal to `materialize`. **Defaults true on a cdrom** (no
+  backend meaningfully emulates writing a virtual ISO; a writable
+  cdrom is rejected); opt-in elsewhere. On a directory payload —
+  legal only on a share now — it protects the host directory.
 - **`extension`** — override the type-declaring extension of the
   cached payload when the source filename misnames or omits it.
   Otherwise derived from the location's filename or path.
@@ -334,11 +363,16 @@ A media owns all content and materialization.
   [Containment](#containment-parent-and-children).
 - **`description`**, **`notes`** — prose.
 
-**A host directory is a payload shape, not a mode:** a media
-whose location is a directory, with `materialize: use`, is the
-live vvfat attach. `use` covers "attach this file" and "attach
-this directory" alike. vvfat emulates no ISO9660, so a directory
-on a cdrom is rejected at resolution.
+**A host directory is a payload shape, not a mode:** `use` covers
+"attach this file" and "attach this directory" alike — the media
+model doesn't distinguish them. Which *device* a directory payload
+may attach to is a separate rule, and it changed under F68: a
+directory is legal only on a `share` slot now, where it becomes a
+live shared filesystem; a drive slot (including a cdrom) whose media
+resolves to a directory is rejected at resolution. See the `share`
+keys bullet above and
+[share-devices.md](../../planning/pledged/design/share-devices.md)
+for what a share actually does with it.
 
 ## Identity and the catalog
 
@@ -873,7 +907,8 @@ here because the model depends on it.
   export → reference the exported `.img` as a local media
   (`use` + `read-only`, or `difference`).
 - **Medium compatibility** is checked at resolution and fails
-  closed naming media and slot: a directory on a cdrom, a `new`
+  closed naming media and slot: a directory on any drive slot
+  (floppy, hdd, or cdrom — legal only on a share now, F68), a `new`
   size onto a cdrom, an ISO into an `hdd` slot.
 - **Cross-format differencing** is allowed (a qcow2 overlay over
   a `.vdi`); the backing format is detected from the extension.

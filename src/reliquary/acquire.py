@@ -265,8 +265,8 @@ def _run(plan, name, extension, context, on_mismatch, events=None,
         # file is a different problem from a wrong one, and catching
         # it here gives a clear error instead of letting the backend
         # fail trying to open a path that doesn't exist.
-        # (A directory is a legal source here — vvfat — so this checks
-        # `exists`, not `isfile`.)
+        # (A directory is a legal source here — a share's payload,
+        # F68 — so this checks `exists`, not `isfile`.)
         if not os.path.exists(plan.path):
             raise PreflightError(
                 f"media {name!r} is declared at {plan.path}, but nothing "

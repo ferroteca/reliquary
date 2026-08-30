@@ -66,7 +66,7 @@ as fewer nodes, not as a still-green run.
 
 The count for each bucket is pinned in `tests/corpus.py` — the helper
 both this corpus and the script corpus use to gather their fixtures —
-at 25, 48, and 2. If a bucket stops loading fixtures, that pin makes
+at 26, 48, and 2. If a bucket stops loading fixtures, that pin makes
 the run fail with a collection error, instead of quietly passing with
 nothing left to check. When you add or retire a fixture, update both
 the pin and the counts in this README.

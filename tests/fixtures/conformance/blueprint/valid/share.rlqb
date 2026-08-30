@@ -1,0 +1,20 @@
+// valid: share slots share the devices map with drives and NICs (D121);
+//        a share's value is a media name or an object naming media
+//        plus an optional model override (vvfat/9p/virtio-fs, F68) and
+//        enabled — no null, since an empty share means nothing
+// spec: Machine topology
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "devices": {
+      "cdrom0": null,
+      "share0": "hostdir",
+      "share1": { "media": "hostdir2", "model": "vvfat" },
+      "share2": { "media": "hostdir3", "enabled": false }
+    } },
+  { "type": "media", "name": "hostdir", "materialize": "use",
+    "location": "./exchange" },
+  { "type": "media", "name": "hostdir2", "materialize": "use",
+    "location": "./exchange2" },
+  { "type": "media", "name": "hostdir3", "materialize": "use",
+    "location": "./exchange3" }
+]

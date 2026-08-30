@@ -299,14 +299,14 @@ names the number it superseded.
   `rlq seed-script freedos-dump-font` (U11).
 
   1. **Give the machine somewhere to put the dump.** In the
-     blueprint, add a drive whose media is a host directory — the
-     drive a file crosses on, with nothing of Reliquary's own
+     blueprint, add a share whose media is a host directory — the
+     device a file crosses on, with nothing of Reliquary's own
      inside it (U14) — then run `rlq apply-blueprint --blueprint
-     <name>`, which gives the stopped machine the drive the
+     <name>`, which gives the stopped machine the share the
      blueprint just gained.
   2. **Ask the guest for the font it loaded.** `rlq run-script
      freedos-dump-font --blueprint <name>` boots to a prompt, reads
-     the live glyph table, writes it to that drive as `FONT.BIN`,
+     the live glyph table, writes it to that share as `FONT.BIN`,
      and powers the machine off. The 4096 bytes are sitting in the
      author's own directory once the run finishes.
   3. **Write down what the raw bytes don't say.** Create

@@ -319,7 +319,9 @@ Reliquary therefore works **agentlessly**:
 
 - Input is sent as keyboard events through QEMU's control protocol.
 - Text is read directly from VGA text memory, without OCR.
-- Files are exchanged through a QEMU virtual FAT drive.
+- Files are exchanged through a share — a host directory presented to
+  the guest, today authored explicitly as a QEMU virtual FAT drive
+  (`model: vvfat`).
 - Command completion is detected by watching for the DOS prompt.
 - Screenshots are captured through QEMU.
 
@@ -336,12 +338,14 @@ it is equally agentless — see `control-planes` in the
 Any DOS with a bootable image works. A machine's drive slots each name a
 **media** component, and that media component determines its own
 content — a blank `materialize: new` disk of a given `size`, a
-`difference`/`copy` over a payload, or a `use` attach (an ISO, or a
-host directory served as a virtual FAT drive). Reliquary builds
-(materializes) any per-machine image under
-`cache/machines/<id>/disks/`. Any QEMU-supported image format works;
-`*.img` and `*.iso` are treated as raw. Reliquary hands back a guest
-program's raw output as-is; interpreting it is left to the caller.
+`difference`/`copy` over a payload, or a `use` attach (an image or an
+ISO). A **share** slot works the same way but always `use`s its
+media, and that media is always a host directory: the guest sees it
+live, for as long as the machine runs. Reliquary builds (materializes)
+any per-machine image under `cache/machines/<id>/disks/`. Any
+QEMU-supported image format works; `*.img` and `*.iso` are treated as
+raw. Reliquary hands back a guest program's raw output as-is;
+interpreting it is left to the caller.
 
 ## The workflow
 
@@ -350,9 +354,10 @@ program's raw output as-is; interpreting it is left to the caller.
    the platform, memory, and devices. Each drive names a **media**
    component, and that media component decides how it is built
    (materialized) — a blank `new` disk, a `difference`/`copy` over a
-   payload, or a `use` attach. To hand the guest its own files, the
-   natural way is a media whose `source` is a host directory
-   (`materialize: use`): that directory *is* the drive.
+   payload, or a `use` attach. To hand the guest its own files, add a
+   **share** instead: a device whose media is a host directory
+   (`materialize: use`) — that directory *is* the share, visible to
+   the guest for as long as the machine runs.
 2. **Create a machine.** `rlq create-machine --blueprint <name>` builds
    one under a generated id (or `run-script` creates one on demand). The
    blueprint (including its media components) and its scripts are
@@ -366,9 +371,9 @@ program's raw output as-is; interpreting it is left to the caller.
    nothing of its own. A small value comes back through a machine
    variable (`rlq get-machine-var`); a whole image comes back by
    swapping it out. Moving files is your job: `rlq get-machine-dir`
-   prints the machine directory, and while the machine is stopped its
-   directory-source and image drives are ordinary host files you can
-   read or prepare with your own tools.
+   prints the machine directory, and its shares and image drives are
+   ordinary host files you can read or prepare with your own tools —
+   a share's directory even while the machine is running.
 5. **Recreate freely.** `destroy-machine` deletes a machine entirely and
    `recreate-machine` rebuilds it under the same id; `apply-blueprint`
    applies blueprint edits to a stopped machine.
@@ -529,8 +534,8 @@ rlq exec "myprog.exe > result.log" --blueprint freedos
 ```
 
 `exec` types the command and waits for the DOS prompt to come back. To
-capture detailed output, put a directory-source media (`source` set to
-a host directory, `materialize: use`) on a machine drive, and have the
+capture detailed output, add a **share** to the machine — a device
+whose media is a host directory (`materialize: use`) — and have the
 program write to it. While the machine is stopped, that directory is
 just an ordinary folder on the host (`rlq get-machine-dir` prints its
 path).
@@ -553,10 +558,11 @@ rlq stop-machine --blueprint freedos
 ```
 
 Stopping checks the VM's recorded identity before shutting it down, and
-flushes any guest writes to a virtual FAT drive back to disk. QEMU takes
-a snapshot of a directory-source media's directory when the drive is
-attached, so after changing its files on the host, stop and restart the
-machine before the guest will see the changes.
+flushes any guest writes to a `vvfat`-model share back to disk. QEMU
+takes a snapshot of a share's directory when the machine starts, so
+after changing its files on the host, stop and restart the machine
+before the guest will see the changes — `vvfat`'s trade-off for
+needing no guest driver at all.
 
 ## Command guide
 
@@ -646,28 +652,29 @@ always reports what the current boot produced. Readiness works the
 same way — your own ready script sets a variable and you poll for it;
 Reliquary does not ship a readiness script of its own.
 
-**Moving files is your job; Reliquary just supplies the drives they
-cross on.** It does not put files onto a machine's drives, does not
-read any back, and never tells you which drive letter the guest gave a
-disk — what is inside a volume is yours to reach with your own tools.
-There are three ways to get files across, and none of them requires
-Reliquary to look inside a filesystem:
+**Moving files is your job; Reliquary just supplies the drives and
+shares they cross on.** It does not put files onto a machine's drives
+or shares, does not read any back, and never tells you which drive
+letter the guest gave a volume — what is inside one is yours to reach
+with your own tools. There are three ways to get files across, and
+none of them requires Reliquary to look inside a filesystem:
 
-- **A directory-source drive.** Point a media at a host directory and
-  the guest sees it as a drive. You write into that directory and the
-  guest reads it; the guest writes and you read it back on the host.
-  The backend takes a snapshot of the directory when the drive is
-  attached, so stopping the machine is what makes a change visible on
-  the other side.
+- **A share.** Add a `share` device whose media is a host directory,
+  and the guest sees it as a live volume for as long as the machine
+  runs. The only model that actually renders today is `vvfat`, QEMU's
+  own synthesized FAT volume: you write into the host directory and
+  the guest reads it; the guest writes and you read it back on the
+  host, but only once the machine stops — QEMU takes a snapshot of the
+  directory when the machine starts, so a host-side change also needs
+  a stop/restart before the guest sees it.
 - **A whole image, swapped live.** `insert-media --file` mounts an
   image you built, without a reboot, and ejecting flushes the guest's
   writes back to that same file. Build and read it with whatever
   image library you like — [remanence][remanence] opens raw and qcow2
   disks in place and reads and writes the FAT volumes inside them.
 - **The machine directory.** `get-machine-dir` prints it. While the
-  machine is stopped its drives are plain files: a directory-source
-  drive *is* its directory, and an image drive is a raw or qcow2
-  file.
+  machine is stopped its drives and shares are plain files: a share
+  *is* its directory, and an image drive is a raw or qcow2 file.
 
 [remanence]: https://pypi.org/project/remanence/
 
@@ -883,7 +890,7 @@ unavailable disk image.
 
 ### Guest-written files are missing
 
-Stop QEMU before reading files written to the virtual FAT drive. Writes are flushed back to the host during shutdown.
+Stop the machine before reading files the guest wrote to a `vvfat`-model share. Writes are flushed back to the host during shutdown.
 
 ## License
 

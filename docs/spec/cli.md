@@ -1108,26 +1108,26 @@ change anything.
 
 **This is the only way Reliquary gives you to reach a machine's file
 content, and that's deliberate, not a shortcut it happens to offer**
-(D108). Reliquary never places a file on a machine's drives, never
-reads one back, and never maps a drive to a guest-visible letter of
-its own — getting files in or out of a machine is explicitly outside
-what Reliquary itself handles (this is carved out by **P16**) — so a
-caller that needs to move a file in or out gets the directory from
-this command and uses its own tools on it. While the machine is
-stopped, regardless of which control plane it uses, its drives are
-just ordinary files and directories on the host: a drive whose media
-is a directory *is* that directory, and an image drive is a raw or
-qcow2 file that any disk-image library can open directly. Reliquary
-doesn't mediate this access and doesn't record that it happened. The
-full rules — including which files stay off-limits even here
-(`cache/media/` payloads) — are in the
+(D108). Reliquary never places a file on a machine's drives or
+shares, never reads one back, and never maps a drive to a
+guest-visible letter of its own — getting files in or out of a
+machine is explicitly outside what Reliquary itself handles (this is
+carved out by **P16**) — so a caller that needs to move a file in or
+out gets the directory from this command and uses its own tools on
+it. While the machine is stopped, regardless of which control plane
+it uses, its drives and shares are just ordinary files and
+directories on the host: a share *is* its host directory, and an
+image drive is a raw or qcow2 file that any disk-image library can
+open directly. Reliquary doesn't mediate this access and doesn't
+record that it happened. The full rules — including which files stay
+off-limits even here (`cache/media/` payloads) — are in the
 [instance model](instance-model.md).
 
 Two other routes Reliquary supplies stay within its own machinery,
-and neither one reaches inside a drive's own filesystem: a
-**directory-source media** attaches a host directory as a drive
-directly, and **`insert-media --file`** mounts an image the caller
-built, while the machine is running (U20).
+and neither one reaches inside a filesystem: a **share** (F68)
+presents a host directory to the guest directly, and
+**`insert-media --file`** mounts an image the caller built, while the
+machine is running (U20).
 
 ```powershell
 rlq get-machine-dir -b freedos

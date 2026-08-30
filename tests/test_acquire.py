@@ -119,7 +119,9 @@ def test_a_missing_local_payload_is_caught_without_a_pin(root):
 
 
 def test_a_directory_source_is_not_treated_as_missing(root):
-    """A directory location is legal — it attaches as vvfat."""
+    """A directory location is legal media content at this layer —
+    whether it's legal to *attach* (share only, F68) is decided where
+    the device that names it materializes, not here."""
     staging = os.path.join(root, "staging")
     os.makedirs(staging)
     doc = parse_document([{"name": "exchange",

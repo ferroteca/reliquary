@@ -51,7 +51,7 @@ _CORPUS = os.path.join(_HERE, "fixtures", "conformance", "blueprint")
 
 _ID = re.compile(r"^// id: (\S+)", re.M)
 
-VALID = corpus.fixtures(_CORPUS, "valid", ".rlqb", count=25)
+VALID = corpus.fixtures(_CORPUS, "valid", ".rlqb", count=26)
 INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqb", count=48)
 AT_RESOLUTION = corpus.fixtures(
     _CORPUS, "invalid-at-resolution", ".rlqb", count=2)
@@ -294,3 +294,34 @@ def test_a_running_state_matches_the_schema(materialized_state):
         "endpoint": {"port": 5555},
         "pid": 4242})
     jsonschema.validate(running, _STATE_SCHEMA)
+
+
+def test_a_share_in_a_materialized_state_matches_the_schema(tmp_path):
+    """A share (F68) is a resolved device shape of its own — not a
+    drive, not a NIC — so `deviceState`'s `oneOf` needs a third
+    branch. A share-carrying state validating against only
+    `driveState`/`networkState` would be exactly the gap that a
+    schema `oneOf` silently swallows: neither branch requires
+    `media`/`materialize`/`path`/`model` without `medium`/
+    `attachment`, so nothing but a real fixture proves the third
+    branch is actually there and actually matches what
+    `_materialize_share` produces.
+    """
+    root = tmp_path / "proj"
+    root.mkdir()
+    exchange = tmp_path / "exchange"
+    exchange.mkdir()
+    (root / "share-bp.rlqb").write_text(json.dumps([
+        {"type": "machine", "name": "share-bp", "platform": "dos",
+         "devices": {"share0": {"media": "exchange-dir",
+                                "model": "vvfat"}}},
+        {"type": "media", "name": "exchange-dir", "materialize": "use",
+         "location": str(exchange)},
+    ]), encoding="utf-8")
+    context = Context(home_dir=str(tmp_path / "home"),
+                      blueprints_dir=str(root), scripts_dir=str(root))
+    with fake_backend.installed():
+        machine_id = create_machine("share-bp", context=context)
+    state = load_machine_state(machine_id, context)
+    assert state["devices"]["share0"]["model"] == "vvfat"
+    jsonschema.validate(state, _STATE_SCHEMA)

@@ -14,19 +14,25 @@ timeout     2m
 # call is made by typing a stub at its prompt rather than staging a
 # program (P2, P3): the stub runs once and goes with the machine.
 #
-# `floppy0` is the slot this script writes through — undeclared on
-# the codex blueprint (P16, D108): a host directory is the author's
-# own path, so give the machine one before running this
-# (docs/dos-automation.md). Floppy lettering is fixed by DOS
-# independently of whatever else the machine has attached, so a lone
-# floppy0 is always A: — no insert or eject appears here, because a
-# directory-source (vvfat) drive carries no image for a live swap to
-# match sizes against (`machines._medium_size`), so attaching it is
-# the blueprint's job, done once, before start. A blueprint that
-# never gained the slot reads honestly from the guest's own DOS: `A:`
-# was never a real drive, so writing to it fails the same way an
-# empty floppy would, and the run ends at this script's `wait` rather
-# than with a corrupt or missing FONT.BIN (P11).
+# This script writes to A:\FONT.BIN — undeclared on the codex
+# blueprint (P16, D108): a host directory is the author's own path,
+# so give the machine one before running this (docs/dos-automation.md).
+# No insert or eject appears here, because a directory-source drive
+# carries no image for a live swap to match sizes against
+# (`machines._medium_size`), so attaching it is the blueprint's job,
+# done once, before start.
+#
+# XXX(F68): before this feature, a directory media could attach
+# directly to `floppy0`, which DOS always letters A: regardless of
+# whatever else the machine has — that's what A:\FONT.BIN above
+# assumed. F68 retires that: a directory payload is legal only on a
+# `share` slot now, which renders disk-shaped, not floppy-shaped, so
+# it no longer lands on A: by construction. What letter DOS actually
+# assigns a share's vvfat drive (after hdd0/cdrom0, MSCDEX's own
+# letter consumption included) has not been confirmed against a real
+# boot, so this stub's A:\ target is unverified and likely wrong.
+# Confirm the real letter and update both this script and U25 in
+# USE-CASES.md together.
 start
 wait "C:\>"
 enter "DEBUG"

@@ -312,17 +312,60 @@ def test_copy_media_materializes_a_duplicate(rig):
     assert rig.state(machine_id)["devices"]["hdd0"]["materialize"] == "copy"
 
 
-def test_directory_source_media_attaches_the_directory(rig):
+def test_a_directory_media_on_a_drive_slot_is_refused(rig):
+    # F68: a directory payload is legal only on a share slot now — the
+    # old silent vvfat carve-out on a drive is gone.
+    work = rig.path("work")
+    os.makedirs(work)
+    with pytest.raises(PreflightError) as caught:
+        rig.create(
+            "hd", {"platform": "dos", "devices": {"hdd0": "shared"}},
+            media=[{"name": "shared", "materialize": "use",
+                    "location": {"local": work}}])
+    assert caught.value.rule_id == "drive.directory-not-allowed"
+
+
+def test_a_share_attaches_the_directory(rig):
     work = rig.path("work")
     os.makedirs(work)
     machine_id = rig.create(
-        "hd", {"platform": "dos", "devices": {"hdd0": "shared"}},
+        "hd", {"platform": "dos",
+               "devices": {"share0": {"media": "shared",
+                                      "model": "vvfat"}}},
         media=[{"name": "shared", "materialize": "use",
                 "location": {"local": work}}])
-    drive = rig.state(machine_id)["devices"]["hdd0"]
+    share = rig.state(machine_id)["devices"]["share0"]
     # The state records the host directory itself; rendering it as
     # a vvfat drive is the adapter's (test_backend_qemu.py).
-    assert os.path.normpath(drive["path"]) == os.path.normpath(work)
+    assert os.path.normpath(share["path"]) == os.path.normpath(work)
+    assert share["model"] == "vvfat"
+
+
+def test_a_share_naming_a_file_is_refused(rig):
+    with pytest.raises(PreflightError) as caught:
+        rig.create(
+            "hd", {"platform": "dos",
+                   "devices": {"share0": {"media": "shared",
+                                          "model": "vvfat"}}},
+            media=[{"name": "shared", "materialize": "use",
+                    "location": {"local": rig.iso_path}}])
+    assert caught.value.rule_id == "share.directory-required"
+
+
+def test_an_unstated_share_model_is_refused_everywhere_in_f68_alone(rig):
+    # F68 alone: 9p (QEMU's eventual live default) doesn't exist until
+    # F69, so an unstated-model share is refused everywhere for now —
+    # exactly what FEATURES.md's F68 entry calls the interim state.
+    report = Capabilities(backend="qemu", share_models=("vvfat",))
+    with fake_backend.installed(capabilities=report):
+        work = rig.path("work")
+        os.makedirs(work)
+        with pytest.raises(PreflightError) as caught:
+            rig.create(
+                "hd", {"platform": "dos", "devices": {"share0": "shared"}},
+                media=[{"name": "shared", "materialize": "use",
+                        "location": {"local": work}}])
+    assert caught.value.rule_id == "machine.no-capable-backend"
 
 
 def test_cdrom_rejects_a_new_media(rig):

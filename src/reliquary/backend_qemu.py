@@ -1120,10 +1120,13 @@ class QemuAdapter(BackendAdapter):
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
-            vvfat=True,
             pointing_devices=("tablet", "mouse"),
             network_models=("pcnet", "ne2k", "virtio"),
             network_attachments=("nat", "bridged"),
+            # vvfat only arrives by name (F68): the live default (9p)
+            # doesn't exist until F69, so an unstated-model share is
+            # refused here rather than silently landing on vvfat.
+            share_models=("vvfat",),
         )
 
     def capture_format(self, plane):
@@ -1190,10 +1193,11 @@ class QemuAdapter(BackendAdapter):
               current=None):
         """Render the machine's state into a QEMU command line and launch.
 
-        Turns Reliquary's own drive and network vocabulary into QEMU
-        configuration: memory, drive arguments, NIC arguments, and the
-        firmware boot order are all rendered here, so no caller ever
-        has to build a backend argument by hand.
+        Turns Reliquary's own drive, network, and share vocabulary into
+        QEMU configuration: memory, drive arguments, NIC arguments,
+        share arguments, and the firmware boot order are all rendered
+        here, so no caller ever has to build a backend argument by
+        hand.
 
         This machine's own ``backend-settings.qemu`` section is
         rendered **last**, after everything Reliquary itself sets: the
@@ -1214,8 +1218,11 @@ class QemuAdapter(BackendAdapter):
                  if "medium" in entry}
         network = {key: entry for key, entry in devices.items()
                   if "attachment" in entry}
+        shares = {key: entry for key, entry in devices.items()
+                 if "medium" not in entry and "attachment" not in entry}
         args += drive_args(drives)
         args += network_args(network)
+        args += share_args(shares, drives)
         boot = _boot_order(state.get("boot", []), drives)
         if boot is not None:
             args += ["-boot", f"order={boot}"]
@@ -1444,15 +1451,28 @@ def settings_args(settings):
     return args
 
 
+def _hdd_ide_end(drives):
+    """The first free IDE bus index after the last hard disk."""
+    return max((d["slot"] for d in drives.values() if d["medium"] == "hdd"),
+              default=-1) + 1
+
+
+def _next_ide_index(drives):
+    """The first free IDE bus index after the last hard disk *and*
+    cdrom — where a share continues the same bus (F68)."""
+    cdrom_count = sum(1 for d in drives.values() if d["medium"] == "cdrom")
+    return _hdd_ide_end(drives) + cdrom_count
+
+
 def drive_args(drives):
     """Build QEMU ``-drive`` arguments from a machine's resolved drives.
 
     Returns a list of tokens for a QEMU command line (``-drive``
     alternating with its value), with floppies first, hard disks
     next, and cdroms placed on the IDE bus after the last hard disk.
-    A drive whose resolved path is a host directory is rendered as
-    vvfat — this can only be known once resolution has already run,
-    which is why it's checked here rather than at assignment time.
+    A drive's resolved path is never a host directory — F68 refuses
+    that at materialization, folding what used to be checked here
+    into a share instead (see :func:`share_args`).
     """
     args = []
 
@@ -1466,35 +1486,26 @@ def drive_args(drives):
             args += ["-drive",
                      f"if=floppy,index={drive['slot']},id={key}"]
             continue
-        is_dir = os.path.isdir(path)
-        source = (f"fat:floppy:rw:{path},format=raw,"
-                  if is_dir else path + ",")
         args += ["-drive",
-                 f"file={source}if=floppy,index={drive['slot']},id={key}"]
+                 f"file={path},if=floppy,index={drive['slot']},id={key}"]
 
     hdds = [(k, v) for k, v in drives.items()
             if v["medium"] == "hdd"]
     for key, drive in sorted(hdds, key=lambda kv: kv[1]["slot"]):
         path = drive["path"]
-        is_dir = os.path.isdir(path)
-        source = (f"fat:rw:{path},format=raw,"
-                  if is_dir else path + ",")
-        inferred = "" if is_dir else format_options(path)
+        inferred = format_options(path)
         # id=<key>, same as every other drive: a hard disk is never
         # swapped live, but its key is still how the settings hatch
         # addresses that drive's options — `-set drive.hdd0.cache=…`
         # (D118) — so every drive is addressable the same way.
         args += ["-drive",
-                 f"file={source}{inferred}if=ide,index={drive['slot']},"
+                 f"file={path},{inferred}if=ide,index={drive['slot']},"
                  f"id={key}"]
 
     cdroms = [(k, v) for k, v in drives.items()
               if v["medium"] == "cdrom"]
     if cdroms:
-        next_ide = max(
-            (d["slot"] for k, d in drives.items() if d["medium"] == "hdd"),
-            default=-1,
-        ) + 1
+        next_ide = _hdd_ide_end(drives)
         for ordinal, (key, drive) in enumerate(
                 sorted(cdroms, key=lambda kv: kv[1]["slot"])):
             path = drive["path"]
@@ -1508,6 +1519,31 @@ def drive_args(drives):
                      f"file={path},{inferred}media=cdrom,if=ide,"
                      f"index={index},id={key}"]
 
+    return args
+
+
+def share_args(shares, drives):
+    """Build QEMU ``-drive`` arguments from a machine's resolved shares.
+
+    Only ``model: vvfat`` renders (F68) — the capability report never
+    claims ``9p``/``virtio-fs`` yet, so ``unmet()`` already refused
+    those at assignment and neither ever reaches here. A share is
+    disk-shaped only (the old floppy-shaped directory rendering is
+    retired), placed on the IDE bus, continuing the index sequence
+    ``drive_args`` left off after the last hard disk and cdrom.
+    """
+    args = []
+    next_ide = _next_ide_index(drives)
+    for ordinal, (key, share) in enumerate(sorted(shares.items())):
+        if share["model"] != "vvfat":
+            raise InternalError(
+                f"share {key} carries model {share['model']!r}, which "
+                "this backend cannot render; unmet() should have "
+                "refused this at assignment")
+        index = next_ide + ordinal
+        args += ["-drive",
+                 f"file=fat:rw:{share['path']},format=raw,if=ide,"
+                 f"index={index},id={key}"]
     return args
 
 

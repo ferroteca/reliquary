@@ -353,15 +353,15 @@ it belonged to — its `Runner` / `MachineConfig` interface has been
 replaced by the blueprint machine model.
 
 **There is no file-transfer API, and no drive-contents report**
-(D108). The binding never writes a file onto a machine's drives,
-never reads one back, never lists what's on a drive, and never
+(D108). The binding never writes a file onto a machine's drives or
+shares, never reads one back, never lists what's on one, and never
 maps a volume to a guest drive letter: what's inside a volume is
 the caller's own business, reached with the caller's own tools
 against the machine directory that `get_machine_dir` returns —
 this is the sanctioned way to reach it, not a fallback for a
 missing feature (P16's file-content carve-out). What the binding
-does provide is the drives themselves: a directory-source media
-attaches a host directory to the guest through vvfat, and
+does provide is the devices themselves: a `share` presents a host
+directory to the guest — today rendered through `vvfat` (F68) — and
 `insert_media(file=)` mounts an image the caller already built
 (U20). `describe_drives` / `refresh_drives` / `put_file` /
 `get_file` / `put_files` / `get_files` / `list_files` have been

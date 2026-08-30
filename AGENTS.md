@@ -80,12 +80,13 @@ workflow:
     (`${…}`) is restricted to exactly two forms — a character class does a first screen, then the two
     productions decide — and references are refused in identity positions, in the dependency graph, and in
     fields with a closed set of allowed values. `document.py` validates the full set of machine fields:
-    `platform`, `backend`, `memory`, `cpus`, `devices` (drives and NICs sharing one slot-keyed map, D121: a drive
-    value is a media name, `null`, `{media, controller, enabled}`, or an inline media definition, including an
+    `platform`, `backend`, `memory`, `cpus`, `devices` (drives, NICs, and shares sharing one slot-keyed map, D121: a
+    drive value is a media name, `null`, `{media, controller, enabled}`, or an inline media definition, including an
     anonymous blank one; a NIC value is an attachment name — `nat` or `bridged` — or `{attachment, interface,
-    model}`, D120/D122 — `model` overrides the platform-resolved chipset), `boot`, `name` (the id-safe identity, not a
-    display label), `description`, `scripts`, `control-planes`, `pointing-device` (F66), `backend-settings`, and
-    `parameters`.
+    model}`, D120/D122 — `model` overrides the platform-resolved chipset; a share value is a media name or
+    `{media, model, enabled}` — no `null`, and no anonymous blank — where `model` is `vvfat`/`9p`/`virtio-fs`, F68),
+    `boot`, `name` (the id-safe identity, not a display label), `description`, `scripts`, `control-planes`,
+    `pointing-device` (F66), `backend-settings`, and `parameters`.
   - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,
     `authoring` writes and removes it. It's authoring-only: it scaffolds a new blueprint (`new_blueprint`), and
     writes a media declaration for a file already on disk (`add_media(name, file)` — computes the sha256, writes
@@ -215,7 +216,7 @@ workflow:
     dependency on `remanence`. Whatever is inside a volume is the caller's business, reached with the caller's
     own tools against the directory `get_machine_dir` returns — which is what makes P16's carve-out for file
     content a real boundary rather than a gap. Two routes Reliquary does supply stay in-band and neither one
-    opens a filesystem: a directory-source media that attaches a host directory as a vvfat drive, and
+    opens a filesystem: a share device that presents a host directory to the guest (F68), and
     `insert_media(file=)`, which swaps a whole image live. `test_old_surface_purge.py` checks that the seven old
     command words for file access stay gone, and `test_command_manifest.py` catches one coming back disguised as
     an unclassified session method.
@@ -1044,23 +1045,36 @@ first (slots 0–1, drives A: and B:), then hard disks (slots 0–3, on the IDE 
 bus after the hard disks. Each removable drive gets a stable QMP `id=<key>`, so a running `insert`/`eject` can
 target it later. An image's file extension decides its format (`format_options()`): `*.img` and `*.iso` are pinned
 to `format=raw` (this avoids a format-probing warning QEMU would otherwise print), and any other extension is left
-for QEMU to identify itself. A directory-source media (one whose `source` is a directory and whose `materialize`
-is `use`) renders as a vvfat drive — vvfat can't emulate ISO9660, so a directory-source media on a cdrom is
-rejected at resolution time. Memory size and boot order are resolved into the machine's state at `create` time
-(the best-guess boot order is: the floppy in slot 0, else the hard disk in slot 0, else the first cdrom).
+for QEMU to identify itself. A drive's resolved payload is never a host directory (F68): that payload shape is
+legal only on a `share` device now, rendered separately by `share_args()` (see "Share devices", below) — a drive
+whose media resolves to a directory fails closed in `machines._materialize_drive`, before rendering ever sees it.
+Memory size and boot order are resolved into the machine's state at `create` time (the best-guess boot order is:
+the floppy in slot 0, else the hard disk in slot 0, else the first cdrom).
 
 `AgentlessGuestExec.wait_ready()` only waits for the boot process to reach a native DOS prompt, detected generically
 as a bare prompt on the bottom-most non-blank row of the screen. Don't add special boot parameters for ordinary DOS
 commands — drive changes, directory changes, environment variables, and program invocations all belong in
 `AgentlessGuestExec.execute()` scripting instead.
 
-### Virtual FAT behavior
+### Share devices
 
-QEMU takes a snapshot of a vvfat staging directory the moment the drive is attached. Any change made on the host
-side after that requires a stop/start cycle to be picked up. Guest writes should only be read back after QEMU
-stops, since that's when the write-back to the host directory actually completes. A directory-source media attaches
-its directory as a vvfat drive (`hdd` renders it as a vvfat hard disk, `floppy` renders it as a vvfat 1.44M FAT12
-floppy).
+A `share<n>` slot presents a host directory to the guest (F68; design: `planning/pledged/design/share-devices.md`),
+sharing the `devices` keyspace with drives and NICs the same way NICs already do (D121) — `document.py`'s
+`MachineShare` / `_share_device` mirror `MachineNetwork` / `_network_device`. A share's media must resolve to a
+directory and materialize `use`; `machines._materialize_share` fails closed otherwise (`share.directory-required`,
+`share.materialize-not-use`). `model` (`vvfat`/`9p`/`virtio-fs`) is capability-checked at assignment the same way a
+NIC's `model` is (D122): `backends.Capabilities`/`Requirements` carry `share_models` (what a backend can render by
+name) and `share_default`/`share_unstated` (what an *unstated* model resolves to on that backend — never silently
+`vvfat`, which only ever arrives by name). Only QEMU's `vvfat` model actually renders today; QEMU reports
+`share_default=None` (its eventual live default, `9p`, isn't built until F69), so an unstated-model share is
+refused everywhere for now — the interim state FEATURES.md's F68 entry names, not a bug.
+
+`backend_qemu.share_args()` renders a `vvfat` share as a synthesized FAT hard disk on the IDE bus, continuing the
+index sequence `drive_args()` leaves off after the last hdd and cdrom — shares are disk-shaped only; the old
+floppy-shaped vvfat rendering is retired. QEMU takes a snapshot of a `vvfat` share's directory the moment the
+machine starts. Any change made on the host side after that requires a stop/start cycle to be picked up. Guest
+writes should only be read back after QEMU stops, since that's when the write-back to the host directory actually
+completes.
 
 ### Script dispatch
 

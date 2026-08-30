@@ -409,11 +409,12 @@ Virtual CPU count. Default `1`.
 
 **blueprint (optional) · object**
 
-The machine's device inventory: drives (floppy/hdd/cdrom) and NICs
-(net) share one slot-keyed map (D121). A key's medium decides which
-kind it is — there's no separate `type` field — and both kinds are
-checked for slot clashes together, so `hdd0` and `net0` can coexist
-freely but a slot can't be declared twice under two spellings.
+The machine's device inventory: drives (floppy/hdd/cdrom), NICs
+(net), and shares (F68) share one slot-keyed map (D121). A key's
+medium decides which kind it is — there's no separate `type` field —
+and all three kinds are checked for slot clashes together, so `hdd0`,
+`net0`, and `share0` can coexist freely but a slot can't be declared
+twice under two spellings.
 
 ### Drives
 
@@ -473,15 +474,18 @@ or an **object** carrying the media name plus hardware attributes:
 The drive names one [`media`](#media--optional--string) component
 and says nothing else about its content — the media is what
 controls [materialization](spec/media-spec.md#materialize): a fresh
-blank disk, a writable overlay on top of a payload, a copy of one,
-or an attached payload as-is (a file, or a host directory served as
-a virtual FAT drive). **The old four-way drive-content selector
-(`size` / `base` / `media` / `hostdir`) is gone.** A blank disk is
-now a media with `materialize: new`; a differencing drive is a
-media with `materialize: difference`; a `hostdir` drive is a media
-whose `location` is a directory, with `materialize: use`. To change
-how a drive materializes, change the media it names — or point it
-at a different media.
+blank disk, a writable overlay on top of a payload, a copy of one, or
+an attached file payload as-is. **The old four-way drive-content
+selector (`size` / `base` / `media` / `hostdir`) is gone.** A blank
+disk is now a media with `materialize: new`; a differencing drive is
+a media with `materialize: difference`. To change how a drive
+materializes, change the media it names — or point it at a different
+media.
+
+A media whose payload resolves to a host **directory** can no longer
+attach to a drive at all (F68) — that's a [share](#shares) now,
+which fails closed naming the path if you try it here. `hostdir` was
+this shape's old name, before the fold.
 
 A removable drive (`cdrom`, `floppy`) may instead be declared
 **empty** with the value `null`:
@@ -669,13 +673,13 @@ becomes available the day a second backend adapter actually exists;
 it's the design choice that makes it cheap once that happens, and
 it's worth stating now for the same reason the table above is.
 
-A `use` media attaches the payload file itself — or, for a
-`location` that's a directory, serves it as a virtual FAT drive —
-with no per-machine image involved at all. Its format is determined
-by the extension of its
-[cached file name](spec/media-spec.md). If a media payload is in a
-format the machine's backend can't attach, that's a capability
-error naming both.
+A `use` media attaches the payload file itself, with no per-machine
+image involved at all. Its format is determined by the extension of
+its [cached file name](spec/media-spec.md). If a media payload is in
+a format the machine's backend can't attach, that's a capability
+error naming both. (A directory payload works the same way but can
+only attach to a [share](#shares) now, F68 — see that section for
+what a drive slot does with one instead: refuses it.)
 
 ---
 
@@ -784,6 +788,100 @@ it today.
 
 - **Any interface name at all, for `nat`.** A NAT attachment needs
   nothing host-specific, which is exactly why it needs no override.
+
+---
+
+### Shares
+
+Each `share` key names a slot; each value names the **media** — a
+host directory, and nothing else — and, optionally, the live
+**mechanism**. A share presents that directory to the guest for as
+long as the machine runs (F68); design:
+[share-devices.md](../planning/pledged/design/share-devices.md).
+
+#### Keys: slots
+
+| kind    | slots | keys                    |
+|---------|-------|-------------------------|
+| `share` | 0–3   | `share0` ... `share3`   |
+
+Like a NIC, there's no bare-name shorthand for slot 0 — every share
+is named by its full slot key.
+
+#### Values
+
+A share entry is either a bare media name, or an object carrying
+`media` plus optional `model` and `enabled`:
+
+```json
+{"devices": {"share0": "exchange-dir"}}
+```
+
+```json
+{"devices": {"share0": {"media": "exchange-dir", "model": "vvfat"}}}
+```
+
+There's no `null` form: an empty removable drive is real hardware
+waiting for a medium, but a share with no directory means nothing.
+
+##### `media` — required · string
+
+The name of a [media component](spec/media-spec.md) whose payload
+resolves to a host **directory**. Its `materialize` must be `use` —
+a share always presents the directory in place, never as a
+per-machine image — and a media that resolves to a *file* instead
+fails closed naming the path: a share is the one device kind a
+directory payload is legal on, and it always is one.
+
+##### `model` — optional · string
+
+The live mechanism, overriding the assigned backend's own default
+(D122):
+
+| value        | mechanism                                    | backends |
+|--------------|-----------------------------------------------|----------|
+| `vvfat`      | a FAT volume synthesized over the directory — no guest driver, no build option, needs nothing extra | QEMU |
+| `9p`         | virtio-9p, a live filesystem protocol          | QEMU (not built yet) |
+| `virtio-fs`  | virtio-fs, a live filesystem protocol backed by `virtiofsd` | QEMU (not built yet) |
+
+`vvfat`'s trade: the guest's view is assembled when the machine
+starts, host edits made while it runs are invisible, and guest writes
+surface on the host once the machine stops — but it needs nothing in
+the guest at all, which is exactly why it's the one mechanism that
+works everywhere today. `9p` and `virtio-fs` are both genuinely live
+in both directions, at the cost of a guest driver (the virtio-dos
+project ships one for each) — neither renders yet (F69/F70), so
+naming either fails closed today with a capability error, the same
+way naming `virtio` on VirtualBox does.
+
+**Omitted, `model` means the assigned backend's own default live
+mechanism — never silently `vvfat`.** An author who declares a share
+and says nothing gets the field's full live contract, or a capability
+error naming what's missing; `vvfat`'s snapshot trade only ever
+arrives by writing the word. Until `9p` ships (F69), that means an
+unstated-model share is refused on every backend — the interim state
+is deliberate, not a bug.
+
+```json
+{"devices": {"share0": {"media": "exchange-dir", "model": "vvfat"}}}
+```
+
+##### `enabled` — optional · boolean · default `true`
+
+Same meaning as a drive's [`enabled`](#enabled--optional--boolean--default-true):
+`false` removes the share from the machine entirely.
+
+#### What a share entry deliberately leaves unsaid
+
+- **Which controller or bus.** A share is disk-shaped only, on
+  whatever the adapter renders — not authored, the same way a NIC's
+  physical port isn't.
+- **Boot membership, or live insert/eject.** A share can't appear in
+  [`boot`](#boot), and `insert-media` / `eject-media` /
+  `set-boot-order` (and the script's `with boot` / `insert` /
+  `eject`) all stay drive-only. Nothing boots from a shared
+  directory, and a share attaches at start and detaches at stop —
+  there's no live attach/detach either.
 
 ---
 
@@ -1077,9 +1175,14 @@ Format checks reject the document outright when they find:
   media / source / archive rule in
   [the media spec](spec/media-spec.md));
 - a `cdrom` drive naming a media that isn't read-only `use`;
+- a drive slot whose media resolves to a host directory (legal only
+  on a share slot now, F68), or a share slot whose media resolves to
+  anything but a directory, or isn't `materialize: use`;
 - an unknown network key, a network slot out of range, a network
   entry missing `attachment`, or an `interface` named on a `nat`
   attachment;
+- an unknown share key, a share slot out of range, a share entry
+  missing `media`, or a `null` share value;
 - a `parameters` value that's neither a string nor a
   `{"property": "<key>"}` object, or one with an invalid key or
   property name.
@@ -1094,13 +1197,15 @@ when it asks for:
   anything but `scsi` on a Hyper-V Generation 2 machine);
 - a `difference` media the backend/format combination can't
   express;
-- a directory-source media the backend can't serve;
 - an image format the backend can't attach;
 - a control plane the backend can't offer;
 - a network attachment the backend can't provide (`bridged` on a
   backend that hasn't built it);
 - a NIC model the backend can't provide (`ne2k` on any backend but
   QEMU);
+- a share `model` the backend can't render, or an unstated share on
+  a backend with no live default yet (F68 — that's every backend
+  today, until F69 ships QEMU's `9p`);
 - a boot order the backend can't honor;
 - a `backend-settings` key the assigned backend doesn't define, or
   one of its arguments that restates a field Reliquary already

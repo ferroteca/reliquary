@@ -36,6 +36,7 @@ _BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
 _CONTROLLERS = {"ide", "sata", "scsi", "nvme", "virtio"}
 _ATTACHMENTS = {"nat", "bridged"}
 _NIC_MODELS = {"pcnet", "ne2k", "virtio"}
+_SHARE_MODELS = {"vvfat", "9p", "virtio-fs"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
 _POINTING_DEVICES = {"tablet", "mouse"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
@@ -46,8 +47,8 @@ _SPEC_TYPES = {"machine", "media"}
 _RETIRED_TYPES = {"source", "archive"}
 _RETIRED_SECTIONS = {"machines", "media", "sources", "archives"}
 
-_DEVICE_KEY = re.compile(r"(floppy|hdd|cdrom|net)(\d+)?")
-_SLOT_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4, "net": 4}
+_DEVICE_KEY = re.compile(r"(floppy|hdd|cdrom|net|share)(\d+)?")
+_SLOT_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4, "net": 4, "share": 4}
 _DRIVE_MEDIA = {"floppy", "hdd", "cdrom"}
 _SIZE = re.compile(r"([1-9][0-9]*)([KMGTkmgt])")
 _SHA256 = re.compile(r"[0-9a-fA-F]{64}")
@@ -335,19 +336,41 @@ class MachineNetwork:
 
 
 @dataclass(frozen=True)
+class MachineShare:
+    """One share slot: a host directory presented to the guest (F68).
+
+    ``media`` always names a directory-payload media — there is no
+    ``null`` form, since an empty share means nothing. ``model``
+    overrides the assigned backend's own default live mechanism
+    (D122) — omitted, an unstated model means that backend's own
+    default, chosen at materialization, never silently ``vvfat``
+    (design: planning/pledged/design/share-devices.md).
+    """
+
+    key: str
+    slot: int
+    media: Optional[str] = None
+    model: Optional[str] = None
+    enabled: bool = True
+    inline: Optional[Media] = None
+
+
+@dataclass(frozen=True)
 class Machine:
-    """Machine topology. A device names a medium (a drive) or an
-    attachment (a NIC); content lives on the media a drive names.
+    """Machine topology. A device names a medium (a drive), an
+    attachment (a NIC), or a shared host directory (a share, F68);
+    content lives on the media a drive or share names.
 
     ``devices`` is the one authoritative field, matching the
     blueprint's own merged shape (D121) — a slot-keyed map of
-    :class:`MachineDrive` and :class:`MachineNetwork` values sharing
-    one keyspace. ``drives`` and ``network`` are read-only computed
-    views over it, filtered by type: most of the engine only ever
-    wants one kind or the other (materialization only touches
-    drives; requirements-gathering wants both, separately), and a
-    view keeps that filter in one place instead of repeated inline
-    ``isinstance`` checks at every call site.
+    :class:`MachineDrive`, :class:`MachineNetwork`, and
+    :class:`MachineShare` values sharing one keyspace. ``drives``,
+    ``network``, and ``shares`` are read-only computed views over it,
+    filtered by type: most of the engine only ever wants one kind or
+    the other (materialization only touches drives; requirements-
+    gathering wants all three, separately), and a view keeps that
+    filter in one place instead of repeated inline ``isinstance``
+    checks at every call site.
     """
 
     name: str
@@ -355,7 +378,8 @@ class Machine:
     backend: Optional[str] = None
     memory: Optional[Union[int, Deferred]] = None
     cpus: Optional[Union[int, Deferred]] = None
-    devices: Mapping[str, Union[MachineDrive, MachineNetwork]] = \
+    devices: Mapping[
+        str, Union[MachineDrive, MachineNetwork, MachineShare]] = \
         field(default_factory=dict)
 
     @property
@@ -369,6 +393,12 @@ class Machine:
         return types.MappingProxyType({
             key: device for key, device in self.devices.items()
             if isinstance(device, MachineNetwork)})
+
+    @property
+    def shares(self):
+        return types.MappingProxyType({
+            key: device for key, device in self.devices.items()
+            if isinstance(device, MachineShare)})
     boot: Tuple[str, ...] = ()
     description: Optional[Union[str, Deferred]] = None
     scripts: Mapping[str, str] = field(default_factory=dict)
@@ -1041,11 +1071,12 @@ _MACHINE_FIELDS = {
 _STATE_ONLY = {"id", "backend-id", "blueprint-digest", "blueprint-source"}
 _DRIVE_FIELDS = {"media", "controller", "enabled"}
 _NETWORK_FIELDS = {"attachment", "interface", "model"}
+_SHARE_FIELDS = {"media", "model", "enabled"}
 
 
 def _device_key(value, where):
     """Parse one authored device key: any medium sharing the keyspace
-    (D121) — floppy/hdd/cdrom (a drive) or net (a NIC)."""
+    (D121) — floppy/hdd/cdrom (a drive), net (a NIC), or share (F68)."""
     if not isinstance(value, str):
         raise where.error(f"device keys must be strings, got: {value!r}",
             rule_id="value.not-a-string")
@@ -1058,7 +1089,7 @@ def _device_key(value, where):
     if not match:
         raise where.error(
             f"invalid device key {value!r}: expected floppy[0..1], "
-            "hdd[0..3], cdrom[0..3], or net[0..3]",
+            "hdd[0..3], cdrom[0..3], net[0..3], or share[0..3]",
             rule_id="device.key-invalid")
     medium = match.group(1)
     slot = int(match.group(2) or 0)
@@ -1159,9 +1190,45 @@ def _network_device(value, key, slot, where):
                           interface=interface, model=model)
 
 
+def _share_device(value, key, slot, register, where):
+    if value is None:
+        raise where.error(
+            f"devices.{key} cannot be null: a share always names a "
+            "directory media", rule_id="share.null-not-allowed")
+    if isinstance(value, str):
+        return MachineShare(key=key, slot=slot,
+                            media=_media_name(value, where))
+    if not isinstance(value, collections.abc.Mapping):
+        raise where.error(
+            f"devices.{key} must be a media name, an object naming a "
+            "media, or an inline media", rule_id="value.not-a-share")
+    if set(value) - _SHARE_FIELDS:
+        # Fields beyond _SHARE_FIELDS mean this isn't a share-attribute
+        # object — it's an inline media spec instead, the same dispatch
+        # _drive() uses. No anonymous blank here: a share always names a
+        # directory, never a content-free blank.
+        inline = _media(value, register, where=where, allow_anonymous=False)
+        return MachineShare(key=key, slot=slot, media=inline.name,
+                            inline=inline)
+    if "media" not in value:
+        raise where.error(f"devices.{key} must name a media",
+            rule_id="share.without-media")
+    model = (_text(value["model"],
+                   where.at(value, "model", f"devices.{key}.model"),
+                   closed=True, allowed=_SHARE_MODELS)
+            if "model" in value else None)
+    return MachineShare(
+        key=key, slot=slot,
+        media=_media_name(value["media"],
+                          where.at(value, "media", f"devices.{key}.media")),
+        model=model,
+        enabled=_flag(value.get("enabled", True),
+                      where.at(value, "enabled", f"devices.{key}.enabled")))
+
+
 def _devices(value, register, where):
-    """Parse the merged ``devices`` map: drives and NICs share one
-    keyspace and one key-clash check (D121), dispatched by medium
+    """Parse the merged ``devices`` map: drives, NICs, and shares share
+    one keyspace and one key-clash check (D121), dispatched by medium
     once the key itself is parsed."""
     if not isinstance(value, collections.abc.Mapping):
         raise where.error("devices must be an object",
@@ -1178,6 +1245,9 @@ def _devices(value, register, where):
         site = where.at(value, authored_key, f"devices.{key}")
         if medium == "net":
             normalized[key] = _network_device(declaration, key, slot, site)
+        elif medium == "share":
+            normalized[key] = _share_device(declaration, key, slot,
+                                            register, site)
         else:
             normalized[key] = _drive(declaration, key, medium, slot,
                                      register, site)

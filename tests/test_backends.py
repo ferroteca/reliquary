@@ -103,6 +103,36 @@ def test_no_declared_network_asks_nothing():
     assert adapter.unmet(_requirements()) == ()
 
 
+def test_a_share_model_the_backend_lacks_is_named():
+    report = Capabilities(backend="hyperv", share_models=("vvfat",))
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(_requirements(share_models=("9p",))) == (
+        "share model '9p'",)
+
+
+def test_an_unstated_share_needs_a_live_default():
+    # `share_models` alone doesn't cover this: an unstated share is
+    # judged against `share_default`, never silently matched to
+    # whatever the backend happens to render (vvfat included).
+    report = Capabilities(backend="hyperv", share_models=("vvfat",))
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(_requirements(share_unstated=True)) == (
+        "a share with no stated model (this backend has no live "
+        "default yet)",)
+
+
+def test_an_unstated_share_is_satisfied_by_a_live_default():
+    report = Capabilities(backend="hyperv", share_default="9p")
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(_requirements(share_unstated=True)) == ()
+
+
+def test_no_declared_share_asks_nothing():
+    report = Capabilities(backend="hyperv")
+    adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
+    assert adapter.unmet(_requirements()) == ()
+
+
 def test_pointer_capable_defaults_to_false():
     # The honest default, matching `capture_format`'s default of
     # `None`: until a backend is actually built, it claims no

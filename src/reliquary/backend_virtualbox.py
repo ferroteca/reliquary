@@ -789,8 +789,8 @@ class VirtualBoxAdapter(BackendAdapter):
     def capabilities(self):
         """What this adapter can actually do today, including agentless-display.
 
-        ``vvfat`` stays ``False``: serving a host directory as a
-        drive is a QEMU-only feature.
+        Neither ``share_models`` nor ``share_default`` is set: this
+        backend's own shared-folder mechanism isn't built yet (F71).
         """
         return Capabilities(
             backend="virtualbox",
@@ -798,7 +798,6 @@ class VirtualBoxAdapter(BackendAdapter):
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
-            vvfat=False,
             network_models=("pcnet",),
             network_attachments=("nat", "bridged"),
         )

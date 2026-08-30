@@ -48,11 +48,14 @@ from .resolve import (load_namespace, location_property_keys,
 
 
 def _drive_media(drive, namespace):
-    """The media a drive carries: from the catalog, or declared inline.
+    """The media a drive or share carries: from the catalog, or
+    declared inline (both shapes carry ``inline``/``media`` the same
+    way, so this serves ``MachineDrive`` and ``MachineShare`` alike).
 
-    A media declared directly on the drive (inline) is used as-is —
+    A media declared directly on the device (inline) is used as-is —
     an anonymous blank drive has no catalog name to look up, since it
-    was never given one.
+    was never given one (a share never has an anonymous inline media
+    at all: F68 refuses one at parse time).
     """
     if drive.inline is not None:
         return drive.inline
@@ -243,12 +246,19 @@ def _requirements(machine, namespace):
     network_models = sorted({
         net.model or _resolve_nic_model(machine.platform)
         for net in machine.network.values()})
+    enabled_shares = [share for share in machine.shares.values()
+                      if share.enabled]
+    share_models = sorted({share.model for share in enabled_shares
+                           if share.model is not None})
+    share_unstated = any(share.model is None for share in enabled_shares)
     return backends.Requirements(
         control_planes=tuple(planes), media=tuple(media),
         controllers=tuple(controllers), materialize=tuple(modes),
         pointing_device=_resolve_pointing_device(machine),
         network_attachments=tuple(network_attachments),
-        network_models=tuple(network_models))
+        network_models=tuple(network_models),
+        share_models=tuple(share_models),
+        share_unstated=share_unstated)
 
 
 def _blueprint_digest(resolved, devices):
@@ -288,6 +298,22 @@ def _drive_common(key, drive):
     return entry
 
 
+def _refuse_drive_directory(path, key):
+    """Fail closed if a drive's resolved payload is a host directory.
+
+    A directory payload is legal only on a share slot now (F68) — the
+    old per-medium carve-out (silently rendered as vvfat on a floppy
+    or hard disk, quietly mishandled on a cdrom) is gone. This can
+    only be checked once the payload has actually been fetched or
+    verified, which is why it lives here rather than at parse time.
+    """
+    if path is not None and os.path.isdir(path):
+        raise PreflightError(
+            f"devices.{key} resolves to a directory ({path}); a "
+            "directory payload is legal only on a share slot, not a "
+            "drive", rule_id="drive.directory-not-allowed")
+
+
 def _materialize_drive(key, drive, adapter, disks_root, namespace, context,
                        properties=None, events=None, cancelled=None):
     """Materialize one enabled drive, returning its resolved state entry.
@@ -295,14 +321,13 @@ def _materialize_drive(key, drive, adapter, disks_root, namespace, context,
     The drive names a media (or is an empty removable slot); which
     materialization mode applies is decided by the media, not the
     drive. ``new`` creates a fresh blank of the given ``size``;
-    ``use`` attaches the fetched payload directly (a directory
-    payload is rendered as vvfat); ``difference``/``copy`` build a
-    per-machine image over, or as a copy of, the fetched payload.
-    Per-machine images live under ``disks/``, keyed by the media name
-    rather than the slot, so a medium moving through a removable slot
-    keeps its own image; the adapter names the actual file, since the
-    native image format is its choice. The returned entry records the
-    resulting ``path`` plus the media name and mode.
+    ``use`` attaches the fetched payload directly; ``difference``/
+    ``copy`` build a per-machine image over, or as a copy of, the
+    fetched payload. Per-machine images live under ``disks/``, keyed
+    by the media name rather than the slot, so a medium moving through
+    a removable slot keeps its own image; the adapter names the actual
+    file, since the native image format is its choice. The returned
+    entry records the resulting ``path`` plus the media name and mode.
     """
     entry = _drive_common(key, drive)
     media = _drive_media(drive, namespace)
@@ -323,19 +348,60 @@ def _materialize_drive(key, drive, adapter, disks_root, namespace, context,
         adapter.create_image(path, mode="new", size=media.size)
         entry.update(size=media.size, path=path)
     elif mode == "use":
-        entry["path"] = _acquire_fetch(
+        path = _acquire_fetch(
             media, namespace, context, properties=properties, events=events,
             cancelled=cancelled)
+        _refuse_drive_directory(path, key)
+        entry["path"] = path
     elif mode in ("difference", "copy"):
         base_payload = _acquire_fetch(
             media, namespace, context, properties=properties, events=events,
             cancelled=cancelled)
+        _refuse_drive_directory(base_payload, key)
         dest = adapter.image_path(disks_root, _image_stem(media, key))
         adapter.create_image(dest, mode=mode, base=base_payload)
         entry["path"] = dest
     else:
         raise InternalError(f"unknown materialize mode {mode!r} for {key}")
     return entry
+
+
+def _materialize_share(key, share, adapter, namespace, context,
+                       properties=None, events=None, cancelled=None):
+    """Materialize one enabled share, returning its resolved state entry.
+
+    A share always names a directory-payload media whose materialize
+    mode must be ``use`` — it presents the directory in place, live,
+    for as long as the machine runs (design:
+    planning/pledged/design/share-devices.md). The model is whatever
+    the blueprint named, or the assigned backend's own default when it
+    named none (D122) — resolving that default here, after
+    assignment, is what keeps an unstated share from ever silently
+    landing on ``vvfat``; ``backends.assign`` already refused this
+    machine if the assigned backend has no live default to fall back
+    on, so ``share_default`` is never ``None`` by the time this runs.
+    """
+    media = _drive_media(share, namespace)
+    mode = media.materialize
+    if mode != "use":
+        raise StaticError(
+            f"devices.{key}: a share always presents its directory in "
+            f"place, so its media must 'use' (attach), not '{mode}'",
+            rule_id="share.materialize-not-use")
+    path = _acquire_fetch(
+        media, namespace, context, properties=properties, events=events,
+        cancelled=cancelled)
+    if not os.path.isdir(path):
+        raise PreflightError(
+            f"devices.{key} names {media.name!r}, which resolves to a "
+            f"file ({path}); a share always presents a directory",
+            rule_id="share.directory-required")
+    return {
+        "media": media.name,
+        "materialize": mode,
+        "path": path,
+        "model": share.model or adapter.capabilities().share_default,
+    }
 
 
 def create(machine, namespace, *, context=None, blueprint_name="",
@@ -430,7 +496,14 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
             properties, events)
     resolved_network = _resolve_network(machine.network, machine.platform,
                                         properties or {})
-    resolved_devices = {**resolved_drives, **resolved_network}
+    resolved_shares = {}
+    for key, share in sorted(machine.shares.items()):
+        if not share.enabled:
+            continue
+        resolved_shares[key] = _materialize_share(
+            key, share, adapter, namespace, context, properties, events)
+    resolved_devices = {**resolved_drives, **resolved_network,
+                        **resolved_shares}
 
     memory = machine.memory
     if memory is None:
@@ -488,19 +561,26 @@ def _bind_location_properties(machine, namespace, *, parameters=None,
     """Bind every ``${key}`` a machine's media locations and network
     interfaces reference.
 
-    Collected across all of the machine's drives and network slots,
-    and bound through the usual property-source order at create/apply
-    time, so that a media located by ``${license-iso}`` — or a
-    bridged NIC's ``${host-nic}`` — gets materialized using whichever
-    value a parameter, the environment, the properties file, or an
-    interactive prompt supplies. Returns ``{key: value}`` (empty when
-    nothing references a property).
+    Collected across all of the machine's drives, shares, and network
+    slots, and bound through the usual property-source order at
+    create/apply time, so that a media located by ``${license-iso}``
+    — a share's ``${exchange-dir}`` (U21) — or a bridged NIC's
+    ``${host-nic}`` — gets materialized using whichever value a
+    parameter, the environment, the properties file, or an interactive
+    prompt supplies. Returns ``{key: value}`` (empty when nothing
+    references a property).
     """
     keys = set()
     for drive in machine.drives.values():
         if not drive.enabled or drive.media is None:
             continue
         media = namespace.media.get(drive.media)
+        if media is not None:
+            keys.update(location_property_keys(media, namespace))
+    for share in machine.shares.values():
+        if not share.enabled or share.media is None:
+            continue
+        media = namespace.media.get(share.media)
         if media is not None:
             keys.update(location_property_keys(media, namespace))
     keys.update(_network_interface_keys(machine))
@@ -602,6 +682,12 @@ def _describe_location_properties(machine, namespace, *, explicit=None,
         media = namespace.media.get(drive.media)
         if media is not None:
             keys.update(location_property_keys(media, namespace))
+    for share in machine.shares.values():
+        if not share.enabled or share.media is None:
+            continue
+        media = namespace.media.get(share.media)
+        if media is not None:
+            keys.update(location_property_keys(media, namespace))
     keys.update(_network_interface_keys(machine))
     if not keys:
         return binding.BoundProperties({}, {})
@@ -697,14 +783,43 @@ def _dry_drive(key, drive, adapter, disks_root, namespace, context,
         return entry
     payload = _dry_payload(media, namespace, context, properties, entries)
     if mode == "use":
+        _refuse_drive_directory(payload, key)
         entry["path"] = payload
     elif mode in ("difference", "copy"):
+        _refuse_drive_directory(payload, key)
         entry["base"] = payload
         entry["path"] = adapter.image_path(disks_root,
                                            _image_stem(media, key))
     else:
         raise InternalError(f"unknown materialize mode {mode!r} for {key}")
     return entry
+
+
+def _dry_share(key, share, adapter, namespace, context, properties, entries):
+    """One share's resolved plan, materializing nothing.
+
+    Mirrors :func:`_materialize_share` decision for decision.
+    """
+    media = _drive_media(share, namespace)
+    mode = media.materialize
+    if mode != "use":
+        raise StaticError(
+            f"devices.{key}: a share always presents its directory in "
+            f"place, so its media must 'use' (attach), not '{mode}'",
+            rule_id="share.materialize-not-use")
+    payload = _dry_payload(media, namespace, context, properties, entries)
+    if payload is not None and not os.path.isdir(payload):
+        raise PreflightError(
+            f"devices.{key} names {media.name!r}, which resolves to a "
+            f"file ({payload}); a share always presents a directory",
+            rule_id="share.directory-required")
+    return {
+        "key": key,
+        "media": media.name,
+        "materialize": mode,
+        "path": payload,
+        "model": share.model or adapter.capabilities().share_default,
+    }
 
 
 def _dry_backend(machine, namespace, backend):
@@ -768,6 +883,10 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         {**entry, "key": key} for key, entry in sorted(
             _dry_network(machine.network, machine.platform,
                         bound.values).items())]
+    shares = [
+        _dry_share(key, share, adapter, namespace, context, bound.values,
+                  entries)
+        for key, share in sorted(machine.shares.items()) if share.enabled]
     memory = machine.memory
     if memory is None:
         memory = _PLATFORM_MEMORY.get(machine.platform, 16)
@@ -786,7 +905,7 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         "boot": list(machine.boot),
         "control-planes": _resolve_control_planes(machine),
         "pointing-device": _resolve_pointing_device(machine),
-        "devices": drives + network,
+        "devices": drives + network + shares,
         "media": entries,
         "properties": dict(bound.sources),
     }
@@ -822,6 +941,12 @@ def _drive_line(drive):
     return f"  {drive['key']} ({where}): {what} -> {target}"
 
 
+def _share_line(entry):
+    """One share's line in the report: its model, and where it lands."""
+    target = entry.get("path") or "(unresolved)"
+    return f"  {entry['key']} ({entry['model']}): {entry['media']} -> {target}"
+
+
 def _media_line(entry):
     """One media's line: its residency, and what it resolved to."""
     if entry["state"] == "unbound":
@@ -853,12 +978,17 @@ def _dry_report(plan):
     lines.append(f"pointing device: {plan['pointing-device']}")
     drives = [d for d in plan["devices"] if "medium" in d]
     network = [d for d in plan["devices"] if "attachment" in d]
+    shares = [d for d in plan["devices"]
+             if "medium" not in d and "attachment" not in d]
     if network:
         lines.append("network:")
         lines.extend(_network_line(entry) for entry in network)
     if drives:
         lines.append("drives:")
         lines.extend(_drive_line(drive) for drive in drives)
+    if shares:
+        lines.append("shares:")
+        lines.extend(_share_line(entry) for entry in shares)
     if plan["media"]:
         lines.append("media:")
         lines.extend(_media_line(entry) for entry in plan["media"])
@@ -1108,7 +1238,17 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             context, bound, events)
         new_network = _resolve_network(parsed.network, parsed.platform,
                                        bound)
-        new_devices = {**new_drives, **new_network}
+        # A share has no materialized image the way an owned drive
+        # does (F68), so unlike `_reconcile_drives` it's simply
+        # re-resolved fresh every apply — there's nothing to keep
+        # unchanged or refuse to regenerate.
+        new_shares = {}
+        for key, share in sorted(parsed.shares.items()):
+            if not share.enabled:
+                continue
+            new_shares[key] = _materialize_share(
+                key, share, adapter, namespace, context, bound, events)
+        new_devices = {**new_drives, **new_network, **new_shares}
 
         memory = parsed.memory
         if memory is None:
@@ -1282,6 +1422,8 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
 
     devices = state.get("devices", {})
     drives = [entry for entry in devices.values() if "medium" in entry]
+    shares = [entry for entry in devices.values()
+             if "medium" not in entry and "attachment" not in entry]
     namespace = load_namespace(context)
     for drive in drives:
         media_name = drive.get("media")
@@ -1292,6 +1434,12 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
             drive["path"] = _fetch(
                 media_name, context, namespace=namespace, events=events,
                 cancelled=cancelled)
+    for share in shares:
+        # A share is always `use` (F68), so this always re-resolves —
+        # the same re-verification a `use` drive gets above.
+        share["path"] = _fetch(
+            share["media"], context, namespace=namespace, events=events,
+            cancelled=cancelled)
     # The backend fixes a floppy drive's geometry from whatever
     # medium is attached at launch, so record it: a later live
     # swap must match, and this is the only moment the fact is
@@ -1444,7 +1592,9 @@ def _change_media_live(machine_id, slot, path, context):
 
 def _medium_size(path):
     """The byte size of an attached medium, or ``None`` for an empty
-    slot or a directory-source (vvfat) drive, which has no image."""
+    slot. A drive can no longer resolve to a directory (F68), but the
+    ``isdir`` guard stays as a defensive no-op rather than assuming
+    that invariant holds all the way down to this helper."""
     if not path or os.path.isdir(path):
         return None
     try:
@@ -1536,6 +1686,7 @@ def insert_media(machine_id, slot, media=None, *, file=None, context=None,
         path = (_anonymous_local(file) if file is not None
                 else _fetch(media, context, events=events,
                             cancelled=cancelled))
+        _refuse_drive_directory(path, slot)
         drive = state["devices"][slot]
         if state.get("phase") == "running":
             _check_live_geometry(state, slot, drive, path)
