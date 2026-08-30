@@ -35,49 +35,6 @@ is added — whether it's first drafted in
 this file as a pledge — take the next number from that ledger and
 update the ledger in the same edit.
 
-## F68 — The `share` device kind, and the vvfat fold
-
-The blueprint gains `share<n>` slots in `devices`: a host directory
-presented to the guest for file exchange. The existing vvfat
-directory-drive folds in as this device kind's one snapshot model,
-and directory payloads stop being legal on drive slots. Design,
-argument, and every rejected alternative:
-[design/share-devices.md](design/share-devices.md) (owner rounds,
-2026-08-29). Demand rests on in-force U14/U20 (D65); pledged
-straight to this file (owner, 2026-08-29).
-
-After this feature alone, `vvfat` was the only model any backend
-served, and an unstated-model share was refused by name
-everywhere. F69 has since landed QEMU's `9p`, so an unstated-model
-share now works on a QEMU built with fsdev support and is still
-refused on one without it, and on VirtualBox until F71 lands.
-
-Work:
-
-- `document.py`: `share` joins the devices-key grammar (D121's
-  clash check covers it by construction); value forms (media name,
-  inline media, `{media, model, enabled}` — no `null`); `model`
-  vocabulary `vvfat`/`9p`/`virtio-fs`; share keys refused in
-  `boot`; directory payloads legal only on share slots — a drive
-  slot whose media resolves to a directory fails closed, and the
-  old cdrom carve-out dissolves into that rule.
-- `backends.py`: share capability and requirement fields with the
-  usual `unmet()` math; `Capabilities.vvfat` retires into them.
-- `backend_qemu.py`: the vvfat rendering moves out of `drive_args`
-  into the share renderer, disk-shaped only.
-- `machines.py` / state: share entries in the merged `devices` map,
-  discriminated by shape; `apply_blueprint` absorbs share changes
-  on a stopped machine; inserting a directory media becomes a named
-  refusal.
-- Specs and content: blueprint-model.md and the JSON schema;
-  media-spec.md's directory-payload section re-homes onto shares;
-  USE-CASES.md's U25 journey respells its drive step as a share;
-  the freedos-dump-font codex script's vvfat comment; AGENTS.md's
-  D108 "two routes" sentence rewords its first route.
-- Tests: `fake_backend.py`'s capability claim and
-  `test_backend_qemu.py`'s vvfat render coverage move with the
-  mechanism.
-
 ## F70 — QEMU virtio-fs shares
 
 QEMU serves a share over virtio-fs, chosen by `model: virtio-fs`.

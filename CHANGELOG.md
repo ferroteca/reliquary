@@ -324,6 +324,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   considered and rejected. The README and `docs/dos-automation.md`
   show this new argument and point to `wait_text` as the general
   authored wait.
+- **A new `share` device kind: a host directory presented to the
+  guest for file exchange, for as long as the machine runs** (F68).
+  Declared in `devices` alongside drives and NICs (`share0`–`share3`),
+  sharing one keyspace and one clash check. `model` names the live
+  mechanism — `vvfat` (QEMU's synthesized FAT volume, present in
+  every build, snapshotting the directory when the machine starts),
+  or a backend's own live default when left unstated, never silently
+  `vvfat` — capability-checked against the assigned backend the same
+  way a NIC's `model` already is.
+- **A directory payload is legal only on a share now.** The old
+  shape — a media whose location resolved to a host directory,
+  attached directly to a drive slot and rendered as vvfat at launch —
+  is retired: a drive whose media resolves to a directory is refused
+  (`drive.directory-not-allowed`), the same way a share whose media
+  resolves to a file is refused (`share.directory-required`).
 - **A `share` device can now be served over virtio-9p, and that is
   what a share with no stated `model` gets on QEMU** (F69). A share
   presents a host directory to the guest for as long as the machine
