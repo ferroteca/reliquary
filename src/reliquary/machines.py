@@ -1431,9 +1431,11 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
         # hashes; per-machine images (new/difference/copy) keep their
         # recorded path.
         if media_name is not None and drive.get("materialize") == "use":
-            drive["path"] = _fetch(
+            path = _fetch(
                 media_name, context, namespace=namespace, events=events,
                 cancelled=cancelled)
+            _refuse_drive_directory(path, drive["medium"] + str(drive["slot"]))
+            drive["path"] = path
     for share in shares:
         # A share is always `use` (F68), so this always re-resolves —
         # the same re-verification a `use` drive gets above.

@@ -766,6 +766,33 @@ def test_start_rejects_already_running(rig):
     assert "already running" in str(caught.value)
 
 
+def test_start_refuses_a_drive_whose_media_now_resolves_to_a_directory(rig):
+    # A media's location can change between create and start (the
+    # whole reason start re-fetches `use` media); if it now resolves
+    # to a directory, that's refused the same way create already
+    # refuses it (F68) — not left to crash inside the backend's own
+    # launch, which is what happened before this check existed here:
+    # a pre-F68-created machine, or a hand-edited blueprint, could
+    # carry a directory straight through to a real QEMU `-drive`
+    # argument and fail there instead, with QEMU's own cryptic error.
+    payload = rig.path("payload.img")
+    with open(payload, "wb") as handle:
+        handle.write(b"IMG")
+    machine_id = rig.create(
+        "driftbp", {"platform": "dos", "devices": {"hdd0": "shared"}},
+        media=[{"name": "shared", "materialize": "use",
+                "location": {"local": payload}}])
+    now_a_dir = rig.path("now-a-dir")
+    os.makedirs(now_a_dir)
+    rig.write(
+        "driftbp", {"platform": "dos", "devices": {"hdd0": "shared"}},
+        media=[{"name": "shared", "materialize": "use",
+                "location": {"local": now_a_dir}}])
+    with pytest.raises(PreflightError) as caught:
+        start_machine(machine_id, context=rig.home)
+    assert caught.value.rule_id == "drive.directory-not-allowed"
+
+
 def test_start_reconciles_a_vm_shut_down_some_other_way(rig):
     """A stale ``running`` never talked to the backend before refusing
     -- the gap `list_machines` closed on read, start closes on write."""
