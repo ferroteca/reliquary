@@ -786,11 +786,15 @@ class VirtualBoxAdapter(BackendAdapter):
             home=os.path.dirname(executable),
             detail=f"found at {executable}")
 
-    def capabilities(self):
+    def capabilities(self, platform=None):
         """What this adapter can actually do today, including agentless-display.
 
         Neither ``share_models`` nor ``share_default`` is set: this
         backend's own shared-folder mechanism isn't built yet (F71).
+
+        ``platform`` is ignored: VirtualBox drives every guest through
+        one ``VBoxManage``, so there is no second tool this report
+        could be about.
         """
         return Capabilities(
             backend="virtualbox",

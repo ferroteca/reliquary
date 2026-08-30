@@ -27,6 +27,7 @@ resolved ``control-planes`` list decides which plane a session serves
 
 import asyncio
 import contextlib
+import functools
 import json
 import os
 import re
@@ -143,6 +144,11 @@ RESERVED_ARGUMENTS = {
     "nographic": "the display choice a start is given",
     "netdev": "the machine's `devices`",
     "net": "the machine's `devices`",
+    # A share's host side (F69). `-virtfs` is QEMU's shorthand that
+    # writes an `-fsdev` and its device in one argument, so reserving
+    # `-fsdev` alone would leave the same fact settable a second way.
+    "fsdev": "the machine's `devices`",
+    "virtfs": "the machine's `devices`",
 }
 
 #: The blueprint's NIC model names — the platform default
@@ -277,6 +283,53 @@ def guest_glyph_banks(cache=None):
             "QEMU")
 
     return text_recognize.cached_banks(cache, "qemu", extract)
+
+
+#: The QEMU device each live share model needs the selected binary to
+#: have been built with (F69). Both are build options rather than
+#: standard parts of QEMU: `virtio-9p-pci` comes from `--enable-virtfs`
+#: and is absent from the official Windows binaries, which answer
+#: "fsdev support is disabled" to `-fsdev help` and list no 9P device
+#: at all. `vvfat` is in every build and needs no probe, so it isn't
+#: listed here.
+_SHARE_MODEL_DEVICES = {"9p": "virtio-9p-pci"}
+
+
+@functools.lru_cache(maxsize=None)
+def probe_share_models(platform=None):
+    """Which live share models the binary this platform launches has.
+
+    This asks the binary itself, rather than reporting what the code
+    below can render, because the two are genuinely different facts:
+    :func:`share_args` can render 9p arguments for any QEMU, and a
+    QEMU built without fsdev support will refuse them. The capability
+    report has to say what the probe found (P11), which is why this
+    exists at all.
+
+    The question is put to `-device help`, which lists the device
+    models the binary was built with, and answered by looking for
+    each model's device in that list. A binary that can't be found or
+    can't be run yields no live models: a probe that didn't happen is
+    not evidence of a capability.
+
+    Cached for the life of the process, per platform, because
+    assignment and share materialization both ask and a subprocess
+    per question would be paid on every command. Tests that change
+    what the probe would find call ``cache_clear()``.
+    """
+    try:
+        executable = find_qemu(platform)
+    except (PreflightError, InternalError):
+        return ()
+    try:
+        completed = subprocess.run(
+            [executable, "-device", "help"], capture_output=True,
+            text=True, check=False, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return ()
+    listing = completed.stdout or ""
+    return tuple(model for model, device in _SHARE_MODEL_DEVICES.items()
+                 if device in listing)
 
 
 def find_qemu_img():
@@ -1103,7 +1156,7 @@ class QemuAdapter(BackendAdapter):
                             home=os.path.dirname(executable),
                             detail=f"found at {executable}")
 
-    def capabilities(self):
+    def capabilities(self, platform=None):
         """What QEMU actually provides today, not what's merely planned.
 
         ``agentless-display`` and ``vnc`` are listed because both are
@@ -1113,7 +1166,21 @@ class QemuAdapter(BackendAdapter):
         something nothing can deliver (P11). The same reasoning
         applies to controllers: only ``ide`` is listed, since that's
         the only one the drive renderer supports.
+
+        The share models are the one part of this report that isn't a
+        fixed claim about this adapter's code. QEMU's live transports
+        are build options, so which of them are available depends on
+        the installed binary — and *which* binary that is depends on
+        the guest platform, the same way :meth:`discover` does. So
+        ``platform`` is passed through to
+        :func:`probe_share_models`, and a machine is judged against
+        the QEMU it will actually launch on. ``vvfat`` is added to
+        whatever the probe found, because it is in every build; it is
+        deliberately never the ``share_default``, so an author who
+        declares a share and says nothing gets the live contract or a
+        capability error, never the snapshot one by surprise.
         """
+        live = probe_share_models(platform)
         return Capabilities(
             backend="qemu",
             control_planes=("agentless-display", "vnc"),
@@ -1123,10 +1190,8 @@ class QemuAdapter(BackendAdapter):
             pointing_devices=("tablet", "mouse"),
             network_models=("pcnet", "ne2k", "virtio"),
             network_attachments=("nat", "bridged"),
-            # vvfat only arrives by name (F68): the live default (9p)
-            # doesn't exist until F69, so an unstated-model share is
-            # refused here rather than silently landing on vvfat.
-            share_models=("vvfat",),
+            share_models=("vvfat",) + live,
+            share_default="9p" if "9p" in live else None,
         )
 
     def capture_format(self, plane):
@@ -1523,28 +1588,84 @@ def drive_args(drives):
 
 
 def share_args(shares, drives):
-    """Build QEMU ``-drive`` arguments from a machine's resolved shares.
+    """Build QEMU arguments from a machine's resolved shares.
 
-    Only ``model: vvfat`` renders (F68) — the capability report never
-    claims ``9p``/``virtio-fs`` yet, so ``unmet()`` already refused
-    those at assignment and neither ever reaches here. A share is
-    disk-shaped only (the old floppy-shaped directory rendering is
-    retired), placed on the IDE bus, continuing the index sequence
-    ``drive_args`` left off after the last hard disk and cdrom.
+    Two models render: ``vvfat`` (F68) and ``9p`` (F69). ``virtio-fs``
+    does not yet, and the capability report never claims it, so
+    ``unmet()`` has already refused it at assignment and it never
+    reaches here — an unrenderable model arriving anyway is a bug in
+    this adapter, not a mistake in a blueprint, so it raises rather
+    than being reported as a preflight failure.
+
+    The two models produce different *shapes* of argument, which is
+    why the IDE index is counted here rather than by position in the
+    sorted list: a ``vvfat`` share is a synthesized disk and takes the
+    next index on the bus, while a ``9p`` share is not a disk at all
+    and takes none.
     """
     args = []
-    next_ide = _next_ide_index(drives)
-    for ordinal, (key, share) in enumerate(sorted(shares.items())):
-        if share["model"] != "vvfat":
+    index = _next_ide_index(drives)
+    for key, share in sorted(shares.items()):
+        model = share["model"]
+        if model == "vvfat":
+            args += _vvfat_share_args(key, share, index)
+            index += 1
+        elif model == "9p":
+            args += _9p_share_args(key, share)
+        else:
             raise InternalError(
-                f"share {key} carries model {share['model']!r}, which "
+                f"share {key} carries model {model!r}, which "
                 "this backend cannot render; unmet() should have "
                 "refused this at assignment")
-        index = next_ide + ordinal
-        args += ["-drive",
-                 f"file=fat:rw:{share['path']},format=raw,if=ide,"
-                 f"index={index},id={key}"]
     return args
+
+
+def _vvfat_share_args(key, share, index):
+    """One ``vvfat`` share: a FAT volume synthesized over the directory.
+
+    Disk-shaped only — the old floppy-shaped directory rendering is
+    retired — placed on the IDE bus, continuing the index sequence
+    :func:`drive_args` left off after the last hard disk and cdrom.
+
+    This mechanism's own read-only option is the ``fat:`` prefix
+    without ``rw:``, which is what the media's ``read-only`` maps onto
+    here — the field is stated for shares as a whole
+    (docs/spec/media-spec.md), so it cannot reach one model and be
+    quietly dropped by the other.
+    """
+    prefix = "fat:" if share.get("read-only") else "fat:rw:"
+    return ["-drive",
+            f"file={prefix}{share['path']},format=raw,if=ide,"
+            f"index={index},id={key}"]
+
+
+def _9p_share_args(key, share):
+    """One ``9p`` share: an in-process virtio-9p server over the directory.
+
+    Two arguments, addressed by the slot's own key the same way a NIC
+    already is — ``-fsdev`` describes the host side, ``-device``
+    attaches the guest-visible port to it, and ``mount_tag`` is the
+    name the guest asks for, which is the slot key on every mechanism.
+    No daemon and no host-side socket: QEMU serves the 9P protocol
+    itself, which is what makes this the cheaper of the two live
+    models and so the one an unstated ``model`` resolves to.
+
+    ``security_model=none`` because the guests this serves have no
+    user ids to map onto the host's: files stay whatever the host made
+    them, and nothing is written into the shared directory that the
+    caller's own tools didn't put there. The alternative that does map
+    ownership, ``mapped-file``, plants a ``.virtfs_metadata``
+    directory inside the share — which would break the one thing every
+    share model promises, that a stopped machine's directory is an
+    ordinary host directory.
+    """
+    fsdev = (f"local,id={key},path={share['path']},"
+             "security_model=none")
+    if share.get("read-only"):
+        fsdev += ",readonly=on"
+    return ["-fsdev", fsdev,
+            "-device",
+            f"virtio-9p-pci,fsdev={key},mount_tag={key},id={key}"]
 
 
 def network_args(network):

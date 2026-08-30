@@ -132,6 +132,11 @@ class FakeAdapter(BackendAdapter):
         self.stop_error = None
         self.session_error = None
         self.discovered_for = None
+        #: Every platform the capability report was asked about, in
+        #: order (F69). A real backend can answer differently per
+        #: guest architecture, so a test can assert it was asked about
+        #: the right one; this double answers the same way regardless.
+        self.capability_platforms = []
 
     # -- discovery and capability ---------------------------------
 
@@ -149,7 +154,8 @@ class FakeAdapter(BackendAdapter):
                             home=f"/fake/{self.name}",
                             detail=f"found at fake-{self.name}")
 
-    def capabilities(self):
+    def capabilities(self, platform=None):
+        self.capability_platforms.append(platform)
         return self.report
 
     def capture_format(self, plane):

@@ -498,11 +498,13 @@ there are three ways to do it:
 - **A share.** A `share` device whose media is a host directory
   presents that directory to the guest for as long as the machine
   runs (F68): you write files into it and the guest reads them, or
-  the guest writes and you read them back on your side. The only
-  model that actually renders today is `vvfat`, and QEMU takes a
-  snapshot of the directory when the machine starts, so with it the
-  machine has to be stopped for a change to become visible, in either
-  direction.
+  the guest writes and you read them back on your side. QEMU renders
+  two models. `model: vvfat` works on any QEMU and needs nothing in
+  the guest, but QEMU takes a snapshot of the directory when the
+  machine starts, so the machine has to be stopped for a change to
+  become visible in either direction. `9p` (F69) is live in both
+  directions, and is what a share with no `model` gets, but it needs
+  a QEMU built with fsdev support and a 9P driver loaded in the guest.
 - **A whole image, swapped live** — `insert-media --file`, below.
 - **The machine directory itself** — `rlq get-machine-dir`. While
   the machine is stopped, its drives and shares are just plain

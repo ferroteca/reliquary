@@ -62,7 +62,9 @@ class _StubAdapter(BackendAdapter):
     #: message when it isn't found.
     looks_for = ""
 
-    def capabilities(self):
+    def capabilities(self, platform=None):
+        # One report whatever the guest is: an unbuilt adapter has
+        # nothing that could differ by architecture.
         return Capabilities(backend=self.name)
 
     def _found(self, executable):

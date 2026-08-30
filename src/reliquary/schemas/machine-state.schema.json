@@ -168,7 +168,11 @@
         "media": {"type": "string"},
         "materialize": {"const": "use"},
         "path": {"type": "string"},
-        "model": {"enum": ["vvfat", "9p", "virtio-fs"]}
+        "model": {"enum": ["vvfat", "9p", "virtio-fs"]},
+        "read-only": {
+          "description": "Whether the guest may write into the shared directory, read off the media and carried here because a backend renders from this entry and never sees the media (F69). Optional rather than required: a machine materialized before F69 has no such field, and a backend reading one that isn't there treats the share as writable, which is the media default everywhere but a cdrom.",
+          "type": "boolean"
+        }
       },
       "required": ["media", "materialize", "path", "model"],
       "additionalProperties": false

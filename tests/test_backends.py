@@ -118,7 +118,7 @@ def test_an_unstated_share_needs_a_live_default():
     adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
     assert adapter.unmet(_requirements(share_unstated=True)) == (
         "a share with no stated model (this backend has no live "
-        "default yet)",)
+        "default)",)
 
 
 def test_an_unstated_share_is_satisfied_by_a_live_default():
@@ -131,6 +131,21 @@ def test_no_declared_share_asks_nothing():
     report = Capabilities(backend="hyperv")
     adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
     assert adapter.unmet(_requirements()) == ()
+
+
+def test_the_capability_check_asks_about_the_guest_platform():
+    """A backend whose tooling differs by guest architecture has to be
+    asked about the right one (F69).
+
+    QEMU's live share transports are build options, so which of them
+    exist is a property of one installed binary — and QEMU installs
+    one binary per architecture. Asking the report without saying
+    which guest this is for would judge a machine against a binary it
+    will never launch on.
+    """
+    adapter = fake_backend.FakeAdapter("hyperv")
+    adapter.unmet(_requirements(platform="winnt"))
+    assert adapter.capability_platforms == ["winnt"]
 
 
 def test_pointer_capable_defaults_to_false():

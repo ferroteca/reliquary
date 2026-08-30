@@ -46,10 +46,11 @@ argument, and every rejected alternative:
 2026-08-29). Demand rests on in-force U14/U20 (D65); pledged
 straight to this file (owner, 2026-08-29).
 
-After this feature alone, `vvfat` is the only model any backend
-serves — an unstated-model share is refused by name everywhere
-until F69/F71 land. That interim state is honest (P11) and named
-here so nobody reads it as a bug.
+After this feature alone, `vvfat` was the only model any backend
+served, and an unstated-model share was refused by name
+everywhere. F69 has since landed QEMU's `9p`, so an unstated-model
+share now works on a QEMU built with fsdev support and is still
+refused on one without it, and on VirtualBox until F71 lands.
 
 Work:
 
@@ -76,25 +77,6 @@ Work:
 - Tests: `fake_backend.py`'s capability claim and
   `test_backend_qemu.py`'s vvfat render coverage move with the
   mechanism.
-
-## F69 — QEMU virtio-9p shares
-
-QEMU serves a share over virtio-9p, and becomes able to honor an
-unstated `model` (its default live mechanism is 9p — never vvfat,
-per the design doc's declined list). Needs F68 delivered first.
-Design: [design/share-devices.md](design/share-devices.md).
-
-Work:
-
-- A per-installation probe of the selected QEMU binary — fsdev/9p
-  is a build option the official Windows binaries lack, so the
-  capability report says what the probe found, never what the
-  adapter's code implements (P11). On a Windows host this needs the
-  maintainer's `windows-fs-raw` QEMU tree via `RELIQUARY_QEMU_HOME`
-  (build recipe in virtio-dos's `docs/TESTING.md`).
-- Rendering: `-fsdev local` plus `virtio-9p-pci`, `mount_tag` =
-  slot key, the media's `read-only` mapped to the fsdev option.
-- `RESERVED_ARGUMENTS` grows the fsdev family.
 
 ## F70 — QEMU virtio-fs shares
 

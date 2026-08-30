@@ -320,8 +320,8 @@ Reliquary therefore works **agentlessly**:
 - Input is sent as keyboard events through QEMU's control protocol.
 - Text is read directly from VGA text memory, without OCR.
 - Files are exchanged through a share — a host directory presented to
-  the guest, today authored explicitly as a QEMU virtual FAT drive
-  (`model: vvfat`).
+  the guest, either as a QEMU virtual FAT drive (`model: vvfat`,
+  which needs nothing in the guest) or live over virtio-9p.
 - Command completion is detected by watching for the DOS prompt.
 - Screenshots are captured through QEMU.
 
@@ -559,10 +559,11 @@ rlq stop-machine --blueprint freedos
 
 Stopping checks the VM's recorded identity before shutting it down, and
 flushes any guest writes to a `vvfat`-model share back to disk. QEMU
-takes a snapshot of a share's directory when the machine starts, so
-after changing its files on the host, stop and restart the machine
-before the guest will see the changes — `vvfat`'s trade-off for
-needing no guest driver at all.
+takes a snapshot of a `vvfat` share's directory when the machine
+starts, so after changing its files on the host, stop and restart the
+machine before the guest will see the changes — that is `vvfat`'s
+trade-off for needing no guest driver at all. A `9p` share has no such
+step: it is live in both directions while the machine runs.
 
 ## Command guide
 
@@ -660,13 +661,16 @@ with your own tools. There are three ways to get files across, and
 none of them requires Reliquary to look inside a filesystem:
 
 - **A share.** Add a `share` device whose media is a host directory,
-  and the guest sees it as a live volume for as long as the machine
-  runs. The only model that actually renders today is `vvfat`, QEMU's
-  own synthesized FAT volume: you write into the host directory and
-  the guest reads it; the guest writes and you read it back on the
-  host, but only once the machine stops — QEMU takes a snapshot of the
-  directory when the machine starts, so a host-side change also needs
-  a stop/restart before the guest sees it.
+  and the guest sees it as a volume for as long as the machine runs.
+  QEMU serves it two ways. `model: vvfat` is QEMU's own synthesized
+  FAT volume and needs nothing loaded in the guest, but it is a
+  snapshot: you write into the host directory and the guest reads it,
+  the guest writes and you read it back on the host, and both
+  directions only take effect across a stop/start, because QEMU takes
+  a snapshot of the directory when the machine starts. Leaving `model`
+  out gets you virtio-9p instead, which is live in both directions
+  while the machine runs — at the cost of a QEMU built with fsdev
+  support and a 9P driver loaded in the guest.
 - **A whole image, swapped live.** `insert-media --file` mounts an
   image you built, without a reboot, and ejecting flushes the guest's
   writes back to that same file. Build and read it with whatever

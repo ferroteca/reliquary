@@ -361,8 +361,9 @@ against the machine directory that `get_machine_dir` returns —
 this is the sanctioned way to reach it, not a fallback for a
 missing feature (P16's file-content carve-out). What the binding
 does provide is the devices themselves: a `share` presents a host
-directory to the guest — today rendered through `vvfat` (F68) — and
-`insert_media(file=)` mounts an image the caller already built
+directory to the guest — rendered through `vvfat` (F68) or
+virtio-9p (F69) — and `insert_media(file=)` mounts an image the
+caller already built
 (U20). `describe_drives` / `refresh_drives` / `put_file` /
 `get_file` / `put_files` / `get_files` / `list_files` have been
 deleted outright, not merely marked deprecated, and

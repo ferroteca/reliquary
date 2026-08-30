@@ -324,6 +324,44 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   considered and rejected. The README and `docs/dos-automation.md`
   show this new argument and point to `wait_text` as the general
   authored wait.
+- **A `share` device can now be served over virtio-9p, and that is
+  what a share with no stated `model` gets on QEMU** (F69). A share
+  presents a host directory to the guest for as long as the machine
+  runs; until now the only mechanism behind it was `model: vvfat`,
+  QEMU's synthesized FAT volume, which takes a snapshot of the
+  directory when the machine starts — so a change on either side only
+  became visible across a stop/start. A `9p` share is live in both
+  directions instead, at the cost of a 9P driver loaded in the guest
+  (virtio-dos ships `VIO9P` for DOS; loading it is the user's job, the
+  same as a packet driver). It renders as `-fsdev local` plus a
+  `virtio-9p-pci` device, with the slot key as the guest-visible mount
+  tag, and it is not a disk, so adding one never shifts a guest's
+  drive letters. Leaving `model` out means the backend's own live
+  mechanism, never silently the snapshot one, so an unstated-model
+  share — which had no live default to resolve to and so was refused
+  on every backend — now works on QEMU.
+- **QEMU's share capability is probed on the installed binary rather
+  than claimed** (F69). fsdev/9p is a QEMU compile-time option, and
+  the official Windows binaries are built without it, so an adapter
+  claiming 9p on the strength of its own code would be promising
+  something a given install cannot deliver. The adapter asks the
+  binary — one `-device help`, looking for `virtio-9p-pci` — and
+  reports what it found. On a QEMU without it, a `9p` share and an
+  unstated-model share are both refused by name at assignment, naming
+  the missing capability, the same way any other capability failure
+  reads; `model: vvfat` is unaffected, since vvfat is in every build.
+  Because QEMU installs a separate system binary per guest
+  architecture, the probe is run against the binary the machine's
+  `platform` will actually launch: the capability report and the
+  requirements check both now carry that platform, the same way
+  backend discovery already did.
+- **A share's `read-only` media flag is now honored.** It maps onto
+  each mechanism's own option — QEMU's `fat:` prefix without `rw:`
+  for a `vvfat` share, `readonly=on` for a `9p` one — so a share
+  declared read-only protects the host directory from the guest
+  instead of being silently ignored. The flag is recorded on the
+  machine's resolved share entry, since a backend renders from that
+  and never sees the media.
 
 ### Fixed
 

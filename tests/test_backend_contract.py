@@ -55,6 +55,11 @@ class _QemuDriver:
     extension = ".qcow2"
     #: The share models this backend can render explicitly, and the
     #: model an unstated share resolves to (F68) — never vvfat itself.
+    #: Pinned to what a *stock* QEMU answers: the live transports are
+    #: build options this adapter probes for per installation (F69),
+    #: so `stock_install` below fixes the probe's answer rather than
+    #: letting the developer's own QEMU decide what this contract
+    #: says. The probed answer is covered in `test_backend_qemu`.
     share_models = ("vvfat",)
     share_default = None
     control_planes = ("agentless-display", "vnc")
@@ -71,6 +76,13 @@ class _QemuDriver:
     #: The destructive command that must never reach a VM if the
     #: identity check fails.
     destructive = "quit"
+
+    @contextlib.contextmanager
+    def stock_install(self):
+        """This backend as an off-the-shelf install answers for itself."""
+        with mock.patch.object(qemu_module, "probe_share_models",
+                               return_value=()):
+            yield
 
     def executable(self, root):
         return os.path.join(root, "qemu-system-i386")
@@ -160,6 +172,12 @@ class _VirtualBoxDriver:
     pointing_devices = ()
     destructive = "controlvm"
 
+    @contextlib.contextmanager
+    def stock_install(self):
+        # Nothing to pin: this adapter's report is a fixed claim about
+        # its own code, with no per-installation probe behind it.
+        yield
+
     def executable(self, root):
         return os.path.join(root, "VBoxManage.exe")
 
@@ -224,7 +242,8 @@ def adapter(driver):
 def test_the_adapter_answers_to_one_name_everywhere(driver, adapter):
     """The registry, the report and the probe agree on the name."""
     assert adapter.name == driver.name
-    assert adapter.capabilities().backend == driver.name
+    with driver.stock_install():
+        assert adapter.capabilities().backend == driver.name
     with driver.absent():
         assert adapter.discover().backend == driver.name
 
@@ -234,7 +253,8 @@ def test_the_capability_report_claims_only_what_is_built(driver, adapter):
     # genuinely differ — shares (F68), and the VNC plane QEMU alone
     # wires — the driver states the claim so a backend cannot quietly
     # widen it.
-    report = adapter.capabilities()
+    with driver.stock_install():
+        report = adapter.capabilities()
     assert report.control_planes == driver.control_planes
     assert report.media == ("floppy", "hdd", "cdrom")
     assert report.controllers == ("ide",)
@@ -276,7 +296,9 @@ def test_each_plane_states_whether_it_delivers_pointer_events(driver,
 
 
 def test_the_capability_report_states_its_pointing_devices(driver, adapter):
-    assert adapter.capabilities().pointing_devices == driver.pointing_devices
+    with driver.stock_install():
+        report = adapter.capabilities()
+    assert report.pointing_devices == driver.pointing_devices
 
 
 def test_an_image_is_named_in_the_backends_own_format(driver, adapter,

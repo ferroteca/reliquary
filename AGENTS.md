@@ -240,7 +240,11 @@ workflow:
     `BackendAdapter` contract (discovery, a capability report, image materialization, start/stop, and the
     carrier session); the `Availability` / `Capabilities` / `Requirements` types shared between what a backend
     reports and what a blueprint demands (`pointing_devices` / `pointing_device`, F66; `network_models` /
-    `network_attachments`, the newest fields here, D120, checked in `unmet()` the same way `drives` is checked);
+    `network_attachments`, D120; `share_models` / `share_default` and `share_models` / `share_unstated`, F68 —
+    all checked in `unmet()` the same way `drives` is checked); `Requirements.platform`, which is not checked
+    against anything but is passed to `capabilities(platform)` so a backend whose host tooling differs by guest
+    architecture reports on the tool that guest will actually use (F69 — QEMU's live share transports are build
+    options, so the answer differs between two binaries of one install);
     `capture_format(plane)` and its sibling
     `pointer_capable(plane)`, two separate per-plane capabilities (F66 — a display plane can capture a
     framebuffer without being able to deliver a pointer event to it, which is true of VirtualBox today), each
@@ -1065,16 +1069,37 @@ directory and materialize `use`; `machines._materialize_share` fails closed othe
 `share.materialize-not-use`). `model` (`vvfat`/`9p`/`virtio-fs`) is capability-checked at assignment the same way a
 NIC's `model` is (D122): `backends.Capabilities`/`Requirements` carry `share_models` (what a backend can render by
 name) and `share_default`/`share_unstated` (what an *unstated* model resolves to on that backend — never silently
-`vvfat`, which only ever arrives by name). Only QEMU's `vvfat` model actually renders today; QEMU reports
-`share_default=None` (its eventual live default, `9p`, isn't built until F69), so an unstated-model share is
-refused everywhere for now — the interim state FEATURES.md's F68 entry names, not a bug.
+`vvfat`, which only ever arrives by name). QEMU renders `vvfat` and `9p` (F69); VirtualBox renders neither until
+F71. The media's `read-only` is copied onto the share's state entry at materialization, because a backend renders
+from that entry and never sees the media.
 
-`backend_qemu.share_args()` renders a `vvfat` share as a synthesized FAT hard disk on the IDE bus, continuing the
-index sequence `drive_args()` leaves off after the last hdd and cdrom — shares are disk-shaped only; the old
-floppy-shaped vvfat rendering is retired. QEMU takes a snapshot of a `vvfat` share's directory the moment the
-machine starts. Any change made on the host side after that requires a stop/start cycle to be picked up. Guest
-writes should only be read back after QEMU stops, since that's when the write-back to the host directory actually
-completes.
+**QEMU's share capability is probed, not claimed** (F69). `9p` needs a QEMU built with fsdev support, which the
+official Windows binaries are not, so `QemuAdapter.capabilities(platform)` runs `probe_share_models(platform)` —
+one `-device help` against the binary that platform actually launches, looking for `virtio-9p-pci` — and reports
+what it found (P11). `vvfat` is added to that unconditionally, since it is in every build. `share_default` is `9p`
+where the probe found it and `None` otherwise, so an unstated-model share works on an fsdev-capable QEMU and is
+refused by name on a stock one. The probe is cached per process per platform. This is why `capabilities()` takes a
+`platform` at all, and why `backends.Requirements` carries one: QEMU installs a separate system binary per guest
+architecture, so the report has to be about the binary the machine will actually launch, the same reason
+`discover()` already takes a platform. On a Windows host, an fsdev-capable QEMU means the maintainer's
+`windows-fs-raw` tree pointed at by `RELIQUARY_QEMU_HOME` (build recipe in virtio-dos's `docs/TESTING.md`).
+
+`backend_qemu.share_args()` dispatches on the model. A `vvfat` share renders as a synthesized FAT hard disk on the
+IDE bus, continuing the index sequence `drive_args()` leaves off after the last hdd and cdrom — shares are
+disk-shaped only; the old floppy-shaped vvfat rendering is retired. A `9p` share renders as `-fsdev local` plus a
+`virtio-9p-pci` device, both addressed by the slot key, with `mount_tag` = the slot key as well; it is not a disk
+and takes no place on the IDE bus, so mixing the two models never shifts a guest's drive letters.
+`security_model=none` is deliberate: these guests have no user ids to map, and the alternative that does map them
+(`mapped-file`) would plant a `.virtfs_metadata` directory inside the shared directory. `read-only` maps onto each
+mechanism's own option — `fat:` without `rw:` for vvfat, `readonly=on` for the fsdev. `RESERVED_ARGUMENTS` refuses
+`-fsdev` and `-virtfs` through the settings hatch, the latter because it is QEMU's shorthand for writing both
+arguments at once.
+
+QEMU takes a snapshot of a `vvfat` share's directory the moment the machine starts. Any change made on the host
+side after that requires a stop/start cycle to be picked up. Guest writes should only be read back after QEMU
+stops, since that's when the write-back to the host directory actually completes. A `9p` share has none of that:
+it is live in both directions while the machine runs. What it needs instead is a guest driver — `VIO9P` from
+virtio-dos for DOS — which is the user's job to load, under U28's packet-driver precedent.
 
 ### Script dispatch
 

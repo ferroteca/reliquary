@@ -22,9 +22,17 @@ timeout     2m
 # (`machines._medium_size`), so attaching it is the blueprint's job,
 # done once, before start.
 #
-# D: (F68): a share renders disk-shaped, not floppy-shaped (unlike
-# the directory-on-floppy0 mechanism this replaced, which DOS always
-# lettered A: regardless of what else was attached). Confirmed
+# That share must name `model: vvfat`. Since F69 a share with no
+# stated model is served over 9p, which DOS gives no drive letter at
+# all until `VIO9P` is loaded in the guest — and this script stages
+# nothing in the guest by design, so there is nothing here to load
+# it. `vvfat` is the model that needs no guest driver, which is what
+# makes the rest of this comment true.
+#
+# D: (F68): a vvfat share renders disk-shaped, not floppy-shaped
+# (unlike the directory-on-floppy0 mechanism this replaced, which
+# DOS always lettered A: regardless of what else was attached).
+# Confirmed
 # against a real boot of the codex freedos blueprint (hdd0, cdrom0)
 # plus one added share: DOS assigns fixed-disk letters to every
 # BIOS-visible non-removable drive before the CD-ROM redirector

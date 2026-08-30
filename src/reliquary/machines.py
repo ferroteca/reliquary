@@ -254,6 +254,7 @@ def _requirements(machine, namespace):
     return backends.Requirements(
         control_planes=tuple(planes), media=tuple(media),
         controllers=tuple(controllers), materialize=tuple(modes),
+        platform=machine.platform,
         pointing_device=_resolve_pointing_device(machine),
         network_attachments=tuple(network_attachments),
         network_models=tuple(network_models),
@@ -366,7 +367,7 @@ def _materialize_drive(key, drive, adapter, disks_root, namespace, context,
     return entry
 
 
-def _materialize_share(key, share, adapter, namespace, context,
+def _materialize_share(key, share, adapter, platform, namespace, context,
                        properties=None, events=None, cancelled=None):
     """Materialize one enabled share, returning its resolved state entry.
 
@@ -380,6 +381,15 @@ def _materialize_share(key, share, adapter, namespace, context,
     landing on ``vvfat``; ``backends.assign`` already refused this
     machine if the assigned backend has no live default to fall back
     on, so ``share_default`` is never ``None`` by the time this runs.
+    The report is asked about this machine's own ``platform`` for the
+    same reason assignment was: a backend can serve different models
+    from the tool one guest architecture needs than from another's
+    (F69), and the two questions must be answered by the same tool.
+
+    ``read-only`` is read off the media and recorded here, because the
+    renderer is given the state entry and never sees the media. It
+    means the same thing it means on a drive: present the payload —
+    here, the host directory — so the guest cannot write to it.
     """
     media = _drive_media(share, namespace)
     mode = media.materialize
@@ -400,7 +410,8 @@ def _materialize_share(key, share, adapter, namespace, context,
         "media": media.name,
         "materialize": mode,
         "path": path,
-        "model": share.model or adapter.capabilities().share_default,
+        "model": share.model or adapter.capabilities(platform).share_default,
+        "read-only": bool(media.read_only),
     }
 
 
@@ -501,7 +512,8 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         if not share.enabled:
             continue
         resolved_shares[key] = _materialize_share(
-            key, share, adapter, namespace, context, properties, events)
+            key, share, adapter, machine.platform, namespace, context,
+            properties, events)
     resolved_devices = {**resolved_drives, **resolved_network,
                         **resolved_shares}
 
@@ -795,7 +807,8 @@ def _dry_drive(key, drive, adapter, disks_root, namespace, context,
     return entry
 
 
-def _dry_share(key, share, adapter, namespace, context, properties, entries):
+def _dry_share(key, share, adapter, platform, namespace, context, properties,
+               entries):
     """One share's resolved plan, materializing nothing.
 
     Mirrors :func:`_materialize_share` decision for decision.
@@ -818,7 +831,8 @@ def _dry_share(key, share, adapter, namespace, context, properties, entries):
         "media": media.name,
         "materialize": mode,
         "path": payload,
-        "model": share.model or adapter.capabilities().share_default,
+        "model": share.model or adapter.capabilities(platform).share_default,
+        "read-only": bool(media.read_only),
     }
 
 
@@ -884,8 +898,8 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
             _dry_network(machine.network, machine.platform,
                         bound.values).items())]
     shares = [
-        _dry_share(key, share, adapter, namespace, context, bound.values,
-                  entries)
+        _dry_share(key, share, adapter, machine.platform, namespace, context,
+                  bound.values, entries)
         for key, share in sorted(machine.shares.items()) if share.enabled]
     memory = machine.memory
     if memory is None:
@@ -1247,7 +1261,8 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             if not share.enabled:
                 continue
             new_shares[key] = _materialize_share(
-                key, share, adapter, namespace, context, bound, events)
+                key, share, adapter, parsed.platform, namespace, context,
+                bound, events)
         new_devices = {**new_drives, **new_network, **new_shares}
 
         memory = parsed.memory

@@ -352,10 +352,24 @@ def test_a_share_naming_a_file_is_refused(rig):
     assert caught.value.rule_id == "share.directory-required"
 
 
-def test_an_unstated_share_model_is_refused_everywhere_in_f68_alone(rig):
-    # F68 alone: 9p (QEMU's eventual live default) doesn't exist until
-    # F69, so an unstated-model share is refused everywhere for now —
-    # exactly what FEATURES.md's F68 entry calls the interim state.
+def test_an_unstated_share_model_takes_the_backends_live_default(rig):
+    # Never vvfat: an author who declares a share and says nothing
+    # gets the live contract, or a capability error (D122). The fake
+    # backend's default is 9p, the same as QEMU's (F69).
+    work = rig.path("work")
+    os.makedirs(work)
+    machine_id = rig.create(
+        "hd", {"platform": "dos", "devices": {"share0": "shared"}},
+        media=[{"name": "shared", "materialize": "use",
+                "location": {"local": work}}])
+    assert rig.state(machine_id)["devices"]["share0"]["model"] == "9p"
+
+
+def test_an_unstated_share_model_is_refused_where_there_is_no_default(rig):
+    # A backend that renders vvfat and nothing live — the stock QEMU
+    # install, whose binaries are built without fsdev support — cannot
+    # serve this machine at all, and says so rather than falling back
+    # to the snapshot model.
     report = Capabilities(backend="qemu", share_models=("vvfat",))
     with fake_backend.installed(capabilities=report):
         work = rig.path("work")
@@ -366,6 +380,32 @@ def test_an_unstated_share_model_is_refused_everywhere_in_f68_alone(rig):
                 media=[{"name": "shared", "materialize": "use",
                         "location": {"local": work}}])
     assert caught.value.rule_id == "machine.no-capable-backend"
+
+
+def test_a_share_records_whether_its_media_is_read_only(rig):
+    # The renderer is given the state entry and never sees the media,
+    # so the media's own `read-only` has to be carried here for a
+    # backend to map it onto its mechanism's option (F69).
+    work = rig.path("work")
+    os.makedirs(work)
+    machine_id = rig.create(
+        "hd", {"platform": "dos",
+               "devices": {"share0": {"media": "shared", "model": "9p"}}},
+        media=[{"name": "shared", "materialize": "use", "read-only": True,
+                "location": {"local": work}}])
+    assert rig.state(machine_id)["devices"]["share0"]["read-only"] is True
+
+
+def test_a_share_whose_media_says_nothing_is_writable(rig):
+    # `read-only` is opt-in everywhere but a cdrom (media-spec.md).
+    work = rig.path("work")
+    os.makedirs(work)
+    machine_id = rig.create(
+        "hd", {"platform": "dos",
+               "devices": {"share0": {"media": "shared", "model": "9p"}}},
+        media=[{"name": "shared", "materialize": "use",
+                "location": {"local": work}}])
+    assert rig.state(machine_id)["devices"]["share0"]["read-only"] is False
 
 
 def test_cdrom_rejects_a_new_media(rig):

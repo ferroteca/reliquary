@@ -15,9 +15,10 @@ serial driver.
 - **Output** is read directly from VGA text memory, without OCR
 - **Files** are yours to move yourself. Reliquary just supplies the
   drive or share to cross on — a `share` device presents a host
-  directory to the guest, today rendered as a QEMU virtual FAT drive
-  (`model: vvfat`), and `insert-media --file` swaps a whole image
-  live — but it never reaches inside a volume itself
+  directory to the guest, either as a QEMU virtual FAT drive
+  (`model: vvfat`, needing nothing in the guest) or live over
+  virtio-9p, and `insert-media --file` swaps a whole image live —
+  but it never reaches inside a volume itself
 - **Command completion** is detected by watching for the DOS prompt
   to come back — either the standard `X:\path>` shape, or exactly
   the prompt the guest was already showing, so a customized prompt
@@ -63,10 +64,11 @@ table, and writes it out as 4096 raw bytes.
 
 Those bytes cross over on a share you supply yourself — the codex
 blueprint doesn't declare one, because a host directory needs your
-own path (see above). Add a `share0` device, naming the model
-explicitly (F68's interim state: an unstated model is refused
-everywhere until F69 ships QEMU's live default), and the media it
-points at:
+own path (see above). Add a `share0` device and the media it points
+at. The example names `model: vvfat` because that works on any QEMU
+and needs nothing loaded in the guest; leaving `model` out gets you
+`9p` instead, which is live in both directions but needs a QEMU built
+with fsdev support and `VIO9P` loaded in DOS:
 
 ```json
 "devices": {
@@ -93,12 +95,18 @@ cheaper check available than the guest's own answer, since a share
 has no image file for a live insert or eject to check against ahead
 of time.
 
-**The script writes to `D:` (F68), confirmed against a real boot.**
+**The script writes to `D:` (F68), confirmed against a real boot —
+with the `model: vvfat` above.** That model is not optional here:
+leaving `model` out gets a `9p` share instead, which DOS gives no
+drive letter at all until `VIO9P` is loaded in the guest, and this
+script deliberately stages nothing in the guest.
+
 Before this feature, a directory media attached directly to
 `floppy0`, which DOS always letters `A:` regardless of what else is
-attached — that was the old assumption. A share renders disk-shaped,
-not floppy-shaped, so it no longer lands on `A:`: DOS assigns fixed-
-disk letters to every BIOS-visible non-removable drive first, so on
+attached — that was the old assumption. A vvfat share renders
+disk-shaped, not floppy-shaped, so it no longer lands on `A:`: DOS
+assigns fixed-disk letters to every BIOS-visible non-removable
+drive first, so on
 the codex blueprint's own shape (`hdd0` then the added `share0`) the
 share is `D:`, and only then does the CD-ROM driver claim its own
 letter (`E:`). A blueprint with more drives ahead of the share shifts

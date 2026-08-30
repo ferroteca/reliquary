@@ -104,14 +104,24 @@ class Capabilities:
     #: The share models this backend can render when a share names one
     #: explicitly (F68): ``vvfat``, ``9p``, or ``virtio-fs``. Defaults
     #: to empty, the same way ``controllers`` does.
+    #:
+    #: These two fields are the first here whose value can depend on
+    #: the *installation* rather than on the adapter's own code (F69):
+    #: QEMU's live transports are build options, so its adapter probes
+    #: the selected binary and reports what it found. One consequence
+    #: is worth stating, since it breaks a pattern the rest of this
+    #: class keeps: a backend that isn't installed on this host can no
+    #: longer answer the share half of "could you build this
+    #: blueprint?", because there is no binary to ask. It reports no
+    #: live model, which is the honest answer and not a claim that the
+    #: backend could never serve one.
     share_models: Tuple[str, ...] = ()
     #: The model an *unstated*-model share resolves to on this backend
     #: (F68) — never ``vvfat``, which only arrives by name (design:
     #: planning/pledged/design/share-devices.md). ``None`` means this
-    #: backend cannot yet serve an unstated-model share at all, which
-    #: is honest today: the live default (``9p`` for QEMU) doesn't
-    #: exist until F69, and VirtualBox's own mechanism doesn't exist
-    #: until F71.
+    #: backend cannot serve an unstated-model share: on QEMU, a binary
+    #: built without fsdev support, and on VirtualBox, every install
+    #: until F71 builds its own mechanism.
     share_default: Optional[str] = None
 
 
@@ -149,6 +159,17 @@ class Requirements:
     media: Tuple[str, ...] = ()
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
+    #: The guest platform this machine declared, or ``None`` when the
+    #: caller is asking about a blueprint rather than a machine (F69).
+    #: This isn't a requirement the way the fields around it are —
+    #: nothing is checked against it. It's here because a backend
+    #: whose host tooling differs by guest architecture has to be
+    #: asked about the right tool: QEMU installs one system binary per
+    #: architecture, and its live share transports are build options,
+    #: so which of them exist is a fact about one binary. Passed
+    #: straight through to :meth:`BackendAdapter.capabilities`, the
+    #: same way :meth:`BackendAdapter.discover` already takes it.
+    platform: Optional[str] = None
     #: The blueprint's declared ``pointing-device``, or ``None`` if it
     #: left this to the default (F66). Unlike the tuple fields above,
     #: this is a single value, since a machine can declare at most
@@ -216,8 +237,19 @@ class BackendAdapter:
         """
         raise NotImplementedError
 
-    def capabilities(self):
-        """What this backend can do, using the blueprint's vocabulary."""
+    def capabilities(self, platform=None):
+        """What this backend can do, using the blueprint's vocabulary.
+
+        ``platform`` is the guest platform of the machine being
+        judged, or ``None`` when the question isn't about one
+        particular machine. It exists for the same reason
+        :meth:`discover` takes it: a backend whose host tooling
+        differs by guest architecture reports what *that* tool can do,
+        not what some other one can (F69 — QEMU's live share
+        transports are build options, so the answer differs between
+        two binaries of the same install). A backend with one tool
+        ignores it.
+        """
         raise NotImplementedError
 
     def capture_format(self, plane):
@@ -267,7 +299,7 @@ class BackendAdapter:
         always names the specific requirement that failed rather than
         just saying something failed.
         """
-        report = self.capabilities()
+        report = self.capabilities(requirements.platform)
         missing = []
         for plane in requirements.control_planes:
             if plane not in report.control_planes:
@@ -294,8 +326,13 @@ class BackendAdapter:
             if model not in report.share_models:
                 missing.append(f"share model {model!r}")
         if requirements.share_unstated and report.share_default is None:
+            # No "yet": as of F69 this is as often a fact about the
+            # install as about what's built — a QEMU compiled without
+            # fsdev support has no live default and never will,
+            # whereas VirtualBox's is genuinely unbuilt (F71). The
+            # message states the finding, not a guess at the reason.
             missing.append("a share with no stated model (this backend "
-                           "has no live default yet)")
+                           "has no live default)")
         return tuple(missing)
 
     def validate_settings(self, settings):
