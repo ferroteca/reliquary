@@ -67,7 +67,7 @@ blueprint doesn't declare one, because a host directory needs your
 own path (see above). Add a `share0` device and the media it points
 at. The example names `model: vvfat` because that works on any QEMU
 and needs nothing loaded in the guest; leaving `model` out gets you
-`9p` instead, which is live in both directions but needs a QEMU built
+`9pfs` instead, which is live in both directions but needs a QEMU built
 with fsdev support and `VIO9P` loaded in DOS:
 
 ```json
@@ -97,7 +97,7 @@ of time.
 
 **The script writes to `D:` (F68), confirmed against a real boot —
 with the `model: vvfat` above.** That model is not optional here:
-leaving `model` out gets a `9p` share instead, which DOS gives no
+leaving `model` out gets a `9pfs` share instead, which DOS gives no
 drive letter at all until `VIO9P` is loaded in the guest, and this
 script deliberately stages nothing in the guest.
 

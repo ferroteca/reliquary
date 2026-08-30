@@ -76,8 +76,8 @@
           }
         },
         "pointing-device": {
-          "description": "The pointer input device (F66). Omitted, it resolves to the platform's default (mouse, today). Never supplied by a reference.",
-          "enum": ["tablet", "mouse"]
+          "description": "The pointer input device (F66; virtio-mouse added by T34). Omitted, it resolves to the platform's default (mouse, today). Never supplied by a reference.",
+          "enum": ["tablet", "mouse", "virtio-mouse"]
         },
         "backend-settings": {
           "type": "object",
@@ -141,7 +141,7 @@
             },
             "model": {
               "description": "The NIC chipset, overriding the platform default (D122). A closed vocabulary: never widened to admit a reference pattern.",
-              "enum": ["pcnet", "ne2k", "virtio"]
+              "enum": ["pcnet", "ne2k", "virtio-net"]
             }
           },
           "additionalProperties": false
@@ -160,7 +160,7 @@
             "media": {"$ref": "#/$defs/mediaName"},
             "model": {
               "description": "The share mechanism, overriding the assigned backend's own default (D122). A closed vocabulary: never widened to admit a reference pattern.",
-              "enum": ["vvfat", "9p", "virtio-fs"]
+              "enum": ["vvfat", "9pfs", "virtio-fs"]
             },
             "enabled": {"type": "boolean"}
           },

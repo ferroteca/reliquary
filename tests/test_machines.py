@@ -355,14 +355,14 @@ def test_a_share_naming_a_file_is_refused(rig):
 def test_an_unstated_share_model_takes_the_backends_live_default(rig):
     # Never vvfat: an author who declares a share and says nothing
     # gets the live contract, or a capability error (D122). The fake
-    # backend's default is 9p, the same as QEMU's (F69).
+    # backend's default is 9pfs, the same as QEMU's (F69).
     work = rig.path("work")
     os.makedirs(work)
     machine_id = rig.create(
         "hd", {"platform": "dos", "devices": {"share0": "shared"}},
         media=[{"name": "shared", "materialize": "use",
                 "location": {"local": work}}])
-    assert rig.state(machine_id)["devices"]["share0"]["model"] == "9p"
+    assert rig.state(machine_id)["devices"]["share0"]["model"] == "9pfs"
 
 
 def test_an_unstated_share_model_is_refused_where_there_is_no_default(rig):
@@ -390,7 +390,7 @@ def test_a_share_records_whether_its_media_is_read_only(rig):
     os.makedirs(work)
     machine_id = rig.create(
         "hd", {"platform": "dos",
-               "devices": {"share0": {"media": "shared", "model": "9p"}}},
+               "devices": {"share0": {"media": "shared", "model": "9pfs"}}},
         media=[{"name": "shared", "materialize": "use", "read-only": True,
                 "location": {"local": work}}])
     assert rig.state(machine_id)["devices"]["share0"]["read-only"] is True
@@ -402,7 +402,7 @@ def test_a_share_whose_media_says_nothing_is_writable(rig):
     os.makedirs(work)
     machine_id = rig.create(
         "hd", {"platform": "dos",
-               "devices": {"share0": {"media": "shared", "model": "9p"}}},
+               "devices": {"share0": {"media": "shared", "model": "9pfs"}}},
         media=[{"name": "shared", "materialize": "use",
                 "location": {"local": work}}])
     assert rig.state(machine_id)["devices"]["share0"]["read-only"] is False

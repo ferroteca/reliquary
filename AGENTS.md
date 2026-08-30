@@ -85,9 +85,10 @@ workflow:
     anonymous blank one; a NIC value is an attachment name — `nat` or `bridged` — or `{attachment, interface,
     model}`, D120/D122 — `model` overrides the platform-resolved chipset; a share value is a media name,
     `{media, model, enabled}`, or an inline media definition carrying its own `model`/`enabled` too (F72) — no
-    `null`, and no anonymous blank, inline included — where `model` is `vvfat`/`9p`/`virtio-fs`, F68),
+    `null`, and no anonymous blank, inline included — where `model` is `vvfat`/`9pfs`/`virtio-fs`, F68),
     `boot`, `name` (the id-safe identity, not a display label), `description`, `scripts`, `control-planes`,
-    `pointing-device` (F66), `backend-settings`, and `parameters`.
+    `pointing-device` (`tablet`/`mouse`/`virtio-mouse`, F66, `virtio-mouse` added by T34), `backend-settings`,
+    and `parameters`.
   - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,
     `authoring` writes and removes it. It's authoring-only: it scaffolds a new blueprint (`new_blueprint`), and
     writes a media declaration for a file already on disk (`add_media(name, file)` — computes the sha256, writes
@@ -262,7 +263,9 @@ workflow:
     same way `credentials._set_provider` substitutes a fake keyring.
   - `backend_qemu.py` contains everything that's specific to QEMU: finding the QEMU binary, running `qemu-img`
     for image work, rendering a machine's drives, NICs, and boot order into QEMU arguments (the `pointing-device:
-    tablet` field renders as `-usb -device usb-tablet,id=pointer0`, F66; `network_args` renders each `devices`
+    tablet` field renders as `-usb -device usb-tablet,id=pointer0`, F66; `pointing-device: virtio-mouse` renders as
+    `-device virtio-mouse-pci,id=pointer0`, T34, the same relative device family as the implicit default, just
+    explicit and paravirtualized; `network_args` renders each `devices`
     NIC entry into a `-netdev`/`-device` pair, D120/D121), the `backend-settings.qemu` escape
     hatch (`SETTINGS_KEYS` = `machine` / `args`; `RESERVED_ARGUMENTS` lists what a blueprint field or the VM
     identity already owns, checked case-sensitively — `-m` is memory and `-M` is the machine type, but
@@ -1067,17 +1070,17 @@ A `share<n>` slot presents a host directory to the guest (F68; design: `planning
 sharing the `devices` keyspace with drives and NICs the same way NICs already do (D121) — `document.py`'s
 `MachineShare` / `_share_device` mirror `MachineNetwork` / `_network_device`. A share's media must resolve to a
 directory and materialize `use`; `machines._materialize_share` fails closed otherwise (`share.directory-required`,
-`share.materialize-not-use`). `model` (`vvfat`/`9p`/`virtio-fs`) is capability-checked at assignment the same way a
+`share.materialize-not-use`). `model` (`vvfat`/`9pfs`/`virtio-fs`) is capability-checked at assignment the same way a
 NIC's `model` is (D122): `backends.Capabilities`/`Requirements` carry `share_models` (what a backend can render by
 name) and `share_default`/`share_unstated` (what an *unstated* model resolves to on that backend — never silently
-`vvfat`, which only ever arrives by name). QEMU renders `vvfat` and `9p` (F69); VirtualBox renders neither until
+`vvfat`, which only ever arrives by name). QEMU renders `vvfat` and `9pfs` (F69); VirtualBox renders neither until
 F71. The media's `read-only` is copied onto the share's state entry at materialization, because a backend renders
 from that entry and never sees the media.
 
-**QEMU's share capability is probed, not claimed** (F69). `9p` needs a QEMU built with fsdev support, which the
+**QEMU's share capability is probed, not claimed** (F69). `9pfs` needs a QEMU built with fsdev support, which the
 official Windows binaries are not, so `QemuAdapter.capabilities(platform)` runs `probe_share_models(platform)` —
 one `-device help` against the binary that platform actually launches, looking for `virtio-9p-pci` — and reports
-what it found (P11). `vvfat` is added to that unconditionally, since it is in every build. `share_default` is `9p`
+what it found (P11). `vvfat` is added to that unconditionally, since it is in every build. `share_default` is `9pfs`
 where the probe found it and `None` otherwise, so an unstated-model share works on an fsdev-capable QEMU and is
 refused by name on a stock one. The probe is cached per process per platform. This is why `capabilities()` takes a
 `platform` at all, and why `backends.Requirements` carries one: QEMU installs a separate system binary per guest
@@ -1087,7 +1090,7 @@ architecture, so the report has to be about the binary the machine will actually
 
 `backend_qemu.share_args()` dispatches on the model. A `vvfat` share renders as a synthesized FAT hard disk on the
 IDE bus, continuing the index sequence `drive_args()` leaves off after the last hdd and cdrom — shares are
-disk-shaped only; the old floppy-shaped vvfat rendering is retired. A `9p` share renders as `-fsdev local` plus a
+disk-shaped only; the old floppy-shaped vvfat rendering is retired. A `9pfs` share renders as `-fsdev local` plus a
 `virtio-9p-pci` device, both addressed by the slot key, with `mount_tag` = the slot key as well; it is not a disk
 and takes no place on the IDE bus, so mixing the two models never shifts a guest's drive letters.
 `security_model=none` is deliberate: these guests have no user ids to map, and the alternative that does map them
@@ -1098,7 +1101,7 @@ arguments at once.
 
 QEMU takes a snapshot of a `vvfat` share's directory the moment the machine starts. Any change made on the host
 side after that requires a stop/start cycle to be picked up. Guest writes should only be read back after QEMU
-stops, since that's when the write-back to the host directory actually completes. A `9p` share has none of that:
+stops, since that's when the write-back to the host directory actually completes. A `9pfs` share has none of that:
 it is live in both directions while the machine runs. What it needs instead is a guest driver — `VIO9P` from
 virtio-dos for DOS — which is the user's job to load, under U28's packet-driver precedent.
 

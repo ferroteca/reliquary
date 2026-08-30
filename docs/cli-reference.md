@@ -502,7 +502,7 @@ there are three ways to do it:
   two models. `model: vvfat` works on any QEMU and needs nothing in
   the guest, but QEMU takes a snapshot of the directory when the
   machine starts, so the machine has to be stopped for a change to
-  become visible in either direction. `9p` (F69) is live in both
+  become visible in either direction. `9pfs` (F69) is live in both
   directions, and is what a share with no `model` gets, but it needs
   a QEMU built with fsdev support and a 9P driver loaded in the guest.
 - **A whole image, swapped live** — `insert-media --file`, below.

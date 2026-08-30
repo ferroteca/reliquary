@@ -562,7 +562,7 @@ flushes any guest writes to a `vvfat`-model share back to disk. QEMU
 takes a snapshot of a `vvfat` share's directory when the machine
 starts, so after changing its files on the host, stop and restart the
 machine before the guest will see the changes — that is `vvfat`'s
-trade-off for needing no guest driver at all. A `9p` share has no such
+trade-off for needing no guest driver at all. A `9pfs` share has no such
 step: it is live in both directions while the machine runs.
 
 ## Command guide

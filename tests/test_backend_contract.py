@@ -72,7 +72,7 @@ class _QemuDriver:
     #: `input-send-event` reaches the emulated tablet on either plane
     #: — a property of the management interface, not of the screen.
     pointer_planes = {"agentless-display": True, "vnc": True}
-    pointing_devices = ("tablet", "mouse")
+    pointing_devices = ("tablet", "mouse", "virtio-mouse")
     #: The destructive command that must never reach a VM if the
     #: identity check fails.
     destructive = "quit"

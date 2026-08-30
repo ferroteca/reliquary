@@ -35,10 +35,10 @@ _PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
 _BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
 _CONTROLLERS = {"ide", "sata", "scsi", "nvme", "virtio"}
 _ATTACHMENTS = {"nat", "bridged"}
-_NIC_MODELS = {"pcnet", "ne2k", "virtio"}
-_SHARE_MODELS = {"vvfat", "9p", "virtio-fs"}
+_NIC_MODELS = {"pcnet", "ne2k", "virtio-net"}
+_SHARE_MODELS = {"vvfat", "9pfs", "virtio-fs"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
-_POINTING_DEVICES = {"tablet", "mouse"}
+_POINTING_DEVICES = {"tablet", "mouse", "virtio-mouse"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
 _SPEC_TYPES = {"machine", "media"}
 # These spec types existed in the original four-component model and

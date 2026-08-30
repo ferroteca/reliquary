@@ -165,7 +165,7 @@ cannot carry.
   values already pass (above): a name only needs to be real,
   general hardware, not honored by every backend today. `pcnet`
   (AMD's Am79C970A, "PCnet-II") runs on both QEMU and VirtualBox;
-  `ne2k` (Novell/Eagle NE2000) and `virtio` (QEMU's paravirtualized
+  `ne2k` (Novell/Eagle NE2000) and `virtio-net` (QEMU's paravirtualized
   NIC, `virtio-net-pci`) only exist on QEMU today, checked and
   refused by name on any other backend at materialization.
   `interface` names the host network interface to bridge onto,
@@ -201,7 +201,7 @@ cannot carry.
   named, materializable directory. `model` and `enabled` are share
   attributes, pulled off the object before the rest of it is read as
   a media reference or an inline spec, so both compose with either
-  form — `{"location": "D:/exchange", "model": "9p"}` names a path
+  form — `{"location": "D:/exchange", "model": "9pfs"}` names a path
   and a model in the one object (F72). No `null` form either way: an
   empty drive bay is real hardware, but a share with no directory
   means nothing. The referenced media's
@@ -211,7 +211,7 @@ cannot carry.
   naming the path, and, symmetrically, a drive slot whose media
   resolves to a directory now fails closed too (a directory payload
   is legal only on a share). `model` names the live mechanism
-  (`vvfat`, `9p`, or `virtio-fs`), capability-checked against the
+  (`vvfat`, `9pfs`, or `virtio-fs`), capability-checked against the
   assigned backend the same way a NIC's `model` is (D122): honored
   where the backend's capability report claims it, refused by name
   otherwise. Omitted, an unstated `model` means the assigned
@@ -263,19 +263,24 @@ cannot carry.
   nothing installed or running in the guest. Defaults that differ
   by platform will arrive once a platform has planes that justify
   a different default.
-- **`pointing-device`** (F66) is `tablet` or `mouse`, judged the
-  same way as `control-planes`: capability-checked against the
-  assigned backend at materialization, failing closed naming both
-  the backend and the device. An absolute event needs an absolute
-  device — a PS/2 mouse is relative and the guest's own driver
-  applies acceleration the host cannot observe (P10) — so `click`
-  preflight-refuses a `mouse` machine by name rather than
-  attempting a calibration guess. Omitted, it resolves to `mouse`
-  — the plain relative device every platform's machine has
-  anyway, so the default matches what's actually there rather
-  than assuming something better. A GUI-era platform will get a
-  richer default once it has one to justify it, the same way
-  `control-planes` will.
+- **`pointing-device`** (F66, `virtio-mouse` added by T34) is
+  `tablet`, `mouse`, or `virtio-mouse`, judged the same way as
+  `control-planes`: capability-checked against the assigned backend
+  at materialization, failing closed naming both the backend and
+  the device. Tablet is the one absolute device — a PS/2 mouse and
+  `virtio-mouse` both report relative motion, and the guest's own
+  driver applies acceleration the host cannot observe (P10) — so
+  `click` preflight-refuses any pointing device but `tablet` by
+  name, rather than attempting a calibration guess. Omitted, it
+  resolves to `mouse` — the plain relative device every platform's
+  machine has anyway, so the default matches what's actually there
+  rather than assuming something better. `virtio-mouse` is the same
+  relative device family, rendered as an explicit paravirtualized
+  device instead of the platform's implicit legacy one; a blueprint
+  names it only when it wants that explicit rendering, since a guest
+  with no virtio driver — DOS included — should stay on the implicit
+  `mouse`. A GUI-era platform will get a richer default once it has
+  one to justify it, the same way `control-planes` will.
 - **`backend-settings`** is the **only** place backend-specific
   configuration may appear, which is what makes a blueprint
   without it portable by construction. One section per backend

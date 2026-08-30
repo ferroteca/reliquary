@@ -102,8 +102,8 @@ class FakeAdapter(BackendAdapter):
             pointing_devices=("tablet", "mouse"),
             network_models=("pcnet", "ne2k"),
             network_attachments=("nat", "bridged"),
-            share_models=("vvfat", "9p", "virtio-fs"),
-            share_default="9p",
+            share_models=("vvfat", "9pfs", "virtio-fs"),
+            share_default="9pfs",
         )
         self.images = []
         self.starts = []

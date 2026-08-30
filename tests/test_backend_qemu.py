@@ -376,7 +376,7 @@ def test_a_removable_drive_carries_its_key_as_the_launch_id(root):
 
 
 # Share devices (F68): a host directory presented to the guest. Only
-# `model: vvfat` renders — the capability report never claims 9p or
+# `model: vvfat` renders — the capability report never claims 9pfs or
 # virtio-fs yet, so unmet() has already refused those at assignment.
 
 def test_a_vvfat_share_renders_as_a_synthesized_fat_drive(root):
@@ -421,7 +421,7 @@ def test_a_share_with_an_unsupported_model_is_an_internal_error(root):
         qemu_module.share_args(shares, {})
 
 
-# The 9p model (F69): an in-process virtio-9p server over a host
+# The 9pfs model (F69): an in-process virtio-9p server over a host
 # directory, live in both directions, and QEMU's default for a share
 # whose blueprint named no model at all.
 
@@ -433,7 +433,7 @@ def test_a_9p_share_renders_an_fsdev_and_a_virtio_9p_device(root):
     work = os.path.join(root, "work")
     os.makedirs(work)
     shares = {"share0": {"media": "hostdir", "materialize": "use",
-                         "path": work, "model": "9p"}}
+                         "path": work, "model": "9pfs"}}
     args = qemu_module.share_args(shares, {})
     fsdev, = _valued(args, "-fsdev")
     device, = _valued(args, "-device")
@@ -450,7 +450,7 @@ def test_a_9p_share_names_the_guest_mount_tag_after_its_slot_key(root):
     work = os.path.join(root, "work")
     os.makedirs(work)
     shares = {"share1": {"media": "hostdir", "materialize": "use",
-                         "path": work, "model": "9p"}}
+                         "path": work, "model": "9pfs"}}
     device, = _valued(qemu_module.share_args(shares, {}), "-device")
     assert "mount_tag=share1" in device
 
@@ -463,7 +463,7 @@ def test_a_9p_share_takes_no_place_on_the_ide_bus(root):
     os.makedirs(work)
     shares = {
         "share0": {"media": "hostdir", "materialize": "use",
-                   "path": work, "model": "9p"},
+                   "path": work, "model": "9pfs"},
         "share1": {"media": "hostdir", "materialize": "use",
                    "path": work, "model": "vvfat"},
     }
@@ -481,7 +481,7 @@ def test_a_read_only_share_is_served_read_only(root):
     work = os.path.join(root, "work")
     os.makedirs(work)
     shares = {"share0": {"media": "hostdir", "materialize": "use",
-                         "path": work, "model": "9p",
+                         "path": work, "model": "9pfs",
                          "read-only": True}}
     fsdev, = _valued(qemu_module.share_args(shares, {}), "-fsdev")
     assert "readonly=on" in fsdev
@@ -491,7 +491,7 @@ def test_a_writable_share_says_nothing_about_read_only(root):
     work = os.path.join(root, "work")
     os.makedirs(work)
     shares = {"share0": {"media": "hostdir", "materialize": "use",
-                         "path": work, "model": "9p",
+                         "path": work, "model": "9pfs",
                          "read-only": False}}
     fsdev, = _valued(qemu_module.share_args(shares, {}), "-fsdev")
     assert "readonly" not in fsdev
@@ -534,11 +534,11 @@ def test_network_model_ne2k_renders_the_isa_variant():
                     "-device", "ne2k_isa,netdev=net0,id=net0"]
 
 
-def test_network_model_virtio_renders_the_pci_device():
+def test_network_model_virtio_net_renders_the_pci_device():
     # D122: same override mechanism as ne2k, targeting the
     # paravirtualized NIC instead.
     network = {"net0": {"attachment": "nat", "interface": None,
-                        "model": "virtio"}}
+                        "model": "virtio-net"}}
     args = qemu_module.network_args(network)
     assert args == ["-netdev", "user,id=net0",
                     "-device", "virtio-net-pci,netdev=net0,id=net0"]
@@ -822,6 +822,22 @@ def test_pointing_device_mouse_renders_nothing_extra():
         adapter.start(state, machine_dir=".", backend_dir="qemu")
     args = launch.call_args.args[0]
     assert "usb-tablet" not in " ".join(args)
+    assert "virtio-mouse" not in " ".join(args)
+
+
+def test_pointing_device_virtio_mouse_renders_the_virtio_device():
+    adapter = qemu_module.QemuAdapter()
+    state = {
+        "id": "vmouse-0", "backend-id": "reliquary-vmouse-0", "memory": 32,
+        "boot": [], "devices": {}, "pointing-device": "virtio-mouse",
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=".", backend_dir="qemu")
+    args = launch.call_args.args[0]
+    assert args[-2:] == ["-device", "virtio-mouse-pci,id=pointer0"]
+    assert "-usb" not in args
 
 
 def test_the_text_screen_reads_characters_and_attribute_tokens():
@@ -869,30 +885,30 @@ def test_the_qemu_adapter_reports_the_pointing_devices_it_renders():
     with mock.patch.object(qemu_module, "probe_share_models",
                            return_value=()):
         report = qemu_module.QemuAdapter().capabilities()
-    assert report.pointing_devices == ("tablet", "mouse")
+    assert report.pointing_devices == ("tablet", "mouse", "virtio-mouse")
 
 
 def test_the_qemu_adapter_reports_the_network_devices_it_renders():
     with mock.patch.object(qemu_module, "probe_share_models",
                            return_value=()):
         report = qemu_module.QemuAdapter().capabilities()
-    assert report.network_models == ("pcnet", "ne2k", "virtio")
+    assert report.network_models == ("pcnet", "ne2k", "virtio-net")
     assert report.network_attachments == ("nat", "bridged")
 
 
 def test_the_qemu_adapter_adds_the_share_models_the_binary_actually_has():
-    # vvfat is in every QEMU build and needs no probe; 9p is there
+    # vvfat is in every QEMU build and needs no probe; 9pfs is there
     # only if the binary was built with fsdev support, and once it is,
     # it is also what an unstated-model share resolves to (F69) --
     # never vvfat, whose snapshot trade only arrives by name.
     with mock.patch.object(qemu_module, "probe_share_models",
-                           return_value=("9p",)):
+                           return_value=("9pfs",)):
         report = qemu_module.QemuAdapter().capabilities("dos")
-    assert report.share_models == ("vvfat", "9p")
-    assert report.share_default == "9p"
+    assert report.share_models == ("vvfat", "9pfs")
+    assert report.share_default == "9pfs"
 
 
-def test_a_qemu_without_9p_offers_vvfat_and_no_live_default():
+def test_a_qemu_without_9pfs_offers_vvfat_and_no_live_default():
     # The stock Windows build: an authored `vvfat` share still works,
     # and an unstated-model share is refused by name here instead of
     # silently landing on the snapshot model.
@@ -920,14 +936,14 @@ def _device_help(stdout):
 # code implements, so the report has to come from probing the very
 # binary a machine will launch.
 
-def test_a_qemu_built_with_fsdev_reports_the_9p_share_model():
+def test_a_qemu_built_with_fsdev_reports_the_9pfs_share_model():
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="/fake/qemu-system-i386"), \
          mock.patch.object(qemu_module.subprocess, "run") as run:
         run.return_value = _device_help(
             'name "virtio-9p-pci", bus PCI, alias "virtio-9p"\n')
         qemu_module.probe_share_models.cache_clear()
-        assert qemu_module.probe_share_models("dos") == ("9p",)
+        assert qemu_module.probe_share_models("dos") == ("9pfs",)
     assert run.call_args.args[0][1:] == ["-device", "help"]
 
 

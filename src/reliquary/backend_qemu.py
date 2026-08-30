@@ -158,12 +158,12 @@ RESERVED_ARGUMENTS = {
 #: appropriate bus for a card real NE2000s shipped on — QEMU also has
 #: a PCI variant (`ne2k_pci`), but nothing in the blueprint
 #: vocabulary names it, and DOS-era platforms have no PCI bus to put
-#: it on anyway. `virtio` renders as `virtio-net-pci`, QEMU's
+#: it on anyway. `virtio-net` renders as `virtio-net-pci`, QEMU's
 #: paravirtualized NIC — real to the guest only in the sense that
 #: `controller`'s own `virtio` value already is, and just as reliant
 #: on the guest actually carrying a virtio driver.
 _NIC_QEMU_MODELS = {"pcnet": "pcnet", "ne2k": "ne2k_isa",
-                    "virtio": "virtio-net-pci"}
+                    "virtio-net": "virtio-net-pci"}
 
 #: The `-drive` properties Reliquary already renders for every drive.
 #: These are refused through ``-set drive.<slot>.<property>`` for the
@@ -292,7 +292,7 @@ def guest_glyph_banks(cache=None):
 #: "fsdev support is disabled" to `-fsdev help` and list no 9P device
 #: at all. `vvfat` is in every build and needs no probe, so it isn't
 #: listed here.
-_SHARE_MODEL_DEVICES = {"9p": "virtio-9p-pci"}
+_SHARE_MODEL_DEVICES = {"9pfs": "virtio-9p-pci"}
 
 
 @functools.lru_cache(maxsize=None)
@@ -1187,11 +1187,11 @@ class QemuAdapter(BackendAdapter):
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
-            pointing_devices=("tablet", "mouse"),
-            network_models=("pcnet", "ne2k", "virtio"),
+            pointing_devices=("tablet", "mouse", "virtio-mouse"),
+            network_models=("pcnet", "ne2k", "virtio-net"),
             network_attachments=("nat", "bridged"),
             share_models=("vvfat",) + live,
-            share_default="9p" if "9p" in live else None,
+            share_default="9pfs" if "9pfs" in live else None,
         )
 
     def capture_format(self, plane):
@@ -1297,6 +1297,12 @@ class QemuAdapter(BackendAdapter):
             # acceleration the host can't observe, so `click` needs
             # the tablet rather than the default relative mouse (P10).
             args += ["-usb", "-device", "usb-tablet,id=pointer0"]
+        elif state.get("pointing-device") == "virtio-mouse":
+            # Same relative device family as the implicit default,
+            # just an explicit paravirtualized model instead of
+            # QEMU's legacy PS/2 mouse (T34) — a guest without a
+            # virtio driver (DOS included) should stay on "mouse".
+            args += ["-device", "virtio-mouse-pci,id=pointer0"]
         args += settings_args(
             (state.get("backend-settings") or {}).get(self.name))
         planes = state.get("control-planes") or ["agentless-display"]
@@ -1590,7 +1596,7 @@ def drive_args(drives):
 def share_args(shares, drives):
     """Build QEMU arguments from a machine's resolved shares.
 
-    Two models render: ``vvfat`` (F68) and ``9p`` (F69). ``virtio-fs``
+    Two models render: ``vvfat`` (F68) and ``9pfs`` (F69). ``virtio-fs``
     does not yet, and the capability report never claims it, so
     ``unmet()`` has already refused it at assignment and it never
     reaches here — an unrenderable model arriving anyway is a bug in
@@ -1600,7 +1606,7 @@ def share_args(shares, drives):
     The two models produce different *shapes* of argument, which is
     why the IDE index is counted here rather than by position in the
     sorted list: a ``vvfat`` share is a synthesized disk and takes the
-    next index on the bus, while a ``9p`` share is not a disk at all
+    next index on the bus, while a ``9pfs`` share is not a disk at all
     and takes none.
     """
     args = []
@@ -1610,7 +1616,7 @@ def share_args(shares, drives):
         if model == "vvfat":
             args += _vvfat_share_args(key, share, index)
             index += 1
-        elif model == "9p":
+        elif model == "9pfs":
             args += _9p_share_args(key, share)
         else:
             raise InternalError(
@@ -1640,7 +1646,7 @@ def _vvfat_share_args(key, share, index):
 
 
 def _9p_share_args(key, share):
-    """One ``9p`` share: an in-process virtio-9p server over the directory.
+    """One ``9pfs`` share: an in-process virtio-9p server over the directory.
 
     Two arguments, addressed by the slot's own key the same way a NIC
     already is — ``-fsdev`` describes the host side, ``-device``

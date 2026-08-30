@@ -760,11 +760,11 @@ configuration.
 
 The NIC chipset (D122). Valid on either attachment:
 
-| value    | chipset                                    | backends |
-|----------|----------------------------------------------|----------|
-| `pcnet`  | AMD Am79C970A ("PCnet-II")                  | QEMU, VirtualBox |
-| `ne2k`   | Novell/Eagle NE2000 (QEMU: `ne2k_isa`)       | QEMU only |
-| `virtio` | paravirtualized NIC (QEMU: `virtio-net-pci`) | QEMU only |
+| value        | chipset                                      | backends |
+|--------------|-----------------------------------------------|----------|
+| `pcnet`      | AMD Am79C970A ("PCnet-II")                   | QEMU, VirtualBox |
+| `ne2k`       | Novell/Eagle NE2000 (QEMU: `ne2k_isa`)       | QEMU only |
+| `virtio-net` | paravirtualized NIC (QEMU: `virtio-net-pci`) | QEMU only |
 
 ```json
 {"devices": {"net0": {"attachment": "nat", "model": "ne2k"}}}
@@ -777,7 +777,7 @@ actually emulate, the same reasoning that makes `ide` the universal
 needs (a packet driver or network stack that only ships an NE2000
 driver, for instance) is exactly the case `model` exists for.
 Checked against the assigned backend the same way `controller` is:
-`ne2k` and `virtio` are real hardware, just not hardware VirtualBox
+`ne2k` and `virtio-net` are real hardware, just not hardware VirtualBox
 emulates, so declaring either on a machine assigned to any other
 backend is a capability error naming both, the same test
 `controller`'s `nvme`/`virtio` already pass — the bar is whether the
@@ -837,7 +837,7 @@ admits the anonymous blank: an inline share medium still needs a
 ```
 
 ```json
-{"devices": {"share0": {"location": "D:/exchange", "model": "9p"}}}
+{"devices": {"share0": {"location": "D:/exchange", "model": "9pfs"}}}
 ```
 
 There's no `null` form: an empty removable drive is real hardware
@@ -862,24 +862,24 @@ The live mechanism, overriding the assigned backend's own default
 | value        | mechanism                                    | backends |
 |--------------|-----------------------------------------------|----------|
 | `vvfat`      | a FAT volume synthesized over the directory — no guest driver, no build option, needs nothing extra | QEMU |
-| `9p`         | virtio-9p, a live filesystem protocol          | QEMU, where the binary was built with fsdev support |
+| `9pfs`       | virtio-9p, a live filesystem protocol          | QEMU, where the binary was built with fsdev support |
 | `virtio-fs`  | virtio-fs, a live filesystem protocol backed by `virtiofsd` | QEMU (not built yet) |
 
 `vvfat`'s trade: the guest's view is assembled when the machine
 starts, host edits made while it runs are invisible, and guest writes
 surface on the host once the machine stops — but it needs nothing in
 the guest at all, which is exactly why it's the one mechanism that
-works everywhere. `9p` and `virtio-fs` are both genuinely live in
+works everywhere. `9pfs` and `virtio-fs` are both genuinely live in
 both directions, at the cost of a guest driver (the virtio-dos
 project ships one for each — `VIO9P` and `VIOFS`; loading it in the
 guest is your job, the same way a packet driver is). `virtio-fs`
 doesn't render yet (F70), so naming it fails closed with a capability
-error, the same way naming `virtio` on VirtualBox does.
+error, the same way naming `virtio-net` on VirtualBox does.
 
-**`9p` also depends on how your QEMU was built.** fsdev support is a
+**`9pfs` also depends on how your QEMU was built.** fsdev support is a
 compile-time option, and the official Windows binaries are built
 without it. Reliquary asks your QEMU rather than assuming: if the
-binary has no virtio-9p device, a `9p` share is refused by name at
+binary has no virtio-9p device, a `9pfs` share is refused by name at
 assignment, exactly like any other capability it can't provide. So
 the same blueprint can work on one host and fail closed on another,
 and the error says which capability was missing.
@@ -888,7 +888,7 @@ and the error says which capability was missing.
 mechanism — never silently `vvfat`.** An author who declares a share
 and says nothing gets the field's full live contract, or a capability
 error naming what's missing; `vvfat`'s snapshot trade only ever
-arrives by writing the word. On QEMU that default is `9p`, so an
+arrives by writing the word. On QEMU that default is `9pfs`, so an
 unstated-model share needs an fsdev-capable QEMU; on a stock one it
 is refused rather than quietly downgraded to the snapshot model.
 VirtualBox has no mechanism of its own yet (F71), so it can serve no
@@ -1236,7 +1236,7 @@ when it asks for:
 - a NIC model the backend can't provide (`ne2k` on any backend but
   QEMU);
 - a share `model` the backend can't render, or an unstated share on
-  a backend with no live default (`9p` on a QEMU built without fsdev
+  a backend with no live default (`9pfs` on a QEMU built without fsdev
   support; any share at all on VirtualBox, until F71);
 - a boot order the backend can't honor;
 - a `backend-settings` key the assigned backend doesn't define, or

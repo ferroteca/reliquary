@@ -648,7 +648,7 @@ def test_a_share_model_is_optional():
 def test_every_share_model_is_accepted_by_the_parser():
     # The parser accepts the whole vocabulary (D122); whether a given
     # model actually renders is a capability question, judged later.
-    for model in ("vvfat", "9p", "virtio-fs"):
+    for model in ("vvfat", "9pfs", "virtio-fs"):
         machine = _machine_with_shares(
             {"share0": {"media": "hostdir", "model": model}})
         assert machine.shares["share0"].model == model
@@ -682,19 +682,19 @@ def test_an_inline_share_composes_with_model():
     # enabled are pulled off first, so they compose with an inline
     # media spec instead of forcing a promotion to a named media.
     machine = _machine_with_shares(
-        {"share0": {"location": "./hostdir", "model": "9p"}})
+        {"share0": {"location": "./hostdir", "model": "9pfs"}})
     share0 = machine.shares["share0"]
-    assert share0.model == "9p"
+    assert share0.model == "9pfs"
     assert share0.inline is not None
     assert share0.inline.location[0].local == "./hostdir"
 
 
 def test_an_inline_share_composes_with_model_and_enabled():
     machine = _machine_with_shares(
-        {"share0": {"location": "./hostdir", "model": "9p",
+        {"share0": {"location": "./hostdir", "model": "9pfs",
                     "enabled": False}})
     share0 = machine.shares["share0"]
-    assert (share0.model, share0.enabled) == ("9p", False)
+    assert (share0.model, share0.enabled) == ("9pfs", False)
     assert share0.inline is not None
     assert share0.inline.location[0].local == "./hostdir"
 
@@ -703,10 +703,10 @@ def test_a_named_share_still_composes_with_model_and_enabled():
     # {media, model, enabled} kept working unchanged (F72 is a strict
     # widening of the inline form, not a redefinition of this one).
     machine = _machine_with_shares(
-        {"share0": {"media": "hostdir", "model": "9p", "enabled": False}})
+        {"share0": {"media": "hostdir", "model": "9pfs", "enabled": False}})
     share0 = machine.shares["share0"]
     assert (share0.media, share0.model, share0.enabled) == \
-        ("hostdir", "9p", False)
+        ("hostdir", "9pfs", False)
 
 
 def test_a_share_path_key_is_still_refused():
@@ -715,7 +715,7 @@ def test_a_share_path_key_is_still_refused():
     # the only one.
     with pytest.raises(StaticError) as caught:
         _machine_with_shares(
-            {"share0": {"path": "./hostdir", "model": "9p"}})
+            {"share0": {"path": "./hostdir", "model": "9pfs"}})
     assert caught.value.rule_id == "field.unknown"
 
 

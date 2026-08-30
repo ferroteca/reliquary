@@ -23,7 +23,7 @@ timeout     2m
 # done once, before start.
 #
 # That share must name `model: vvfat`. Since F69 a share with no
-# stated model is served over 9p, which DOS gives no drive letter at
+# stated model is served over 9pfs, which DOS gives no drive letter at
 # all until `VIO9P` is loaded in the guest — and this script stages
 # nothing in the guest by design, so there is nothing here to load
 # it. `vvfat` is the model that needs no guest driver, which is what

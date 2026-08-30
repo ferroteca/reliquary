@@ -105,7 +105,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   then never settled, the same distinction `exec` already reports.
 - **A share can now name its host path and its live `model` in the
   same object** (F72). `{"share0": {"location": "D:/exchange",
-  "model": "9p"}}` used to fail with `unknown media field:
+  "model": "9pfs"}}` used to fail with `unknown media field:
   devices.share0.model`, because the parser picked between a
   share-attribute object and an inline media spec by the whole
   object's shape: adding `model` to an object that also carried
@@ -360,7 +360,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   runs; until now the only mechanism behind it was `model: vvfat`,
   QEMU's synthesized FAT volume, which takes a snapshot of the
   directory when the machine starts — so a change on either side only
-  became visible across a stop/start. A `9p` share is live in both
+  became visible across a stop/start. A `9pfs` share is live in both
   directions instead, at the cost of a 9P driver loaded in the guest
   (virtio-dos ships `VIO9P` for DOS; loading it is the user's job, the
   same as a packet driver). It renders as `-fsdev local` plus a
@@ -376,7 +376,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   claiming 9p on the strength of its own code would be promising
   something a given install cannot deliver. The adapter asks the
   binary — one `-device help`, looking for `virtio-9p-pci` — and
-  reports what it found. On a QEMU without it, a `9p` share and an
+  reports what it found. On a QEMU without it, a `9pfs` share and an
   unstated-model share are both refused by name at assignment, naming
   the missing capability, the same way any other capability failure
   reads; `model: vvfat` is unaffected, since vvfat is in every build.
@@ -387,11 +387,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   backend discovery already did.
 - **A share's `read-only` media flag is now honored.** It maps onto
   each mechanism's own option — QEMU's `fat:` prefix without `rw:`
-  for a `vvfat` share, `readonly=on` for a `9p` one — so a share
+  for a `vvfat` share, `readonly=on` for a `9pfs` one — so a share
   declared read-only protects the host directory from the guest
   instead of being silently ignored. The flag is recorded on the
   machine's resolved share entry, since a backend renders from that
   and never sees the media.
+- **A machine can now declare `pointing-device: virtio-mouse`** (T34).
+  Omitted or `mouse`, a machine still gets QEMU's implicit legacy PS/2
+  mouse, unchanged. `virtio-mouse` is the same relative device family,
+  rendered explicitly instead — `-device virtio-mouse-pci,id=pointer0`
+  on QEMU — for a guest that carries a virtio driver; a guest without
+  one, DOS included, should stay on the implicit `mouse`. `click`
+  still refuses any pointing device but `tablet` (`machine.pointing-
+  device-not-tablet`), unchanged.
 
 ### Fixed
 

@@ -102,7 +102,7 @@ class Capabilities:
     #: or ``bridged``, the blueprint's own terms. Defaults to empty.
     network_attachments: Tuple[str, ...] = ()
     #: The share models this backend can render when a share names one
-    #: explicitly (F68): ``vvfat``, ``9p``, or ``virtio-fs``. Defaults
+    #: explicitly (F68): ``vvfat``, ``9pfs``, or ``virtio-fs``. Defaults
     #: to empty, the same way ``controllers`` does.
     #:
     #: These two fields are the first here whose value can depend on

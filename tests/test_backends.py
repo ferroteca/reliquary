@@ -106,8 +106,8 @@ def test_no_declared_network_asks_nothing():
 def test_a_share_model_the_backend_lacks_is_named():
     report = Capabilities(backend="hyperv", share_models=("vvfat",))
     adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
-    assert adapter.unmet(_requirements(share_models=("9p",))) == (
-        "share model '9p'",)
+    assert adapter.unmet(_requirements(share_models=("9pfs",))) == (
+        "share model '9pfs'",)
 
 
 def test_an_unstated_share_needs_a_live_default():
@@ -122,7 +122,7 @@ def test_an_unstated_share_needs_a_live_default():
 
 
 def test_an_unstated_share_is_satisfied_by_a_live_default():
-    report = Capabilities(backend="hyperv", share_default="9p")
+    report = Capabilities(backend="hyperv", share_default="9pfs")
     adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
     assert adapter.unmet(_requirements(share_unstated=True)) == ()
 
