@@ -11,7 +11,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > is pledged, and this document adds no new blueprint vocabulary**:
 > every item below either puts off adding a field or refuses to add
 > one at all. If a field does get added later, it still has to go
-> through the surface-change rule ([../SURFACES.md](../SURFACES.md))
+> through the surface-change rule ([../../SURFACES.md](../../SURFACES.md))
 > at that later point. The decisions made here, and the alternatives
 > rejected along the way, are written down in place — the same way
 > the other F5 design documents record theirs.
