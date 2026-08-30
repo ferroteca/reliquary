@@ -146,35 +146,6 @@ its own. A group with nothing in it isn't shown at all — an empty
 heading would just be a record of finished work, and this file
 doesn't keep those.
 
-### Specifications
-
-- **T33 — The share grammar and its spec disagree about inline
-  media.** `document._share_device` accepts a full media written in
-  place on a share slot — deliberately, with a comment saying so and
-  a share-specific rule that an inline media there may not be
-  anonymous. The normative model does not admit that form:
-  [blueprint-model.md](../docs/spec/blueprint-model.md) lists four
-  value forms for a drive, inline media among them, and only two for
-  a share — a media name, or an object carrying `media` plus
-  optional `model` and `enabled`.
-  [blueprint-reference.md](../docs/blueprint-reference.md) goes
-  further and calls `media` **required**, and AGENTS.md repeats the
-  two-form claim. So the shortest share an author can actually write
-  today — `{"share0": {"location": "D:/exchange"}}`, which works —
-  is undefined against the project's own norm, and the documentation
-  gives no way to discover it.
-  Decide which side is right and make them agree. The code looks
-  like the intended one: the branch carries a comment saying what it
-  is for, and a carve-out written for shares specifically, neither
-  of which is what an accident leaves behind. If that is the answer,
-  amend blueprint-model.md, blueprint-reference.md and AGENTS.md to
-  admit the form; if it is not, take the branch out of
-  `_share_device`. Either way the three documents and the code stop
-  disagreeing.
-  Settle this before **F72**
-  ([proposed/FEATURES.md](proposed/FEATURES.md)), which proposes
-  changing that same dispatch and assumes the form stays.
-
 ### Backends
 
 - **T32 — Detect a usable bridge interface for QEMU's `bridged`

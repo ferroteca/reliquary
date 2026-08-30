@@ -810,8 +810,15 @@ is named by its full slot key.
 
 #### Values
 
-A share entry is either a bare media name, or an object carrying
-`media` plus optional `model` and `enabled`:
+A share entry is a bare media name, an object carrying `media` plus
+optional `model` and `enabled`, or an inline media spec — a full
+[media component](spec/media-spec.md) written in place of the value,
+distinguished from the `media`-object form by carrying at least one
+field a share-attribute object doesn't recognize (`location`,
+`materialize`, `name`, and so on). Unlike a drive's inline form, a
+share's never admits the anonymous blank: an inline share medium
+still needs a `location` (or an equivalent source) to resolve to a
+named directory.
 
 ```json
 {"devices": {"share0": "exchange-dir"}}
@@ -821,17 +828,23 @@ A share entry is either a bare media name, or an object carrying
 {"devices": {"share0": {"media": "exchange-dir", "model": "vvfat"}}}
 ```
 
+```json
+{"devices": {"share0": {"location": "D:/exchange"}}}
+```
+
 There's no `null` form: an empty removable drive is real hardware
 waiting for a medium, but a share with no directory means nothing.
 
-##### `media` — required · string
+##### `media` — required on the named forms · string
 
 The name of a [media component](spec/media-spec.md) whose payload
 resolves to a host **directory**. Its `materialize` must be `use` —
 a share always presents the directory in place, never as a
 per-machine image — and a media that resolves to a *file* instead
 fails closed naming the path: a share is the one device kind a
-directory payload is legal on, and it always is one.
+directory payload is legal on, and it always is one. The inline form
+carries no separate `media` key — the value *is* the media spec, and
+the same directory/`use` rules apply to what it resolves to.
 
 ##### `model` — optional · string
 

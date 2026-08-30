@@ -83,8 +83,9 @@ workflow:
     `platform`, `backend`, `memory`, `cpus`, `devices` (drives, NICs, and shares sharing one slot-keyed map, D121: a
     drive value is a media name, `null`, `{media, controller, enabled}`, or an inline media definition, including an
     anonymous blank one; a NIC value is an attachment name — `nat` or `bridged` — or `{attachment, interface,
-    model}`, D120/D122 — `model` overrides the platform-resolved chipset; a share value is a media name or
-    `{media, model, enabled}` — no `null`, and no anonymous blank — where `model` is `vvfat`/`9p`/`virtio-fs`, F68),
+    model}`, D120/D122 — `model` overrides the platform-resolved chipset; a share value is a media name,
+    `{media, model, enabled}`, or an inline media definition — no `null`, and no anonymous blank, inline included —
+    where `model` is `vvfat`/`9p`/`virtio-fs`, F68),
     `boot`, `name` (the id-safe identity, not a display label), `description`, `scripts`, `control-planes`,
     `pointing-device` (F66), `backend-settings`, and `parameters`.
   - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,

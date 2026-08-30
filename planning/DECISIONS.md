@@ -124,6 +124,33 @@ pressure worth re-examining once the surrounding area firms up.
 
 ## Decided
 
+- D123 — A SHARE'S INLINE-MEDIA FORM IS THE INTENDED ONE; THE MODEL AND
+  ITS DOCS WERE THE DRIFT — DECIDED (owner, 2026-08-30) and delivered
+  the same day, striking T33. Supports U14, U21; extends F72's own
+  starting point.
+
+  `document._share_device` already accepted a full media written in
+  place on a share slot — deliberately: the branch carries a comment
+  saying what it's for, and a share-specific rule (no anonymous blank
+  there) that only makes sense if the form is intended, not an
+  accident. But blueprint-model.md counted two share value forms
+  where a drive gets four, blueprint-reference.md called `media`
+  unconditionally required, and AGENTS.md repeated the two-form
+  claim — so the shortest share an author could actually write,
+  `{"share0": {"location": "D:/exchange"}}`, was undefined against
+  the project's own norm.
+
+  **The code stays; the norm and its docs catch up.** A deliberate
+  carve-out with an explanatory comment is not what an accidental
+  branch looks like, and a share's inline form is exactly the shape a
+  drive's already is (U14, U21) — refusing it there would be an
+  arbitrary asymmetry, not a considered one. blueprint-model.md,
+  blueprint-reference.md, and AGENTS.md now all state three share
+  value forms — a media name, `{media, model, enabled}`, or an inline
+  media spec — with the inline form still refusing the anonymous
+  blank a drive's inline form permits: a share with no directory
+  means nothing, named or not.
+
 - D122 — A `net` DEVICE MAY NAME ITS CHIPSET EXPLICITLY (`model`),
   OVERRIDING THE PLATFORM DEFAULT, CHECKED PER BACKEND THE SAME WAY
   `controller`'S `nvme`/`virtio` ALREADY ARE — DECIDED (owner,

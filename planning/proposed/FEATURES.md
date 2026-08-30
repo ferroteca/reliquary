@@ -1505,12 +1505,13 @@ design round starts with a head start:
 > **Entered 2026-08-30** by the owner, from using F69's `9p` model
 > the day it landed. Serves **U14** and **U20** through F68's share
 > device; the complaint is about that device's authoring surface,
-> not about any mechanism underneath it. References **T33**
-> ([TASKS.md](../TASKS.md)), which must settle first: this proposal
-> assumes an inline media stays legal on a share slot, and T33 is
-> where that gets decided. Related to **F15**, which asks for a
-> *command* that attaches a host directory; this asks for a shorter
-> way to *write* one in a blueprint. Neither replaces the other.
+> not about any mechanism underneath it. This proposal assumes an
+> inline media stays legal on a share slot — settled by **D123**
+> ([DECISIONS.md](../DECISIONS.md)), which struck T33 in favor of
+> keeping the form and catching the docs up to it. Related to **F15**,
+> which asks for a *command* that attaches a host directory; this asks
+> for a shorter way to *write* one in a blueprint. Neither replaces
+> the other.
 
 **When you declare a share, two facts usually matter — the host
 directory, and the model — and today they cannot be written in the

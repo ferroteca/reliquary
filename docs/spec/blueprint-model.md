@@ -192,11 +192,15 @@ cannot carry.
   second one authorable only when it actually matters, defaulting
   otherwise.
 - **`share` keys** (F68) name a host directory presented to the
-  guest for file exchange, for as long as the machine runs: either a
+  guest for file exchange, for as long as the machine runs: a
   media name (string) — the catalog reference to a directory-payload
-  media — or an object carrying `media` plus optional `model` and
-  `enabled`. No `null` form: an empty drive bay is real hardware, but
-  a share with no directory means nothing. The referenced media's
+  media — an object carrying `media` plus optional `model` and
+  `enabled`, or an inline media spec — a full media written in place,
+  the same shape a drive accepts, except a share never admits the
+  anonymous blank: an inline share medium must still resolve to a
+  named, materializable directory. No `null` form either way: an
+  empty drive bay is real hardware, but a share with no directory
+  means nothing. The referenced media's
   `materialize` must be `use` — a share presents the directory in
   place, never as a per-machine image — and it must resolve to a
   directory: a share whose media resolves to a file fails closed
