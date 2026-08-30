@@ -812,13 +812,17 @@ is named by its full slot key.
 
 A share entry is a bare media name, an object carrying `media` plus
 optional `model` and `enabled`, or an inline media spec — a full
-[media component](spec/media-spec.md) written in place of the value,
-distinguished from the `media`-object form by carrying at least one
-field a share-attribute object doesn't recognize (`location`,
-`materialize`, `name`, and so on). Unlike a drive's inline form, a
-share's never admits the anonymous blank: an inline share medium
-still needs a `location` (or an equivalent source) to resolve to a
-named directory.
+[media component](spec/media-spec.md) written in place of the value.
+`model` and `enabled` are share attributes, read off the object
+first; whatever's left decides whether the rest is a `media`
+reference or an inline spec (a bare `media` key means the former,
+anything else — `location`, `materialize`, `name`, and so on — means
+the latter). Because they're read off first, `model` and `enabled`
+compose with either form (F72): a share can name its path and its
+model in the same object, without promoting the media to its own
+top-level component. Unlike a drive's inline form, a share's never
+admits the anonymous blank: an inline share medium still needs a
+`location` (or an equivalent source) to resolve to a named directory.
 
 ```json
 {"devices": {"share0": "exchange-dir"}}
@@ -830,6 +834,10 @@ named directory.
 
 ```json
 {"devices": {"share0": {"location": "D:/exchange"}}}
+```
+
+```json
+{"devices": {"share0": {"location": "D:/exchange", "model": "9p"}}}
 ```
 
 There's no `null` form: an empty removable drive is real hardware

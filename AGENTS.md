@@ -84,8 +84,8 @@ workflow:
     drive value is a media name, `null`, `{media, controller, enabled}`, or an inline media definition, including an
     anonymous blank one; a NIC value is an attachment name — `nat` or `bridged` — or `{attachment, interface,
     model}`, D120/D122 — `model` overrides the platform-resolved chipset; a share value is a media name,
-    `{media, model, enabled}`, or an inline media definition — no `null`, and no anonymous blank, inline included —
-    where `model` is `vvfat`/`9p`/`virtio-fs`, F68),
+    `{media, model, enabled}`, or an inline media definition carrying its own `model`/`enabled` too (F72) — no
+    `null`, and no anonymous blank, inline included — where `model` is `vvfat`/`9p`/`virtio-fs`, F68),
     `boot`, `name` (the id-safe identity, not a display label), `description`, `scripts`, `control-planes`,
     `pointing-device` (F66), `backend-settings`, and `parameters`.
   - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,

@@ -103,6 +103,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and only polls frequently once a prompt is actually on screen. If
   it times out, the error message says whether it saw a prompt that
   then never settled, the same distinction `exec` already reports.
+- **A share can now name its host path and its live `model` in the
+  same object** (F72). `{"share0": {"location": "D:/exchange",
+  "model": "9p"}}` used to fail with `unknown media field:
+  devices.share0.model`, because the parser picked between a
+  share-attribute object and an inline media spec by the whole
+  object's shape: adding `model` to an object that also carried
+  `location` flipped it into the inline branch, where `model` isn't a
+  recognized field, so the only way to name a model was to promote the
+  media to its own top-level component first. `model` and `enabled`
+  are now read off the object before that choice is made, since
+  they're share attributes either way, and everything left over is
+  handed to the same media-parsing path a `{media, model, enabled}`
+  reference or an inline spec already went through. `{media, model,
+  enabled}` keeps parsing exactly as before — this is a strict
+  widening, not a redefinition.
 
 ### Added
 

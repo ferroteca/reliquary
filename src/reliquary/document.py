@@ -1071,7 +1071,6 @@ _MACHINE_FIELDS = {
 _STATE_ONLY = {"id", "backend-id", "blueprint-digest", "blueprint-source"}
 _DRIVE_FIELDS = {"media", "controller", "enabled"}
 _NETWORK_FIELDS = {"attachment", "interface", "model"}
-_SHARE_FIELDS = {"media", "model", "enabled"}
 
 
 def _device_key(value, where):
@@ -1202,28 +1201,34 @@ def _share_device(value, key, slot, register, where):
         raise where.error(
             f"devices.{key} must be a media name, an object naming a "
             "media, or an inline media", rule_id="value.not-a-share")
-    if set(value) - _SHARE_FIELDS:
-        # Fields beyond _SHARE_FIELDS mean this isn't a share-attribute
-        # object — it's an inline media spec instead, the same dispatch
-        # _drive() uses. No anonymous blank here: a share always names a
-        # directory, never a content-free blank.
-        inline = _media(value, register, where=where, allow_anonymous=False)
-        return MachineShare(key=key, slot=slot, media=inline.name,
-                            inline=inline)
-    if "media" not in value:
-        raise where.error(f"devices.{key} must name a media",
-            rule_id="share.without-media")
+    # model and enabled are share attributes, always — pull them off
+    # before deciding what the rest of the object means (F72), so a
+    # share's model composes with either a media name or an inline
+    # media spec, instead of the whole object's shape picking the
+    # branch.
     model = (_text(value["model"],
                    where.at(value, "model", f"devices.{key}.model"),
                    closed=True, allowed=_SHARE_MODELS)
             if "model" in value else None)
-    return MachineShare(
-        key=key, slot=slot,
-        media=_media_name(value["media"],
-                          where.at(value, "media", f"devices.{key}.media")),
-        model=model,
-        enabled=_flag(value.get("enabled", True),
-                      where.at(value, "enabled", f"devices.{key}.enabled")))
+    enabled = _flag(value.get("enabled", True),
+                    where.at(value, "enabled", f"devices.{key}.enabled"))
+    remainder = {field: field_value for field, field_value in value.items()
+                if field not in ("model", "enabled")}
+    if set(remainder) == {"media"}:
+        return MachineShare(
+            key=key, slot=slot,
+            media=_media_name(remainder["media"],
+                              where.at(value, "media", f"devices.{key}.media")),
+            model=model, enabled=enabled)
+    if not remainder:
+        raise where.error(f"devices.{key} must name a media",
+            rule_id="share.without-media")
+    # Everything else is an inline media spec, the same dispatch
+    # _drive() uses. No anonymous blank here: a share always names a
+    # directory, never a content-free blank.
+    inline = _media(remainder, register, where=where, allow_anonymous=False)
+    return MachineShare(key=key, slot=slot, media=inline.name, inline=inline,
+                        model=model, enabled=enabled)
 
 
 def _devices(value, register, where):

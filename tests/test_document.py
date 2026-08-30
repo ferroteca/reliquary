@@ -668,13 +668,55 @@ def test_a_share_may_disable_itself():
 
 
 def test_a_share_object_with_unknown_keys_is_treated_as_inline_media():
-    # Mirrors _drive()'s dispatch: fields outside _SHARE_FIELDS mean
-    # this is an inline media spec, not a share-attribute object.
+    # Mirrors _drive()'s dispatch: fields beyond model/enabled mean
+    # this is an inline media spec, not a bare media reference.
     machine = _machine_with_shares(
         {"share0": {"location": "./hostdir"}})
     share0 = machine.shares["share0"]
     assert share0.inline is not None
     assert share0.inline.location[0].local == "./hostdir"
+
+
+def test_an_inline_share_composes_with_model():
+    # F72: a share's path and its model in one object — model and
+    # enabled are pulled off first, so they compose with an inline
+    # media spec instead of forcing a promotion to a named media.
+    machine = _machine_with_shares(
+        {"share0": {"location": "./hostdir", "model": "9p"}})
+    share0 = machine.shares["share0"]
+    assert share0.model == "9p"
+    assert share0.inline is not None
+    assert share0.inline.location[0].local == "./hostdir"
+
+
+def test_an_inline_share_composes_with_model_and_enabled():
+    machine = _machine_with_shares(
+        {"share0": {"location": "./hostdir", "model": "9p",
+                    "enabled": False}})
+    share0 = machine.shares["share0"]
+    assert (share0.model, share0.enabled) == ("9p", False)
+    assert share0.inline is not None
+    assert share0.inline.location[0].local == "./hostdir"
+
+
+def test_a_named_share_still_composes_with_model_and_enabled():
+    # {media, model, enabled} kept working unchanged (F72 is a strict
+    # widening of the inline form, not a redefinition of this one).
+    machine = _machine_with_shares(
+        {"share0": {"media": "hostdir", "model": "9p", "enabled": False}})
+    share0 = machine.shares["share0"]
+    assert (share0.media, share0.model, share0.enabled) == \
+        ("hostdir", "9p", False)
+
+
+def test_a_share_path_key_is_still_refused():
+    # DECLINED in F72: a `path` key next to model would work, but adds
+    # a second spelling for where a payload comes from. `location` is
+    # the only one.
+    with pytest.raises(StaticError) as caught:
+        _machine_with_shares(
+            {"share0": {"path": "./hostdir", "model": "9p"}})
+    assert caught.value.rule_id == "field.unknown"
 
 
 def test_a_share_object_without_media_is_refused():

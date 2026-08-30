@@ -198,7 +198,11 @@ cannot carry.
   `enabled`, or an inline media spec — a full media written in place,
   the same shape a drive accepts, except a share never admits the
   anonymous blank: an inline share medium must still resolve to a
-  named, materializable directory. No `null` form either way: an
+  named, materializable directory. `model` and `enabled` are share
+  attributes, pulled off the object before the rest of it is read as
+  a media reference or an inline spec, so both compose with either
+  form — `{"location": "D:/exchange", "model": "9p"}` names a path
+  and a model in the one object (F72). No `null` form either way: an
   empty drive bay is real hardware, but a share with no directory
   means nothing. The referenced media's
   `materialize` must be `use` — a share presents the directory in
