@@ -1038,7 +1038,7 @@ relevant lesson: *renaming something is free before v1 and never
 free after*. Right now, this change costs almost nothing —
 **no shipped script uses a reactive phase yet**, `always` currently
 appears only in
-[03-timing-spellings-and-scope](design/../design/script-examples/),
+[03-timing-spellings-and-scope](../design/script-examples/),
 and there's no backward compatibility to preserve before 1.0 (P9).
 After 1.0 ships, that option disappears. That asymmetry is the
 argument for settling this now, rather than waiting until someone

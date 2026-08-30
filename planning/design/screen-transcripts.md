@@ -8,7 +8,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > **Status:** this is delivered design doctrine — F42 built the
 > capture and F43 built the fixture corpus on top of it, and once a
 > feature is delivered there's no more "pledged" feature for its
-> design document to sit next to ([README.md](README.md)). It stays
+> design document to sit next to ([README.md](../README.md)). It stays
 > under `planning/` instead of moving to `docs/spec/` because the
 > transcript format is internal by decision (**D98**), the same route
 > `backend-adapter.md` took. It exists because of **P22**: the test

@@ -9,7 +9,7 @@ SPDX-License-Identifier: GPL-3.0-only
 > here is pledged, and this document adds no vocabulary by itself**:
 > `reliquary.properties` becomes real only when a feature entry citing
 > this document goes through the surface-change rule
-> ([../SURFACES.md](../SURFACES.md)).
+> ([SURFACES.md](../../SURFACES.md)).
 
 ## The need
 

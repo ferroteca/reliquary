@@ -362,7 +362,7 @@ stable formatting, and precise error messages. The script language
 remains a separate, line-oriented format for describing behavior.
 Reliquary publishes one composed-blueprint JSON Schema, versioned
 and packaged as
-[blueprint-schema-v1.json](../../Reliquary/schemas/blueprint-schema-v1.json),
+[blueprint-schema-v1.json](../../src/reliquary/schemas/blueprint-schema-v1.json),
 so editors can use it today. That schema is kept in sync with the
 prose specs, which remain the normative source of truth; Reliquary's
 own validation logic is the parser's, and a shared corpus of valid
