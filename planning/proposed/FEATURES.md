@@ -1499,3 +1499,71 @@ design round starts with a head start:
   public surface (P23) — never by quietly showing up unannounced the
   way `set_machine_var` originally did.
 
+
+## F72 — A share's path and its model in one place
+
+> **Entered 2026-08-30** by the owner, from using F69's `9p` model
+> the day it landed. Serves **U14** and **U20** through F68's share
+> device; the complaint is about that device's authoring surface,
+> not about any mechanism underneath it. References **T33**
+> ([TASKS.md](../TASKS.md)), which must settle first: this proposal
+> assumes an inline media stays legal on a share slot, and T33 is
+> where that gets decided. Related to **F15**, which asks for a
+> *command* that attaches a host directory; this asks for a shorter
+> way to *write* one in a blueprint. Neither replaces the other.
+
+**When you declare a share, two facts usually matter — the host
+directory, and the model — and today they cannot be written in the
+same object.** This is a parse error:
+
+```json
+{"devices": {"share0": {"location": "D:/exchange", "model": "9p"}}}
+```
+
+```
+error: unknown media field: devices.share0.model (field.unknown)
+```
+
+The cause is how `document._share_device` decides what kind of
+object it is looking at. If the object's keys all fall inside
+`{media, model, enabled}` it is a share-attribute object; otherwise
+the whole object is re-read as an inline media spec, where `model`
+is not a field. So `location` and `model` select different branches,
+and adding the second one changes the meaning of the first.
+`enabled` has the same problem for the same reason.
+
+The consequence is that the compact form only works for a share
+that accepts every default. The moment an author names a model, the
+media has to be promoted to its own top-level component and the
+device entry rewritten to point at it by name — one fact becomes two
+components. That is the wrong direction: naming the model is the
+*more* considered choice, and it costs more to write.
+
+The shape of a fix, if this is pledged: **stop deciding the branch
+by the whole object's shape.** Take `model` and `enabled` off the
+object first, as share attributes that are always share attributes,
+and hand every remaining key to the media parser. Then
+`{location, model}` works, `{media, model}` keeps working unchanged,
+and nothing that parses today changes meaning — a strict widening
+rather than a redefinition. Media has no `model` field of its own,
+so nothing collides.
+
+DECLINED, and why:
+
+- **A bare host path as the share's value** —
+  `{"share0": "D:/exchange"}`. This is what an author reaches for
+  first, and it is the shape least likely to work. A bare string in
+  `devices` is a media name in every other slot, so this would make
+  one string mean two different things depending on which slot it
+  sits in, and telling them apart would be a rule about the shape of
+  the text — does it contain a separator, is it absolute — rather
+  than about anything the author declared. A media named `dist` and
+  a directory named `dist` are both ordinary.
+- **A `path` key on the share-attribute object** —
+  `{"path": …, "model": …}`. This works and reads well. What it
+  costs is a second way to say where a payload comes from, sitting
+  next to `location`, which is the media model's only spelling for
+  that fact today. The same objection killed a second spelling
+  inside `backend-settings.qemu` (`backend_qemu.SETTINGS_KEYS`), and
+  it would land harder here, because this is the device grammar
+  rather than an escape hatch.
