@@ -58,7 +58,7 @@ always wins, and no number is ever reissued.
 - **The next S-number to issue is S9** — used for application
   surfaces, listed in root [ARCHITECTURE.md](../ARCHITECTURE.md)
   under "The application surfaces."
-- **The next T-number to issue is T34** — used for tasks, entered
+- **The next T-number to issue is T35** — used for tasks, entered
   into [TASKS.md](TASKS.md); entering a task is the same act as
   pledging it (D43). This sequence started counting from T8, not
   T0, because T0 through T7 were already used by an earlier

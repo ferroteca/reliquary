@@ -161,3 +161,24 @@ doesn't keep those.
   and VMware aren't affected: both already pick a sensible default
   bridge target on their own when `interface` is omitted.
 
+- **T34 — Add `pointing-device: virtio-mouse`, and rename two other
+  device-model values for the same explicit-technology naming (owner,
+  2026-08-30).** `pointing-device` (F66) gains a third value alongside
+  `tablet`/`mouse`: `virtio-mouse`, capability-checked the same way
+  the other two are, rendering as `-device virtio-mouse-pci,id=pointer0`
+  on QEMU. It is the same relative device family as the implicit
+  default `mouse` — `click` still refuses everything but `tablet` — just
+  an explicit paravirtualized model instead of QEMU's implicit legacy
+  PS/2 mouse; a guest with no virtio driver, DOS included, should stay
+  on `mouse`. Omitting the field, or naming `mouse`, is unchanged.
+
+  Alongside it, two already-pledged-but-unreleased device-model values
+  are renamed for the same reason `virtio-mouse` is spelled out rather
+  than bare `virtio` — a bare `virtio` already names the NIC model
+  (D122) — so every explicit device-technology value now names its
+  device kind, not just its transport: the share `model` value `9p`
+  (F69) becomes `9pfs`, and the NIC `model` value `virtio` (D122)
+  becomes `virtio-net`. Neither has shipped in a release yet, so this
+  is a rename before first use, not a compatibility break against any
+  released version — document.py, backend_qemu.py, both schemas, the
+  spec, and every test and doc mentioning either value move together.
