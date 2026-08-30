@@ -93,16 +93,18 @@ cheaper check available than the guest's own answer, since a share
 has no image file for a live insert or eject to check against ahead
 of time.
 
-**The script's hardcoded target drive letter is still unverified
-(F68).** Before this feature, a directory media attached directly to
+**The script writes to `D:` (F68), confirmed against a real boot.**
+Before this feature, a directory media attached directly to
 `floppy0`, which DOS always letters `A:` regardless of what else is
-attached — that's the assumption `freedos-dump-font.rlqs` was
-written against. A share renders disk-shaped, not floppy-shaped, so
-it no longer lands on `A:` by construction; what letter DOS actually
-assigns it (after `hdd0`/`cdrom0`, and whatever MSCDEX consumes) has
-not yet been confirmed against a real boot. The script's own header
-comment carries an `XXX(F68)` marker for this; treat this section the
-same way until that's resolved.
+attached — that was the old assumption. A share renders disk-shaped,
+not floppy-shaped, so it no longer lands on `A:`: DOS assigns fixed-
+disk letters to every BIOS-visible non-removable drive first, so on
+the codex blueprint's own shape (`hdd0` then the added `share0`) the
+share is `D:`, and only then does the CD-ROM driver claim its own
+letter (`E:`). A blueprint with more drives ahead of the share shifts
+its letter down accordingly, the same way adding a second physical
+hard disk would — this is ordinary DOS drive-lettering, not something
+particular to shares.
 
 The dumped bytes are just the raw cell bitmaps — declaring what
 they actually *mean* (the cell geometry, and the codepage the

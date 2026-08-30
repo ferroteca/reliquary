@@ -14,25 +14,25 @@ timeout     2m
 # call is made by typing a stub at its prompt rather than staging a
 # program (P2, P3): the stub runs once and goes with the machine.
 #
-# This script writes to A:\FONT.BIN — undeclared on the codex
+# This script writes to D:\FONT.BIN — undeclared on the codex
 # blueprint (P16, D108): a host directory is the author's own path,
-# so give the machine one before running this (docs/dos-automation.md).
-# No insert or eject appears here, because a directory-source drive
-# carries no image for a live swap to match sizes against
+# so give the machine a `share` before running this
+# (docs/dos-automation.md). No insert or eject appears here, because
+# a share carries no image for a live swap to match sizes against
 # (`machines._medium_size`), so attaching it is the blueprint's job,
 # done once, before start.
 #
-# XXX(F68): before this feature, a directory media could attach
-# directly to `floppy0`, which DOS always letters A: regardless of
-# whatever else the machine has — that's what A:\FONT.BIN above
-# assumed. F68 retires that: a directory payload is legal only on a
-# `share` slot now, which renders disk-shaped, not floppy-shaped, so
-# it no longer lands on A: by construction. What letter DOS actually
-# assigns a share's vvfat drive (after hdd0/cdrom0, MSCDEX's own
-# letter consumption included) has not been confirmed against a real
-# boot, so this stub's A:\ target is unverified and likely wrong.
-# Confirm the real letter and update both this script and U25 in
-# USE-CASES.md together.
+# D: (F68): a share renders disk-shaped, not floppy-shaped (unlike
+# the directory-on-floppy0 mechanism this replaced, which DOS always
+# lettered A: regardless of what else was attached). Confirmed
+# against a real boot of the codex freedos blueprint (hdd0, cdrom0)
+# plus one added share: DOS assigns fixed-disk letters to every
+# BIOS-visible non-removable drive before the CD-ROM redirector
+# claims its own — hdd0 is C:, the share is D:, and only then does
+# FDAUTO.BAT's CD-ROM driver take the next free letter, E:. This
+# holds for this exact shape (one hdd, one cdrom, one share); a
+# blueprint with more drives before the share shifts the letter down
+# accordingly, the same way adding a second physical hard disk would.
 start
 wait "C:\>"
 enter "DEBUG"
@@ -63,7 +63,7 @@ wait "Unexpected breakpoint interrupt"
 # BX:CX is the byte count DEBUG's `W` writes when the target file is
 # new — 0000:1000 (4096) — set explicitly rather than trusted from
 # whatever the registers already held.
-enter "N A:\FONT.BIN"
+enter "N D:\FONT.BIN"
 enter "R BX"
 enter "0"
 enter "R CX"
