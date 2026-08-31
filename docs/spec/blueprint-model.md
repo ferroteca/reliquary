@@ -268,28 +268,32 @@ cannot carry.
   by platform will arrive once a platform has planes that justify
   a different default.
 - **`pointer` keys** (F66, `virtual-mouse` added by T34, moved into
-  `devices` by D124, renamed by D126) name the pointer input device:
-  `pointer0` is the only legal key, and its value is `virtual-tablet`,
-  `emulated-mouse`, or `virtual-mouse`, judged the same way as
-  `control-planes`: capability-checked against the assigned backend
-  at materialization, failing closed naming both the backend and the
-  device. A generic name says which kind of device it is (D126):
-  `emulated-` mimics real legacy hardware, `virtual-` only exists
-  because it's useful inside a VM. The tablet is the one absolute
-  device — a PS/2 mouse and `virtual-mouse` both report relative
-  motion, and the guest's own driver applies acceleration the host
-  cannot observe (P10) — so `click` preflight-refuses any pointing
-  device but `virtual-tablet` by name, rather than attempting a
-  calibration guess. Omitted, it resolves to `emulated-mouse` — the
-  plain relative device every platform's machine has anyway, so the
-  default matches what's actually there rather than assuming
-  something better. `virtual-mouse` is the same relative device
-  family, rendered as an explicit paravirtualized device instead of
-  the platform's implicit legacy one; a blueprint names it only when
-  it wants that explicit rendering, since a guest with no virtio
-  driver — DOS included — should stay on the implicit
-  `emulated-mouse`. A GUI-era platform will get a richer default once
-  it has one to justify it, the same way `control-planes` will.
+  `devices` by D124, renamed by D126, split into
+  `emulated-tablet`/`virtual-tablet` by D127) name the pointer input
+  device: `pointer0` is the only legal key, and its value is
+  `virtual-tablet`, `emulated-tablet`, `emulated-mouse`, or
+  `virtual-mouse`, judged the same way as `control-planes`:
+  capability-checked against the assigned backend at materialization,
+  failing closed naming both the backend and the device. A generic
+  name says which kind of device it is (D126): `emulated-` mimics
+  real legacy hardware, `virtual-` only exists because it's useful
+  inside a VM. The tablets are the two absolute devices — a PS/2
+  mouse and `virtual-mouse` both report relative motion, and the
+  guest's own driver applies acceleration the host cannot observe
+  (P10) — so `click` preflight-refuses any pointing device but
+  `emulated-tablet` or `virtual-tablet` by name, rather than
+  attempting a calibration guess. Omitted, it resolves to
+  `emulated-mouse` — the plain relative device every platform's
+  machine has anyway, so the default matches what's actually there
+  rather than assuming something better. `virtual-mouse` and
+  `virtual-tablet` are the paravirtualized rendering of the relative
+  and absolute device families respectively; a blueprint names one
+  only when it wants that explicit rendering, since a guest with no
+  virtio driver — DOS and ReactOS included — should use the
+  `emulated-` variant instead: the implicit `emulated-mouse`, or an
+  explicit `emulated-tablet` where `click` needs an absolute device.
+  A GUI-era platform will get a richer default once it has one to
+  justify it, the same way `control-planes` will.
 - **`rng` keys** (D125, narrowing D91; renamed by D126) name a
   random-number generator device: `rng0` is the only legal key, and
   its value is a portable device name — today, only `virtual-rng` —

@@ -164,10 +164,11 @@ to notice.
 
 ## USB: comes from whatever device needs it, never its own field
 
-`devices.pointer0: virtual-tablet`
+`devices.pointer0: emulated-tablet`
 ([blueprint-model.md](../../../docs/spec/blueprint-model.md), F66,
-already delivered, moved into `devices` by D124, renamed by D126) is
-the actual demand here, and a backend adapter
+already delivered, moved into `devices` by D124, renamed by D126,
+split from `virtual-tablet` by D127) is the actual demand here, and a
+backend adapter
 that renders the tablet renders its USB controller automatically,
 without being asked separately. A bare `usb: true` field would just
 declare a controller with nothing plugged into it — machine shape

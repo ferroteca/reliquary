@@ -225,7 +225,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   data, not pixels, so a landmark wait recorded in a transcript can't
   be replayed, and replay reports that by name instead of fabricating
   a screen to match against.
-- **Pointer input: a new `pointer_event` carrier, a `virtual-tablet`
+- **Pointer input: a new `pointer_event` carrier, an absolute-position
   pointing device, and a new `click` script verb** (F66, split out of F5,
   serving U5). The backend-adapter interface gained one new method,
   `pointer_event(x, y, buttons)`, which sends RFB's own `PointerEvent`
@@ -238,19 +238,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   same coordinate space a landmark is defined in, so no separate
   scaling is needed.
 - **A machine can now declare a pointer input device**, at
-  `devices.pointer0`, set to `virtual-tablet` or `emulated-mouse`,
+  `devices.pointer0`, set to an absolute or relative device name,
   checked against backend capability at assignment time the same way
-  `drives` already is — if a blueprint declares `virtual-tablet` and
-  the assigned backend can't supply it, assignment fails, naming both
-  the backend and the missing device. Every platform still defaults
-  to `emulated-mouse`, the standard relative pointing device every
-  machine already has. QEMU renders `virtual-tablet` as
-  `-usb -device usb-tablet,id=pointer0` and reports both device types
-  in its capability report. `click` refuses to run, before doing
-  anything, on a machine whose `devices.pointer0` is `emulated-mouse`,
-  naming the reason: an absolute click position needs an absolute
-  pointing device, and reliquary won't guess a calibration against a
-  relative one (P10).
+  `drives` already is — if a blueprint declares a device the assigned
+  backend can't supply, assignment fails, naming both the backend and
+  the missing device. Every platform still defaults to
+  `emulated-mouse`, the standard relative pointing device every
+  machine already has. QEMU renders the absolute device (`emulated-
+  tablet`, a real USB HID tablet, or `virtual-tablet`, its
+  paravirtualized equivalent, D127) as `-usb -device
+  usb-tablet,id=pointer0` or `-device virtio-tablet-pci,id=pointer0`
+  respectively, and reports all four device types in its capability
+  report. `click` refuses to run, before doing anything, on a machine
+  whose `devices.pointer0` is a relative device (`emulated-mouse` or
+  `virtual-mouse`), naming the reason: an absolute click position
+  needs an absolute pointing device, and reliquary won't guess a
+  calibration against a relative one (P10).
 - **`click` gets the same before-it-runs capability check landmark
   conditions do, plus one more.** `click` needs everything a landmark
   condition needs (framebuffer capture) plus the ability to deliver a
@@ -400,8 +403,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `-device virtio-mouse-pci,id=pointer0` on QEMU — for a guest that
   carries a virtio driver; a guest without one, DOS included, should
   stay on the implicit `emulated-mouse`. `click` still refuses any
-  pointing device but `virtual-tablet` (`machine.pointing-
-  device-not-tablet`), unchanged.
+  pointing device but `emulated-tablet` or `virtual-tablet`
+  (`machine.pointing-device-not-tablet`), unchanged.
 - **The pointer input device moves into `devices`, at the fixed key
   `pointer0`** (T35, D124), replacing the top-level `pointing-device`
   field: `virtual-tablet`/`emulated-mouse`/`virtual-mouse` mean
@@ -434,6 +437,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   this is a plain rename with nothing to migrate; `pcnet`, `ne2k`,
   `9pfs`, and `vvfat` are unaffected, since they already name real
   hardware or an actual protocol, not a generic description.
+- **`devices.pointer0`'s absolute device splits into `emulated-tablet`
+  (real USB HID) and `virtual-tablet` (paravirtualized)** (D127).
+  `virtual-tablet` used to render as QEMU's `usb-tablet` — real
+  hardware, despite the `virtual-` name — because D126 carved out an
+  exception for it rather than reclassifying it. That exception is
+  gone: `virtual-tablet` now renders as `virtio-tablet-pci`, the same
+  paravirtualized family as `virtual-mouse`, and the new
+  `emulated-tablet` name takes over the `usb-tablet` rendering,
+  needing no guest driver beyond USB HID support. `click` accepts
+  either as an absolute device. The recovered `reactos.rlqb` codex
+  blueprint now declares `emulated-tablet`, not `virtual-tablet`,
+  since ReactOS carries no virtio-input driver.
 
 ### Fixed
 

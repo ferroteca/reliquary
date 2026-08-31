@@ -134,7 +134,9 @@ work.
 ## What the recovered recipe actually does
 
 `reactos.rlqb` (in `src/reliquary/codex/blueprints/`) declares one
-machine — `platform: "winnt"`, `devices.pointer0: "virtual-tablet"`,
+machine — `platform: "winnt"`, `devices.pointer0: "emulated-tablet"`
+(D127 — a real USB HID tablet; ReactOS carries no virtio-input
+driver for the paravirtualized `virtual-tablet`),
 `control-planes: ["vnc"]`, 512 MB of memory, a blank 2 GB `hdd0`
 disk, an empty `cdrom0` drive, boot order `["hdd0", "cdrom0"]` —
 plus one media chain: a zip download from SourceForge (with an

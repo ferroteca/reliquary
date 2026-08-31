@@ -921,8 +921,9 @@ Same meaning as a drive's [`enabled`](#enabled--optional--boolean--default-true)
 
 The `pointer0` key names the machine's pointer input device (F66,
 `virtual-mouse` added by T34, moved into `devices` by D124, renamed
-by D126). `pointer0` is the only legal key — a machine has at most
-one active pointing device, so there's no `pointer1`.
+by D126, split into `emulated-tablet`/`virtual-tablet` by D127).
+`pointer0` is the only legal key — a machine has at most one active
+pointing device, so there's no `pointer1`.
 
 #### Keys: slots
 
@@ -938,12 +939,13 @@ key is always written, even though it's the only one that exists.
 A bare device name:
 
 ```json
-{"devices": {"pointer0": "virtual-tablet"}}
+{"devices": {"pointer0": "emulated-tablet"}}
 ```
 
 | value              | reports                                       | backends |
 |--------------------|------------------------------------------------|----------|
-| `virtual-tablet`   | absolute position — the guest driver maps host coordinates straight onto the screen | QEMU, VirtualBox |
+| `emulated-tablet`  | absolute position, rendered as a real USB HID tablet (QEMU: `usb-tablet`) — the guest driver maps host coordinates straight onto the screen, needing no guest driver beyond USB HID support | QEMU, VirtualBox |
+| `virtual-tablet`   | the same absolute-position family as `emulated-tablet`, rendered as an explicit paravirtualized device (QEMU: `virtio-tablet-pci`) | QEMU only |
 | `emulated-mouse`   | relative motion, the platform default — the guest's own driver applies acceleration the host cannot observe | every backend |
 | `virtual-mouse`    | the same relative device family as `emulated-mouse`, rendered as an explicit paravirtualized device (QEMU: `virtio-mouse-pci`) | QEMU only |
 
@@ -954,15 +956,17 @@ the same way every other capability is (P11): a device the backend
 can't provide is a capability error naming both. Omitted, it resolves
 to `emulated-mouse` — the plain relative device every platform's
 machine already has, so the default matches what's actually there.
-`virtual-mouse` is worth naming only when a guest actually carries a
-virtio driver; DOS and every guest without one should stay on the
-implicit `emulated-mouse`.
+`virtual-mouse` and `virtual-tablet` are worth naming only when a
+guest actually carries a virtio driver (D127); DOS, ReactOS, and
+every guest without one should use `emulated-mouse` or
+`emulated-tablet` instead.
 
-**`click` needs `virtual-tablet`.** A relative device —
-`emulated-mouse` or `virtual-mouse` — can't be aimed at an absolute
-screen position without guessing a calibration, so
+**`click` needs an absolute device: `emulated-tablet` or
+`virtual-tablet`.** A relative device — `emulated-mouse` or
+`virtual-mouse` — can't be aimed at an absolute screen position
+without guessing a calibration, so
 [`click`](spec/script-spec.md#click) refuses to run, before doing
-anything, on a machine whose `pointer0` isn't `virtual-tablet`
+anything, on a machine whose `pointer0` is neither
 (`machine.pointing-device-not-tablet`).
 
 ---

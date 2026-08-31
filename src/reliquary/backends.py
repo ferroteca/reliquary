@@ -89,10 +89,10 @@ class Capabilities:
     media: Tuple[str, ...] = ()
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
-    #: The pointing devices this backend can attach (F66, D126):
-    #: ``virtual-tablet`` or ``emulated-mouse``, the blueprint's own
-    #: terms. Defaults to empty, so an adapter that hasn't set this
-    #: claims no pointing devices.
+    #: The pointing devices this backend can attach (F66, D126, D127):
+    #: ``virtual-tablet``, ``emulated-tablet``, or ``emulated-mouse``,
+    #: the blueprint's own terms. Defaults to empty, so an adapter
+    #: that hasn't set this claims no pointing devices.
     pointing_devices: Tuple[str, ...] = ()
     #: The NIC models this backend can attach (D120): ``pcnet`` or
     #: ``ne2k``, the blueprint's own terms. Defaults to empty, the

@@ -1945,6 +1945,20 @@ def test_a_click_binds_its_landmark_with_one_spot_and_no_modifier(
     assert "next" in resolved.landmarks["welcome"].spots
 
 
+def test_a_click_also_accepts_the_emulated_tablet(preflight):
+    # D127: `emulated-tablet` (real USB HID) and `virtual-tablet`
+    # (paravirtualized) are both absolute devices; click accepts
+    # either.
+    preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
+    script = parse_script(_HEAD + "machine stopped\nclick @welcome\n")
+    resolved = _preflight_machine_rules(
+        script,
+        preflight.state(planes=("vnc",), pointing_device="emulated-tablet"),
+        "<script>", preflight.home)
+    assert resolved.capture_format == "rgb"
+    assert "next" in resolved.landmarks["welcome"].spots
+
+
 def test_a_click_naming_its_spot_binds_cleanly(preflight):
     preflight.write_landmark(
         "welcome",

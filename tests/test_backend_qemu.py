@@ -796,11 +796,11 @@ def test_start_renders_this_backends_section_last():
 
 # The session's carriers, over a scripted monitor.
 
-def test_pointing_device_tablet_renders_the_usb_device():
+def test_pointing_device_emulated_tablet_renders_the_usb_device():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "tab-0", "backend-id": "reliquary-tab-0", "memory": 32,
-        "boot": [], "devices": {"pointer0": {"value": "virtual-tablet"}},
+        "boot": [], "devices": {"pointer0": {"value": "emulated-tablet"}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -808,6 +808,21 @@ def test_pointing_device_tablet_renders_the_usb_device():
         adapter.start(state, machine_dir=".", backend_dir="qemu")
     args = launch.call_args.args[0]
     assert args[-3:] == ["-usb", "-device", "usb-tablet,id=pointer0"]
+
+
+def test_pointing_device_virtual_tablet_renders_the_virtio_device():
+    adapter = qemu_module.QemuAdapter()
+    state = {
+        "id": "vtab-0", "backend-id": "reliquary-vtab-0", "memory": 32,
+        "boot": [], "devices": {"pointer0": {"value": "virtual-tablet"}},
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=".", backend_dir="qemu")
+    args = launch.call_args.args[0]
+    assert args[-2:] == ["-device", "virtio-tablet-pci,id=pointer0"]
+    assert "-usb" not in args
 
 
 def test_pointing_device_mouse_renders_nothing_extra():
@@ -885,8 +900,8 @@ def test_the_qemu_adapter_reports_the_pointing_devices_it_renders():
     with mock.patch.object(qemu_module, "probe_share_models",
                            return_value=()):
         report = qemu_module.QemuAdapter().capabilities()
-    assert report.pointing_devices == ("virtual-tablet", "emulated-mouse",
-                                       "virtual-mouse")
+    assert report.pointing_devices == ("virtual-tablet", "emulated-tablet",
+                                       "emulated-mouse", "virtual-mouse")
 
 
 def test_the_qemu_adapter_reports_the_network_devices_it_renders():
@@ -946,7 +961,7 @@ def test_a_share_a_pointer_and_an_rng_dont_get_mixed_up(root):
         "boot": [], "devices": {
             "share0": {"media": "hostdir", "materialize": "use",
                       "path": work, "model": "vvfat"},
-            "pointer0": {"value": "virtual-tablet"},
+            "pointer0": {"value": "emulated-tablet"},
             "rng0": {"rng-model": "virtual-rng"},
         },
     }

@@ -179,7 +179,7 @@
       "description": "The one resolved pointer slot (D124), always present at key pointer0, defaulted to emulated-mouse when the blueprint named none.",
       "type": "object",
       "properties": {
-        "value": {"enum": ["virtual-tablet", "emulated-mouse", "virtual-mouse"]}
+        "value": {"enum": ["virtual-tablet", "emulated-tablet", "emulated-mouse", "virtual-mouse"]}
       },
       "required": ["value"],
       "additionalProperties": false

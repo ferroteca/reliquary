@@ -776,7 +776,8 @@ def test_a_pointer_device_is_a_bare_value():
 
 
 def test_every_pointer_device_is_accepted_by_the_parser():
-    for value in ("virtual-tablet", "emulated-mouse", "virtual-mouse"):
+    for value in ("virtual-tablet", "emulated-tablet", "emulated-mouse",
+                 "virtual-mouse"):
         machine = _machine_with_pointer({"pointer0": value})
         assert machine.pointer["pointer0"].value == value
 

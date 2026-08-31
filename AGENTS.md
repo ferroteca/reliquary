@@ -87,8 +87,9 @@ workflow:
     `{media, model, enabled}`, or an inline media definition carrying its own `model`/`enabled` too (F72) — no
     `null`, and no anonymous blank, inline included — where `model` is `vvfat`/`9pfs`/`virtual-fs`, F68),
     `boot`, `name` (the id-safe identity, not a display label), `description`, `scripts`, `control-planes`,
-    `backend-settings`, and `parameters`. The pointer device (`virtual-tablet`/`emulated-mouse`/`virtual-mouse`,
-    F66, `virtual-mouse` added by T34, both renamed by D126) and the RNG (`virtual-rng` only, D125, renamed by
+    `backend-settings`, and `parameters`. The pointer device
+    (`virtual-tablet`/`emulated-tablet`/`emulated-mouse`/`virtual-mouse`, F66, `virtual-mouse` added by T34, both
+    renamed by D126, tablet split by D127) and the RNG (`virtual-rng` only, D125, renamed by
     D126) each live in `devices` too, at the fixed keys `pointer0` and `rng0` (D124, D125) — a machine has at
     most one of each, so neither key takes a second slot.
   - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,
@@ -266,9 +267,11 @@ workflow:
     same way `credentials._set_provider` substitutes a fake keyring.
   - `backend_qemu.py` contains everything that's specific to QEMU: finding the QEMU binary, running `qemu-img`
     for image work, rendering a machine's drives, NICs, and boot order into QEMU arguments (`devices.pointer0:
-    virtual-tablet` renders as `-usb -device usb-tablet,id=pointer0`, F66; `pointer0: virtual-mouse` renders as
-    `-device virtio-mouse-pci,id=pointer0`, T34, the same relative device family as the implicit default, just
-    explicit and paravirtualized; `devices.rng0: virtual-rng` renders as `-device virtio-rng-pci,id=rng0`, D125;
+    emulated-tablet` renders as `-usb -device usb-tablet,id=pointer0`, F66; `pointer0: virtual-tablet` renders as
+    `-device virtio-tablet-pci,id=pointer0`, D127, the same absolute device family, just paravirtualized;
+    `pointer0: virtual-mouse` renders as `-device virtio-mouse-pci,id=pointer0`, T34, the same relative device
+    family as the implicit default, just explicit and paravirtualized; `devices.rng0: virtual-rng` renders as
+    `-device virtio-rng-pci,id=rng0`, D125;
     `network_args` renders each `devices`
     NIC entry into a `-netdev`/`-device` pair, D120/D121), the `backend-settings.qemu` escape
     hatch (`SETTINGS_KEYS` = `machine` / `args`; `RESERVED_ARGUMENTS` lists what a blueprint field or the VM

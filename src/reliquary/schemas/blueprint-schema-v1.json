@@ -169,8 +169,8 @@
     },
 
     "pointerDevice": {
-      "description": "The pointer input device (F66; virtual-mouse added by T34; moved into devices by D124; renamed by D126). Omitted, it resolves to the platform's default (emulated-mouse, today). Never supplied by a reference.",
-      "enum": ["virtual-tablet", "emulated-mouse", "virtual-mouse"]
+      "description": "The pointer input device (F66; virtual-mouse added by T34; moved into devices by D124; renamed by D126; split into emulated-tablet/virtual-tablet by D127). Omitted, it resolves to the platform's default (emulated-mouse, today). Never supplied by a reference.",
+      "enum": ["virtual-tablet", "emulated-tablet", "emulated-mouse", "virtual-mouse"]
     },
 
     "rngDevice": {

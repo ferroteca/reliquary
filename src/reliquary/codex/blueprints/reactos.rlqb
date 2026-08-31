@@ -15,7 +15,10 @@
     "control-planes": ["vnc"],
     "description": "ReactOS 0.4.15-x86 installed from its own ISO",
     "devices": {
-      "pointer0": "virtual-tablet",
+      // Not "virtual-tablet": that's paravirtualized (D127) and
+      // ReactOS carries no virtio-input driver. "emulated-tablet" is
+      // a real USB HID tablet, plug-and-play with no driver needed.
+      "pointer0": "emulated-tablet",
       // Blank disk. The installer partitions and formats it.
       "hdd0": { "type": "media", "size": "2G" },
       // Empty for now. The install script inserts the ISO here.

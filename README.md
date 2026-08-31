@@ -283,7 +283,7 @@ click @setup-page spot="next"
 `click` finds the landmark the same way `wait` does: it waits for a matching, settled frame, and times out visibly
 if the landmark never appears. It then sends a left click at the named spot (or the only spot, if the landmark
 declares exactly one), and moves the cursor out of frame afterward. It needs an absolute pointing device — declare
-`"devices": {"pointer0": "virtual-tablet"}` on the machine, because a relative mouse cannot be aimed without
+`"devices": {"pointer0": "emulated-tablet"}` on the machine, because a relative mouse cannot be aimed without
 guessing (a PS/2 mouse's guest driver applies acceleration the host cannot observe) — and a machine declaring
 `emulated-mouse` is refused by name before the run starts.
 

@@ -41,8 +41,11 @@ _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
 #: A generic pointer device name says which kind of device it is:
 #: `emulated-` mimics real legacy hardware, `virtual-` only exists
 #: because it's useful inside a VM (D126, renaming F66/T34's
-#: `tablet`/`mouse`/`virtio-mouse`).
-_POINTING_DEVICES = {"virtual-tablet", "emulated-mouse", "virtual-mouse"}
+#: `tablet`/`mouse`/`virtio-mouse`). `emulated-tablet` and
+#: `virtual-tablet` (split by D127) are both absolute devices;
+#: `click` accepts either.
+_POINTING_DEVICES = {"virtual-tablet", "emulated-tablet",
+                     "emulated-mouse", "virtual-mouse"}
 #: The `rng` device's portable model names (D126, renaming D125's
 #: `virtio-rng`, which narrowed D91): a name checked against whichever
 #: backend is actually assigned, never a backend's own internal

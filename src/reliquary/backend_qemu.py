@@ -172,12 +172,17 @@ _NIC_QEMU_MODELS = {"pcnet": "pcnet", "ne2k": "ne2k_isa",
 _RNG_QEMU_DEVICES = {"virtual-rng": "virtio-rng-pci"}
 
 #: The pointer input device's rendering (F66, T34, D124, renamed by
-#: D126): omitted or `emulated-mouse` needs no extra argument at all
-#: — that's QEMU's own implicit legacy PS/2 mouse, already there
-#: without asking.
+#: D126, split by D127): omitted or `emulated-mouse` needs no extra
+#: argument at all — that's QEMU's own implicit legacy PS/2 mouse,
+#: already there without asking. `emulated-tablet` mimics a real USB
+#: HID tablet, needing no guest driver beyond USB HID support.
+#: `virtual-tablet` and `virtual-mouse` are QEMU's paravirtualized
+#: devices, needing a virtio-input guest driver neither DOS nor
+#: ReactOS carries.
 _POINTER_QEMU_ARGS = {
     "emulated-mouse": [],
-    "virtual-tablet": ["-usb", "-device", "usb-tablet,id=pointer0"],
+    "emulated-tablet": ["-usb", "-device", "usb-tablet,id=pointer0"],
+    "virtual-tablet": ["-device", "virtio-tablet-pci,id=pointer0"],
     "virtual-mouse": ["-device", "virtio-mouse-pci,id=pointer0"],
 }
 
@@ -1203,8 +1208,8 @@ class QemuAdapter(BackendAdapter):
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
-            pointing_devices=("virtual-tablet", "emulated-mouse",
-                              "virtual-mouse"),
+            pointing_devices=("virtual-tablet", "emulated-tablet",
+                              "emulated-mouse", "virtual-mouse"),
             network_models=("pcnet", "ne2k", "virtual-net"),
             network_attachments=("nat", "bridged"),
             share_models=("vvfat",) + live,

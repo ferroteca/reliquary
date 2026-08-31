@@ -2205,6 +2205,11 @@ def _walk(script):
 
 _REMOVABLE_MEDIA = frozenset({"floppy", "cdrom"})
 
+#: The two absolute-position pointer devices (D127): `click` accepts
+#: either, since both report a screen position rather than relative
+#: motion, unlike `emulated-mouse` or `virtual-mouse`.
+_ABSOLUTE_POINTERS = frozenset({"emulated-tablet", "virtual-tablet"})
+
 
 def _no_such_media(name, namespace):
     """The diagnostic for a media reference the namespace lacks."""
@@ -2431,12 +2436,13 @@ def _preflight_landmarks(script, machine_state, script_path, context):
                     "pointer0", {}).get("value", "emulated-mouse")
                 pointer_capable = _backends.adapter(
                     machine_state["backend"]).pointer_capable(plane)
-            if pointing_device != "virtual-tablet":
+            if pointing_device not in _ABSOLUTE_POINTERS:
                 raise ScriptPreflightError(
                     "click needs an absolute pointing device and this "
                     f"machine's is {pointing_device!r}; declare "
-                    '"devices": {"pointer0": "virtual-tablet"} in the '
-                    "blueprint",
+                    '"devices": {"pointer0": "emulated-tablet"} (no '
+                    'guest driver needed) or "virtual-tablet" '
+                    "(paravirtualized) in the blueprint",
                     statement=node, path=script_path,
                     rule_id="machine.pointing-device-not-tablet")
             if not pointer_capable:

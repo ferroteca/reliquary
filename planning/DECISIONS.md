@@ -124,6 +124,35 @@ pressure worth re-examining once the surrounding area firms up.
 
 ## Decided
 
+- D127 — THE POINTER TABLET SPLITS INTO `emulated-tablet` (REAL USB HID)
+  AND `virtual-tablet` (PARAVIRTUALIZED) — DECIDED (owner, 2026-08-31)
+  and delivered the same day, amending D126's tablet handling and
+  correcting `backend_qemu.py`'s rendering. Supports U5; P25.
+
+  D126 named `virtual-tablet` as the one exception to its own rule —
+  "an absolute-position input device with no bare-metal equivalent" —
+  because it didn't fit either the `emulated-` (mimics real legacy
+  hardware) or `virtual-` (paravirtualized, useful only in a VM)
+  category cleanly. That exception was unnecessary: the device QEMU
+  actually rendered for `virtual-tablet` was `usb-tablet`, a real USB
+  HID device — squarely an `emulated-` case, just one D126 hadn't
+  reclassified. `virtual-tablet` now renders as QEMU's paravirtualized
+  `virtio-tablet-pci`, the same family as `virtual-mouse`
+  (`virtio-mouse-pci`); a new `emulated-tablet` name takes over
+  `usb-tablet`'s rendering, needing no guest driver beyond USB HID
+  support. `click`'s absolute-device refusal
+  (`machine.pointing-device-not-tablet`) now accepts either name.
+
+  This matters beyond naming: `virtio-tablet-pci` needs a virtio-input
+  guest driver that DOS, ReactOS, and most pre-virtio guests don't
+  carry, while `usb-tablet` is plug-and-play. The recovered
+  `reactos.rlqb` blueprint (`winnt-platform.md`) demonstrated
+  `click`-based GUI installs against `virtual-tablet` before this
+  decision — it is updated to `emulated-tablet` alongside this change,
+  so the working install path keeps working. None of the renamed
+  fields has shipped in a release yet (P9), so, like D124 and D126,
+  this lands as a plain rename/split with nothing to migrate.
+
 - D126 — A GENERIC DEVICE NAME IN THE BLUEPRINT VOCABULARY IS PREFIXED
   `emulated-` OR `virtual-`, NEVER BARE — DECIDED (owner, 2026-08-30)
   and delivered the same day, renaming `pointer0`'s
@@ -148,7 +177,10 @@ pressure worth re-examining once the surrounding area firms up.
   already has), and `virtual-` for a name that exists only because
   it's useful inside a VM — a paravirtualized device (`virtual-mouse`,
   `virtual-rng`, `virtual-net`) or an absolute-position input device
-  with no bare-metal equivalent (`virtual-tablet`). Real hardware and
+  with no bare-metal equivalent (`virtual-tablet`) [D127 closed this
+  exception: `virtual-tablet` now IS the paravirtualized case, and a
+  new `emulated-tablet` name took over the real-hardware rendering
+  this paragraph had folded into it]. Real hardware and
   protocol names are unaffected — `pcnet`, `ne2k`, `9pfs`, and `vvfat`
   keep their names. None of the renamed fields has shipped in a
   release yet, so this is a plain rename with nothing to migrate, the
@@ -202,12 +234,15 @@ pressure worth re-examining once the surrounding area firms up.
   a machine has at most one active pointing device, so there is no
   `pointer1` — and its value is the same three choices as before:
   `virtual-tablet`, `emulated-mouse`, or `virtual-mouse` (renamed by
-  D126). Leaving `pointer0` out still means the same default leaving
-  out `pointing-device` used to mean: `emulated-mouse`. Every check
-  that used to run against `pointing-device` — the capability check
-  against the assigned backend, `click`'s refusal of every device but
-  `virtual-tablet` — still runs the same way, now reading the value
-  from `devices.pointer0` instead of a separate field.
+  D126) [D127 split `virtual-tablet` into `virtual-tablet` and
+  `emulated-tablet`, a fourth choice]. Leaving `pointer0` out still
+  means the same default leaving out `pointing-device` used to mean:
+  `emulated-mouse`. Every check that used to run against
+  `pointing-device` — the capability check against the assigned
+  backend, `click`'s refusal of every device but `virtual-tablet`
+  [now `emulated-tablet` or `virtual-tablet`, D127] — still runs the
+  same way, now reading the value from `devices.pointer0` instead of
+  a separate field.
 
   This is a breaking rename of an already-shipped field (F66, T34).
   Before 1.0 there is no compatibility promise (P9), so it lands as
