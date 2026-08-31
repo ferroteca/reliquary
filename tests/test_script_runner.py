@@ -1683,19 +1683,19 @@ class _Preflight:
     def state(self, phase="ready", drives=None, backend="qemu",
               planes=("vnc",), pointing_device=None):
         """The machine.json a preflight is run against."""
-        state = {
+        devices = dict(drives) if drives is not None else {
+            "hdd0": {"medium": "hdd", "slot": 0, "size": "20M",
+                     "path": "blank.qcow2"},
+        }
+        if pointing_device is not None:
+            devices["pointer0"] = {"value": pointing_device}
+        return {
             "id": self.machine_id,
             "phase": phase,
             "backend": backend,
             "control-planes": list(planes),
-            "devices": drives if drives is not None else {
-                "hdd0": {"medium": "hdd", "slot": 0, "size": "20M",
-                         "path": "blank.qcow2"},
-            },
+            "devices": devices,
         }
-        if pointing_device is not None:
-            state["pointing-device"] = pointing_device
-        return state
 
     def write_state(self, phase="ready", drives=None, backend="qemu",
                     planes=("vnc",), pointing_device=None):

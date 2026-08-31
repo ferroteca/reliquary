@@ -1,0 +1,8 @@
+// valid: rng0 shares the devices map with drives (D121); its value
+//        is a portable device name, never a backend-internal
+//        spelling (D125, narrowing D91)
+// spec: Machine topology
+[
+  { "type": "machine", "name": "rig", "platform": "dos",
+    "devices": { "cdrom0": null, "rng0": "virtio-rng" } }
+]

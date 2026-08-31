@@ -165,6 +165,21 @@ RESERVED_ARGUMENTS = {
 _NIC_QEMU_MODELS = {"pcnet": "pcnet", "ne2k": "ne2k_isa",
                     "virtio-net": "virtio-net-pci"}
 
+#: The blueprint's portable RNG model names, mapped to the QEMU device
+#: that renders them (D125, narrowing D91): `virtio-rng` is
+#: Reliquary's own name, never the backend-internal spelling
+#: (`virtio-rng-pci`) D91 was overruled for admitting.
+_RNG_QEMU_DEVICES = {"virtio-rng": "virtio-rng-pci"}
+
+#: The pointer input device's rendering (F66, T34, D124): omitted or
+#: `mouse` needs no extra argument at all — that's QEMU's own implicit
+#: legacy PS/2 mouse, already there without asking.
+_POINTER_QEMU_ARGS = {
+    "mouse": [],
+    "tablet": ["-usb", "-device", "usb-tablet,id=pointer0"],
+    "virtio-mouse": ["-device", "virtio-mouse-pci,id=pointer0"],
+}
+
 #: The `-drive` properties Reliquary already renders for every drive.
 #: These are refused through ``-set drive.<slot>.<property>`` for the
 #: same reason ``-drive`` itself is refused: it would be a second way
@@ -1192,6 +1207,7 @@ class QemuAdapter(BackendAdapter):
             network_attachments=("nat", "bridged"),
             share_models=("vvfat",) + live,
             share_default="9pfs" if "9pfs" in live else None,
+            rng_models=("virtio-rng",),
         )
 
     def capture_format(self, plane):
@@ -1283,26 +1299,25 @@ class QemuAdapter(BackendAdapter):
                  if "medium" in entry}
         network = {key: entry for key, entry in devices.items()
                   if "attachment" in entry}
+        # A pointer entry carries "value" and an rng entry carries
+        # "rng-model" (never "model" — a share already owns that key
+        # in this same merged map, D124/D125), so both are excluded
+        # from "shares" the same way a NIC's "attachment" already is.
+        pointer = {key: entry for key, entry in devices.items()
+                  if "value" in entry}
+        rng = {key: entry for key, entry in devices.items()
+              if "rng-model" in entry}
         shares = {key: entry for key, entry in devices.items()
-                 if "medium" not in entry and "attachment" not in entry}
+                 if "medium" not in entry and "attachment" not in entry
+                 and "value" not in entry and "rng-model" not in entry}
         args += drive_args(drives)
         args += network_args(network)
         args += share_args(shares, drives)
         boot = _boot_order(state.get("boot", []), drives)
         if boot is not None:
             args += ["-boot", f"order={boot}"]
-        if state.get("pointing-device") == "tablet":
-            # An absolute pointing device (F66): a PS/2 mouse reports
-            # relative motion and its guest driver applies
-            # acceleration the host can't observe, so `click` needs
-            # the tablet rather than the default relative mouse (P10).
-            args += ["-usb", "-device", "usb-tablet,id=pointer0"]
-        elif state.get("pointing-device") == "virtio-mouse":
-            # Same relative device family as the implicit default,
-            # just an explicit paravirtualized model instead of
-            # QEMU's legacy PS/2 mouse (T34) — a guest without a
-            # virtio driver (DOS included) should stay on "mouse".
-            args += ["-device", "virtio-mouse-pci,id=pointer0"]
+        args += pointer_args(pointer)
+        args += rng_args(rng)
         args += settings_args(
             (state.get("backend-settings") or {}).get(self.name))
         planes = state.get("control-planes") or ["agentless-display"]
@@ -1697,4 +1712,26 @@ def network_args(network):
         model = _NIC_QEMU_MODELS[entry["model"]]
         args += ["-netdev", netdev,
                  "-device", f"{model},netdev={key},id={key}"]
+    return args
+
+
+def pointer_args(pointer):
+    """Render the machine's one pointer input device (F66, T34, D124)."""
+    entry = pointer.get("pointer0")
+    if entry is None:
+        return []
+    return list(_POINTER_QEMU_ARGS[entry["value"]])
+
+
+def rng_args(rng):
+    """Build QEMU ``-device`` arguments from a machine's RNG slots (D125).
+
+    Each slot renders as its portable model's QEMU device, addressed
+    by the slot's own key — ``id=rng0`` — the same convention every
+    other device already uses.
+    """
+    args = []
+    for key, entry in sorted(rng.items()):
+        device = _RNG_QEMU_DEVICES[entry["rng-model"]]
+        args += ["-device", f"{device},id={key}"]
     return args

@@ -39,6 +39,11 @@ _NIC_MODELS = {"pcnet", "ne2k", "virtio-net"}
 _SHARE_MODELS = {"vvfat", "9pfs", "virtio-fs"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
 _POINTING_DEVICES = {"tablet", "mouse", "virtio-mouse"}
+#: The `rng` device's portable model names (D125, narrowing D91):
+#: `virtio-rng` is Reliquary's own name, distinct from QEMU's internal
+#: bus-addressing spelling `virtio-rng-pci` — D91 was overruled
+#: specifically for admitting the latter.
+_RNG_MODELS = {"virtio-rng"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
 _SPEC_TYPES = {"machine", "media"}
 # These spec types existed in the original four-component model and
@@ -47,8 +52,11 @@ _SPEC_TYPES = {"machine", "media"}
 _RETIRED_TYPES = {"source", "archive"}
 _RETIRED_SECTIONS = {"machines", "media", "sources", "archives"}
 
-_DEVICE_KEY = re.compile(r"(floppy|hdd|cdrom|net|share)(\d+)?")
-_SLOT_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4, "net": 4, "share": 4}
+_DEVICE_KEY = re.compile(r"(floppy|hdd|cdrom|net|share|pointer|rng)(\d+)?")
+#: `pointer` and `rng` each take exactly one slot: a machine has at
+#: most one active pointing device, and at most one RNG (D124, D125).
+_SLOT_LIMITS = {"floppy": 2, "hdd": 4, "cdrom": 4, "net": 4, "share": 4,
+                "pointer": 1, "rng": 1}
 _DRIVE_MEDIA = {"floppy", "hdd", "cdrom"}
 _SIZE = re.compile(r"([1-9][0-9]*)([KMGTkmgt])")
 _SHA256 = re.compile(r"[0-9a-fA-F]{64}")
@@ -356,21 +364,48 @@ class MachineShare:
 
 
 @dataclass(frozen=True)
+class MachinePointer:
+    """The one pointer-input slot (D124, folding F66's `pointing-device`
+    field into `devices`): always `pointer0` — a machine has at most
+    one active pointing device, so there is no `pointer1`.
+    """
+
+    key: str
+    slot: int
+    value: str
+
+
+@dataclass(frozen=True)
+class MachineRng:
+    """The one RNG slot (D125, narrowing D91): a portable device name,
+    never a backend-internal one — `model` is checked against the
+    assigned backend's capability report the same way a NIC's or a
+    share's `model` is.
+    """
+
+    key: str
+    slot: int
+    model: str
+
+
+@dataclass(frozen=True)
 class Machine:
     """Machine topology. A device names a medium (a drive), an
-    attachment (a NIC), or a shared host directory (a share, F68);
-    content lives on the media a drive or share names.
+    attachment (a NIC), a shared host directory (a share, F68), the
+    pointer input device (D124), or an RNG (D125); content lives on
+    the media a drive or share names.
 
     ``devices`` is the one authoritative field, matching the
     blueprint's own merged shape (D121) — a slot-keyed map of
-    :class:`MachineDrive`, :class:`MachineNetwork`, and
-    :class:`MachineShare` values sharing one keyspace. ``drives``,
-    ``network``, and ``shares`` are read-only computed views over it,
-    filtered by type: most of the engine only ever wants one kind or
-    the other (materialization only touches drives; requirements-
-    gathering wants all three, separately), and a view keeps that
-    filter in one place instead of repeated inline ``isinstance``
-    checks at every call site.
+    :class:`MachineDrive`, :class:`MachineNetwork`,
+    :class:`MachineShare`, :class:`MachinePointer`, and
+    :class:`MachineRng` values sharing one keyspace. ``drives``,
+    ``network``, ``shares``, ``pointer``, and ``rng`` are read-only
+    computed views over it, filtered by type: most of the engine only
+    ever wants one kind or the other (materialization only touches
+    drives; requirements-gathering wants every kind, separately), and
+    a view keeps that filter in one place instead of repeated inline
+    ``isinstance`` checks at every call site.
     """
 
     name: str
@@ -379,8 +414,8 @@ class Machine:
     memory: Optional[Union[int, Deferred]] = None
     cpus: Optional[Union[int, Deferred]] = None
     devices: Mapping[
-        str, Union[MachineDrive, MachineNetwork, MachineShare]] = \
-        field(default_factory=dict)
+        str, Union[MachineDrive, MachineNetwork, MachineShare,
+                  MachinePointer, MachineRng]] = field(default_factory=dict)
 
     @property
     def drives(self):
@@ -399,11 +434,22 @@ class Machine:
         return types.MappingProxyType({
             key: device for key, device in self.devices.items()
             if isinstance(device, MachineShare)})
+
+    @property
+    def pointer(self):
+        return types.MappingProxyType({
+            key: device for key, device in self.devices.items()
+            if isinstance(device, MachinePointer)})
+
+    @property
+    def rng(self):
+        return types.MappingProxyType({
+            key: device for key, device in self.devices.items()
+            if isinstance(device, MachineRng)})
     boot: Tuple[str, ...] = ()
     description: Optional[Union[str, Deferred]] = None
     scripts: Mapping[str, str] = field(default_factory=dict)
     control_planes: Tuple[str, ...] = ()
-    pointing_device: Optional[str] = None
     backend_settings: Mapping[str, Mapping] = field(default_factory=dict)
     parameters: Mapping[str, object] = field(default_factory=dict)
 
@@ -903,7 +949,7 @@ _MEDIA_FIELDS = {"type", "name", "materialize", "size", "location", "sha256",
 _CHILD_FIELDS = (_MEDIA_FIELDS - {"location"}) | {"path"}
 _MACHINE_VOCABULARY = {"platform", "backend", "memory", "cpus", "devices",
                        "boot", "scripts", "control-planes",
-                       "pointing-device", "backend-settings", "parameters"}
+                       "backend-settings", "parameters"}
 
 
 def _unknown_media_field(unknown, where, container):
@@ -1066,7 +1112,7 @@ def _check_type_echo(value, expected, where):
 _MACHINE_FIELDS = {
     "type", "name", "platform", "backend", "memory", "cpus", "devices",
     "boot", "description", "scripts", "control-planes",
-    "pointing-device", "backend-settings", "parameters",
+    "backend-settings", "parameters",
 }
 _STATE_ONLY = {"id", "backend-id", "blueprint-digest", "blueprint-source"}
 _DRIVE_FIELDS = {"media", "controller", "enabled"}
@@ -1088,8 +1134,8 @@ def _device_key(value, where):
     if not match:
         raise where.error(
             f"invalid device key {value!r}: expected floppy[0..1], "
-            "hdd[0..3], cdrom[0..3], net[0..3], or share[0..3]",
-            rule_id="device.key-invalid")
+            "hdd[0..3], cdrom[0..3], net[0..3], share[0..3], pointer0, "
+            "or rng0", rule_id="device.key-invalid")
     medium = match.group(1)
     slot = int(match.group(2) or 0)
     if slot >= _SLOT_LIMITS[medium]:
@@ -1231,10 +1277,25 @@ def _share_device(value, key, slot, register, where):
                         model=model, enabled=enabled)
 
 
+def _pointer_device(value, key, where):
+    """Parse the `pointer0` slot: a bare device name (D124)."""
+    return MachinePointer(
+        key=key, slot=0,
+        value=_text(value, where, closed=True, allowed=_POINTING_DEVICES))
+
+
+def _rng_device(value, key, where):
+    """Parse the `rng0` slot: a bare, portable device name (D125)."""
+    return MachineRng(
+        key=key, slot=0,
+        model=_text(value, where, closed=True, allowed=_RNG_MODELS))
+
+
 def _devices(value, register, where):
-    """Parse the merged ``devices`` map: drives, NICs, and shares share
-    one keyspace and one key-clash check (D121), dispatched by medium
-    once the key itself is parsed."""
+    """Parse the merged ``devices`` map: drives, NICs, shares, the
+    pointer device, and the RNG share one keyspace and one key-clash
+    check (D121, D124, D125), dispatched by medium once the key itself
+    is parsed."""
     if not isinstance(value, collections.abc.Mapping):
         raise where.error("devices must be an object",
             rule_id="value.not-an-object")
@@ -1253,6 +1314,10 @@ def _devices(value, register, where):
         elif medium == "share":
             normalized[key] = _share_device(declaration, key, slot,
                                             register, site)
+        elif medium == "pointer":
+            normalized[key] = _pointer_device(declaration, key, site)
+        elif medium == "rng":
+            normalized[key] = _rng_device(declaration, key, site)
         else:
             normalized[key] = _drive(declaration, key, medium, slot,
                                      register, site)
@@ -1432,10 +1497,6 @@ def _machine(value, register, *, where=_MACHINE):
         control_planes=_control_planes(value["control-planes"],
                                        at("control-planes"))
         if "control-planes" in value else (),
-        pointing_device=_text(value["pointing-device"],
-                              at("pointing-device"), closed=True,
-                              allowed=_POINTING_DEVICES)
-        if "pointing-device" in value else None,
         backend_settings=_backend_settings(value["backend-settings"],
                                            at("backend-settings"))
         if "backend-settings" in value else empty,

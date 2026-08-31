@@ -123,6 +123,12 @@ class Capabilities:
     #: built without fsdev support, and on VirtualBox, every install
     #: until F71 builds its own mechanism.
     share_default: Optional[str] = None
+    #: The RNG models this backend can attach (D125): ``virtio-rng``,
+    #: the blueprint's own portable name — never the backend-internal
+    #: spelling D91 was overruled for admitting. Defaults to empty, the
+    #: same way ``network_models`` does — an adapter that hasn't set
+    #: this claims no RNG devices.
+    rng_models: Tuple[str, ...] = ()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -170,8 +176,8 @@ class Requirements:
     #: straight through to :meth:`BackendAdapter.capabilities`, the
     #: same way :meth:`BackendAdapter.discover` already takes it.
     platform: Optional[str] = None
-    #: The blueprint's declared ``pointing-device``, or ``None`` if it
-    #: left this to the default (F66). Unlike the tuple fields above,
+    #: The machine's pointer device, with the default already filled
+    #: in (F66, D124) — never ``None``. Unlike the tuple fields above,
     #: this is a single value, since a machine can declare at most
     #: one pointing device.
     pointing_device: Optional[str] = None
@@ -191,6 +197,10 @@ class Requirements:
     #: so this is checked against ``share_default``, not
     #: ``share_models`` — the two ask different questions.
     share_unstated: bool = False
+    #: The distinct RNG models this machine's ``devices`` declare
+    #: (D125) — never includes an absent one, the same way
+    #: ``network_models`` never speaks for a machine with no NIC.
+    rng_models: Tuple[str, ...] = ()
 
 
 class BackendAdapter:
@@ -325,6 +335,9 @@ class BackendAdapter:
         for model in requirements.share_models:
             if model not in report.share_models:
                 missing.append(f"share model {model!r}")
+        for model in requirements.rng_models:
+            if model not in report.rng_models:
+                missing.append(f"rng device {model!r}")
         if requirements.share_unstated and report.share_default is None:
             # No "yet": as of F69 this is as often a fact about the
             # install as about what's built — a QEMU compiled without

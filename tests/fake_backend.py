@@ -104,6 +104,7 @@ class FakeAdapter(BackendAdapter):
             network_attachments=("nat", "bridged"),
             share_models=("vvfat", "9pfs", "virtio-fs"),
             share_default="9pfs",
+            rng_models=("virtio-rng",),
         )
         self.images = []
         self.starts = []

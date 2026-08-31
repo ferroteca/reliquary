@@ -24,9 +24,9 @@ SPDX-License-Identifier: GPL-3.0-only
 > **Status:** every field in this reference is validated at parse
 > time — `platform`, `backend`, `memory`, `cpus`, `devices` (a drive
 > — a media name, `null`, or an object with `controller`/`enabled`/
-> `media` — or a NIC — an attachment name, or an object with
-> `attachment`/`interface`/`model`, sharing one slot-keyed map,
-> D121/D122),
+> `media` — a NIC — an attachment name, or an object with
+> `attachment`/`interface`/`model` — a share, the pointer device, or
+> an RNG, all sharing one slot-keyed map, D121/D122/D124/D125),
 > `boot`, `name`, `description`,
 > `scripts`, `control-planes`, `backend-settings`, and `parameters`
 > — along with accepting JSON5
@@ -914,6 +914,95 @@ Same meaning as a drive's [`enabled`](#enabled--optional--boolean--default-true)
   `eject`) all stay drive-only. Nothing boots from a shared
   directory, and a share attaches at start and detaches at stop —
   there's no live attach/detach either.
+
+---
+
+### Pointer device
+
+The `pointer0` key names the machine's pointer input device (F66,
+`virtio-mouse` added by T34, moved into `devices` by D124). `pointer0`
+is the only legal key — a machine has at most one active pointing
+device, so there's no `pointer1`.
+
+#### Keys: slots
+
+| kind      | slots | keys        |
+|-----------|-------|-------------|
+| `pointer` | 0 only | `pointer0` |
+
+Like a NIC or a share, there's no bare-name shorthand: the full slot
+key is always written, even though it's the only one that exists.
+
+#### Values
+
+A bare device name:
+
+```json
+{"devices": {"pointer0": "tablet"}}
+```
+
+| value          | reports                                       | backends |
+|----------------|------------------------------------------------|----------|
+| `tablet`       | absolute position — the guest driver maps host coordinates straight onto the screen | QEMU, VirtualBox |
+| `mouse`        | relative motion, the platform default — the guest's own driver applies acceleration the host cannot observe | every backend |
+| `virtio-mouse` | the same relative device family as `mouse`, rendered as an explicit paravirtualized device (QEMU: `virtio-mouse-pci`) | QEMU only |
+
+Checked against the assigned backend the same way every other
+capability is (P11): a device the backend can't provide is a
+capability error naming both. Omitted, it resolves to `mouse` — the
+plain relative device every platform's machine already has, so the
+default matches what's actually there. `virtio-mouse` is worth naming
+only when a guest actually carries a virtio driver; DOS and every
+guest without one should stay on the implicit `mouse`.
+
+**`click` needs `tablet`.** A relative device — `mouse` or
+`virtio-mouse` — can't be aimed at an absolute screen position without
+guessing a calibration, so [`click`](spec/script-spec.md#click)
+refuses to run, before doing anything, on a machine whose `pointer0`
+isn't `tablet` (`machine.pointing-device-not-tablet`).
+
+---
+
+### RNG
+
+The `rng0` key names a random-number generator device (D125,
+narrowing D91). Its value is a portable device name — a `net`
+chipset or a share mechanism by another name — checked against the
+assigned backend's capability report the same way those `model`
+fields are, and rendered in that backend's own terms.
+
+#### Keys: slots
+
+| kind  | slots  | keys    |
+|-------|--------|---------|
+| `rng` | 0 only | `rng0`  |
+
+#### Values
+
+A bare device name:
+
+```json
+{"devices": {"rng0": "virtio-rng"}}
+```
+
+| value         | device                                          | backends |
+|---------------|--------------------------------------------------|----------|
+| `virtio-rng`  | a paravirtualized RNG (QEMU: `virtio-rng-pci`)   | QEMU only |
+
+`virtio-rng` is Reliquary's own portable name — never
+`virtio-rng-pci`, QEMU's internal bus-addressing spelling, which D91
+was overruled for admitting directly. Omitted, the machine has no RNG
+device at all, the same way a machine with no `net` key has no NIC.
+Declaring one before its assigned backend can provide it is a
+capability error naming both.
+
+#### What an RNG entry deliberately leaves unsaid
+
+- **Which bus or controller.** Same reasoning as a NIC's or a share's
+  own device: not authored, only rendered.
+- **Whether the guest has a driver for it.** The machine only
+  provides the hardware; supplying the driver is the caller's own
+  business (`planning/USE-CASES.md`, U22).
 
 ---
 

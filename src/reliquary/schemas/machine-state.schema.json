@@ -80,16 +80,12 @@
       "type": "array",
       "items": {"enum": ["agentless-display", "vnc", "serial-console", "guest-agent"]}
     },
-    "pointing-device": {
-      "description": "The resolved pointer input device (F66; virtio-mouse added by T34).",
-      "enum": ["tablet", "mouse", "virtio-mouse"]
-    },
     "backend-settings": {
       "description": "The blueprint's per-backend settings sections, carried through verbatim.",
       "type": "object"
     },
     "devices": {
-      "description": "The resolved, enabled drives, NICs, and shares, keyed by device key, sharing one map (D121). A drive entry carries its medium and slot plus the realized cache path (a per-machine image under disks/, an attached payload, or null for an empty removable slot — never a host directory now, F68). A NIC entry carries its declared attachment, the resolved interface (null when none was named), and the platform-resolved chipset. A share entry carries its resolved media, always-'use' materialize, the host directory path, and the resolved model.",
+      "description": "The resolved, enabled drives, NICs, shares, the pointer device, and the RNG, keyed by device key, sharing one map (D121, D124, D125). A drive entry carries its medium and slot plus the realized cache path (a per-machine image under disks/, an attached payload, or null for an empty removable slot — never a host directory now, F68). A NIC entry carries its declared attachment, the resolved interface (null when none was named), and the platform-resolved chipset. A share entry carries its resolved media, always-'use' materialize, the host directory path, and the resolved model. The pointer entry (always present, at key pointer0) carries the resolved device. An RNG entry carries its portable model under rng-model, not model, so it stays tellable apart from a share entry in this same merged map.",
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/deviceState"}
     },
@@ -112,11 +108,13 @@
       "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?)$"
     },
     "deviceState": {
-      "description": "A resolved drive, NIC, or share (D121, F68) — the three shapes never overlap (driveState requires medium, networkState requires attachment, shareState requires media/materialize/path/model and forbids both, and additionalProperties is false on all three), so oneOf discriminates safely, unlike the blueprint schema's bare-string device shorthand.",
+      "description": "A resolved drive, NIC, share, pointer, or RNG (D121, F68, D124, D125) — the five shapes never overlap (driveState requires medium, networkState requires attachment, shareState requires media/materialize/path/model, pointerState requires value, rngState requires rng-model, and additionalProperties is false on all five), so oneOf discriminates safely, unlike the blueprint schema's bare-string device shorthand.",
       "oneOf": [
         {"$ref": "#/$defs/driveState"},
         {"$ref": "#/$defs/networkState"},
-        {"$ref": "#/$defs/shareState"}
+        {"$ref": "#/$defs/shareState"},
+        {"$ref": "#/$defs/pointerState"},
+        {"$ref": "#/$defs/rngState"}
       ]
     },
     "driveState": {
@@ -175,6 +173,24 @@
         }
       },
       "required": ["media", "materialize", "path", "model"],
+      "additionalProperties": false
+    },
+    "pointerState": {
+      "description": "The one resolved pointer slot (D124), always present at key pointer0, defaulted to mouse when the blueprint named none.",
+      "type": "object",
+      "properties": {
+        "value": {"enum": ["tablet", "mouse", "virtio-mouse"]}
+      },
+      "required": ["value"],
+      "additionalProperties": false
+    },
+    "rngState": {
+      "description": "One resolved RNG slot (D125). rng-model is the portable device name, checked against the assigned backend's capability report the same way a NIC's or a share's model is.",
+      "type": "object",
+      "properties": {
+        "rng-model": {"enum": ["virtio-rng"]}
+      },
+      "required": ["rng-model"],
       "additionalProperties": false
     },
     "driveGeometry": {

@@ -87,8 +87,9 @@ workflow:
     `{media, model, enabled}`, or an inline media definition carrying its own `model`/`enabled` too (F72) — no
     `null`, and no anonymous blank, inline included — where `model` is `vvfat`/`9pfs`/`virtio-fs`, F68),
     `boot`, `name` (the id-safe identity, not a display label), `description`, `scripts`, `control-planes`,
-    `pointing-device` (`tablet`/`mouse`/`virtio-mouse`, F66, `virtio-mouse` added by T34), `backend-settings`,
-    and `parameters`.
+    `backend-settings`, and `parameters`. The pointer device (`tablet`/`mouse`/`virtio-mouse`, F66, `virtio-mouse`
+    added by T34) and the RNG (`virtio-rng` only, D125) each live in `devices` too, at the fixed keys `pointer0`
+    and `rng0` (D124, D125) — a machine has at most one of each, so neither key takes a second slot.
   - `authoring.py` is the counterpart of `assets.py`: `assets` resolves and reads what a user already owns,
     `authoring` writes and removes it. It's authoring-only: it scaffolds a new blueprint (`new_blueprint`), and
     writes a media declaration for a file already on disk (`add_media(name, file)` — computes the sha256, writes
@@ -145,8 +146,9 @@ workflow:
   `cache/machines/<blueprint>-<n>/`.
 
     Backend assignment happens here, before any image work. The blueprint's full set of requirements — control
-    planes, media kinds, controllers, materialization modes, and the `pointing-device` field (F66, resolved by
-    `_resolve_pointing_device`, which defaults to `mouse`) — becomes a `backends.Requirements` object. A
+    planes, media kinds, controllers, materialization modes, the pointer device (F66, resolved by
+    `_pointer_value`, which defaults to `mouse`), and any RNG models declared (D125) — becomes a
+    `backends.Requirements` object. A
     declared `backend` field pins the choice. So does a `backend-settings` section for exactly one backend: its
     presence alone narrows the search to that backend, regardless of what settings it contains
     (`_backend_choice`: use the declared backend if there is one, else the one backend with a settings section if
@@ -242,8 +244,8 @@ workflow:
     `BackendAdapter` contract (discovery, a capability report, image materialization, start/stop, and the
     carrier session); the `Availability` / `Capabilities` / `Requirements` types shared between what a backend
     reports and what a blueprint demands (`pointing_devices` / `pointing_device`, F66; `network_models` /
-    `network_attachments`, D120; `share_models` / `share_default` and `share_models` / `share_unstated`, F68 —
-    all checked in `unmet()` the same way `drives` is checked); `Requirements.platform`, which is not checked
+    `network_attachments`, D120; `share_models` / `share_default` and `share_models` / `share_unstated`, F68;
+    `rng_models`, D125 — all checked in `unmet()` the same way `drives` is checked); `Requirements.platform`, which is not checked
     against anything but is passed to `capabilities(platform)` so a backend whose host tooling differs by guest
     architecture reports on the tool that guest will actually use (F69 — QEMU's live share transports are build
     options, so the answer differs between two binaries of one install);
@@ -262,10 +264,11 @@ workflow:
     only needs the second one. `_set_adapter` is the test hook that lets tests substitute a fake adapter, the
     same way `credentials._set_provider` substitutes a fake keyring.
   - `backend_qemu.py` contains everything that's specific to QEMU: finding the QEMU binary, running `qemu-img`
-    for image work, rendering a machine's drives, NICs, and boot order into QEMU arguments (the `pointing-device:
-    tablet` field renders as `-usb -device usb-tablet,id=pointer0`, F66; `pointing-device: virtio-mouse` renders as
+    for image work, rendering a machine's drives, NICs, and boot order into QEMU arguments (`devices.pointer0:
+    tablet` renders as `-usb -device usb-tablet,id=pointer0`, F66; `pointer0: virtio-mouse` renders as
     `-device virtio-mouse-pci,id=pointer0`, T34, the same relative device family as the implicit default, just
-    explicit and paravirtualized; `network_args` renders each `devices`
+    explicit and paravirtualized; `devices.rng0: virtio-rng` renders as `-device virtio-rng-pci,id=rng0`, D125;
+    `network_args` renders each `devices`
     NIC entry into a `-netdev`/`-device` pair, D120/D121), the `backend-settings.qemu` escape
     hatch (`SETTINGS_KEYS` = `machine` / `args`; `RESERVED_ARGUMENTS` lists what a blueprint field or the VM
     identity already owns, checked case-sensitively — `-m` is memory and `-M` is the machine type, but

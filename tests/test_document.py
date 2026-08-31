@@ -760,3 +760,117 @@ def test_boot_refuses_a_share_slot():
         _parse([{"type": "machine", "name": "rig", "platform": "dos",
                  "devices": {"share0": "hostdir"}, "boot": ["share0"]}])
     assert caught.value.rule_id == "drive.boot-undeclared"
+
+
+# The pointer device (F66, moved into `devices` by D124): always
+# `pointer0`, no other slot exists.
+
+def _machine_with_pointer(pointer):
+    return _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                    "devices": pointer}]).machines["rig"]
+
+
+def test_a_pointer_device_is_a_bare_value():
+    machine = _machine_with_pointer({"pointer0": "tablet"})
+    assert machine.pointer["pointer0"].value == "tablet"
+
+
+def test_every_pointer_device_is_accepted_by_the_parser():
+    for value in ("tablet", "mouse", "virtio-mouse"):
+        machine = _machine_with_pointer({"pointer0": value})
+        assert machine.pointer["pointer0"].value == value
+
+
+def test_an_unknown_pointer_device_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_pointer({"pointer0": "joystick"})
+    assert caught.value.rule_id == "value.not-in-vocabulary"
+
+
+def test_a_pointer_device_takes_no_reference():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_pointer({"pointer0": "${device}"})
+    assert caught.value.rule_id == "ref.not-allowed-here"
+
+
+def test_pointer_has_no_second_slot():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_pointer({"pointer1": "tablet"})
+    assert caught.value.rule_id == "device.slot-out-of-range"
+
+
+def test_a_machine_with_no_pointer_device_declares_none():
+    machine = _machine_with_pointer({})
+    assert machine.pointer == {}
+
+
+# The RNG (D125, narrowing D91): always `rng0`, a portable device
+# name — never a backend-internal spelling.
+
+def _machine_with_rng(rng):
+    return _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                    "devices": rng}]).machines["rig"]
+
+
+def test_an_rng_device_is_a_bare_value():
+    machine = _machine_with_rng({"rng0": "virtio-rng"})
+    assert machine.rng["rng0"].model == "virtio-rng"
+
+
+def test_an_unknown_rng_device_is_refused():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_rng({"rng0": "virtio-rng-pci"})
+    assert caught.value.rule_id == "value.not-in-vocabulary"
+
+
+def test_an_rng_device_takes_no_reference():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_rng({"rng0": "${device}"})
+    assert caught.value.rule_id == "ref.not-allowed-here"
+
+
+def test_rng_has_no_second_slot():
+    with pytest.raises(StaticError) as caught:
+        _machine_with_rng({"rng1": "virtio-rng"})
+    assert caught.value.rule_id == "device.slot-out-of-range"
+
+
+def test_a_machine_with_no_rng_declares_none():
+    machine = _machine_with_rng({})
+    assert machine.rng == {}
+
+
+def test_drives_nics_shares_pointer_and_rng_share_one_devices_map():
+    doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                   "devices": {"hdd0": "blank", "net0": "nat",
+                               "share0": "hostdir", "pointer0": "tablet",
+                               "rng0": "virtio-rng"}}])
+    machine = doc.machines["rig"]
+    assert set(machine.devices) == {
+        "hdd0", "net0", "share0", "pointer0", "rng0"}
+    assert set(machine.drives) == {"hdd0"}
+    assert set(machine.network) == {"net0"}
+    assert set(machine.shares) == {"share0"}
+    assert set(machine.pointer) == {"pointer0"}
+    assert set(machine.rng) == {"rng0"}
+
+
+def test_boot_refuses_a_pointer_slot():
+    with pytest.raises(StaticError) as caught:
+        _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                 "devices": {"pointer0": "tablet"}, "boot": ["pointer0"]}])
+    assert caught.value.rule_id == "drive.boot-undeclared"
+
+
+def test_boot_refuses_an_rng_slot():
+    with pytest.raises(StaticError) as caught:
+        _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                 "devices": {"rng0": "virtio-rng"}, "boot": ["rng0"]}])
+    assert caught.value.rule_id == "drive.boot-undeclared"
+
+
+def test_pointing_device_is_no_longer_a_top_level_field():
+    with pytest.raises(StaticError) as caught:
+        _parse([{"type": "machine", "name": "rig", "platform": "dos",
+                 "pointing-device": "tablet"}])
+    assert caught.value.rule_id == "field.unknown"

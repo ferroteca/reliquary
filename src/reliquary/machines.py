@@ -175,7 +175,7 @@ def _resolve_control_planes(machine):
             or _default_control_planes(machine.platform))
 
 
-def _resolve_pointing_device(machine):
+def _pointer_value(machine):
     """The machine's pointer input device, with the default filled in.
 
     ``mouse`` (a standard relative-motion device) is what every
@@ -185,7 +185,30 @@ def _resolve_pointing_device(machine):
     get a more specific default, the same way `_default_control_planes`
     will eventually get richer per-platform defaults of its own.
     """
-    return machine.pointing_device or "mouse"
+    device = machine.pointer.get("pointer0")
+    return device.value if device is not None else "mouse"
+
+
+def _resolve_pointer(machine):
+    """This machine's `pointer0` slot, resolved into a state entry
+    (D124). Always present, unlike `net`/`share`/`rng`, which are
+    absent entirely when undeclared: every machine has a pointer
+    device whether or not one was named, so the default is filled in
+    here rather than by leaving the slot out.
+    """
+    return {"pointer0": {"value": _pointer_value(machine)}}
+
+
+def _resolve_rng(rng):
+    """This machine's `rng` slots, resolved into state entries (D125).
+
+    ``rng-model`` — not ``model`` — is the entry's key: a share entry
+    also carries a ``model`` key in the same merged `devices` state
+    map, and the two must stay tellable apart by key alone the way a
+    drive's ``medium`` and a NIC's ``attachment`` already are.
+    """
+    return {key: {"rng-model": device.model}
+            for key, device in sorted(rng.items())}
 
 
 def _backend_choice(machine):
@@ -251,11 +274,13 @@ def _requirements(machine, namespace):
     share_models = sorted({share.model for share in enabled_shares
                            if share.model is not None})
     share_unstated = any(share.model is None for share in enabled_shares)
+    rng_models = sorted({device.model for device in machine.rng.values()})
     return backends.Requirements(
         control_planes=tuple(planes), media=tuple(media),
         controllers=tuple(controllers), materialize=tuple(modes),
         platform=machine.platform,
-        pointing_device=_resolve_pointing_device(machine),
+        pointing_device=_pointer_value(machine),
+        rng_models=tuple(rng_models),
         network_attachments=tuple(network_attachments),
         network_models=tuple(network_models),
         share_models=tuple(share_models),
@@ -515,7 +540,8 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
             key, share, adapter, machine.platform, namespace, context,
             properties, events)
     resolved_devices = {**resolved_drives, **resolved_network,
-                        **resolved_shares}
+                        **resolved_shares, **_resolve_pointer(machine),
+                        **_resolve_rng(machine.rng)}
 
     memory = machine.memory
     if memory is None:
@@ -529,7 +555,6 @@ def _materialize_machine(machine, namespace, machine_id, blueprint_name,
         "name": machine.name,
         "description": machine.description,
         "control-planes": control_planes,
-        "pointing-device": _resolve_pointing_device(machine),
         "backend-settings": {
             name: dict(section)
             for name, section in machine.backend_settings.items()},
@@ -901,6 +926,9 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         _dry_share(key, share, adapter, machine.platform, namespace, context,
                   bound.values, entries)
         for key, share in sorted(machine.shares.items()) if share.enabled]
+    pointer = [{"key": "pointer0", **_resolve_pointer(machine)["pointer0"]}]
+    rng = [{**entry, "key": key}
+          for key, entry in sorted(_resolve_rng(machine.rng).items())]
     memory = machine.memory
     if memory is None:
         memory = _PLATFORM_MEMORY.get(machine.platform, 16)
@@ -918,8 +946,7 @@ def _dry_create(machine, namespace, *, context, blueprint_name, source,
         "cpus": machine.cpus if machine.cpus is not None else 1,
         "boot": list(machine.boot),
         "control-planes": _resolve_control_planes(machine),
-        "pointing-device": _resolve_pointing_device(machine),
-        "devices": drives + network + shares,
+        "devices": drives + network + shares + pointer + rng,
         "media": entries,
         "properties": dict(bound.sources),
     }
@@ -961,6 +988,11 @@ def _share_line(entry):
     return f"  {entry['key']} ({entry['model']}): {entry['media']} -> {target}"
 
 
+def _rng_line(entry):
+    """One RNG device's line in the report (D125)."""
+    return f"  {entry['key']} ({entry['rng-model']})"
+
+
 def _media_line(entry):
     """One media's line: its residency, and what it resolved to."""
     if entry["state"] == "unbound":
@@ -989,11 +1021,14 @@ def _dry_report(plan):
     if plan["boot"]:
         lines.append("boot: " + ", ".join(plan["boot"]))
     lines.append("control planes: " + ", ".join(plan["control-planes"]))
-    lines.append(f"pointing device: {plan['pointing-device']}")
     drives = [d for d in plan["devices"] if "medium" in d]
     network = [d for d in plan["devices"] if "attachment" in d]
+    pointer = [d for d in plan["devices"] if "value" in d]
+    rng = [d for d in plan["devices"] if "rng-model" in d]
     shares = [d for d in plan["devices"]
-             if "medium" not in d and "attachment" not in d]
+             if "medium" not in d and "attachment" not in d
+             and "value" not in d and "rng-model" not in d]
+    lines.append(f"pointer: {pointer[0]['value']}")
     if network:
         lines.append("network:")
         lines.extend(_network_line(entry) for entry in network)
@@ -1003,6 +1038,9 @@ def _dry_report(plan):
     if shares:
         lines.append("shares:")
         lines.extend(_share_line(entry) for entry in shares)
+    if rng:
+        lines.append("rng:")
+        lines.extend(_rng_line(entry) for entry in rng)
     if plan["media"]:
         lines.append("media:")
         lines.extend(_media_line(entry) for entry in plan["media"])
@@ -1263,7 +1301,8 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             new_shares[key] = _materialize_share(
                 key, share, adapter, parsed.platform, namespace, context,
                 bound, events)
-        new_devices = {**new_drives, **new_network, **new_shares}
+        new_devices = {**new_drives, **new_network, **new_shares,
+                       **_resolve_pointer(parsed), **_resolve_rng(parsed.rng)}
 
         memory = parsed.memory
         if memory is None:
@@ -1277,7 +1316,6 @@ def apply_blueprint(*, machine=None, blueprint=None, context=None,
             "name": parsed.name,
             "description": parsed.description,
             "control-planes": control_planes,
-            "pointing-device": _resolve_pointing_device(parsed),
             "backend-settings": {
                 name: dict(section)
                 for name, section in parsed.backend_settings.items()},
@@ -1437,8 +1475,14 @@ def _start_locked(machine_id, *, display=False, context=None, events=None,
 
     devices = state.get("devices", {})
     drives = [entry for entry in devices.values() if "medium" in entry]
+    # A pointer entry carries "value" and an rng entry carries
+    # "rng-model" (never "model" — a share already owns that key in
+    # this same merged map, D124/D125), so both are excluded here the
+    # same way a NIC's "attachment" already is: neither needs the
+    # re-fetch/re-verify a `use` drive or a share gets below.
     shares = [entry for entry in devices.values()
-             if "medium" not in entry and "attachment" not in entry]
+             if "medium" not in entry and "attachment" not in entry
+             and "value" not in entry and "rng-model" not in entry]
     namespace = load_namespace(context)
     for drive in drives:
         media_name = drive.get("media")

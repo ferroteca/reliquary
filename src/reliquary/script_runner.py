@@ -2392,10 +2392,11 @@ def _preflight_landmarks(script, machine_state, script_path, context):
     check done at the *condition's* granularity rather than the
     whole script's, since a script that watches no landmark makes no
     demand on the plane at all. `click` (F66) adds three more checks
-    that apply only to it: the machine's `pointing-device` must be
-    `tablet`; the driving plane must be able to deliver a pointer
-    event even if it captures one (a plane can have one capability
-    without the other); and the `spot=` check above.
+    that apply only to it: the machine's pointer device
+    (`devices.pointer0`, D124) must be `tablet`; the driving plane
+    must be able to deliver a pointer event even if it captures one (a
+    plane can have one capability without the other); and the `spot=`
+    check above.
     """
     namespace = None
     resolved = {}
@@ -2426,15 +2427,15 @@ def _preflight_landmarks(script, machine_state, script_path, context):
             if node.verb != "click":
                 continue
             if pointer_capable is None:
-                pointing_device = machine_state.get(
-                    "pointing-device", "mouse")
+                pointing_device = machine_state.get("devices", {}).get(
+                    "pointer0", {}).get("value", "mouse")
                 pointer_capable = _backends.adapter(
                     machine_state["backend"]).pointer_capable(plane)
             if pointing_device != "tablet":
                 raise ScriptPreflightError(
                     "click needs an absolute pointing device and this "
                     f"machine's is {pointing_device!r}; declare "
-                    "\"pointing-device\": \"tablet\" in the blueprint",
+                    '"devices": {"pointer0": "tablet"} in the blueprint',
                     statement=node, path=script_path,
                     rule_id="machine.pointing-device-not-tablet")
             if not pointer_capable:

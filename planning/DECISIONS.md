@@ -124,6 +124,66 @@ pressure worth re-examining once the surrounding area firms up.
 
 ## Decided
 
+- D125 — A PORTABLE `rng` DEVICE JOINS `devices` AS AN `rng0` SLOT,
+  NARROWING D91 RATHER THAN REVERSING IT — DECIDED (owner,
+  2026-08-30) and delivered the same day, promoting U22 to the
+  current list. Supports U22; P25.
+
+  D91 was overruled for putting `virtio-rng-pci` into the blueprint's
+  vocabulary by name — that name is QEMU's own internal
+  bus-addressing spelling, not something portable across backends,
+  and D93 shut down building the shared vocabulary out of one
+  backend's internal names. That specific objection still holds
+  today. What's changed since is D122: it already lets a `net`
+  device or a share name real hardware directly through `model` — a
+  value checked against whichever backend is actually assigned,
+  refused by name on any backend that doesn't have it — as long as
+  the name is real, general hardware, not a backend's own internal
+  spelling. This decision applies that same rule to a random-number
+  generator: `devices` gains an `rng0` slot, whose value is a
+  portable name, currently `virtio-rng` only, capability-checked the
+  same way a NIC's or a share's `model` is. QEMU renders it as
+  `-device virtio-rng-pci,id=rng0`; every other backend refuses it by
+  name until one actually builds the capability. Leaving `rng0` out
+  means the machine has no RNG device at all, the same way leaving
+  out every `net` key means it has no NIC.
+
+  The demand is U22's driver-testing harness (the `driver-rig`
+  example in `planning/proposed/USE-CASES.md`), which already worked
+  through `backend-settings.qemu.args` but wanted this named as
+  portable vocabulary instead of a QEMU-only argument, so the
+  declaration stays meaningful if another backend ever grows the same
+  capability. That's the first real device U22's growable vocabulary
+  actually delivers, so U22 moves to the current list the same way
+  U28 did for network devices — future devices join the same way,
+  one name at a time, without needing a new use case each time.
+
+- D124 — THE POINTER INPUT DEVICE MOVES FROM ITS OWN `pointing-device`
+  FIELD INTO `devices`, AS A `pointer0` SLOT — DECIDED (owner,
+  2026-08-30) and delivered the same day, extending D121's device-map
+  merge to a fourth device kind. Supports U5; P25.
+
+  Since D121, `devices` already holds drives, NICs, and shares in one
+  slot-keyed map, discriminated by the key's own medium. The pointer
+  input device was the one piece of machine topology left outside
+  that map, in its own top-level `pointing-device` field with no
+  slot. This decision moves it in: `pointer0` is the only valid key —
+  a machine has at most one active pointing device, so there is no
+  `pointer1` — and its value is the same three choices as before:
+  `tablet`, `mouse`, or `virtio-mouse`. Leaving `pointer0` out still
+  means the same default leaving out `pointing-device` used to mean:
+  `mouse`. Every check that used to run against `pointing-device` —
+  the capability check against the assigned backend, `click`'s
+  refusal of every device but `tablet` — still runs the same way, now
+  reading the value from `devices.pointer0` instead of a separate
+  field.
+
+  This is a breaking rename of an already-shipped field (F66, T34).
+  Before 1.0 there is no compatibility promise (P9), so it lands as
+  one complete change: the old field is gone outright, not
+  deprecated, matching how T34 renamed the share and NIC model names
+  the same day it added them.
+
 - D123 — A SHARE'S INLINE-MEDIA FORM IS THE INTENDED ONE; THE MODEL AND
   ITS DOCS WERE THE DRIFT — DECIDED (owner, 2026-08-30) and delivered
   the same day, striking T33. Supports U14, U21; extends F72's own
@@ -4415,3 +4475,9 @@ same surface-change process as anything else.
   spelling, not a name that's portable across backends, and
   admitting a device vocabulary built out of one backend's internal
   spellings is exactly the mechanism D93 shut down.
+
+  **Narrowed by D125**: a random-number generator did eventually join
+  the portable vocabulary, but under a portable name of its own
+  (`virtio-rng`, checked against the assigned backend the same way a
+  NIC's `model` is) — never under `virtio-rng-pci`, so this entry's
+  objection to that specific spelling is unaffected.

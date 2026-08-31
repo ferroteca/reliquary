@@ -1,8 +1,8 @@
-// invalid: closed vocabulary: devices.pointer0
+// invalid: closed vocabulary: devices.rng0
 // spec: Reach
 // schema: rejects
 // id: ref.not-allowed-here
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "devices": { "pointer0": "${device}", "cdrom0": null } }
+    "devices": { "rng0": "${device}", "cdrom0": null } }
 ]

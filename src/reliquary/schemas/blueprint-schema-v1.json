@@ -48,11 +48,11 @@
         },
         "cpus": {"type": ["string", "integer"]},
         "devices": {
-          "description": "Drives, NICs, and shares share one slot-keyed map (D121, F68).",
+          "description": "Drives, NICs, shares, the pointer device, and the RNG share one slot-keyed map (D121, F68, D124, D125).",
           "type": "object",
           "propertyNames": {
             "description": "Slot keys are fixed and never take a reference: an object key is authored graph.",
-            "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?|net[0-3]|share[0-3]?)$"
+            "pattern": "^(floppy[01]?|hdd[0-3]?|cdrom[0-3]?|net[0-3]|share[0-3]?|pointer0?|rng0?)$"
           },
           "additionalProperties": {"$ref": "#/$defs/device"}
         },
@@ -75,10 +75,6 @@
             "enum": ["agentless-display", "vnc", "serial-console", "guest-agent"]
           }
         },
-        "pointing-device": {
-          "description": "The pointer input device (F66; virtio-mouse added by T34). Omitted, it resolves to the platform's default (mouse, today). Never supplied by a reference.",
-          "enum": ["tablet", "mouse", "virtio-mouse"]
-        },
         "backend-settings": {
           "type": "object",
           "propertyNames": {"enum": ["qemu", "virtualbox", "vmware", "hyperv"]},
@@ -90,11 +86,13 @@
     },
 
     "device": {
-      "description": "A drive (floppy/hdd/cdrom), a NIC (net), or a share (F68), discriminated by slot key medium, not by shape — anyOf rather than oneOf because a bare media name and a bare attachment name are both plain strings and can't be told apart by shape alone; the parser is what actually discriminates, by the slot key (D121).",
+      "description": "A drive (floppy/hdd/cdrom), a NIC (net), a share (F68), the pointer device (pointer, D124), or an RNG (rng, D125), discriminated by slot key medium, not by shape — anyOf rather than oneOf because a bare media name and a bare attachment name are both plain strings and can't be told apart by shape alone; the parser is what actually discriminates, by the slot key (D121).",
       "anyOf": [
         {"$ref": "#/$defs/drive"},
         {"$ref": "#/$defs/networkDevice"},
-        {"$ref": "#/$defs/shareDevice"}
+        {"$ref": "#/$defs/shareDevice"},
+        {"$ref": "#/$defs/pointerDevice"},
+        {"$ref": "#/$defs/rngDevice"}
       ]
     },
 
@@ -168,6 +166,16 @@
         },
         {"$ref": "#/$defs/media"}
       ]
+    },
+
+    "pointerDevice": {
+      "description": "The pointer input device (F66; virtio-mouse added by T34; moved into devices by D124). Omitted, it resolves to the platform's default (mouse, today). Never supplied by a reference.",
+      "enum": ["tablet", "mouse", "virtio-mouse"]
+    },
+
+    "rngDevice": {
+      "description": "A portable RNG device name (D125, narrowing D91) — never a backend-internal spelling. Never supplied by a reference.",
+      "enum": ["virtio-rng"]
     },
 
     "media": {

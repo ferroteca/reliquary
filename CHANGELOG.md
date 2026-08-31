@@ -237,19 +237,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cursor afterward. Coordinates are always framebuffer pixels, the
   same coordinate space a landmark is defined in, so no separate
   scaling is needed.
-- **`pointing-device` is now a machine field**, set to `tablet` or
-  `mouse`, checked against backend capability at assignment time the
-  same way `drives` already is — if a blueprint declares `tablet` and
-  the assigned backend can't supply it, assignment fails, naming both
-  the backend and the missing device. Every platform still defaults
-  to `mouse`, the standard relative pointing device every machine
-  already has. QEMU renders `tablet` as
-  `-usb -device usb-tablet,id=pointer0` and reports both device types
-  in its capability report. `click` refuses to run, before doing
-  anything, on a machine whose `pointing-device` is `mouse`, naming
-  the reason: an absolute click position needs an absolute pointing
-  device, and reliquary won't guess a calibration against a relative
-  one (P10).
+- **A machine can now declare a pointer input device**, at
+  `devices.pointer0`, set to `tablet` or `mouse`, checked against
+  backend capability at assignment time the same way `drives` already
+  is — if a blueprint declares `tablet` and the assigned backend
+  can't supply it, assignment fails, naming both the backend and the
+  missing device. Every platform still defaults to `mouse`, the
+  standard relative pointing device every machine already has. QEMU
+  renders `tablet` as `-usb -device usb-tablet,id=pointer0` and
+  reports both device types in its capability report. `click` refuses
+  to run, before doing anything, on a machine whose `devices.pointer0`
+  is `mouse`, naming the reason: an absolute click position needs an
+  absolute pointing device, and reliquary won't guess a calibration
+  against a relative one (P10).
 - **`click` gets the same before-it-runs capability check landmark
   conditions do, plus one more.** `click` needs everything a landmark
   condition needs (framebuffer capture) plus the ability to deliver a
@@ -392,7 +392,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of being silently ignored. The flag is recorded on the
   machine's resolved share entry, since a backend renders from that
   and never sees the media.
-- **A machine can now declare `pointing-device: virtio-mouse`** (T34).
+- **A machine can now declare `devices.pointer0: virtio-mouse`** (T34).
   Omitted or `mouse`, a machine still gets QEMU's implicit legacy PS/2
   mouse, unchanged. `virtio-mouse` is the same relative device family,
   rendered explicitly instead — `-device virtio-mouse-pci,id=pointer0`
@@ -400,6 +400,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   one, DOS included, should stay on the implicit `mouse`. `click`
   still refuses any pointing device but `tablet` (`machine.pointing-
   device-not-tablet`), unchanged.
+- **The pointer input device moves into `devices`, at the fixed key
+  `pointer0`** (T35, D124), replacing the top-level `pointing-device`
+  field: `tablet`/`mouse`/`virtio-mouse` mean exactly what they did
+  before, just declared as `"devices": {"pointer0": "tablet"}` instead
+  of `"pointing-device": "tablet"`. Neither field has shipped in a
+  release yet, so this is a plain rename with nothing to migrate.
+- **A machine can now declare an RNG device**, at `devices.rng0`, set
+  to `virtio-rng` (T35, D125, narrowing D91) — a portable name, never
+  QEMU's own internal bus-addressing spelling (`virtio-rng-pci`),
+  checked against the assigned backend's capability report the same
+  way a NIC's or a share's `model` is. QEMU renders it as
+  `-device virtio-rng-pci,id=rng0`; every other backend refuses it by
+  name until one actually builds the capability. Omitted, the machine
+  has no RNG device at all, the same way omitting every `net` key
+  means it has no NIC. The demand is a driver-testing harness that
+  previously reached the device only through `backend-settings.qemu.
+  args` (`planning/proposed/USE-CASES.md`'s `driver-rig` example,
+  U22) and wanted it named as portable vocabulary instead.
 
 ### Fixed
 

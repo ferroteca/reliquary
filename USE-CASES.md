@@ -412,3 +412,190 @@ names the number it superseded.
      `rlq run-script install --blueprint <name>`. An attachment or a
      model the assigned backend can't provide fails closed at
      materialization, naming both (P11).
+
+- **U22 — The device is the machine's whole point.** A developer
+  writing a guest-side driver for a paravirtual device tests it from
+  their own harness, in a machine that exists for one reason: to have
+  that one particular device present for the driver to bind to.
+  Without it, nothing under test even runs — not a weaker test, a
+  completely different one. Declaring the device in the blueprint
+  makes it a portable fact instead of a raw engine argument:
+  assignment finds any backend that provides it, a host where none
+  can refuses up front and names the missing device, the blueprint
+  stays shareable and checkable into source control (U4/U17), and the
+  whole loop — stage, load, exercise, read results back, dispose —
+  runs from the caller's own code through one tool, with no raw
+  engine flags and no second test harness. `rng0` is the first device
+  this pattern actually delivers (D125): a portable name
+  (`virtio-rng`), not a backend's own internal spelling
+  (`virtio-rng-pci`), capability-checked against the assigned backend
+  the same way a NIC's or a share's `model` is. Other devices join the
+  same way, one name at a time; a device the vocabulary doesn't name
+  yet is still reachable through the backend's own settings section,
+  at the cost of portability. Whether the *guest* even has a driver
+  for the device stays the caller's own business — the machine just
+  provides the hardware, and supplying the driver is the whole point
+  of the exercise.
+
+  **The use case, step by step** — a precise recipe over Reliquary's
+  real interfaces: a user should be able to follow it exactly as
+  written and reach the goal. Every command shown here is the
+  interface as it actually stands today. The steps below show the
+  API; every one also has an equivalent CLI command (U9).
+
+  1. **The intent.** "I built `DRIVER.EXE` — a DOS driver for a
+     paravirtual device — with my host toolchain, and I want to test
+     it against the real device model, from my own test harness." The
+     build lands in `build\out\`, alongside its load-time transport
+     tool (`TRANSPRT.EXE`) and its exerciser (`DRVTEST.EXE`), which
+     exits `0` on success and `1` on any failure.
+
+  2. **Pin everything to the project's own directory tree** (U17).
+     The harness builds one context object and passes it everywhere;
+     nothing resolves from the user's home directory, and nothing
+     resolves out of the codex on any interface, so the checked-in
+     files are the only source Reliquary can pull from (D88 — there's
+     no setting to turn this off):
+
+     ```python
+     ctx = reliquary.Context(
+         home_dir=".rig",              # caches and machines land here
+         blueprints_dir="blueprints",  # checked in, used in place
+         scripts_dir="scripts")
+     ```
+
+  3. **Write `blueprints\driver-rig.rlqb`**, checked into the repo —
+     declaring the device as a portable fact, with the work drive
+     pointing straight at the build output. Relative paths resolve
+     against the project's own directories, so the file stays
+     portable across checkouts:
+
+     ```json
+     [
+       {
+         "type": "machine",
+         "name": "driver-rig",
+         "platform": "dos",
+         "memory": "32M",
+         "boot": ["hdd0"],
+         "scripts": {
+           "ready": "driver-ready"
+         },
+         "devices": {
+           "rng0": "virtio-rng",
+           "hdd0": {
+             "type": "media",
+             "name": "dos-base",
+             "location": {"local": "images/dos-base.img"},
+             "materialize": "difference"
+           },
+           "hdd1": {
+             "type": "media",
+             "name": "work",
+             "location": {"local": "build/out"},
+             "materialize": "use"
+           }
+         }
+       }
+     ]
+     ```
+
+     `hdd0` materializes as a differencing image on top of the
+     checked-in installed base, so every machine boots the exact same
+     bytes and the base image is never written to; `hdd1` *is* the
+     build directory, served to the guest as one FAT volume. No
+     `backend` is pinned: assignment walks the usual priority order
+     and picks the first backend whose capability report claims
+     `rng0`'s device (D125) — today, only QEMU's does, so a host
+     without QEMU, or a QEMU whose adapter hasn't declared the device,
+     refuses at preflight, naming what's missing, rather than QEMU
+     simply being asked for it directly. A device the vocabulary
+     doesn't name yet still goes through `backend-settings` (D92) —
+     pinning the backend, asking for the device in that backend's own
+     configuration language — at the cost of portability; that's
+     exactly what this use case buys once a device joins the shared
+     vocabulary.
+
+  4. **Write `scripts\driver-ready.rlqs`** — the caller's own
+     readiness check, since Reliquary doesn't ship a built-in
+     readiness policy (this is U14's usual pattern: the guest says
+     it's ready, and the host reads that back):
+
+     ```text
+     description "Boot to a DOS prompt and say so"
+     platform dos
+     machine  stopped
+     timeout  2m
+
+     start
+     wait /[A-Z]:\\.*>/
+     set ready "yes"
+     ```
+
+  5. **Create the machine.**
+     `reliquary.create_machine("driver-rig", context=ctx)` — with the
+     CLI equivalent `rlq create-machine --blueprint driver-rig` —
+     returns `"driver-rig-0"`. The priority walk probes `qemu` first
+     and finds it capable of `rng0`'s device, so that's what this
+     machine resolves to; a host with no backend able to provide the
+     device refuses **right here**, at preflight, naming it — a
+     `PreflightError`, exit code `3` on the CLI — instead of failing
+     later, mid-boot, as a driver that mysteriously won't load. The
+     device is capability-checked the same way any other `devices`
+     entry is, so any machine that actually gets created is one whose
+     device is guaranteed to be there at every start.
+
+  6. **Boot, and let the guest say it's ready.**
+     `reliquary.run_script("ready", machine="driver-rig-0",
+     context=ctx)` looks up the blueprint's `scripts` map, starts the
+     stopped machine the way the script's own `start` step directs,
+     waits for the boot to reach a prompt, and sets the variable;
+     `reliquary.get_machine_var("ready", machine="driver-rig-0",
+     context=ctx)` reads back `"yes"`.
+
+  7. **Load the driver — a setup step whose output is nothing and
+     whose success is everything.** Run these in order, once per
+     session, each one checked for success (D89):
+
+     ```python
+     reliquary.exec(r"D:\TRANSPRT.EXE", check=True,
+                    machine="driver-rig-0", context=ctx)
+     reliquary.exec(r"D:\DRIVER.EXE", check=True,
+                    machine="driver-rig-0", context=ctx)
+     ```
+
+     After each command, Reliquary's interaction layer checks the
+     guest with `IF ERRORLEVEL 1` and a sentinel it composes itself.
+     If a command signals failure — "no device present," already
+     loaded, wrong load order — Reliquary raises `RunFailure`, naming
+     the command that failed (exit code `4` on the CLI), so a rejected
+     loader ends the session right there with one clear failure,
+     instead of every later test failing in confusing ways. What each
+     command returns is unchanged otherwise. A command that never ran
+     at all — say, a typo — doesn't get caught by this check: it's
+     only designed to catch commands that ran and then signaled
+     failure.
+
+  8. **Exercise the driver, and read the results back.**
+     `rows = reliquary.exec(r"D:\DRVTEST.EXE 48",
+     machine="driver-rig-0", timeout=30, context=ctx)` returns the
+     screen's rows, and parsing them is entirely the caller's own
+     business (P18) — Reliquary doesn't interpret them at all. For
+     bulkier results, redirect them in the guest to the work drive
+     instead (`DRVTEST -v > D:\RUN.LOG`), and the caller reads them
+     **straight off its own host directory** once the machine stops:
+     the work drive *is* that directory, so nothing needs to be
+     fetched back separately (D108). The guest drive letter `D:` is
+     the author's own choice — it appears in the guest commands above
+     because the author built the machine that way, not because
+     Reliquary reported it.
+
+  9. **Iterate, then dispose of the machine.** Rebuild the driver;
+     because the work drive reads straight from its source directory,
+     it picks up the new build automatically at the next start. So one
+     round looks like `stop_machine` → `run_script("ready")` → load →
+     exercise — or, when rebooting each round becomes the bottleneck,
+     U20's live `insert-media --file` swap instead. When the work is
+     done, `reliquary.destroy_machine("driver-rig-0", ctx)` cleans up:
+     nothing is left behind except the results the caller chose to
+     keep (U14).

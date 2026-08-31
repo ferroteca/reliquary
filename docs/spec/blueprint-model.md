@@ -99,12 +99,13 @@ required type is an error.
 
 Topology only — no content lives here. `platform` (required,
 never inferred — P10), `backend`, `memory`, `cpus`, `boot`,
-`control-planes`, `pointing-device`, `devices`, `backend-settings`,
+`control-planes`, `devices`, `backend-settings`,
 `description`, `scripts`, `parameters`, and `name`.
 
 `devices` maps a slot key (`hdd0`, `cdrom0`, `floppy0`, `net0`,
-`share0`, …) to a drive, a NIC, or a share — the three kinds share
-one map and one key-clash check, discriminated by the key's own
+`share0`, `pointer0`, `rng0`, …) to a drive, a NIC, a share, the
+pointer input device, or an RNG — the five kinds share one map and
+one key-clash check, discriminated by the key's own
 medium (D121). A drive value is one of:
 
 - a **media name** (string) — the catalog reference;
@@ -142,14 +143,17 @@ cannot carry.
   openbsd 512, win9x 64, winnt 256.
 - **`cpus`** defaults to 1.
 - **device keys** name a medium and a slot (`floppy` 0–1, `hdd`
-  0–3, `cdrom` 0–3, `net` 0–3, `share` 0–3), all sharing one
-  keyspace and one clash check (D121) — declaring `hdd0` and `net0`
-  in the same `devices` map is fine, but naming one slot twice, in
-  either spelling, is a **clash** and fails validation, as does a
-  slot outside its medium's range. Only drive keys (`floppy`/`hdd`/
-  `cdrom`) get the **bare-medium-is-an-alias-for-slot-0** shorthand
-  (`hdd` ≡ `hdd0`); a NIC or a share is always named by its full
-  slot key. The state always records the indexed form.
+  0–3, `cdrom` 0–3, `net` 0–3, `share` 0–3, `pointer` 0 only, `rng`
+  0 only), all sharing one keyspace and one clash check (D121, D124,
+  D125) — declaring `hdd0` and `net0` in the same `devices` map is
+  fine, but naming one slot twice, in either spelling, is a **clash**
+  and fails validation, as does a slot outside its medium's range.
+  Only drive keys (`floppy`/`hdd`/`cdrom`) get the
+  **bare-medium-is-an-alias-for-slot-0** shorthand (`hdd` ≡ `hdd0`);
+  a NIC, a share, the pointer device, or an RNG is always named by
+  its full slot key — `pointer0` and `rng0` are also the *only*
+  legal spellings, since neither medium has a second slot. The state
+  always records the indexed form.
 - **`controller`** is valid on `hdd` and `cdrom` only — a floppy
   attaches to the floppy controller implicitly and **rejects the
   key**. Omitted, it resolves to `ide`, recorded into the state at
@@ -263,24 +267,38 @@ cannot carry.
   nothing installed or running in the guest. Defaults that differ
   by platform will arrive once a platform has planes that justify
   a different default.
-- **`pointing-device`** (F66, `virtio-mouse` added by T34) is
-  `tablet`, `mouse`, or `virtio-mouse`, judged the same way as
-  `control-planes`: capability-checked against the assigned backend
-  at materialization, failing closed naming both the backend and
-  the device. Tablet is the one absolute device — a PS/2 mouse and
-  `virtio-mouse` both report relative motion, and the guest's own
-  driver applies acceleration the host cannot observe (P10) — so
-  `click` preflight-refuses any pointing device but `tablet` by
-  name, rather than attempting a calibration guess. Omitted, it
-  resolves to `mouse` — the plain relative device every platform's
-  machine has anyway, so the default matches what's actually there
-  rather than assuming something better. `virtio-mouse` is the same
-  relative device family, rendered as an explicit paravirtualized
-  device instead of the platform's implicit legacy one; a blueprint
-  names it only when it wants that explicit rendering, since a guest
-  with no virtio driver — DOS included — should stay on the implicit
-  `mouse`. A GUI-era platform will get a richer default once it has
-  one to justify it, the same way `control-planes` will.
+- **`pointer` keys** (F66, `virtio-mouse` added by T34, moved into
+  `devices` by D124) name the pointer input device: `pointer0` is
+  the only legal key, and its value is `tablet`, `mouse`, or
+  `virtio-mouse`, judged the same way as `control-planes`:
+  capability-checked against the assigned backend at materialization,
+  failing closed naming both the backend and the device. Tablet is
+  the one absolute device — a PS/2 mouse and `virtio-mouse` both
+  report relative motion, and the guest's own driver applies
+  acceleration the host cannot observe (P10) — so `click`
+  preflight-refuses any pointing device but `tablet` by name, rather
+  than attempting a calibration guess. Omitted, it resolves to
+  `mouse` — the plain relative device every platform's machine has
+  anyway, so the default matches what's actually there rather than
+  assuming something better. `virtio-mouse` is the same relative
+  device family, rendered as an explicit paravirtualized device
+  instead of the platform's implicit legacy one; a blueprint names it
+  only when it wants that explicit rendering, since a guest with no
+  virtio driver — DOS included — should stay on the implicit `mouse`.
+  A GUI-era platform will get a richer default once it has one to
+  justify it, the same way `control-planes` will.
+- **`rng` keys** (D125, narrowing D91) name a random-number
+  generator device: `rng0` is the only legal key, and its value is a
+  portable device name — today, only `virtio-rng` — checked and
+  rendered the same way a NIC's or a share's `model` is: honored
+  where the assigned backend's capability report claims it, refused
+  by name otherwise. `virtio-rng` is Reliquary's own portable name,
+  never QEMU's internal bus-addressing spelling
+  (`virtio-rng-pci`) — D91 was overruled specifically for admitting
+  that spelling; D125 admits the portable name instead, following the
+  same rule a NIC's `model` already does. Omitted, the machine has no
+  RNG device at all, the same way omitting every `net` key means it
+  has no NIC.
 - **`backend-settings`** is the **only** place backend-specific
   configuration may appear, which is what makes a blueprint
   without it portable by construction. One section per backend
@@ -681,9 +699,9 @@ Two exclusions, and they have different grounds:
    reference. The catalog and the authored graph stay static
    (G3) — the same ground that killed the `children` glob.
 2. **Closed vocabularies.** `platform`, `backend`,
-   `materialize`, `controller`, `control-planes` items, and
-   `pointing-device` never take a reference. These are where a
-   published schema's
+   `materialize`, `controller`, `control-planes` items, and the
+   `pointer`/`rng` device values never take a reference. These are
+   where a published schema's
    completion is most valuable and where a reference destroys
    it (U4, U5), and they have no named case asking for one.
    `platform` is the sharpest instance: P10 has it never

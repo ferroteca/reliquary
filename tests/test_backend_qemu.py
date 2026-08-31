@@ -800,7 +800,7 @@ def test_pointing_device_tablet_renders_the_usb_device():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "tab-0", "backend-id": "reliquary-tab-0", "memory": 32,
-        "boot": [], "devices": {}, "pointing-device": "tablet",
+        "boot": [], "devices": {"pointer0": {"value": "tablet"}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -814,7 +814,7 @@ def test_pointing_device_mouse_renders_nothing_extra():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "mouse-0", "backend-id": "reliquary-mouse-0", "memory": 32,
-        "boot": [], "devices": {}, "pointing-device": "mouse",
+        "boot": [], "devices": {"pointer0": {"value": "mouse"}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -829,7 +829,7 @@ def test_pointing_device_virtio_mouse_renders_the_virtio_device():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "vmouse-0", "backend-id": "reliquary-vmouse-0", "memory": 32,
-        "boot": [], "devices": {}, "pointing-device": "virtio-mouse",
+        "boot": [], "devices": {"pointer0": {"value": "virtio-mouse"}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -894,6 +894,69 @@ def test_the_qemu_adapter_reports_the_network_devices_it_renders():
         report = qemu_module.QemuAdapter().capabilities()
     assert report.network_models == ("pcnet", "ne2k", "virtio-net")
     assert report.network_attachments == ("nat", "bridged")
+
+
+def test_the_qemu_adapter_reports_the_rng_models_it_renders():
+    with mock.patch.object(qemu_module, "probe_share_models",
+                           return_value=()):
+        report = qemu_module.QemuAdapter().capabilities()
+    assert report.rng_models == ("virtio-rng",)
+
+
+def test_an_rng_device_renders_as_virtio_rng_pci():
+    adapter = qemu_module.QemuAdapter()
+    state = {
+        "id": "rng-0", "backend-id": "reliquary-rng-0", "memory": 32,
+        "boot": [], "devices": {"rng0": {"rng-model": "virtio-rng"}},
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=".", backend_dir="qemu")
+    args = launch.call_args.args[0]
+    assert args[-2:] == ["-device", "virtio-rng-pci,id=rng0"]
+
+
+def test_no_rng_device_renders_nothing_extra():
+    adapter = qemu_module.QemuAdapter()
+    state = {
+        "id": "no-rng-0", "backend-id": "reliquary-no-rng-0", "memory": 32,
+        "boot": [], "devices": {},
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=".", backend_dir="qemu")
+    args = launch.call_args.args[0]
+    assert "virtio-rng" not in " ".join(args)
+
+
+def test_a_share_a_pointer_and_an_rng_dont_get_mixed_up(root):
+    # A pointer entry carries "value" and an rng entry carries
+    # "rng-model" — this is the actual boundary D124/D125 added inside
+    # the merged devices map, so it's worth checking directly, not
+    # just in isolation: a share must not swallow either one, and
+    # neither must be classified as the other.
+    adapter = qemu_module.QemuAdapter()
+    work = os.path.join(root, "work")
+    os.makedirs(work)
+    state = {
+        "id": "mixed-0", "backend-id": "reliquary-mixed-0", "memory": 32,
+        "boot": [], "devices": {
+            "share0": {"media": "hostdir", "materialize": "use",
+                      "path": work, "model": "vvfat"},
+            "pointer0": {"value": "tablet"},
+            "rng0": {"rng-model": "virtio-rng"},
+        },
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=".", backend_dir="qemu")
+    joined = " ".join(launch.call_args.args[0])
+    assert "id=share0" in joined
+    assert "usb-tablet,id=pointer0" in joined
+    assert "virtio-rng-pci,id=rng0" in joined
 
 
 def test_the_qemu_adapter_adds_the_share_models_the_binary_actually_has():

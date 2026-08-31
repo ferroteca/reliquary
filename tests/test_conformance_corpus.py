@@ -51,8 +51,8 @@ _CORPUS = os.path.join(_HERE, "fixtures", "conformance", "blueprint")
 
 _ID = re.compile(r"^// id: (\S+)", re.M)
 
-VALID = corpus.fixtures(_CORPUS, "valid", ".rlqb", count=26)
-INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqb", count=48)
+VALID = corpus.fixtures(_CORPUS, "valid", ".rlqb", count=27)
+INVALID = corpus.fixtures(_CORPUS, "invalid", ".rlqb", count=49)
 AT_RESOLUTION = corpus.fixtures(
     _CORPUS, "invalid-at-resolution", ".rlqb", count=2)
 
@@ -208,7 +208,7 @@ def test_the_schema_rejects_exactly_what_the_fixture_declares(fixture):
 
 @pytest.mark.parametrize("vocabulary", [
     "platform", "backend", "materialize", "controller", "control-planes",
-    "pointing-device"])
+    "pointing-device", "rng"])
 def test_a_closed_vocabulary_is_schema_enforced(vocabulary):
     """Confirms closed vocabularies actually reject a `${...}`
     reference, instead of just assuming the schema enforces it.
@@ -324,4 +324,26 @@ def test_a_share_in_a_materialized_state_matches_the_schema(tmp_path):
         machine_id = create_machine("share-bp", context=context)
     state = load_machine_state(machine_id, context)
     assert state["devices"]["share0"]["model"] == "vvfat"
+    jsonschema.validate(state, _STATE_SCHEMA)
+
+
+def test_an_rng_in_a_materialized_state_matches_the_schema(tmp_path):
+    """An RNG (D125) is its own resolved device shape too, keyed by
+    `rng-model` rather than `model` specifically so it can't be
+    mistaken for a share in this same merged map — the schema's
+    `oneOf` needs a fifth branch, and only a real fixture proves it's
+    actually there and actually matches what `_resolve_rng` produces.
+    """
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "rng-bp.rlqb").write_text(json.dumps([
+        {"type": "machine", "name": "rng-bp", "platform": "dos",
+         "devices": {"rng0": "virtio-rng"}},
+    ]), encoding="utf-8")
+    context = Context(home_dir=str(tmp_path / "home"),
+                      blueprints_dir=str(root), scripts_dir=str(root))
+    with fake_backend.installed():
+        machine_id = create_machine("rng-bp", context=context)
+    state = load_machine_state(machine_id, context)
+    assert state["devices"]["rng0"]["rng-model"] == "virtio-rng"
     jsonschema.validate(state, _STATE_SCHEMA)
