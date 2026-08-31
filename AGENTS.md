@@ -302,6 +302,21 @@ workflow:
     decision). It knows nothing about machines and verifies no identity, which is why it's a separate module
     sitting below the adapter.
 
+    `qga.py` is another such wire protocol, the same shape as `rfb.py`: a minimal in-tree client for QEMU Guest
+    Agent's JSON protocol (`QgaClient` — `sync`/`ping`/`run`, over a raw stdlib socket, no new dependency), knowing
+    nothing about machines and verifying no identity of its own. `backend-settings.qemu.guest-agent` (D128,
+    narrowing D93 rather than reversing it) opts a machine into the channel it connects to — `true` or
+    `"virtio-serial"` renders a named `virtserialport` (`org.qemu.guest_agent.0`) over a real UNIX-socket chardev;
+    `"isa-serial"` renders the same chardev on a dedicated second serial port instead, leaving the platform's own
+    default port alone. Both are backed by `guest_agent_socket_path(backend_dir)`, recorded into the started VM's
+    `endpoint` the same way the VNC port already is, so a later caller finds it from state alone. This setting
+    stays QEMU-only on purpose (D93/P25: it names a transport this one backend offers, not a portable concept),
+    and fails closed at validation time on a host with no `socket.AF_UNIX` (Windows, for now) rather than
+    producing a channel nothing can ever reach. `Machine.guest_agent()` (`machine_handle.py`) is the QEMU-only
+    seam that yields a connected `QgaClient`, the same way `Machine.qmp()` yields a raw QMP session — and
+    `rlq guest-agent-ping` / `rlq guest-agent-exec` are its CLI escape hatches, declared in the command manifest
+    the same way `hmp` is.
+
     No adapter, for any backend, ever opens a disk's contents: an adapter creates the images a machine runs on
     and exposes nothing that reads inside one (D108).
   - `backend_virtualbox.py` is the VirtualBox adapter (lifecycle and VDI images from F50; agentless-display
@@ -480,6 +495,9 @@ workflow:
     because it's a handle type, not a family of functions: a machine is addressed by its materialization
     directory, the adapter named in its recorded identity supplies the session (`Machine.session()` /
     `console()`), and `Machine.qmp()` is a QEMU-only escape hatch that refuses to work for any other backend.
+    `Machine.guest_agent()` is the same shape of escape hatch for a QGA channel (D128): it verifies identity
+    through a session first, refuses any backend but QEMU, and reads the socket path off the recorded
+    `endpoint.guest-agent-socket` rather than recomputing it, yielding a connected `qga.QgaClient`.
   - `platform_dos.py` owns DOS provisioning and facades, and today it's down to just `program_name` — the
     drive-letter mapping and the guest-path grammar it used to hold were removed along with volume mapping
     (D108), so nothing in this module translates a host path into a DOS drive letter any more.
@@ -653,7 +671,7 @@ workflow:
     reaching the guest stops the recording for the rest of the run, the same rule that suppresses the automatic
     failure screenshot, applied to this other artifact a run can leave behind.
   - `cli.py` owns command-line parsing, exit codes (`errors.exit_code`, over the one `ReliquaryError` hierarchy),
-    and the output discipline described elsewhere in this file. `_build_parser()` registers all 42 commands
+    and the output discipline described elsewhere in this file. `_build_parser()` registers all 45 commands
     through nine family-specific builder functions and returns `(parser, commands)`; `_COMMANDS` is derived from
     that return value rather than declared separately — it used to be a hand-maintained `frozenset`, which was
     just one more list of the same command names to keep in sync, so don't bring that back. The builders are

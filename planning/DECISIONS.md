@@ -124,6 +124,99 @@ pressure worth re-examining once the surrounding area firms up.
 
 ## Decided
 
+- D128 — A QEMU GUEST-AGENT CONTROL CHANNEL JOINS
+  `backend-settings.qemu` AS `guest-agent`, NARROWING D93 RATHER THAN
+  REVERSING IT — DECIDED (owner, 2026-08-31) and delivered the same
+  day. Supports P25.
+
+  An earlier same-day round explored making this a portable `devices`
+  slot (`console0: virtual-console`), the rng/pointer pattern (D124,
+  D125). That approach was abandoned before landing: the owner's
+  actual requirement was a working guest-agent channel, and a
+  portable device name says nothing about *why* it exists — QEMU
+  Guest Agent (QGA) is not a portable concept at all. VirtualBox has
+  Guest Additions, VMware has VMware Tools, Hyper-V has integration
+  services; each is a completely different mechanism with no shared
+  wire shape a portable name could honestly describe. So this stays
+  exactly what D93 already said backend-specific things must be: a
+  key in `backend-settings.qemu`, never a first-class blueprint field.
+
+  THE SETTING: `backend-settings.qemu.guest-agent` is `true` (the
+  default transport) or an explicit transport name — `"virtio-serial"`
+  or `"isa-serial"`. It is entirely opt-in: omitted, a machine has no
+  guest-agent channel at all, the same as every other
+  `backend-settings` key.
+
+  - `virtio-serial` (the default) renders a virtio-serial bus, a
+    chardev backed by a real UNIX-socket, and a port named
+    `org.qemu.guest_agent.0` — the exact name `qemu-guest-agent`
+    itself looks for inside the guest. This is a `virtserialport`,
+    not a `virtconsole`: the two are QEMU's same underlying device,
+    but `virtconsole` risks the guest kernel attaching a boot console
+    or a getty to the same channel QGA's JSON traffic rides on, which
+    a named, non-console port avoids entirely.
+  - `isa-serial` renders the same chardev on a **dedicated second**
+    serial port, explicitly not taking over whatever default serial
+    port the platform's machine type already wires up — anything else
+    already using that default port is undisturbed.
+  - `vsock` was considered and deferred. Unlike a socket path, a vsock
+    transport needs a guest CID unique across every VM on the host,
+    which has no natural default — auto-allocating one is a real
+    design question of its own (comparable to `allocate_machine_id`,
+    but host-wide rather than per-home), and stating one explicitly
+    pushes a host-wide uniqueness concern onto every blueprint author.
+    Left for separate follow-on work once that's actually designed.
+
+  THIS NARROWS D93, IT DOES NOT REVERSE IT: D93 rejected
+  `virtio-console` for two reasons — it was QEMU's own internal
+  spelling, and a real serial device drags in a host endpoint's whole
+  lifecycle, undesigned to this day
+  (`planning/design/guest-communication.md`'s "Serial console"
+  section). Both objections are still live and still correct for a
+  *portable* device. Neither applies here: `guest-agent` never claims
+  to be portable — it's declared in the one place backend-specific
+  configuration is allowed to live — and the endpoint lifecycle this
+  decision creates is narrow and mechanical (a socket file under the
+  machine's own materialization directory, created and torn down with
+  the VM, the same pattern QMP's own endpoint already follows), not
+  the open-ended "what protocol, what capabilities, what fallback
+  policy" question guest-communication.md defers.
+
+  HOST SUPPORT: the channel is a UNIX domain socket, so this setting
+  needs a host whose Python actually has one — Linux and macOS today,
+  not Windows (`socket.AF_UNIX` is simply absent there). Declaring
+  `guest-agent` on an unsupported host fails closed at
+  `create-machine` time, naming the gap, rather than silently
+  producing a machine nothing can ever reach (P11). Windows support —
+  QEMU's own `-chardev pipe` plus a client built on Windows named
+  pipes, which the Python standard library has no support for at all
+  — is left as explicit follow-on work.
+
+  THE CLIENT: `qga.py` is a new, minimal, in-tree client for QGA's
+  JSON protocol (`QgaClient`: `sync`, `ping`, `run`), the same shape
+  and the same "no new dependency" reasoning as `rfb.py` (D110) — a
+  raw stdlib socket, incremental JSON decoding (QGA's replies carry no
+  delimiter of their own to lean on), and no identity verification of
+  its own, since that happens one layer up. `Machine.guest_agent()`
+  (`machine_handle.py`) is that layer: a QEMU-only seam, refusing any
+  other backend the same way `Machine.qmp()` already does, verifying
+  this machine's identity through a session before trusting the
+  recorded socket path. This is deliberately not `interaction.
+  GuestExec`: that protocol's `execute()` returns nothing, while a
+  guest agent's entire value is the richer result (exit status,
+  captured output) `run()` returns instead. Growing one shared
+  interface across the agentless DOS workflow and QGA is exactly the
+  follow-up work guest-communication.md already flags as open; this
+  client stays separate until that happens.
+
+  CLI SURFACE: `rlq guest-agent-ping` and `rlq guest-agent-exec` are
+  new commands, declared as manifest exceptions the same way `hmp`
+  is (P6 requires every capability reachable from the CLI; a
+  `Machine`-only method, with no `Session` twin, is exactly `hmp`'s
+  own shape of gap, and this is the same gap for the same reason —
+  both escape hatches wait for the control-plane design to give them
+  a real API home).
+
 - D127 — THE POINTER TABLET SPLITS INTO `emulated-tablet` (REAL USB HID)
   AND `virtual-tablet` (PARAVIRTUALIZED) — DECIDED (owner, 2026-08-31)
   and delivered the same day, amending D126's tablet handling and

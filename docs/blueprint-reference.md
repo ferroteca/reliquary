@@ -1216,6 +1216,7 @@ The one built adapter's vocabulary:
 |---|---|---|
 | `machine` | a QEMU machine type | `-machine <value>` |
 | `args` | array of arguments | appended verbatim |
+| `guest-agent` | `true`, `"virtio-serial"`, or `"isa-serial"` | a QEMU Guest Agent channel — see below |
 
 The values are entirely yours to choose: Reliquary doesn't check
 whether QEMU actually has the machine type you named, or
@@ -1236,6 +1237,51 @@ one naming the field that already owns it:
 | `-machine`, `-M` | this section's own `machine` key |
 | `-name`, `-uuid`, `-qmp` | the recorded VM identity |
 | `-display`, `-nographic` | the display choice a start is given |
+
+#### `guest-agent`
+
+Opts a machine into a [QEMU Guest Agent](https://www.qemu.org/docs/master/interop/qemu-ga-ref.html)
+channel (D128, narrowing D93 rather than reversing it). Omitted, the
+machine has no such channel at all — this is entirely opt-in, the
+same as everything else in `backend-settings`.
+
+```json
+{"backend-settings": {"qemu": {"guest-agent": true}}}
+```
+
+`true` means "on, with the default transport" — `virtio-serial`. The
+transport can also be named explicitly:
+
+| value | renders as |
+|---|---|
+| `true` or `"virtio-serial"` | a virtio-serial bus, a chardev backed by a real UNIX socket, and a port named `org.qemu.guest_agent.0` — the name `qemu-guest-agent` itself looks for inside the guest |
+| `"isa-serial"` | the same chardev, attached to a **dedicated second** COM port — the platform's own default serial port, if it has one, is left alone |
+
+This setting is deliberately QEMU-only: it names a transport this one
+backend happens to offer, not a portable concept every backend must
+speak (D93/P25). `vsock` is not offered yet — it needs a guest CID
+unique across every VM on the host, which has no natural default the
+way a socket path does, and is left for separate follow-on work.
+
+**What this does not do.** Declaring `guest-agent` only wires the
+channel — it does not install or run anything inside the guest.
+`qemu-guest-agent` is guest-OS software Reliquary neither ships nor
+manages (ARCHITECTURE.md P3, the same rule that keeps every other
+guest agent out of scope): the channel is inert until that daemon is
+installed and running on the other end.
+
+**Host support.** The channel is a UNIX domain socket, so this
+setting needs a host whose Python has one — Linux and macOS today,
+not Windows. Declaring it on an unsupported host fails closed at
+`create-machine` time, naming the gap, rather than producing a
+machine that can never actually be reached.
+
+**Reaching it.** `rlq guest-agent-ping` confirms the channel is alive
+(see [cli.md](spec/cli.md#guest-agent)), and `rlq guest-agent-exec`
+runs one executable in the guest through it and returns its exit
+code, stdout, and stderr. Both are QEMU-only escape hatches, the same
+way `hmp` is — nothing about `guest-agent`'s value here promises a
+richer client is built on top.
 
 An option written with its value packed into one array element
 (`"-m 64"`) is caught the same way as if it were split apart. Two

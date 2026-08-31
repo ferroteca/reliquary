@@ -1035,6 +1035,47 @@ def test_the_qmp_seam_is_refused_on_another_backend():
                 pass
 
 
+def test_the_guest_agent_seam_is_refused_on_another_backend():
+    # Same rule as qmp(): a guest-agent channel is a QEMU-specific
+    # setting (D128), not a portable capability.
+    vm = {"backend": "virtualbox", "backend-id": "vbox-uuid",
+          "token": "0" * 32, "endpoint": {}}
+    with fake_backend.installed(name="virtualbox"), \
+            mock.patch.object(machine_module, "read_vm_state",
+                              return_value=vm):
+        with pytest.raises(PreflightError,
+                           match="no QEMU guest-agent channel"):
+            with machine_module.Machine("run-home").guest_agent():
+                pass
+
+
+def test_the_guest_agent_seam_refuses_an_unconfigured_channel():
+    vm = {"backend": "qemu", "backend-id": "reliquary-plain-0",
+          "token": "0" * 32, "endpoint": {"port": 54321}}
+    with fake_backend.installed(), \
+            mock.patch.object(machine_module, "read_vm_state",
+                              return_value=vm):
+        with pytest.raises(PreflightError,
+                           match="no guest-agent channel configured"):
+            with machine_module.Machine("run-home").guest_agent():
+                pass
+
+
+def test_the_guest_agent_seam_yields_a_client_for_the_recorded_socket():
+    vm = {"backend": "qemu", "backend-id": "reliquary-plain-0",
+          "token": "0" * 32,
+          "endpoint": {"port": 54321,
+                       "guest-agent-socket": "/tmp/qga.sock"}}
+    with fake_backend.installed(), \
+            mock.patch.object(machine_module, "read_vm_state",
+                              return_value=vm), \
+            mock.patch.object(machine_module.qga, "QgaClient") as client_cls:
+        client_cls.return_value.__enter__.return_value = "the-client"
+        with machine_module.Machine("run-home").guest_agent() as agent:
+            assert agent == "the-client"
+    client_cls.assert_called_once_with("/tmp/qga.sock")
+
+
 def test_package_exposes_the_protocol_and_agentless_adapter():
     assert reliquary.GuestExec is interaction_module.GuestExec
     assert reliquary.AgentlessGuestExec is (

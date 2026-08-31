@@ -767,10 +767,133 @@ def test_a_value_that_merely_looks_like_an_option_passes():
 
 def test_validate_settings_is_the_renderer_and_returns_nothing():
     adapter = qemu_module.QemuAdapter()
-    assert adapter.settings_keys == ("machine", "args")
+    assert adapter.settings_keys == ("machine", "args", "guest-agent")
     assert adapter.validate_settings({"machine": "pc"}) is None
     with pytest.raises(StaticError):
         adapter.validate_settings({"args": ["-boot", "d"]})
+
+
+@pytest.fixture
+def guest_agent_capable_host():
+    """Pretend this host has UNIX socket support (D128), so the
+    rendering logic — which is itself host-independent, unlike the
+    real client in `qga.py` — can be tested on every CI host,
+    including the Windows one this suite actually runs on today."""
+    with mock.patch.object(qemu_module.qga, "host_supports_guest_agent",
+                           return_value=True):
+        yield
+
+
+def test_guest_agent_true_is_a_valid_bare_value(guest_agent_capable_host):
+    assert qemu_module.settings_args({"guest-agent": True}) == []
+
+
+def test_guest_agent_unknown_value_is_refused():
+    with pytest.raises(StaticError) as caught:
+        qemu_module.settings_args({"guest-agent": "vsock"})
+    assert caught.value.rule_id == "machine.settings-guest-agent-invalid"
+
+
+def test_guest_agent_needs_a_host_with_af_unix():
+    with mock.patch.object(qemu_module.qga, "host_supports_guest_agent",
+                           return_value=False):
+        with pytest.raises(PreflightError) as caught:
+            qemu_module.settings_args({"guest-agent": True})
+    assert caught.value.rule_id == "machine.guest-agent-unsupported-host"
+
+
+def test_guest_agent_validates_without_a_backend_dir(guest_agent_capable_host):
+    # settings_args(settings) with no backend_dir is exactly what
+    # validate_settings calls (D128's own promise: a value this
+    # accepts is always renderable once backend_dir is known) — so
+    # validation must not require it, and must render nothing yet.
+    assert qemu_module.settings_args({"guest-agent": "isa-serial"}) == []
+
+
+def test_guest_agent_virtio_serial_renders_bus_chardev_and_port(
+        guest_agent_capable_host, root):
+    adapter = qemu_module.QemuAdapter()
+    backend_dir = os.path.join(root, "qemu")
+    state = {
+        "id": "qga-0", "backend-id": "reliquary-qga-0", "memory": 32,
+        "boot": [], "devices": {},
+        "backend-settings": {"qemu": {"guest-agent": True}},
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=root, backend_dir=backend_dir)
+    args = launch.call_args.args[0]
+    socket_path = os.path.join(backend_dir, "qga.sock")
+    assert args[-6:] == [
+        "-chardev", f"socket,id=qga-char0,path={socket_path},"
+                   "server=on,wait=off",
+        "-device", "virtio-serial-pci,id=qga-bus0",
+        "-device", "virtserialport,bus=qga-bus0.0,chardev=qga-char0,"
+                   "name=org.qemu.guest_agent.0,id=qga0",
+    ]
+
+
+def test_guest_agent_isa_serial_adds_a_dedicated_second_port(
+        guest_agent_capable_host, root):
+    adapter = qemu_module.QemuAdapter()
+    backend_dir = os.path.join(root, "qemu")
+    state = {
+        "id": "qga-1", "backend-id": "reliquary-qga-1", "memory": 32,
+        "boot": [], "devices": {},
+        "backend-settings": {"qemu": {"guest-agent": "isa-serial"}},
+    }
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu") as launch:
+        adapter.start(state, machine_dir=root, backend_dir=backend_dir)
+    args = launch.call_args.args[0]
+    socket_path = os.path.join(backend_dir, "qga.sock")
+    assert args[-4:] == [
+        "-chardev", f"socket,id=qga-char0,path={socket_path},"
+                   "server=on,wait=off",
+        "-device", "isa-serial,chardev=qga-char0,id=qga0",
+    ]
+    assert "virtio-serial" not in " ".join(args)
+
+
+def test_no_guest_agent_renders_nothing_and_records_no_socket(root):
+    adapter = qemu_module.QemuAdapter()
+    backend_dir = os.path.join(root, "qemu")
+    state = {
+        "id": "no-qga-0", "backend-id": "reliquary-no-qga-0", "memory": 32,
+        "boot": [], "devices": {},
+    }
+    launched = {"backend": "qemu", "backend-id": "reliquary-no-qga-0",
+               "token": "t", "endpoint": {"port": 54321}}
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu",
+                              return_value=launched):
+        identity = adapter.start(state, machine_dir=root,
+                                 backend_dir=backend_dir)
+    assert "guest-agent-socket" not in identity["endpoint"]
+
+
+def test_guest_agent_records_the_socket_path_in_the_endpoint(
+        guest_agent_capable_host, root):
+    adapter = qemu_module.QemuAdapter()
+    backend_dir = os.path.join(root, "qemu")
+    state = {
+        "id": "qga-2", "backend-id": "reliquary-qga-2", "memory": 32,
+        "boot": [], "devices": {},
+        "backend-settings": {"qemu": {"guest-agent": True}},
+    }
+    launched = {"backend": "qemu", "backend-id": "reliquary-qga-2",
+               "token": "t", "endpoint": {"port": 54321}}
+    with mock.patch.object(qemu_module, "find_qemu",
+                           return_value="qemu-system-i386"), \
+            mock.patch.object(qemu_module, "launch_owned_qemu",
+                              return_value=launched):
+        identity = adapter.start(state, machine_dir=root,
+                                 backend_dir=backend_dir)
+    assert identity["endpoint"]["guest-agent-socket"] == (
+        os.path.join(backend_dir, "qga.sock"))
 
 
 def test_start_renders_this_backends_section_last():

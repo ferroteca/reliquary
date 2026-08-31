@@ -449,6 +449,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   either as an absolute device. The recovered `reactos.rlqb` codex
   blueprint now declares `emulated-tablet`, not `virtual-tablet`,
   since ReactOS carries no virtio-input driver.
+- **A machine can opt into a QEMU Guest Agent channel**, with
+  `backend-settings.qemu.guest-agent` (D128, narrowing D93 rather than
+  reversing it) — `true` or `"virtio-serial"` renders a named
+  `virtserialport` (`org.qemu.guest_agent.0`) over a real UNIX-socket
+  chardev, and `"isa-serial"` renders the same chardev on a dedicated
+  second serial port, leaving the platform's own default port alone.
+  This stays QEMU-only on purpose: QGA is not a portable concept
+  across backends, so this lives in the escape hatch, never in
+  `devices`. Omitted, a machine has no such channel at all. The
+  channel needs a host with UNIX domain sockets (Linux and macOS
+  today, not Windows) and fails closed at `create-machine` time on a
+  host without one. A new minimal in-tree client, `qga.py`, speaks
+  just enough of QGA's JSON protocol to prove a channel is alive and
+  run one command (`sync`/`ping`/`run` — the same "no new dependency"
+  reasoning as `rfb.py`, D110), reached through `Machine.guest_agent()`
+  and the new `rlq guest-agent-ping` / `rlq guest-agent-exec` commands,
+  both QEMU-only escape hatches in the same shape as `hmp`.
 
 ### Fixed
 

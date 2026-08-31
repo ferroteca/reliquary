@@ -790,6 +790,20 @@ def _add_console_commands(subcommands):
     _add_selectors(command)
     command.add_argument("line")
 
+    command = subcommands.add_parser(
+        "guest-agent-ping",
+        help="confirm the QEMU guest agent is alive on its channel")
+    _add_selectors(command)
+    command.add_argument("--timeout", type=float, default=None)
+
+    command = subcommands.add_parser(
+        "guest-agent-exec",
+        help="run one executable through the QEMU guest agent")
+    _add_selectors(command)
+    command.add_argument("path", help="the executable's path in the guest")
+    command.add_argument("exec_args", nargs="*", metavar="arg")
+    command.add_argument("--timeout", type=float, default=None)
+
 
 def _build_parser():
     """Build the whole CLI: the root parser, and every command it registers.
@@ -1687,6 +1701,22 @@ def _dispatch(arguments, session, context):
         with Machine(machine_home).qmp() as qmp:
             output = qmp.hmp(arguments.line)
         return _emit(arguments, output, lambda: print(output))
+    if arguments.command == "guest-agent-ping":
+        with Machine(machine_home).guest_agent() as agent:
+            agent.ping(timeout=timeout)
+        return _emit(arguments, {},
+                     lambda: _narrate("guest agent is alive"))
+    if arguments.command == "guest-agent-exec":
+        with Machine(machine_home).guest_agent() as agent:
+            result = agent.run(arguments.path, arguments.exec_args,
+                               timeout=timeout)
+        value = {"exit-code": result.exit_code, "signal": result.signal,
+                 "stdout": result.stdout, "stderr": result.stderr}
+
+        def _render_exec():
+            sys.stdout.write(result.stdout)
+            sys.stderr.write(result.stderr)
+        return _emit(arguments, value, _render_exec)
     # A command that's registered with argparse but has no matching
     # `if` branch above ends up here. Just returning 0 in that case
     # would report success for work that was never actually done,

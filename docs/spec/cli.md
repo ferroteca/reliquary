@@ -1150,6 +1150,40 @@ rlq hmp "info status" -b freedos
 rlq hmp "info block" -m freedos-0
 ```
 
+### Guest agent
+
+```
+rlq guest-agent-ping (--blueprint <name> | --machine <id>) [--timeout <seconds>]
+rlq guest-agent-exec <path> [arg ...] (--blueprint <name> | --machine <id>) [--timeout <seconds>]
+```
+
+Two escape hatches over a machine's QEMU Guest Agent channel (D128;
+[blueprint-reference.md](../blueprint-reference.md#guest-agent)
+documents how a machine declares one). Both only work with QEMU, and
+only on a machine whose `backend-settings.qemu.guest-agent` is set —
+a machine with no channel refuses with `machine.guest-agent-not-
+configured` before either command tries to connect.
+
+`guest-agent-ping` just confirms the agent is alive and answering.
+`guest-agent-exec` runs one executable directly inside the guest —
+QEMU Guest Agent has no shell of its own, so a shell command line
+needs the guest's own shell named explicitly:
+
+```powershell
+rlq guest-agent-ping -b freedos
+rlq guest-agent-exec /bin/echo hello -m freedos-0
+rlq guest-agent-exec /bin/sh -c "uname -a" -m freedos-0
+```
+
+`guest-agent-exec`'s output is exactly what the guest executable
+wrote: stdout to stdout, stderr to stderr. `--json` returns the exit
+code and signal alongside both streams as one document, since a
+piped human-readable rendering can't carry the exit code separately.
+
+Like `hmp`, this is a backend-specific escape hatch, not a portable
+capability: once the control-plane design settles, it will be
+reclassified accordingly (docs/spec/api.md).
+
 ### Recorded interaction runs — backlog (D36)
 
 The `begin-run` / `end-run` pair, which would record a loop of
@@ -1605,7 +1639,8 @@ a machine — `create-machine`, `start-machine`, `stop-machine`,
 `run` operations, `begin-run`, `end-run`, `insert-media`,
 `eject-media`, `set-boot-order`, `get-machine-dir`, and the
 guest-console family (`type`, `enter`, `press`, `exec`, `select`,
-`screen`, `wait`, `screenshot`, `hmp`) — at least one selector is
+`screen`, `wait`, `screenshot`, `hmp`, `guest-agent-ping`,
+`guest-agent-exec`) — at least one selector is
 required. The one exception is `run-script`, which creates a machine
 automatically when `--blueprint` names a blueprint that has none
 yet. Under `--dry-run`, a selector is optional, and whether you give

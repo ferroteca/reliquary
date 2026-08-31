@@ -102,6 +102,20 @@ with the control-plane design (docs/spec/api.md, guest-console \
 family)"""
 
 [[exceptions]]
+name = "guest-agent-ping"
+missing = "api"
+reason = """the QEMU guest-agent escape hatch (D128); QEMU-only, the \
+same way hmp is, and its twin lands with the control-plane design \
+(docs/spec/api.md, guest-console family)"""
+
+[[exceptions]]
+name = "guest-agent-exec"
+missing = "api"
+reason = """the QEMU guest-agent escape hatch (D128); QEMU-only, the \
+same way hmp is, and its twin lands with the control-plane design \
+(docs/spec/api.md, guest-console family)"""
+
+[[exceptions]]
 name = "seed-blueprint"
 missing = "api"
 reason = """CLI-only by decision (D87): reaching the shipped \

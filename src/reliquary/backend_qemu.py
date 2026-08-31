@@ -42,6 +42,7 @@ from PIL import Image
 from qemu.qmp import ConnectError, ExecuteError, QMPClient
 
 from . import backends
+from . import qga
 from . import rfb
 from . import text_recognize
 from .backends import Availability, BackendAdapter, Capabilities
@@ -106,10 +107,22 @@ _BOOT_LETTER = {"floppy": "a", "hdd": "c", "cdrom": "d"}
 
 #: The keys ``backend-settings.qemu`` may carry. ``machine`` names a
 #: QEMU machine type; ``args`` is a list of arguments appended to the
-#: launch command line as-is. This is the entire escape hatch on
-#: purpose: adding a second way to say the same thing below would
-#: create two sources of truth for one fact.
-SETTINGS_KEYS = ("machine", "args")
+#: launch command line as-is; ``guest-agent`` opts a machine into a
+#: QEMU Guest Agent channel (D128) — this one stays a QEMU-only
+#: setting on purpose (D93/P25: it names no portable concept, only a
+#: transport this one backend happens to offer).
+SETTINGS_KEYS = ("machine", "args", "guest-agent")
+
+#: The transports a ``guest-agent`` channel may name explicitly
+#: (D128). ``vsock`` is deliberately absent: it needs a guest CID
+#: unique across every VM on the host, which has no natural default
+#: the way a socket path does, and is left for separate follow-on
+#: work once CID allocation has its own design.
+_GUEST_AGENT_TRANSPORTS = frozenset({"virtio-serial", "isa-serial"})
+
+#: ``guest-agent``'s own default transport, used when the value is
+#: bare ``true`` rather than an explicit transport name.
+_GUEST_AGENT_DEFAULT = "virtio-serial"
 
 #: QEMU arguments the ``args`` escape hatch may not carry, each mapped
 #: to what already owns it. These fall into two groups: things a
@@ -1325,8 +1338,8 @@ class QemuAdapter(BackendAdapter):
             args += ["-boot", f"order={boot}"]
         args += pointer_args(pointer)
         args += rng_args(rng)
-        args += settings_args(
-            (state.get("backend-settings") or {}).get(self.name))
+        qemu_settings = (state.get("backend-settings") or {}).get(self.name)
+        args += settings_args(qemu_settings, backend_dir=backend_dir)
         planes = state.get("control-planes") or ["agentless-display"]
         identity = launch_owned_qemu(
             args, vm_name=vm_name, display=display, current_vm=current,
@@ -1337,6 +1350,12 @@ class QemuAdapter(BackendAdapter):
             # alongside the ports lets the session use it without
             # re-reading the policy. The default plane needs no record.
             identity["endpoint"]["plane"] = "vnc"
+        if (qemu_settings or {}).get("guest-agent") is not None:
+            # Recorded so a later caller (Machine.guest_agent()) finds
+            # the socket from state alone, the same way the VNC port
+            # is recorded above rather than recomputed at connect time.
+            identity["endpoint"]["guest-agent-socket"] = (
+                guest_agent_socket_path(backend_dir))
         return identity
 
     def stop(self, vm):
@@ -1477,7 +1496,49 @@ def _reserved_set(value):
     return None
 
 
-def settings_args(settings):
+def guest_agent_socket_path(backend_dir):
+    """Where a machine's guest-agent socket lives (D128).
+
+    Under the machine's own QEMU-specific materialization directory,
+    the same rule every other persistent endpoint follows
+    (guest-communication.md): nothing about this channel's identity
+    is invented at connect time, so a caller can always find it again
+    from the recorded state alone.
+    """
+    return os.path.join(backend_dir, "qga.sock")
+
+
+def _guest_agent_args(value, backend_dir):
+    """Render the three QEMU objects a guest-agent channel needs: a
+    chardev backed by a real host socket, and either a named
+    virtio-serial port (the default) or a dedicated second isa-serial
+    port — the transport ``value`` names, or ``true`` for the default
+    (D128).
+
+    Both transports share the same chardev, so the client this
+    channel is for (:mod:`reliquary.qga`) never needs to know which
+    one rendered it — it only ever connects to a socket path.
+    """
+    transport = _GUEST_AGENT_DEFAULT if value is True else value
+    path = guest_agent_socket_path(backend_dir)
+    chardev_id = "qga-char0"
+    args = ["-chardev", f"socket,id={chardev_id},path={path},"
+                       "server=on,wait=off"]
+    if transport == "virtio-serial":
+        args += ["-device", "virtio-serial-pci,id=qga-bus0"]
+        args += ["-device",
+                 f"virtserialport,bus=qga-bus0.0,chardev={chardev_id},"
+                 "name=org.qemu.guest_agent.0,id=qga0"]
+    else:
+        # isa-serial: a dedicated second COM port, added alongside
+        # whichever default serial port the platform's machine type
+        # already wires up — never taking that one over, so anything
+        # else already using it is undisturbed.
+        args += ["-device", f"isa-serial,chardev={chardev_id},id=qga0"]
+    return args
+
+
+def settings_args(settings, backend_dir=None):
     """Validate ``backend-settings.qemu`` and render it into arguments.
 
     This is the only path that does both, so a section that passes
@@ -1496,6 +1557,15 @@ def settings_args(settings):
     identity is refused, naming the owner, because letting the hatch
     set the same thing two different ways is exactly what it must not
     become.
+
+    ``guest-agent`` is the one key whose full rendering needs more
+    than the settings themselves — the socket path is derived from
+    ``backend_dir``, which validation time does not have. So its
+    *value* (closed vocabulary, host support) is always checked here,
+    on every call; only the actual device arguments wait for
+    ``backend_dir``, supplied at launch. A value this function accepts
+    is always renderable once ``backend_dir`` is known — nothing about
+    a valid value can fail later.
     """
     settings = settings or {}
     unknown = sorted(key for key in settings if key not in SETTINGS_KEYS)
@@ -1513,6 +1583,24 @@ def settings_args(settings):
                 f"string naming a QEMU machine type, got: {machine!r}",
                 rule_id="value.not-a-string")
         args += ["-machine", machine]
+    guest_agent = settings.get("guest-agent")
+    if guest_agent is not None:
+        if guest_agent is not True and guest_agent not in (
+                _GUEST_AGENT_TRANSPORTS):
+            raise StaticError(
+                "backend-settings.qemu.guest-agent must be true or one "
+                f"of {sorted(_GUEST_AGENT_TRANSPORTS)}, got: "
+                f"{guest_agent!r}",
+                rule_id="machine.settings-guest-agent-invalid")
+        if not qga.host_supports_guest_agent():
+            raise PreflightError(
+                "backend-settings.qemu.guest-agent needs a UNIX domain "
+                "socket, which this host's Python does not support — "
+                "Windows hosts aren't covered yet (D128, "
+                "planning/design/guest-communication.md)",
+                rule_id="machine.guest-agent-unsupported-host")
+        if backend_dir is not None:
+            args += _guest_agent_args(guest_agent, backend_dir)
     extra = settings.get("args")
     if extra is not None:
         if not isinstance(extra, list):

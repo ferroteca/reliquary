@@ -19,6 +19,7 @@ import sys
 import time
 
 from . import backends
+from . import qga
 from . import screen_stability
 from . import text_recognize
 # Only the recorded VM identity is needed here, and that lives in
@@ -120,6 +121,36 @@ class Machine:
                     "has no QMP monitor; the QMP seam is QEMU's alone",
                     rule_id="machine.not-a-qemu-machine")
             yield open_session.native()
+
+    @contextlib.contextmanager
+    def guest_agent(self):
+        """Yield a connected QGA client for this machine's guest-agent
+        channel (D128).
+
+        Deliberately scoped to QEMU only, the same way :meth:`qmp` is:
+        a guest-agent channel is a QEMU-specific setting
+        (``backend-settings.qemu.guest-agent``), not a portable
+        capability. Opening a session first verifies this machine's
+        identity before trusting anything recorded about it, including
+        the socket path below — the same rule every other
+        management-interface operation follows
+        (planning/design/guest-communication.md).
+        """
+        with self.session() as open_session:
+            if open_session.backend != "qemu":
+                raise PreflightError(
+                    f"this machine runs on {open_session.backend}, which "
+                    "has no QEMU guest-agent channel",
+                    rule_id="machine.not-a-qemu-machine")
+            _adapter, vm = self._identity()
+            path = (vm.get("endpoint") or {}).get("guest-agent-socket")
+            if path is None:
+                raise PreflightError(
+                    "this machine has no guest-agent channel configured "
+                    "(backend-settings.qemu.guest-agent)",
+                    rule_id="machine.guest-agent-not-configured")
+            with qga.QgaClient(path) as client:
+                yield client
 
     @contextlib.contextmanager
     def console(self):
