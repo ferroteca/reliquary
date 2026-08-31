@@ -2094,12 +2094,12 @@ starts (G3).
 
 **Capability.** `click` requires everything a landmark condition
 does (framebuffer capture on the driving control plane) plus two
-more: pointer input on that plane, and `devices.pointer0: tablet`
-on the machine (see [blueprint-model.md](blueprint-model.md)) — an
-absolute event needs an absolute device, so a relative `mouse`
-machine is refused by name rather than attempted with a
-calibration guess. Every refusal lands before the first guest
-input (G3).
+more: pointer input on that plane, and
+`devices.pointer0: virtual-tablet` on the machine (see
+[blueprint-model.md](blueprint-model.md)) — an absolute event needs
+an absolute device, so a relative `emulated-mouse` machine is
+refused by name rather than attempted with a calibration guess.
+Every refusal lands before the first guest input (G3).
 
 **For now: only a single left click.** `button=`, `count=`, and a
 drag verb are natural future additions (G7) that nothing currently
@@ -2486,9 +2486,9 @@ scope, preflight further rejects, naming what it needed:
   captures no framebuffer (`machine.plane-no-framebuffer`, a
   machine) — capability at the condition's granularity, so a script
   watching no landmark is unaffected;
-- `click` on a machine whose `devices.pointer0` is not `tablet`
-  (`machine.pointing-device-not-tablet`), or whose driving control
-  plane cannot deliver a pointer event
+- `click` on a machine whose `devices.pointer0` is not
+  `virtual-tablet` (`machine.pointing-device-not-tablet`), or whose
+  driving control plane cannot deliver a pointer event
   (`machine.plane-no-pointer-input` — a separate question from
   framebuffer capture, since a plane can hold one without the
   other) (F66, a machine);

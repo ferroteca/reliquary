@@ -1,7 +1,7 @@
 // valid: devices.pointer0 is a closed enum, capability-checked at
-//       assignment like control-planes (F66, D124)
+//       assignment like control-planes (F66, D124, renamed by D126)
 // spec: Machine topology
 [
   { "type": "machine", "name": "rig", "platform": "dos",
-    "devices": { "pointer0": "tablet", "cdrom0": null } }
+    "devices": { "pointer0": "virtual-tablet", "cdrom0": null } }
 ]

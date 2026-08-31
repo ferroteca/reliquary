@@ -648,7 +648,7 @@ def test_a_share_model_is_optional():
 def test_every_share_model_is_accepted_by_the_parser():
     # The parser accepts the whole vocabulary (D122); whether a given
     # model actually renders is a capability question, judged later.
-    for model in ("vvfat", "9pfs", "virtio-fs"):
+    for model in ("vvfat", "9pfs", "virtual-fs"):
         machine = _machine_with_shares(
             {"share0": {"media": "hostdir", "model": model}})
         assert machine.shares["share0"].model == model
@@ -771,12 +771,12 @@ def _machine_with_pointer(pointer):
 
 
 def test_a_pointer_device_is_a_bare_value():
-    machine = _machine_with_pointer({"pointer0": "tablet"})
-    assert machine.pointer["pointer0"].value == "tablet"
+    machine = _machine_with_pointer({"pointer0": "virtual-tablet"})
+    assert machine.pointer["pointer0"].value == "virtual-tablet"
 
 
 def test_every_pointer_device_is_accepted_by_the_parser():
-    for value in ("tablet", "mouse", "virtio-mouse"):
+    for value in ("virtual-tablet", "emulated-mouse", "virtual-mouse"):
         machine = _machine_with_pointer({"pointer0": value})
         assert machine.pointer["pointer0"].value == value
 
@@ -795,7 +795,7 @@ def test_a_pointer_device_takes_no_reference():
 
 def test_pointer_has_no_second_slot():
     with pytest.raises(StaticError) as caught:
-        _machine_with_pointer({"pointer1": "tablet"})
+        _machine_with_pointer({"pointer1": "virtual-tablet"})
     assert caught.value.rule_id == "device.slot-out-of-range"
 
 
@@ -813,8 +813,8 @@ def _machine_with_rng(rng):
 
 
 def test_an_rng_device_is_a_bare_value():
-    machine = _machine_with_rng({"rng0": "virtio-rng"})
-    assert machine.rng["rng0"].model == "virtio-rng"
+    machine = _machine_with_rng({"rng0": "virtual-rng"})
+    assert machine.rng["rng0"].model == "virtual-rng"
 
 
 def test_an_unknown_rng_device_is_refused():
@@ -831,7 +831,7 @@ def test_an_rng_device_takes_no_reference():
 
 def test_rng_has_no_second_slot():
     with pytest.raises(StaticError) as caught:
-        _machine_with_rng({"rng1": "virtio-rng"})
+        _machine_with_rng({"rng1": "virtual-rng"})
     assert caught.value.rule_id == "device.slot-out-of-range"
 
 
@@ -843,8 +843,9 @@ def test_a_machine_with_no_rng_declares_none():
 def test_drives_nics_shares_pointer_and_rng_share_one_devices_map():
     doc = _parse([{"type": "machine", "name": "rig", "platform": "dos",
                    "devices": {"hdd0": "blank", "net0": "nat",
-                               "share0": "hostdir", "pointer0": "tablet",
-                               "rng0": "virtio-rng"}}])
+                               "share0": "hostdir",
+                               "pointer0": "virtual-tablet",
+                               "rng0": "virtual-rng"}}])
     machine = doc.machines["rig"]
     assert set(machine.devices) == {
         "hdd0", "net0", "share0", "pointer0", "rng0"}
@@ -858,19 +859,20 @@ def test_drives_nics_shares_pointer_and_rng_share_one_devices_map():
 def test_boot_refuses_a_pointer_slot():
     with pytest.raises(StaticError) as caught:
         _parse([{"type": "machine", "name": "rig", "platform": "dos",
-                 "devices": {"pointer0": "tablet"}, "boot": ["pointer0"]}])
+                 "devices": {"pointer0": "virtual-tablet"},
+                 "boot": ["pointer0"]}])
     assert caught.value.rule_id == "drive.boot-undeclared"
 
 
 def test_boot_refuses_an_rng_slot():
     with pytest.raises(StaticError) as caught:
         _parse([{"type": "machine", "name": "rig", "platform": "dos",
-                 "devices": {"rng0": "virtio-rng"}, "boot": ["rng0"]}])
+                 "devices": {"rng0": "virtual-rng"}, "boot": ["rng0"]}])
     assert caught.value.rule_id == "drive.boot-undeclared"
 
 
 def test_pointing_device_is_no_longer_a_top_level_field():
     with pytest.raises(StaticError) as caught:
         _parse([{"type": "machine", "name": "rig", "platform": "dos",
-                 "pointing-device": "tablet"}])
+                 "pointing-device": "virtual-tablet"}])
     assert caught.value.rule_id == "field.unknown"

@@ -225,8 +225,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   data, not pixels, so a landmark wait recorded in a transcript can't
   be replayed, and replay reports that by name instead of fabricating
   a screen to match against.
-- **Pointer input: a new `pointer_event` carrier, a `tablet` pointing
-  device, and a new `click` script verb** (F66, split out of F5,
+- **Pointer input: a new `pointer_event` carrier, a `virtual-tablet`
+  pointing device, and a new `click` script verb** (F66, split out of F5,
   serving U5). The backend-adapter interface gained one new method,
   `pointer_event(x, y, buttons)`, which sends RFB's own `PointerEvent`
   message on the VNC plane's wire, alongside the existing `KeyEvent`,
@@ -238,18 +238,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   same coordinate space a landmark is defined in, so no separate
   scaling is needed.
 - **A machine can now declare a pointer input device**, at
-  `devices.pointer0`, set to `tablet` or `mouse`, checked against
-  backend capability at assignment time the same way `drives` already
-  is — if a blueprint declares `tablet` and the assigned backend
-  can't supply it, assignment fails, naming both the backend and the
-  missing device. Every platform still defaults to `mouse`, the
-  standard relative pointing device every machine already has. QEMU
-  renders `tablet` as `-usb -device usb-tablet,id=pointer0` and
-  reports both device types in its capability report. `click` refuses
-  to run, before doing anything, on a machine whose `devices.pointer0`
-  is `mouse`, naming the reason: an absolute click position needs an
-  absolute pointing device, and reliquary won't guess a calibration
-  against a relative one (P10).
+  `devices.pointer0`, set to `virtual-tablet` or `emulated-mouse`,
+  checked against backend capability at assignment time the same way
+  `drives` already is — if a blueprint declares `virtual-tablet` and
+  the assigned backend can't supply it, assignment fails, naming both
+  the backend and the missing device. Every platform still defaults
+  to `emulated-mouse`, the standard relative pointing device every
+  machine already has. QEMU renders `virtual-tablet` as
+  `-usb -device usb-tablet,id=pointer0` and reports both device types
+  in its capability report. `click` refuses to run, before doing
+  anything, on a machine whose `devices.pointer0` is `emulated-mouse`,
+  naming the reason: an absolute click position needs an absolute
+  pointing device, and reliquary won't guess a calibration against a
+  relative one (P10).
 - **`click` gets the same before-it-runs capability check landmark
   conditions do, plus one more.** `click` needs everything a landmark
   condition needs (framebuffer capture) plus the ability to deliver a
@@ -392,22 +393,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   instead of being silently ignored. The flag is recorded on the
   machine's resolved share entry, since a backend renders from that
   and never sees the media.
-- **A machine can now declare `devices.pointer0: virtio-mouse`** (T34).
-  Omitted or `mouse`, a machine still gets QEMU's implicit legacy PS/2
-  mouse, unchanged. `virtio-mouse` is the same relative device family,
-  rendered explicitly instead — `-device virtio-mouse-pci,id=pointer0`
-  on QEMU — for a guest that carries a virtio driver; a guest without
-  one, DOS included, should stay on the implicit `mouse`. `click`
-  still refuses any pointing device but `tablet` (`machine.pointing-
+- **A machine can now declare `devices.pointer0: virtual-mouse`** (T34).
+  Omitted or `emulated-mouse`, a machine still gets QEMU's implicit
+  legacy PS/2 mouse, unchanged. `virtual-mouse` is the same relative
+  device family, rendered explicitly instead —
+  `-device virtio-mouse-pci,id=pointer0` on QEMU — for a guest that
+  carries a virtio driver; a guest without one, DOS included, should
+  stay on the implicit `emulated-mouse`. `click` still refuses any
+  pointing device but `virtual-tablet` (`machine.pointing-
   device-not-tablet`), unchanged.
 - **The pointer input device moves into `devices`, at the fixed key
   `pointer0`** (T35, D124), replacing the top-level `pointing-device`
-  field: `tablet`/`mouse`/`virtio-mouse` mean exactly what they did
-  before, just declared as `"devices": {"pointer0": "tablet"}` instead
-  of `"pointing-device": "tablet"`. Neither field has shipped in a
+  field: `virtual-tablet`/`emulated-mouse`/`virtual-mouse` mean
+  exactly what they did before, just declared as
+  `"devices": {"pointer0": "virtual-tablet"}` instead of
+  `"pointing-device": "tablet"`. Neither field has shipped in a
   release yet, so this is a plain rename with nothing to migrate.
 - **A machine can now declare an RNG device**, at `devices.rng0`, set
-  to `virtio-rng` (T35, D125, narrowing D91) — a portable name, never
+  to `virtual-rng` (T35, D125, narrowing D91) — a portable name, never
   QEMU's own internal bus-addressing spelling (`virtio-rng-pci`),
   checked against the assigned backend's capability report the same
   way a NIC's or a share's `model` is. QEMU renders it as
@@ -418,6 +421,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   previously reached the device only through `backend-settings.qemu.
   args` (`planning/proposed/USE-CASES.md`'s `driver-rig` example,
   U22) and wanted it named as portable vocabulary instead.
+- **`devices.pointer0`'s `virtual-tablet`/`emulated-mouse`/
+  `virtual-mouse`, `devices.rng0`'s `virtual-rng`, a `net` device's
+  `model: virtual-net`, and a `share` device's `model: virtual-fs`
+  are renamed from `tablet`/`mouse`/`virtio-mouse`, `virtio-rng`,
+  `virtio-net`, and `virtio-fs`** (D126). A generic device name now
+  says which kind of device it is: `emulated-` for a name that mimics
+  real legacy hardware, `virtual-` for a name that only exists because
+  it's useful inside a VM — a paravirtualized device, or (for the
+  pointer) the absolute-position device that has no bare-metal
+  equivalent. None of these fields has shipped in a release yet, so
+  this is a plain rename with nothing to migrate; `pcnet`, `ne2k`,
+  `9pfs`, and `vvfat` are unaffected, since they already name real
+  hardware or an actual protocol, not a generic description.
 
 ### Fixed
 

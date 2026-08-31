@@ -424,7 +424,7 @@ def test_backend_overrides_the_blueprint_field(dry):
                     media=("floppy", "hdd", "cdrom"),
                     controllers=("ide",),
                     materialize=("new", "use"),
-                    pointing_devices=("tablet", "mouse")))
+                    pointing_devices=("virtual-tablet", "emulated-mouse")))
     plan = dry.run(backend="vmware").plan
     assert plan["backend"] == "vmware"
     assert plan["backend-source"] == "--backend"

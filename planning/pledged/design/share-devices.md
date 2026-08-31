@@ -135,7 +135,8 @@ Each backend serves a share with its own mechanisms:
   and its stub likewise claims nothing.
 
 Because QEMU genuinely has several, a share's object form gains an
-optional **`model`** key — values `vvfat`, `9p`, and `virtio-fs` —
+optional **`model`** key — values `vvfat`, `9p`, and `virtual-fs`
+(D126 renamed the last of these from `virtio-fs`) —
 under D122's bar: honored where the capability report says so,
 refused by name everywhere else, the same way `controller`'s
 `nvme`/`virtio` and `net`'s `ne2k` already are. `9p` and
@@ -162,7 +163,7 @@ nothing must get the field's full live contract, never silently the
 snapshot one. 9p over virtio-fs because it is the cheaper live
 contract in every direction: served in-process with no daemon to
 supervise, no vhost-user socket, and no shared-memory coupling to
-the machine's own `memory`. `virtio-fs` is chosen by name when its
+the machine's own `memory`. `virtual-fs` is chosen by name when its
 throughput and semantics are worth that host-side cost.
 
 One consequence is stated plainly rather than hidden: **which guest

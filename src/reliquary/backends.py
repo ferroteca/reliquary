@@ -89,9 +89,10 @@ class Capabilities:
     media: Tuple[str, ...] = ()
     controllers: Tuple[str, ...] = ()
     materialize: Tuple[str, ...] = ()
-    #: The pointing devices this backend can attach (F66): ``tablet``
-    #: or ``mouse``, the blueprint's own terms. Defaults to empty, so
-    #: an adapter that hasn't set this claims no pointing devices.
+    #: The pointing devices this backend can attach (F66, D126):
+    #: ``virtual-tablet`` or ``emulated-mouse``, the blueprint's own
+    #: terms. Defaults to empty, so an adapter that hasn't set this
+    #: claims no pointing devices.
     pointing_devices: Tuple[str, ...] = ()
     #: The NIC models this backend can attach (D120): ``pcnet`` or
     #: ``ne2k``, the blueprint's own terms. Defaults to empty, the
@@ -102,8 +103,8 @@ class Capabilities:
     #: or ``bridged``, the blueprint's own terms. Defaults to empty.
     network_attachments: Tuple[str, ...] = ()
     #: The share models this backend can render when a share names one
-    #: explicitly (F68): ``vvfat``, ``9pfs``, or ``virtio-fs``. Defaults
-    #: to empty, the same way ``controllers`` does.
+    #: explicitly (F68): ``vvfat``, ``9pfs``, or ``virtual-fs`` (D126).
+    #: Defaults to empty, the same way ``controllers`` does.
     #:
     #: These two fields are the first here whose value can depend on
     #: the *installation* rather than on the adapter's own code (F69):
@@ -123,11 +124,11 @@ class Capabilities:
     #: built without fsdev support, and on VirtualBox, every install
     #: until F71 builds its own mechanism.
     share_default: Optional[str] = None
-    #: The RNG models this backend can attach (D125): ``virtio-rng``,
-    #: the blueprint's own portable name — never the backend-internal
-    #: spelling D91 was overruled for admitting. Defaults to empty, the
-    #: same way ``network_models`` does — an adapter that hasn't set
-    #: this claims no RNG devices.
+    #: The RNG models this backend can attach (D125, renamed by D126):
+    #: ``virtual-rng``, the blueprint's own portable name — never the
+    #: backend-internal spelling D91 was overruled for admitting.
+    #: Defaults to empty, the same way ``network_models`` does — an
+    #: adapter that hasn't set this claims no RNG devices.
     rng_models: Tuple[str, ...] = ()
 
 

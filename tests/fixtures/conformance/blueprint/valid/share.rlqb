@@ -1,6 +1,6 @@
 // valid: share slots share the devices map with drives and NICs (D121);
 //        a share's value is a media name or an object naming media
-//        plus an optional model override (vvfat/9pfs/virtio-fs, F68) and
+//        plus an optional model override (vvfat/9pfs/virtual-fs, F68) and
 //        enabled — no null, since an empty share means nothing
 // spec: Machine topology
 [

@@ -67,11 +67,12 @@ def test_a_media_kind_the_backend_lacks_is_named():
 
 
 def test_a_pointing_device_the_backend_lacks_is_named():
-    report = Capabilities(backend="hyperv", pointing_devices=("mouse",))
+    report = Capabilities(backend="hyperv",
+                          pointing_devices=("emulated-mouse",))
     adapter = fake_backend.FakeAdapter("hyperv", capabilities=report)
     assert adapter.unmet(
-        _requirements(pointing_device="tablet")) == (
-        "pointing device 'tablet'",)
+        _requirements(pointing_device="virtual-tablet")) == (
+        "pointing device 'virtual-tablet'",)
 
 
 def test_no_declared_pointing_device_asks_nothing():

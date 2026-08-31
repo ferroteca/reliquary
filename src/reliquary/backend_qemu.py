@@ -158,26 +158,27 @@ RESERVED_ARGUMENTS = {
 #: appropriate bus for a card real NE2000s shipped on — QEMU also has
 #: a PCI variant (`ne2k_pci`), but nothing in the blueprint
 #: vocabulary names it, and DOS-era platforms have no PCI bus to put
-#: it on anyway. `virtio-net` renders as `virtio-net-pci`, QEMU's
+#: it on anyway. `virtual-net` renders as `virtio-net-pci`, QEMU's
 #: paravirtualized NIC — real to the guest only in the sense that
 #: `controller`'s own `virtio` value already is, and just as reliant
 #: on the guest actually carrying a virtio driver.
 _NIC_QEMU_MODELS = {"pcnet": "pcnet", "ne2k": "ne2k_isa",
-                    "virtio-net": "virtio-net-pci"}
+                    "virtual-net": "virtio-net-pci"}
 
 #: The blueprint's portable RNG model names, mapped to the QEMU device
-#: that renders them (D125, narrowing D91): `virtio-rng` is
-#: Reliquary's own name, never the backend-internal spelling
+#: that renders them (D126, renaming D125's `virtio-rng`, which
+#: narrowed D91): a portable name, never the backend-internal spelling
 #: (`virtio-rng-pci`) D91 was overruled for admitting.
-_RNG_QEMU_DEVICES = {"virtio-rng": "virtio-rng-pci"}
+_RNG_QEMU_DEVICES = {"virtual-rng": "virtio-rng-pci"}
 
-#: The pointer input device's rendering (F66, T34, D124): omitted or
-#: `mouse` needs no extra argument at all — that's QEMU's own implicit
-#: legacy PS/2 mouse, already there without asking.
+#: The pointer input device's rendering (F66, T34, D124, renamed by
+#: D126): omitted or `emulated-mouse` needs no extra argument at all
+#: — that's QEMU's own implicit legacy PS/2 mouse, already there
+#: without asking.
 _POINTER_QEMU_ARGS = {
-    "mouse": [],
-    "tablet": ["-usb", "-device", "usb-tablet,id=pointer0"],
-    "virtio-mouse": ["-device", "virtio-mouse-pci,id=pointer0"],
+    "emulated-mouse": [],
+    "virtual-tablet": ["-usb", "-device", "usb-tablet,id=pointer0"],
+    "virtual-mouse": ["-device", "virtio-mouse-pci,id=pointer0"],
 }
 
 #: The `-drive` properties Reliquary already renders for every drive.
@@ -1202,12 +1203,13 @@ class QemuAdapter(BackendAdapter):
             media=("floppy", "hdd", "cdrom"),
             controllers=("ide",),
             materialize=("new", "difference", "copy", "use"),
-            pointing_devices=("tablet", "mouse", "virtio-mouse"),
-            network_models=("pcnet", "ne2k", "virtio-net"),
+            pointing_devices=("virtual-tablet", "emulated-mouse",
+                              "virtual-mouse"),
+            network_models=("pcnet", "ne2k", "virtual-net"),
             network_attachments=("nat", "bridged"),
             share_models=("vvfat",) + live,
             share_default="9pfs" if "9pfs" in live else None,
-            rng_models=("virtio-rng",),
+            rng_models=("virtual-rng",),
         )
 
     def capture_format(self, plane):
@@ -1611,7 +1613,7 @@ def drive_args(drives):
 def share_args(shares, drives):
     """Build QEMU arguments from a machine's resolved shares.
 
-    Two models render: ``vvfat`` (F68) and ``9pfs`` (F69). ``virtio-fs``
+    Two models render: ``vvfat`` (F68) and ``9pfs`` (F69). ``virtual-fs``
     does not yet, and the capability report never claims it, so
     ``unmet()`` has already refused it at assignment and it never
     reaches here — an unrenderable model arriving anyway is a bug in

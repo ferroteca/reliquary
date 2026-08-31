@@ -338,12 +338,12 @@ def test_an_rng_in_a_materialized_state_matches_the_schema(tmp_path):
     root.mkdir()
     (root / "rng-bp.rlqb").write_text(json.dumps([
         {"type": "machine", "name": "rng-bp", "platform": "dos",
-         "devices": {"rng0": "virtio-rng"}},
+         "devices": {"rng0": "virtual-rng"}},
     ]), encoding="utf-8")
     context = Context(home_dir=str(tmp_path / "home"),
-                      blueprints_dir=str(root), scripts_dir=str(root))
+              blueprints_dir=str(root), scripts_dir=str(root))
     with fake_backend.installed():
         machine_id = create_machine("rng-bp", context=context)
     state = load_machine_state(machine_id, context)
-    assert state["devices"]["rng0"]["rng-model"] == "virtio-rng"
+    assert state["devices"]["rng0"]["rng-model"] == "virtual-rng"
     jsonschema.validate(state, _STATE_SCHEMA)

@@ -138,7 +138,7 @@ def test_state_records_bookkeeping_and_defaults(rig):
     assert state["memory"] == 16
     assert state["cpus"] == 1
     assert state["control-planes"] == ["agentless-display"]
-    assert state["devices"]["pointer0"] == {"value": "mouse"}
+    assert state["devices"]["pointer0"] == {"value": "emulated-mouse"}
     # The blueprint declares a scripts map and the state does not
     # record it (D101): a label names which instructions to run,
     # not what the machine is, so it stays outside the shape
@@ -152,8 +152,8 @@ def test_state_records_bookkeeping_and_defaults(rig):
 def test_a_declared_pointing_device_is_resolved_into_state(rig):
     machine_id = rig.create(
         "tablet-rig",
-        {"platform": "dos", "devices": {"pointer0": "tablet"}})
-    assert rig.state(machine_id)["devices"]["pointer0"] == {"value": "tablet"}
+        {"platform": "dos", "devices": {"pointer0": "virtual-tablet"}})
+    assert rig.state(machine_id)["devices"]["pointer0"] == {"value": "virtual-tablet"}
 
 
 # Network devices (D120): attachment resolves into state; the chipset
@@ -164,7 +164,7 @@ def test_a_nat_network_is_resolved_into_state(rig):
         "nat-rig", {"platform": "dos", "devices": {"net0": "nat"}})
     assert rig.state(machine_id)["devices"] == {
         "net0": {"attachment": "nat", "interface": None, "model": "pcnet"},
-        "pointer0": {"value": "mouse"}}
+        "pointer0": {"value": "emulated-mouse"}}
 
 
 def test_a_bridged_network_with_an_explicit_interface_is_resolved(rig):
@@ -177,7 +177,7 @@ def test_a_bridged_network_with_an_explicit_interface_is_resolved(rig):
 
 def test_a_machine_with_no_network_declares_none(rig):
     machine_id = rig.create("no-net-rig", {"platform": "dos"})
-    assert rig.state(machine_id)["devices"] == {"pointer0": {"value": "mouse"}}
+    assert rig.state(machine_id)["devices"] == {"pointer0": {"value": "emulated-mouse"}}
 
 
 def test_a_bridged_interface_property_from_an_explicit_value(rig):
@@ -245,7 +245,7 @@ def test_a_network_attachment_the_backend_cant_provide_is_refused(tmp_path):
 
 def test_apply_resolves_a_newly_declared_network(rig):
     machine_id = rig.create("net-apply", {"platform": "dos"})
-    assert rig.state(machine_id)["devices"] == {"pointer0": {"value": "mouse"}}
+    assert rig.state(machine_id)["devices"] == {"pointer0": {"value": "emulated-mouse"}}
     rig.write("net-apply", {"platform": "dos",
                             "devices": {"net0": "nat"}})
     apply_blueprint(machine=machine_id, context=rig.home)
@@ -257,9 +257,9 @@ def test_apply_resolves_a_newly_declared_network(rig):
 
 def test_a_declared_rng_is_resolved_into_state(rig):
     machine_id = rig.create(
-        "rng-rig", {"platform": "dos", "devices": {"rng0": "virtio-rng"}})
+        "rng-rig", {"platform": "dos", "devices": {"rng0": "virtual-rng"}})
     assert rig.state(machine_id)["devices"]["rng0"] == {
-        "rng-model": "virtio-rng"}
+        "rng-model": "virtual-rng"}
 
 
 def test_a_machine_with_no_rng_declares_none(rig):
@@ -276,18 +276,18 @@ def test_an_rng_model_the_backend_cant_provide_is_refused(tmp_path):
         rig = _Rig(str(tmp_path), backend)
         with pytest.raises(PreflightError) as caught:
             rig.create("no-rng", {"platform": "dos",
-                                  "devices": {"rng0": "virtio-rng"}})
-        assert "rng device 'virtio-rng'" in str(caught.value)
+                                  "devices": {"rng0": "virtual-rng"}})
+        assert "rng device 'virtual-rng'" in str(caught.value)
 
 
 def test_apply_resolves_a_newly_declared_rng(rig):
     machine_id = rig.create("rng-apply", {"platform": "dos"})
     assert "rng0" not in rig.state(machine_id)["devices"]
     rig.write("rng-apply", {"platform": "dos",
-                            "devices": {"rng0": "virtio-rng"}})
+                            "devices": {"rng0": "virtual-rng"}})
     apply_blueprint(machine=machine_id, context=rig.home)
     assert rig.state(machine_id)["devices"]["rng0"] == {
-        "rng-model": "virtio-rng"}
+        "rng-model": "virtual-rng"}
 
 
 def test_optional_fields_absent(rig):
@@ -296,7 +296,7 @@ def test_optional_fields_absent(rig):
     assert state["memory"] == 16
     assert state["description"] is None
     assert "scripts" not in state
-    assert state["devices"] == {"pointer0": {"value": "mouse"}}
+    assert state["devices"] == {"pointer0": {"value": "emulated-mouse"}}
     assert state["boot"] == []
 
 
@@ -1217,10 +1217,10 @@ def test_apply_adds_and_removes_drives(rig):
 
 def test_apply_resolves_a_newly_declared_pointing_device(rig):
     machine_id = rig.create("pda", {"platform": "dos"})
-    assert rig.state(machine_id)["devices"]["pointer0"] == {"value": "mouse"}
-    rig.write("pda", {"platform": "dos", "devices": {"pointer0": "tablet"}})
+    assert rig.state(machine_id)["devices"]["pointer0"] == {"value": "emulated-mouse"}
+    rig.write("pda", {"platform": "dos", "devices": {"pointer0": "virtual-tablet"}})
     apply_blueprint(machine=machine_id, context=rig.home)
-    assert rig.state(machine_id)["devices"]["pointer0"] == {"value": "tablet"}
+    assert rig.state(machine_id)["devices"]["pointer0"] == {"value": "virtual-tablet"}
 
 
 def test_apply_refuses_an_unimplemented_control_plane(rig):

@@ -37,7 +37,8 @@ update the ledger in the same edit.
 
 ## F70 — QEMU virtio-fs shares
 
-QEMU serves a share over virtio-fs, chosen by `model: virtio-fs`.
+QEMU serves a share over virtio-fs, chosen by `model: virtual-fs`
+(D126).
 Needs F68 delivered first. Design:
 [design/share-devices.md](design/share-devices.md).
 

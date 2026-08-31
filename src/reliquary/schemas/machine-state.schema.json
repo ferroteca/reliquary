@@ -154,7 +154,7 @@
       "properties": {
         "attachment": {"enum": ["nat", "bridged"]},
         "interface": {"type": ["string", "null"]},
-        "model": {"enum": ["pcnet", "ne2k", "virtio-net"]}
+        "model": {"enum": ["pcnet", "ne2k", "virtual-net"]}
       },
       "required": ["attachment", "interface", "model"],
       "additionalProperties": false
@@ -166,7 +166,7 @@
         "media": {"type": "string"},
         "materialize": {"const": "use"},
         "path": {"type": "string"},
-        "model": {"enum": ["vvfat", "9pfs", "virtio-fs"]},
+        "model": {"enum": ["vvfat", "9pfs", "virtual-fs"]},
         "read-only": {
           "description": "Whether the guest may write into the shared directory, read off the media and carried here because a backend renders from this entry and never sees the media (F69). Optional rather than required: a machine materialized before F69 has no such field, and a backend reading one that isn't there treats the share as writable, which is the media default everywhere but a cdrom.",
           "type": "boolean"
@@ -176,10 +176,10 @@
       "additionalProperties": false
     },
     "pointerState": {
-      "description": "The one resolved pointer slot (D124), always present at key pointer0, defaulted to mouse when the blueprint named none.",
+      "description": "The one resolved pointer slot (D124), always present at key pointer0, defaulted to emulated-mouse when the blueprint named none.",
       "type": "object",
       "properties": {
-        "value": {"enum": ["tablet", "mouse", "virtio-mouse"]}
+        "value": {"enum": ["virtual-tablet", "emulated-mouse", "virtual-mouse"]}
       },
       "required": ["value"],
       "additionalProperties": false
@@ -188,7 +188,7 @@
       "description": "One resolved RNG slot (D125). rng-model is the portable device name, checked against the assigned backend's capability report the same way a NIC's or a share's model is.",
       "type": "object",
       "properties": {
-        "rng-model": {"enum": ["virtio-rng"]}
+        "rng-model": {"enum": ["virtual-rng"]}
       },
       "required": ["rng-model"],
       "additionalProperties": false

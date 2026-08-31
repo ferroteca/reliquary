@@ -124,6 +124,36 @@ pressure worth re-examining once the surrounding area firms up.
 
 ## Decided
 
+- D126 — A GENERIC DEVICE NAME IN THE BLUEPRINT VOCABULARY IS PREFIXED
+  `emulated-` OR `virtual-`, NEVER BARE — DECIDED (owner, 2026-08-30)
+  and delivered the same day, renaming `pointer0`'s
+  `tablet`/`mouse`/`virtio-mouse`, `rng0`'s `virtio-rng`, a `net`
+  device's `model: virtio-net`, and a `share` device's
+  `model: virtio-fs`. Supports P25.
+
+  A device model name in this vocabulary is either a real hardware or
+  protocol name (`pcnet`, `ne2k`, `9pfs`, `vvfat`) or a generic
+  description of what the device does, with no one specific chipset
+  behind it. The generic names had drifted into different spellings
+  for the same two ideas — a plain `mouse`, a bare `tablet`, and four
+  separate `virtio-*` names — which made `virtio-*` read like a
+  chipset family of its own, when it actually just means
+  "paravirtualized, not modeling any real card." It also isn't tied
+  to QEMU: VirtualBox and other backends can implement the same
+  paravirtualized idea their own way, under their own driver stack.
+
+  Every generic name now says which of the two kinds it is:
+  `emulated-` for a name that mimics one specific piece of real
+  legacy hardware (`emulated-mouse`, the PS/2 mouse every machine
+  already has), and `virtual-` for a name that exists only because
+  it's useful inside a VM — a paravirtualized device (`virtual-mouse`,
+  `virtual-rng`, `virtual-net`) or an absolute-position input device
+  with no bare-metal equivalent (`virtual-tablet`). Real hardware and
+  protocol names are unaffected — `pcnet`, `ne2k`, `9pfs`, and `vvfat`
+  keep their names. None of the renamed fields has shipped in a
+  release yet, so this is a plain rename with nothing to migrate, the
+  same reasoning D124 gave for the `pointer0` move.
+
 - D125 — A PORTABLE `rng` DEVICE JOINS `devices` AS AN `rng0` SLOT,
   NARROWING D91 RATHER THAN REVERSING IT — DECIDED (owner,
   2026-08-30) and delivered the same day, promoting U22 to the
@@ -141,8 +171,9 @@ pressure worth re-examining once the surrounding area firms up.
   the name is real, general hardware, not a backend's own internal
   spelling. This decision applies that same rule to a random-number
   generator: `devices` gains an `rng0` slot, whose value is a
-  portable name, currently `virtio-rng` only, capability-checked the
-  same way a NIC's or a share's `model` is. QEMU renders it as
+  portable name, currently `virtual-rng` only (renamed by D126),
+  capability-checked the same way a NIC's or a share's `model` is.
+  QEMU renders it as
   `-device virtio-rng-pci,id=rng0`; every other backend refuses it by
   name until one actually builds the capability. Leaving `rng0` out
   means the machine has no RNG device at all, the same way leaving
@@ -170,13 +201,13 @@ pressure worth re-examining once the surrounding area firms up.
   slot. This decision moves it in: `pointer0` is the only valid key —
   a machine has at most one active pointing device, so there is no
   `pointer1` — and its value is the same three choices as before:
-  `tablet`, `mouse`, or `virtio-mouse`. Leaving `pointer0` out still
-  means the same default leaving out `pointing-device` used to mean:
-  `mouse`. Every check that used to run against `pointing-device` —
-  the capability check against the assigned backend, `click`'s
-  refusal of every device but `tablet` — still runs the same way, now
-  reading the value from `devices.pointer0` instead of a separate
-  field.
+  `virtual-tablet`, `emulated-mouse`, or `virtual-mouse` (renamed by
+  D126). Leaving `pointer0` out still means the same default leaving
+  out `pointing-device` used to mean: `emulated-mouse`. Every check
+  that used to run against `pointing-device` — the capability check
+  against the assigned backend, `click`'s refusal of every device but
+  `virtual-tablet` — still runs the same way, now reading the value
+  from `devices.pointer0` instead of a separate field.
 
   This is a breaking rename of an already-shipped field (F66, T34).
   Before 1.0 there is no compatibility promise (P9), so it lands as

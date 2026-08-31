@@ -1868,7 +1868,7 @@ def test_a_script_watching_no_landmark_asks_the_plane_nothing(preflight):
 # the three landmark refusals it shares with `wait`, tested above.
 
 def test_a_click_needs_the_tablet_pointing_device(preflight):
-    # The default is `mouse` (the stock relative device every
+    # The default is `emulated-mouse` (the stock relative device every
     # platform's machine carries anyway), and `click` refuses it by
     # name rather than attempting a calibration guess (P10, P11).
     preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
@@ -1877,7 +1877,7 @@ def test_a_click_needs_the_tablet_pointing_device(preflight):
         preflight.execute(
             _HEAD + "machine stopped\nclick @welcome\n")
     assert caught.value.rule_id == "machine.pointing-device-not-tablet"
-    assert "'mouse'" in str(caught.value)
+    assert "'emulated-mouse'" in str(caught.value)
 
 
 def test_a_click_needs_a_plane_that_delivers_pointer_events(preflight):
@@ -1887,11 +1887,12 @@ def test_a_click_needs_a_plane_that_delivers_pointer_events(preflight):
     # itself would be watchable here.
     preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
     preflight.write_state(backend="qemu", planes=("agentless-display",),
-                          pointing_device="tablet")
+                          pointing_device="virtual-tablet")
     with fake_backend.installed(
             name="qemu",
             capabilities=fake_backend.Capabilities(
-                backend="qemu", pointing_devices=("tablet", "mouse")),
+                backend="qemu",
+                pointing_devices=("virtual-tablet", "emulated-mouse")),
             capture_planes={"agentless-display": "rgb"},
             pointer_planes={"agentless-display": False}):
         with pytest.raises(ScriptPreflightError) as caught:
@@ -1903,7 +1904,7 @@ def test_a_click_needs_a_plane_that_delivers_pointer_events(preflight):
 
 def test_a_click_with_no_declared_spots_needs_one(preflight):
     preflight.write_landmark("welcome")
-    preflight.write_state(planes=("vnc",), pointing_device="tablet")
+    preflight.write_state(planes=("vnc",), pointing_device="virtual-tablet")
     with pytest.raises(ScriptPreflightError) as caught:
         preflight.execute(
             _HEAD + "machine stopped\nclick @welcome\n")
@@ -1915,7 +1916,7 @@ def test_a_click_with_more_than_one_spot_needs_one_named(preflight):
     preflight.write_landmark(
         "welcome",
         spots={"next": {"x": 1, "y": 1}, "cancel": {"x": 2, "y": 2}})
-    preflight.write_state(planes=("vnc",), pointing_device="tablet")
+    preflight.write_state(planes=("vnc",), pointing_device="virtual-tablet")
     with pytest.raises(ScriptPreflightError) as caught:
         preflight.execute(
             _HEAD + "machine stopped\nclick @welcome\n")
@@ -1925,7 +1926,7 @@ def test_a_click_with_more_than_one_spot_needs_one_named(preflight):
 
 def test_a_click_spot_naming_nothing_is_refused(preflight):
     preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
-    preflight.write_state(planes=("vnc",), pointing_device="tablet")
+    preflight.write_state(planes=("vnc",), pointing_device="virtual-tablet")
     with pytest.raises(ScriptPreflightError) as caught:
         preflight.execute(
             _HEAD + 'machine stopped\nclick @welcome spot="cancel"\n')
@@ -1938,7 +1939,7 @@ def test_a_click_binds_its_landmark_with_one_spot_and_no_modifier(
     preflight.write_landmark("welcome", spots={"next": {"x": 1, "y": 1}})
     script = parse_script(_HEAD + "machine stopped\nclick @welcome\n")
     resolved = _preflight_machine_rules(
-        script, preflight.state(planes=("vnc",), pointing_device="tablet"),
+        script, preflight.state(planes=("vnc",), pointing_device="virtual-tablet"),
         "<script>", preflight.home)
     assert resolved.capture_format == "rgb"
     assert "next" in resolved.landmarks["welcome"].spots
@@ -1951,7 +1952,7 @@ def test_a_click_naming_its_spot_binds_cleanly(preflight):
     script = parse_script(
         _HEAD + 'machine stopped\nclick @welcome spot="cancel"\n')
     resolved = _preflight_machine_rules(
-        script, preflight.state(planes=("vnc",), pointing_device="tablet"),
+        script, preflight.state(planes=("vnc",), pointing_device="virtual-tablet"),
         "<script>", preflight.home)
     assert "cancel" in resolved.landmarks["welcome"].spots
 

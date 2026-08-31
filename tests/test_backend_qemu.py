@@ -377,7 +377,7 @@ def test_a_removable_drive_carries_its_key_as_the_launch_id(root):
 
 # Share devices (F68): a host directory presented to the guest. Only
 # `model: vvfat` renders — the capability report never claims 9pfs or
-# virtio-fs yet, so unmet() has already refused those at assignment.
+# virtual-fs yet, so unmet() has already refused those at assignment.
 
 def test_a_vvfat_share_renders_as_a_synthesized_fat_drive(root):
     work = os.path.join(root, "work")
@@ -416,7 +416,7 @@ def test_a_share_with_an_unsupported_model_is_an_internal_error(root):
     # unmet() refuses this at assignment (F70 not delivered yet), so
     # reaching the renderer at all is a bug, not a blueprint mistake.
     shares = {"share0": {"media": "hostdir", "materialize": "use",
-                         "path": root, "model": "virtio-fs"}}
+                         "path": root, "model": "virtual-fs"}}
     with pytest.raises(InternalError):
         qemu_module.share_args(shares, {})
 
@@ -534,11 +534,11 @@ def test_network_model_ne2k_renders_the_isa_variant():
                     "-device", "ne2k_isa,netdev=net0,id=net0"]
 
 
-def test_network_model_virtio_net_renders_the_pci_device():
+def test_network_model_virtual_net_renders_the_pci_device():
     # D122: same override mechanism as ne2k, targeting the
     # paravirtualized NIC instead.
     network = {"net0": {"attachment": "nat", "interface": None,
-                        "model": "virtio-net"}}
+                        "model": "virtual-net"}}
     args = qemu_module.network_args(network)
     assert args == ["-netdev", "user,id=net0",
                     "-device", "virtio-net-pci,netdev=net0,id=net0"]
@@ -800,7 +800,7 @@ def test_pointing_device_tablet_renders_the_usb_device():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "tab-0", "backend-id": "reliquary-tab-0", "memory": 32,
-        "boot": [], "devices": {"pointer0": {"value": "tablet"}},
+        "boot": [], "devices": {"pointer0": {"value": "virtual-tablet"}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -814,7 +814,7 @@ def test_pointing_device_mouse_renders_nothing_extra():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "mouse-0", "backend-id": "reliquary-mouse-0", "memory": 32,
-        "boot": [], "devices": {"pointer0": {"value": "mouse"}},
+        "boot": [], "devices": {"pointer0": {"value": "emulated-mouse"}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -829,7 +829,7 @@ def test_pointing_device_virtio_mouse_renders_the_virtio_device():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "vmouse-0", "backend-id": "reliquary-vmouse-0", "memory": 32,
-        "boot": [], "devices": {"pointer0": {"value": "virtio-mouse"}},
+        "boot": [], "devices": {"pointer0": {"value": "virtual-mouse"}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -885,14 +885,15 @@ def test_the_qemu_adapter_reports_the_pointing_devices_it_renders():
     with mock.patch.object(qemu_module, "probe_share_models",
                            return_value=()):
         report = qemu_module.QemuAdapter().capabilities()
-    assert report.pointing_devices == ("tablet", "mouse", "virtio-mouse")
+    assert report.pointing_devices == ("virtual-tablet", "emulated-mouse",
+                                       "virtual-mouse")
 
 
 def test_the_qemu_adapter_reports_the_network_devices_it_renders():
     with mock.patch.object(qemu_module, "probe_share_models",
                            return_value=()):
         report = qemu_module.QemuAdapter().capabilities()
-    assert report.network_models == ("pcnet", "ne2k", "virtio-net")
+    assert report.network_models == ("pcnet", "ne2k", "virtual-net")
     assert report.network_attachments == ("nat", "bridged")
 
 
@@ -900,14 +901,14 @@ def test_the_qemu_adapter_reports_the_rng_models_it_renders():
     with mock.patch.object(qemu_module, "probe_share_models",
                            return_value=()):
         report = qemu_module.QemuAdapter().capabilities()
-    assert report.rng_models == ("virtio-rng",)
+    assert report.rng_models == ("virtual-rng",)
 
 
 def test_an_rng_device_renders_as_virtio_rng_pci():
     adapter = qemu_module.QemuAdapter()
     state = {
         "id": "rng-0", "backend-id": "reliquary-rng-0", "memory": 32,
-        "boot": [], "devices": {"rng0": {"rng-model": "virtio-rng"}},
+        "boot": [], "devices": {"rng0": {"rng-model": "virtual-rng"}},
     }
     with mock.patch.object(qemu_module, "find_qemu",
                            return_value="qemu-system-i386"), \
@@ -945,8 +946,8 @@ def test_a_share_a_pointer_and_an_rng_dont_get_mixed_up(root):
         "boot": [], "devices": {
             "share0": {"media": "hostdir", "materialize": "use",
                       "path": work, "model": "vvfat"},
-            "pointer0": {"value": "tablet"},
-            "rng0": {"rng-model": "virtio-rng"},
+            "pointer0": {"value": "virtual-tablet"},
+            "rng0": {"rng-model": "virtual-rng"},
         },
     }
     with mock.patch.object(qemu_module, "find_qemu",

@@ -2428,14 +2428,15 @@ def _preflight_landmarks(script, machine_state, script_path, context):
                 continue
             if pointer_capable is None:
                 pointing_device = machine_state.get("devices", {}).get(
-                    "pointer0", {}).get("value", "mouse")
+                    "pointer0", {}).get("value", "emulated-mouse")
                 pointer_capable = _backends.adapter(
                     machine_state["backend"]).pointer_capable(plane)
-            if pointing_device != "tablet":
+            if pointing_device != "virtual-tablet":
                 raise ScriptPreflightError(
                     "click needs an absolute pointing device and this "
                     f"machine's is {pointing_device!r}; declare "
-                    '"devices": {"pointer0": "tablet"} in the blueprint',
+                    '"devices": {"pointer0": "virtual-tablet"} in the '
+                    "blueprint",
                     statement=node, path=script_path,
                     rule_id="machine.pointing-device-not-tablet")
             if not pointer_capable:

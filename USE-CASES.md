@@ -427,7 +427,7 @@ names the number it superseded.
   runs from the caller's own code through one tool, with no raw
   engine flags and no second test harness. `rng0` is the first device
   this pattern actually delivers (D125): a portable name
-  (`virtio-rng`), not a backend's own internal spelling
+  (`virtual-rng`), not a backend's own internal spelling
   (`virtio-rng-pci`), capability-checked against the assigned backend
   the same way a NIC's or a share's `model` is. Other devices join the
   same way, one name at a time; a device the vocabulary doesn't name
@@ -482,7 +482,7 @@ names the number it superseded.
            "ready": "driver-ready"
          },
          "devices": {
-           "rng0": "virtio-rng",
+           "rng0": "virtual-rng",
            "hdd0": {
              "type": "media",
              "name": "dos-base",

@@ -15,7 +15,7 @@
     "control-planes": ["vnc"],
     "description": "ReactOS 0.4.15-x86 installed from its own ISO",
     "devices": {
-      "pointer0": "tablet",
+      "pointer0": "virtual-tablet",
       // Blank disk. The installer partitions and formats it.
       "hdd0": { "type": "media", "size": "2G" },
       // Empty for now. The install script inserts the ISO here.

@@ -35,15 +35,20 @@ _PLATFORMS = {"dos", "openbsd", "win9x", "winnt"}
 _BACKENDS = {"qemu", "virtualbox", "vmware", "hyperv"}
 _CONTROLLERS = {"ide", "sata", "scsi", "nvme", "virtio"}
 _ATTACHMENTS = {"nat", "bridged"}
-_NIC_MODELS = {"pcnet", "ne2k", "virtio-net"}
-_SHARE_MODELS = {"vvfat", "9pfs", "virtio-fs"}
+_NIC_MODELS = {"pcnet", "ne2k", "virtual-net"}
+_SHARE_MODELS = {"vvfat", "9pfs", "virtual-fs"}
 _CONTROL_PLANES = {"agentless-display", "vnc", "serial-console", "guest-agent"}
-_POINTING_DEVICES = {"tablet", "mouse", "virtio-mouse"}
-#: The `rng` device's portable model names (D125, narrowing D91):
-#: `virtio-rng` is Reliquary's own name, distinct from QEMU's internal
-#: bus-addressing spelling `virtio-rng-pci` — D91 was overruled
-#: specifically for admitting the latter.
-_RNG_MODELS = {"virtio-rng"}
+#: A generic pointer device name says which kind of device it is:
+#: `emulated-` mimics real legacy hardware, `virtual-` only exists
+#: because it's useful inside a VM (D126, renaming F66/T34's
+#: `tablet`/`mouse`/`virtio-mouse`).
+_POINTING_DEVICES = {"virtual-tablet", "emulated-mouse", "virtual-mouse"}
+#: The `rng` device's portable model names (D126, renaming D125's
+#: `virtio-rng`, which narrowed D91): a name checked against whichever
+#: backend is actually assigned, never a backend's own internal
+#: spelling (QEMU's `virtio-rng-pci`) — D91 was overruled specifically
+#: for admitting that spelling.
+_RNG_MODELS = {"virtual-rng"}
 _MATERIALIZE = {"new", "difference", "copy", "use"}
 _SPEC_TYPES = {"machine", "media"}
 # These spec types existed in the original four-component model and

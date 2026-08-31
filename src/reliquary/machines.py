@@ -178,15 +178,15 @@ def _resolve_control_planes(machine):
 def _pointer_value(machine):
     """The machine's pointer input device, with the default filled in.
 
-    ``mouse`` (a standard relative-motion device) is what every
-    platform's default machine already carries anyway, so this
+    ``emulated-mouse`` (a standard relative-motion device) is what
+    every platform's default machine already carries anyway, so this
     default just states what is already true rather than choosing
     something new (F66). A platform from the GUI era will eventually
     get a more specific default, the same way `_default_control_planes`
     will eventually get richer per-platform defaults of its own.
     """
     device = machine.pointer.get("pointer0")
-    return device.value if device is not None else "mouse"
+    return device.value if device is not None else "emulated-mouse"
 
 
 def _resolve_pointer(machine):

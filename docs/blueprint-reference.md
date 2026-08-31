@@ -764,7 +764,7 @@ The NIC chipset (D122). Valid on either attachment:
 |--------------|-----------------------------------------------|----------|
 | `pcnet`      | AMD Am79C970A ("PCnet-II")                   | QEMU, VirtualBox |
 | `ne2k`       | Novell/Eagle NE2000 (QEMU: `ne2k_isa`)       | QEMU only |
-| `virtio-net` | paravirtualized NIC (QEMU: `virtio-net-pci`) | QEMU only |
+| `virtual-net` | paravirtualized NIC (QEMU: `virtio-net-pci`) | QEMU only |
 
 ```json
 {"devices": {"net0": {"attachment": "nat", "model": "ne2k"}}}
@@ -777,9 +777,9 @@ actually emulate, the same reasoning that makes `ide` the universal
 needs (a packet driver or network stack that only ships an NE2000
 driver, for instance) is exactly the case `model` exists for.
 Checked against the assigned backend the same way `controller` is:
-`ne2k` and `virtio-net` are real hardware, just not hardware VirtualBox
-emulates, so declaring either on a machine assigned to any other
-backend is a capability error naming both, the same test
+`ne2k` and `virtual-net` are real hardware, just not hardware
+VirtualBox emulates, so declaring either on a machine assigned to any
+other backend is a capability error naming both, the same test
 `controller`'s `nvme`/`virtio` already pass — the bar is whether the
 chipset is real, general hardware, not whether every backend emulates
 it today.
@@ -863,18 +863,18 @@ The live mechanism, overriding the assigned backend's own default
 |--------------|-----------------------------------------------|----------|
 | `vvfat`      | a FAT volume synthesized over the directory — no guest driver, no build option, needs nothing extra | QEMU |
 | `9pfs`       | virtio-9p, a live filesystem protocol          | QEMU, where the binary was built with fsdev support |
-| `virtio-fs`  | virtio-fs, a live filesystem protocol backed by `virtiofsd` | QEMU (not built yet) |
+| `virtual-fs`  | virtio-fs, a live filesystem protocol backed by `virtiofsd` | QEMU (not built yet) |
 
 `vvfat`'s trade: the guest's view is assembled when the machine
 starts, host edits made while it runs are invisible, and guest writes
 surface on the host once the machine stops — but it needs nothing in
 the guest at all, which is exactly why it's the one mechanism that
-works everywhere. `9pfs` and `virtio-fs` are both genuinely live in
+works everywhere. `9pfs` and `virtual-fs` are both genuinely live in
 both directions, at the cost of a guest driver (the virtio-dos
 project ships one for each — `VIO9P` and `VIOFS`; loading it in the
-guest is your job, the same way a packet driver is). `virtio-fs`
+guest is your job, the same way a packet driver is). `virtual-fs`
 doesn't render yet (F70), so naming it fails closed with a capability
-error, the same way naming `virtio-net` on VirtualBox does.
+error, the same way naming `virtual-net` on VirtualBox does.
 
 **`9pfs` also depends on how your QEMU was built.** fsdev support is a
 compile-time option, and the official Windows binaries are built
@@ -920,9 +920,9 @@ Same meaning as a drive's [`enabled`](#enabled--optional--boolean--default-true)
 ### Pointer device
 
 The `pointer0` key names the machine's pointer input device (F66,
-`virtio-mouse` added by T34, moved into `devices` by D124). `pointer0`
-is the only legal key — a machine has at most one active pointing
-device, so there's no `pointer1`.
+`virtual-mouse` added by T34, moved into `devices` by D124, renamed
+by D126). `pointer0` is the only legal key — a machine has at most
+one active pointing device, so there's no `pointer1`.
 
 #### Keys: slots
 
@@ -938,38 +938,43 @@ key is always written, even though it's the only one that exists.
 A bare device name:
 
 ```json
-{"devices": {"pointer0": "tablet"}}
+{"devices": {"pointer0": "virtual-tablet"}}
 ```
 
-| value          | reports                                       | backends |
-|----------------|------------------------------------------------|----------|
-| `tablet`       | absolute position — the guest driver maps host coordinates straight onto the screen | QEMU, VirtualBox |
-| `mouse`        | relative motion, the platform default — the guest's own driver applies acceleration the host cannot observe | every backend |
-| `virtio-mouse` | the same relative device family as `mouse`, rendered as an explicit paravirtualized device (QEMU: `virtio-mouse-pci`) | QEMU only |
+| value              | reports                                       | backends |
+|--------------------|------------------------------------------------|----------|
+| `virtual-tablet`   | absolute position — the guest driver maps host coordinates straight onto the screen | QEMU, VirtualBox |
+| `emulated-mouse`   | relative motion, the platform default — the guest's own driver applies acceleration the host cannot observe | every backend |
+| `virtual-mouse`    | the same relative device family as `emulated-mouse`, rendered as an explicit paravirtualized device (QEMU: `virtio-mouse-pci`) | QEMU only |
 
-Checked against the assigned backend the same way every other
-capability is (P11): a device the backend can't provide is a
-capability error naming both. Omitted, it resolves to `mouse` — the
-plain relative device every platform's machine already has, so the
-default matches what's actually there. `virtio-mouse` is worth naming
-only when a guest actually carries a virtio driver; DOS and every
-guest without one should stay on the implicit `mouse`.
+A generic pointer name says which kind of device it is (D126):
+`emulated-` mimics real legacy hardware, `virtual-` only exists
+because it's useful inside a VM. Checked against the assigned backend
+the same way every other capability is (P11): a device the backend
+can't provide is a capability error naming both. Omitted, it resolves
+to `emulated-mouse` — the plain relative device every platform's
+machine already has, so the default matches what's actually there.
+`virtual-mouse` is worth naming only when a guest actually carries a
+virtio driver; DOS and every guest without one should stay on the
+implicit `emulated-mouse`.
 
-**`click` needs `tablet`.** A relative device — `mouse` or
-`virtio-mouse` — can't be aimed at an absolute screen position without
-guessing a calibration, so [`click`](spec/script-spec.md#click)
-refuses to run, before doing anything, on a machine whose `pointer0`
-isn't `tablet` (`machine.pointing-device-not-tablet`).
+**`click` needs `virtual-tablet`.** A relative device —
+`emulated-mouse` or `virtual-mouse` — can't be aimed at an absolute
+screen position without guessing a calibration, so
+[`click`](spec/script-spec.md#click) refuses to run, before doing
+anything, on a machine whose `pointer0` isn't `virtual-tablet`
+(`machine.pointing-device-not-tablet`).
 
 ---
 
 ### RNG
 
 The `rng0` key names a random-number generator device (D125,
-narrowing D91). Its value is a portable device name — a `net`
-chipset or a share mechanism by another name — checked against the
-assigned backend's capability report the same way those `model`
-fields are, and rendered in that backend's own terms.
+narrowing D91; renamed by D126). Its value is a portable device
+name — a `net` chipset or a share mechanism by another name —
+checked against the assigned backend's capability report the same
+way those `model` fields are, and rendered in that backend's own
+terms.
 
 #### Keys: slots
 
@@ -982,14 +987,14 @@ fields are, and rendered in that backend's own terms.
 A bare device name:
 
 ```json
-{"devices": {"rng0": "virtio-rng"}}
+{"devices": {"rng0": "virtual-rng"}}
 ```
 
-| value         | device                                          | backends |
-|---------------|--------------------------------------------------|----------|
-| `virtio-rng`  | a paravirtualized RNG (QEMU: `virtio-rng-pci`)   | QEMU only |
+| value          | device                                          | backends |
+|----------------|--------------------------------------------------|----------|
+| `virtual-rng`  | a paravirtualized RNG (QEMU: `virtio-rng-pci`)   | QEMU only |
 
-`virtio-rng` is Reliquary's own portable name — never
+`virtual-rng` is Reliquary's own portable name — never
 `virtio-rng-pci`, QEMU's internal bus-addressing spelling, which D91
 was overruled for admitting directly. Omitted, the machine has no RNG
 device at all, the same way a machine with no `net` key has no NIC.
