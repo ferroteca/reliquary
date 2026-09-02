@@ -51,11 +51,20 @@ Work:
 - One `virtiofsd` per share: started before the machine, supervised
   while it runs, stopped after; its death mid-run is a named
   failure.
-- The vhost-user socket (a named-object transport on Windows, per
-  the prototype) and the shared-memory backend, which must agree
-  with the blueprint's own `memory` — the coupling that puts this
-  work in the adapter rather than the `backend-settings` escape
-  hatch.
+- The vhost-user transport. On Windows the QEMU tree that has it
+  at all now connects by handle rather than by name: the chardev
+  carries `backend-process=<handle>`, a handle to the `virtiofsd`
+  process that QEMU has to inherit when it is spawned (D129). So
+  the launch grows named resource passing — `pass_handles=` on
+  Windows, `pass_fds=` on POSIX — and the share code hands it the
+  handle it made inheritable.
+- The shared-memory backend, which must agree with the blueprint's
+  own `memory` — the coupling that puts this work in the adapter
+  rather than the `backend-settings` escape hatch. `-object
+  memory-backend-*` and `-numa node,memdev=` join
+  `RESERVED_ARGUMENTS` in the same change, because that is when the
+  machine's memory finally has one owner to name in the refusal
+  (D129).
 
 ## F71 — VirtualBox shared folders
 

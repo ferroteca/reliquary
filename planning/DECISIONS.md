@@ -124,6 +124,91 @@ pressure worth re-examining once the surrounding area firms up.
 
 ## Decided
 
+- D129 — RELIQUARY PASSES NAMED HOST RESOURCES ACROSS ITS OWN QEMU
+  SPAWN, AS AN INTERNAL ADAPTER CAPABILITY; THE CALLER-FACING HALF
+  IS DEFERRED — DECIDED (owner, 2026-09-01). Supports U14; P7, P11.
+
+  WHAT PROMPTED IT: QEMU's `windows-fs-raw` tree (commits
+  `03e6c50998`, `fa8807fd01`) replaced its named-object vhost-user
+  transport with a `DuplicateHandle` into the back-end process. A
+  chardev now carries `backend-process=<handle>` — a handle to the
+  `virtiofsd` process, created inheritable by whoever launches it,
+  and valid inside QEMU's process because QEMU inherited it.
+  Reliquary's spawn passes nothing on: `subprocess.Popen` defaults
+  to `close_fds=True`, so `CreateProcess` gets
+  `bInheritHandles=FALSE` (`backend_qemu.py`,
+  `launch_owned_qemu`). QEMU then reports no back-end process
+  handle at all, which reads like the chardev option having been
+  ignored.
+
+  THIS IS F70'S PROBLEM, NOT ONLY A CALLER'S. F70 pledges that
+  reliquary starts one `virtiofsd` per share and connects QEMU to
+  it, so on a Windows host reliquary is itself the launcher this
+  mechanism describes. F70's work list recorded "a named-object
+  transport on Windows"; that transport is gone, and this decision
+  corrects it in the same commit.
+
+  THE MECHANISM NAMES RESOURCES, NEVER THE SPAWN'S KEYWORD
+  ARGUMENTS: `pass_handles=[...]` on Windows, `pass_fds=[...]` on
+  POSIX. That is `subprocess`'s own vocabulary, and it already has
+  `pass_fds` for the POSIX half. On Windows it is a `STARTUPINFO`
+  carrying `lpAttributeList["handle_list"]`: `subprocess` inherits
+  exactly those handles plus the standard ones and turns
+  `close_fds` off itself, warning only when the caller also passes
+  `close_fds` explicitly. This is less new machinery than it
+  sounds — the launch already redirects stderr, so `subprocess`
+  already builds that handle list for the three standard handles on
+  every start, and the new parameters extend a list that exists.
+
+  A GENERIC POPEN-KWARGS PASSTHROUGH IS REFUSED, and stays
+  refused: it puts `subprocess` in reliquary's own vocabulary,
+  which P7 rules out for anything that has to be expressible from
+  C or Java; it lets a caller clobber `DETACHED_PROCESS |
+  CREATE_NEW_PROCESS_GROUP`, which the ownership model depends on;
+  and it is worse on the merits, since `close_fds=False` hands
+  QEMU every inheritable handle in the parent where a named list
+  hands it one.
+
+  THE CALLER-FACING HALF WAITS. `backend-settings.qemu.args` lets
+  a caller put any argument on QEMU's command line, and an
+  argument naming a host resource the caller created is the one
+  thing it cannot deliver — the hatch is expressive in words and
+  mute in resources. Exposing `pass_handles` / `pass_fds` on the
+  API would close that, and three things say not yet: reliquary
+  cannot supervise a back end it never started, so that device
+  could die mid-run with nothing to report it, against P11's rule
+  that a missing capability is named rather than papered over; the
+  same route needs a shared memory backend as well (below); and no
+  use case asks for it yet. REOPEN IT when a real use case needs a
+  caller-owned vhost-user back end and answers who supervises it —
+  a guest vsock suite is the likely first, and it would hit this
+  identically, with the same symptomless failure.
+
+  A CONSEQUENCE WORTH NAMING: every vhost-user device needs the
+  guest's memory served from a shared memory backend. `-m` is
+  reserved to the machine's `memory`, but `-object
+  memory-backend-*` and `-numa node,memdev=` are not, so a caller
+  driving one of these devices through the hatch today is
+  restating the machine's memory through arguments
+  `RESERVED_ARGUMENTS` does not catch. They are not reserved now:
+  F70 renders that memory backend itself and reserves it then, in
+  one place, with a real owner to name in the refusal — reserving
+  it earlier would break a route that currently works and buy
+  nothing.
+
+  THE IDENTITY RECORD STAYS PID-ONLY. `launch_owned_qemu` returns
+  `backends.identity(..., pid=proc.pid)` and drops the `Popen`,
+  which forecloses the other route to the same goal: duplicating
+  into QEMU after it starts and adding the chardev over QMP, which
+  from a pid alone becomes `OpenProcess` on an unverifiable pid.
+  It stays foreclosed on purpose — a pid is persistable and a
+  handle is not, reconnecting to a VM across processes is the
+  whole model, and the after-start route has no demand, since
+  share hotplug is out of scope
+  ([pledged/design/share-devices.md](pledged/design/share-devices.md)).
+  Inside the launch the `Popen` is a live local, so nothing the
+  launch itself needs is lost. Revisit if hotplug arrives.
+
 - D128 — A QEMU GUEST-AGENT CONTROL CHANNEL JOINS
   `backend-settings.qemu` AS `guest-agent`, NARROWING D93 RATHER THAN
   REVERSING IT — DECIDED (owner, 2026-08-31) and delivered the same

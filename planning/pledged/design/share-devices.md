@@ -122,8 +122,8 @@ Each backend serves a share with its own mechanisms:
   and present in every QEMU build. **virtio-9p** (`-fsdev local`
   plus a `virtio-9p-pci` device — in-process, no daemon).
   **virtio-fs** (a `vhost-user-fs-pci` device backed by an external
-  `virtiofsd` process per share, over a vhost-user socket, with the
-  machine's memory served from a shared memory backend sized
+  `virtiofsd` process per share, over a vhost-user transport, with
+  the machine's memory served from a shared memory backend sized
   exactly to the blueprint's `memory`).
 - **VirtualBox** has one: its own shared-folder protocol
   (`VBoxManage sharedfolder add` at materialization, removed with
@@ -162,9 +162,10 @@ deliberately not vvfat: an author who declares a share and says
 nothing must get the field's full live contract, never silently the
 snapshot one. 9p over virtio-fs because it is the cheaper live
 contract in every direction: served in-process with no daemon to
-supervise, no vhost-user socket, and no shared-memory coupling to
-the machine's own `memory`. `virtual-fs` is chosen by name when its
-throughput and semantics are worth that host-side cost.
+supervise, no vhost-user transport, no shared-memory coupling to
+the machine's own `memory`, and nothing to hand across the launch
+(D129). `virtual-fs` is chosen by name when its throughput and
+semantics are worth that host-side cost.
 
 One consequence is stated plainly rather than hidden: **which guest
 driver a share needs follows the assigned backend and model.** A
@@ -211,9 +212,29 @@ supervises it, stops it after, and reports its death mid-run as a
 named failure — plus the shared-memory configuration, which must
 agree with the blueprint's `memory`. That coupling is also why the
 `backend-settings.qemu.args` escape hatch, which genuinely can
-carry a 9p share today, structurally can't deliver virtio-fs: the
-settings section is forbidden from touching what Reliquary owns,
-and the memory backend is exactly that.
+carry a 9p share today, may not deliver virtio-fs: the settings
+section is forbidden from touching what Reliquary owns, and the
+memory backend is exactly that. Today that is a rule the hatch
+does not yet enforce — `-m` is reserved, but `-object
+memory-backend-*` and `-numa node,memdev=` are not, so the
+argument that restates the machine's memory gets through. They
+join `RESERVED_ARGUMENTS` when this feature renders the memory
+backend itself and there is one owner to name in the refusal
+(D129).
+
+**On Windows the transport is a handle, not a name.** The QEMU
+tree that carries vhost-user there duplicates into the back-end
+process instead of publishing a named object, so the chardev
+carries `backend-process=<handle>` — a handle to the `virtiofsd`
+process, made inheritable by whoever launched it and valid inside
+QEMU because QEMU inherited it. That makes handing a resource
+across the QEMU launch part of this feature rather than a detail
+of it: the adapter's launch takes named resources
+(`pass_handles=` on Windows, `pass_fds=` on POSIX), never a
+`subprocess` keyword passthrough, which would let a caller
+clobber the process-ownership flags the whole model rests on
+(D129). Reliquary is both launchers here, so nothing about this
+reaches a blueprint or the API.
 
 ## This does not reopen D108
 
